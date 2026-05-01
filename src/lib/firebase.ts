@@ -10,13 +10,12 @@ export const auth = getAuth(app);
 // Connectivity Test
 async function testConnection() {
   try {
+    // Only test if not already checking
     await getDocFromServer(doc(db, 'system', 'connection_test'));
-    console.log('Firebase Connection: OK');
   } catch (error) {
+    // We ignore most errors here as this is just a warm-up for the SDK
     if (error instanceof Error && error.message.includes('offline')) {
-      console.error('Firebase Connection: Offline. Please check your data connection and Firebase project status.');
-    } else {
-      console.log('Firebase Connection: Handshake complete (expected behavior)');
+      console.warn('Firebase: Device appears to be offline.');
     }
   }
 }

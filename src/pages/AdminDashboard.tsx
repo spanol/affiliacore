@@ -8,6 +8,7 @@ import {
   UserPlus
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { cn } from '../lib/utils';
 
 const metrics = [
   { label: 'Total de Afiliados', value: '1,248', trend: +12, icon: Users, color: 'brand' },
@@ -33,36 +34,57 @@ export default function AdminDashboard() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.05 }}
-            className={clsx(
+            className={cn(
               "p-5 rounded-xl border shadow-sm transition-all relative overflow-hidden",
               idx === 3 
                 ? "bg-gradient-to-br from-brand to-slate-800 text-white border-transparent" 
                 : "bg-white border-slate-200"
             )}
           >
-            <div className="flex justify-between items-start mb-1">
-              <p className={clsx(
-                "text-[10px] uppercase font-bold tracking-wider",
-                idx === 3 ? "text-white/70" : "text-slate-500"
+            <div className="flex justify-between items-start mb-4">
+              <div className={cn(
+                "p-2 rounded-lg",
+                idx === 3 ? "bg-white/10" : {
+                  'bg-brand/10': metric.color === 'brand',
+                  'bg-green-100': metric.color === 'green',
+                  'bg-purple-100': metric.color === 'purple',
+                  'bg-orange-100': metric.color === 'orange'
+                }
               )}>
-                {metric.label}
-              </p>
+                <metric.icon size={20} className={cn(
+                  idx === 3 ? "text-white" : {
+                    'text-brand': metric.color === 'brand',
+                    'text-green-600': metric.color === 'green',
+                    'text-purple-600': metric.color === 'purple',
+                    'text-orange-600': metric.color === 'orange'
+                  }
+                )} />
+              </div>
               {idx !== 3 && (
-                <div className={clsx(
+                <div className={cn(
                   "flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full",
-                  metric.trend > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                  metric.trend > 0 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
                 )}>
                   {metric.trend > 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
                   {Math.abs(metric.trend)}%
                 </div>
               )}
             </div>
-            <h3 className="text-2xl font-bold">{metric.value}</h3>
-            <div className={clsx(
-              "text-[10px] mt-2 font-medium",
-              idx === 3 ? "text-white/80" : "text-slate-400"
-            )}>
-              {idx === 3 ? "Meta mensal: 82%" : idx === 2 ? "Meta acumulada" : "Estável esta semana"}
+            
+            <div>
+              <p className={cn(
+                "text-[10px] uppercase font-bold tracking-wider mb-1",
+                idx === 3 ? "text-white/70" : "text-slate-500"
+              )}>
+                {metric.label}
+              </p>
+              <h3 className="text-2xl font-bold">{metric.value}</h3>
+              <div className={cn(
+                "text-[10px] mt-2 font-medium",
+                idx === 3 ? "text-white/80" : "text-slate-400"
+              )}>
+                {idx === 3 ? "Meta mensal: 82%" : idx === 2 ? "Meta acumulada" : "Estável esta semana"}
+              </div>
             </div>
           </motion.div>
         ))}
@@ -92,13 +114,13 @@ export default function AdminDashboard() {
                 ].map((row, i) => (
                   <tr key={i} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 flex items-center gap-3">
-                      <div className={clsx("w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px]", row.color)}>
+                      <div className={cn("w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px]", row.color)}>
                         {row.initial}
                       </div>
                       <span className="font-medium text-slate-700">{row.name}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={clsx(
+                      <span className={cn(
                         "px-2 py-0.5 rounded-full text-[10px] font-bold",
                         row.status === 'Ativo' ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
                       )}>

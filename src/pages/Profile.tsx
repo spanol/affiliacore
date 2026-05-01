@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { updatePassword, updateEmail } from 'firebase/auth';
-import { auth, db } from '../lib/firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
   User, 
   Mail, 
@@ -29,13 +29,18 @@ export default function Profile() {
     setLoading(true);
     setMessage(null);
 
+    const currentPath = `users/${user.uid}`;
     try {
       // Update Firestore
-      await updateDoc(doc(db, 'users', user.uid), {
-        name,
-        avatarUrl,
-        updatedAt: serverTimestamp()
-      });
+      try {
+        await updateDoc(doc(db, 'users', user.uid), {
+          name: name.trim(),
+          avatarUrl,
+          updatedAt: serverTimestamp()
+        });
+      } catch (firestoreErr) {
+        handleFirestoreError(firestoreErr, OperationType.UPDATE, currentPath);
+      }
 
       // Update Password if provided
       if (newPassword) {

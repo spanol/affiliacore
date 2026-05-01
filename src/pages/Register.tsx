@@ -24,24 +24,42 @@ export default function Register() {
     let currentPath = '';
     
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
+      let user;
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        user = userCredential.user;
+      } catch (authErr: any) {
+        // Se o e-mail já existe, vamos ver se o usuário está logado e tentar criar o perfil
+        // Isso ajuda em casos onde o Auth funcionou mas o Firestore falhou anteriormente
+        if (authErr.code === 'auth/email-already-in-use') {
+          if (auth.currentUser && auth.currentUser.email === email) {
+            user = auth.currentUser;
+          } else {
+            setError('Este e-mail já está cadastrado. Tente fazer login ou use outro.');
+            setLoading(false);
+            return;
+          }
+        } else {
+          throw authErr;
+        }
+      }
+      
       // Create user profile in Firestore
-      const role = email === 'goatechbr@gmail.com' ? 'admin' : 'client';
+      const role = email.trim().toLowerCase() === 'goatechbr@gmail.com' ? 'admin' : 'client';
       currentPath = `users/${user.uid}`;
       
       try {
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
-          name,
-          email,
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
           role,
-          avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
+          avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
       } catch (firestoreErr) {
+        console.error('Firestore creation failed:', firestoreErr);
         handleFirestoreError(firestoreErr, OperationType.WRITE, currentPath);
       }
 
