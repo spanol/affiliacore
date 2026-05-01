@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocFromServer } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 interface UserProfile {
@@ -30,16 +30,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (currentUser) {
         const path = `users/${currentUser.uid}`;
         try {
+          console.log('Fetching profile for:', currentUser.uid, 'on path: users/' + currentUser.uid);
           const docRef = doc(db, 'users', currentUser.uid);
-          const docSnap = await getDoc(docRef);
+          const docSnap = await getDocFromServer(docRef);
           if (docSnap.exists()) {
+            console.log('Profile found:', docSnap.data());
             setProfile(docSnap.data() as UserProfile);
           } else {
+            console.log('Profile not found in Firestore');
             setProfile(null);
           }
-        } catch (error) {
+        } catch (error: any) {
+          console.error('Error fetching profile:', error);
           handleFirestoreError(error, OperationType.GET, path);
           setProfile(null);
+        } finally {
+          setLoading(false);
         }
       } else {
         setProfile(null);

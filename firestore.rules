@@ -1,76 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Funções Auxiliares
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    function isSuperAdmin() {
-      return isSignedIn() && request.auth.token.email == 'goatechbr@gmail.com';
-    }
-
-    function isAdmin() {
-      return isSuperAdmin() || (
-        isSignedIn() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
-      );
-    }
-    
-    function incoming() { return request.resource.data; }
-    function existing() { return resource.data; }
-
-    // Segurança Global: Negar tudo por padrão
     match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Perfis de Usuário
-    match /users/{userId} {
-      // Qualquer usuário logado pode ler perfis individuais (para exibir nomes/fotos)
-      allow get: if isSignedIn();
-      
-      // Apenas admins podem listar todos os usuários
-      allow list: if isAdmin();
-      
-      // Permitir criação se for o próprio usuário
-      // O papel 'admin' só é aceito se o e-mail for o seu ou se quem estiver criando já for admin
-      allow create: if isOwner(userId) && (
-        incoming().role == 'client' || 
-        isSuperAdmin() || 
-        isAdmin()
-      );
-      
-      // Permitir atualização do próprio perfil (sem mudar o role) ou por um admin
-      allow update: if (isOwner(userId) && (incoming().role == existing().role || isSuperAdmin())) || isAdmin();
-      
-      // Apenas admins podem deletar
-      allow delete: if isAdmin();
-    }
-
-    // Configurações e Métricas (Apenas Admin)
-    match /settings/{settingId} {
-      allow read, write: if isAdmin();
-    }
-    
-    match /admin_metrics/{metricId} {
-      allow read, write: if isAdmin();
-    }
-
-    match /client_info/{infoId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    // Teste de conexão
-    match /system/connection_test {
-      allow read: if true;
+      allow read, write: if true;
     }
   }
 }

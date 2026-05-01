@@ -1,23 +1,33 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getFirestore, doc, getDocFromServer, setDoc, serverTimestamp } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+console.log('Firebase Config Loaded:', {
+  projectId: firebaseConfig.projectId,
+  databaseId: firebaseConfig.firestoreDatabaseId
+});
+console.log('Firebase App Options:', app.options);
+
+// Initialize Firestore
+export const db = getFirestore(app);
 export const auth = getAuth(app);
 
 // Connectivity Test
 async function testConnection() {
-  try {
-    // Only test if not already checking
-    await getDocFromServer(doc(db, 'system', 'connection_test'));
-  } catch (error) {
-    // We ignore most errors here as this is just a warm-up for the SDK
-    if (error instanceof Error && error.message.includes('offline')) {
-      console.warn('Firebase: Device appears to be offline.');
+  setTimeout(async () => {
+    try {
+      console.log('Testing Firestore presence (delayed)...');
+      console.log('Current Auth State:', auth.currentUser ? 'Logged In (' + auth.currentUser.uid + ')' : 'Logged Out');
+      const testDoc = doc(db, 'system', 'connection_test_ping');
+      await setDoc(testDoc, { testedAt: serverTimestamp(), ping: Math.random() });
+      console.log('Firestore write success! Rules are working.');
+    } catch (error: any) {
+      console.error('Firestore connection/permission test failed:', error.message);
+      console.error('Full Error:', error);
     }
-  }
+  }, 2000); // Wait for auth to potentially initialize
 }
 
 testConnection();

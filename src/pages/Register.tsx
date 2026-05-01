@@ -57,10 +57,12 @@ export default function Register() {
           avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
-        });
-      } catch (firestoreErr) {
+        }, { merge: true });
+      } catch (firestoreErr: any) {
         console.error('Firestore creation failed:', firestoreErr);
+        setError(`Erro ao salvar perfil: ${firestoreErr.message || 'Verifique as permissões do Firebase.'}`);
         handleFirestoreError(firestoreErr, OperationType.WRITE, currentPath);
+        return;
       }
 
       setSuccess(true);
