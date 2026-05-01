@@ -1,0 +1,56 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information and role",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "client"] },
+        "avatarUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "AdminMetric": {
+      "title": "Admin Metric",
+      "description": "Key performance metrics for the admin dashboard",
+      "type": "object",
+      "properties": {
+        "label": { "type": "string" },
+        "value": { "type": "string" },
+        "trend": { "type": "number" },
+        "icon": { "type": "string" }
+      },
+      "required": ["label", "value"]
+    },
+    "ClientInfo": {
+      "title": "Client Info",
+      "description": "Information displayed to clients",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string" }
+      },
+      "required": ["title", "content"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/admin_metrics/{metricId}": {
+      "schema": "AdminMetric",
+      "description": "Metrics for admin dashboard"
+    },
+    "/client_info/{infoId}": {
+      "schema": "ClientInfo",
+      "description": "Information for client dashboard"
+    }
+  }
+}

@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // User profiles
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+               data.email is string && data.email.size() > 0 &&
+               data.role in ['admin', 'client'] &&
+               (data.avatarUrl == null || (data.avatarUrl is string && data.avatarUrl.size() < 2000));
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      
+      // Allow create if signing up (first user could be admin if we want, or we manually set it)
+      // Usually users register as 'client' by default
+      allow create: if isSignedIn() && isOwner(userId) && isValidUser(incoming()) && incoming().role == 'client';
+      
+      // Allow update if owner (name, avatar, but NOT role) or if admin
+      allow update: if (isOwner(userId) && isValidUser(incoming()) && incoming().role == existing().role) || isAdmin();
+    }
+
+    // Admin metrics
+    match /admin_metrics/{metricId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Client info
+    match /client_info/{infoId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}
