@@ -37,6 +37,18 @@
         "type": { "type": "string" }
       },
       "required": ["title", "content"]
+    },
+    "AppSetting": {
+      "title": "App Setting",
+      "description": "Global application settings and API keys",
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "value": { "type": "string" },
+        "description": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["key", "value"]
     }
   },
   "firestore": {
@@ -51,6 +63,10 @@
     "/client_info/{infoId}": {
       "schema": "ClientInfo",
       "description": "Information for client dashboard"
+    },
+    "/settings/{settingId}": {
+      "schema": "AppSetting",
+      "description": "Global settings accessible only by admin"
     }
   }
 }

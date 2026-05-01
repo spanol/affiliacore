@@ -34,7 +34,7 @@ export default function Login() {
         className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 w-full max-w-md"
       >
         <div className="text-center mb-8">
-          <div className="mx-auto w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white text-xl font-bold mb-4">CS</div>
+          <div className="mx-auto w-12 h-12 bg-brand rounded-xl flex items-center justify-center text-white text-xl font-bold mb-4">CS</div>
           <h2 className="text-xl font-bold text-slate-800">Autenticação</h2>
           <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mt-1">Acesse sua área restrita</p>
         </div>
@@ -56,7 +56,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-blue-600 transition-all outline-none"
+                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-brand transition-all outline-none"
                 placeholder="nome@empresa.com"
               />
             </div>
@@ -71,7 +71,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-blue-600 transition-all outline-none"
+                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-brand transition-all outline-none"
                 placeholder="••••••••"
               />
             </div>
@@ -80,14 +80,14 @@ export default function Login() {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 transition-all disabled:opacity-50 mt-4 flex items-center justify-center gap-2 shadow-lg shadow-blue-100"
+            className="w-full bg-brand text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition-all disabled:opacity-50 mt-4 flex items-center justify-center gap-2 shadow-lg shadow-brand/10"
           >
             {loading ? 'Processando...' : <><LogIn size={18} /> Entrar no sistema</>}
           </button>
         </form>
 
         <p className="text-center mt-8 text-xs font-bold text-slate-400 uppercase tracking-tight">
-          Novo aqui? <Link to="/register" className="text-blue-600 hover:underline">Solicitar cadastro</Link>
+          Novo aqui? <Link to="/register" className="text-brand hover:underline">Solicitar cadastro</Link>
         </p>
       </motion.div>
     </div>

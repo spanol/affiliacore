@@ -104,7 +104,7 @@ export default function Profile() {
                   onClick={() => setAvatarUrl(url)}
                   className={cn(
                     "p-0.5 rounded-lg border-2 transition-all overflow-hidden bg-slate-50",
-                    avatarUrl === url ? "border-blue-600" : "border-transparent opacity-60 hover:opacity-100"
+                    avatarUrl === url ? "border-brand" : "border-transparent opacity-60 hover:opacity-100"
                   )}
                 >
                   <img src={url} alt={`Avatar option ${idx}`} className="w-full h-auto rounded-md" />
@@ -128,7 +128,7 @@ export default function Profile() {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       required
-                      className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-blue-600 transition-all outline-none"
+                      className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-brand transition-all outline-none"
                     />
                   </div>
                 </div>
@@ -161,7 +161,7 @@ export default function Profile() {
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="••••••••"
                     minLength={6}
-                    className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-blue-600 transition-all outline-none"
+                    className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-brand transition-all outline-none"
                   />
                 </div>
                 <p className="text-[9px] text-slate-400 mt-1 italic">Mínimo 6 caracteres para alteração.</p>
@@ -172,7 +172,7 @@ export default function Profile() {
               <button 
                 type="submit"
                 disabled={loading}
-                className="bg-blue-600 text-white px-6 py-2.5 rounded-md text-xs font-bold hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                className="bg-brand text-white px-6 py-2.5 rounded-md text-xs font-bold hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center gap-2 shadow-sm"
               >
                 {loading ? 'Salvando...' : <><Save size={16} /> Salvar Alterações</>}
               </button>

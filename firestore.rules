@@ -33,22 +33,26 @@ service cloud.firestore {
 
     // User profiles
     match /users/{userId} {
-      function isValidUser(data) {
-        return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+      function isValidUser(data, userId) {
+        return data.uid == userId &&
+               data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
                data.email is string && data.email.size() > 0 &&
                data.role in ['admin', 'client'] &&
-               (data.avatarUrl == null || (data.avatarUrl is string && data.avatarUrl.size() < 2000));
+               (data.avatarUrl == null || (data.avatarUrl is string && data.avatarUrl.size() < 2000)) &&
+               data.createdAt is timestamp &&
+               data.updatedAt is timestamp;
       }
 
       allow get: if isSignedIn();
       allow list: if isAdmin();
       
-      // Allow create if signing up (first user could be admin if we want, or we manually set it)
-      // Usually users register as 'client' by default
-      allow create: if isSignedIn() && isOwner(userId) && isValidUser(incoming()) && incoming().role == 'client';
+      // Allow create if signing up
+      // Special case: allow the goatechbr@gmail.com to be admin on creation
+      allow create: if isSignedIn() && isOwner(userId) && isValidUser(incoming(), userId) && 
+                    (incoming().role == 'client' || (incoming().role == 'admin' && incoming().email == 'goatechbr@gmail.com'));
       
       // Allow update if owner (name, avatar, but NOT role) or if admin
-      allow update: if (isOwner(userId) && isValidUser(incoming()) && incoming().role == existing().role) || isAdmin();
+      allow update: if (isOwner(userId) && isValidUser(incoming(), userId) && incoming().role == existing().role) || isAdmin();
     }
 
     // Admin metrics
@@ -61,6 +65,11 @@ service cloud.firestore {
     match /client_info/{infoId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
+    }
+
+    // Settings (Secure keys and configs)
+    match /settings/{settingId} {
+      allow read, write: if isAdmin();
     }
   }
 }

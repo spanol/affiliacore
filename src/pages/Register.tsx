@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function Register() {
@@ -19,20 +19,31 @@ export default function Register() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    
+    // Explicit path for logging
+    let currentPath = '';
+    
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
       // Create user profile in Firestore
-      await setDoc(doc(db, 'users', user.uid), {
-        uid: user.uid,
-        name,
-        email,
-        role: 'client', // Default to client
-        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
+      const role = email === 'goatechbr@gmail.com' ? 'admin' : 'client';
+      currentPath = `users/${user.uid}`;
+      
+      try {
+        await setDoc(doc(db, 'users', user.uid), {
+          uid: user.uid,
+          name,
+          email,
+          role,
+          avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      } catch (firestoreErr) {
+        handleFirestoreError(firestoreErr, OperationType.WRITE, currentPath);
+      }
 
       setSuccess(true);
       // Simulate welcome email
@@ -79,7 +90,7 @@ export default function Register() {
         className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 w-full max-w-md"
       >
         <div className="text-center mb-8">
-          <div className="mx-auto w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white text-xl font-bold mb-4">CS</div>
+          <div className="mx-auto w-12 h-12 bg-brand rounded-xl flex items-center justify-center text-white text-xl font-bold mb-4">CS</div>
           <h2 className="text-xl font-bold text-slate-800">Novo Afiliado</h2>
           <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mt-1">Crie sua conta profissional</p>
         </div>
@@ -101,7 +112,7 @@ export default function Register() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-blue-600 transition-all outline-none"
+                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-brand transition-all outline-none"
                 placeholder="Seu nome"
               />
             </div>
@@ -116,7 +127,7 @@ export default function Register() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-blue-600 transition-all outline-none"
+                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-brand transition-all outline-none"
                 placeholder="nome@exemplo.com"
               />
             </div>
@@ -132,7 +143,7 @@ export default function Register() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
-                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-blue-600 transition-all outline-none"
+                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-brand transition-all outline-none"
                 placeholder="Mínimo 6 caracteres"
               />
             </div>
@@ -141,14 +152,14 @@ export default function Register() {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition-all disabled:opacity-50 mt-4 flex items-center justify-center gap-2 shadow-lg shadow-slate-200"
+            className="w-full bg-brand text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition-all disabled:opacity-50 mt-4 flex items-center justify-center gap-2 shadow-lg shadow-brand/10"
           >
             {loading ? 'Cadastrando...' : <><UserPlus size={18} /> Criar minha conta</>}
           </button>
         </form>
 
         <p className="text-center mt-8 text-xs font-bold text-slate-400 uppercase tracking-tight">
-          Já possui acesso? <Link to="/login" className="text-blue-600 hover:underline">Fazer login</Link>
+          Já possui acesso? <Link to="/login" className="text-brand hover:underline">Fazer login</Link>
         </p>
       </motion.div>
     </div>

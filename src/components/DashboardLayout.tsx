@@ -36,14 +36,16 @@ export default function DashboardLayout() {
           label: 'Dashboard', 
           path: profile?.role === 'admin' ? '/admin' : '/client', 
           icon: LayoutDashboard 
-        }
+        },
+        ...(profile?.role === 'admin' ? [
+          { label: 'Configurações do Sistema', path: '/settings', icon: Settings }
+        ] : [])
       ] 
     },
     { 
       label: 'Conta', 
       items: [
         { label: 'Meu Perfil', path: '/profile', icon: User },
-        { label: 'Configurações', path: '/settings', icon: Settings },
       ] 
     }
   ];
@@ -52,9 +54,9 @@ export default function DashboardLayout() {
     <div className="flex flex-col h-full bg-white border-r border-slate-200">
       <div className="p-6">
         <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold transition-transform group-hover:scale-105">CS</div>
+          <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center text-white font-bold transition-transform group-hover:scale-105">CS</div>
           <h1 className="text-sm font-bold leading-tight text-slate-900">
-            Afiliados<br/><span className="text-blue-600">Carlos Santos</span>
+            Afiliados<br/><span className="text-brand">Carlos Santos</span>
           </h1>
         </Link>
       </div>
@@ -74,12 +76,12 @@ export default function DashboardLayout() {
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded-md transition-all text-sm font-medium",
                     location.pathname === item.path 
-                      ? "bg-blue-50 text-blue-700" 
+                      ? "bg-brand/10 text-brand font-bold" 
                       : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                   )}
                 >
                   <item.icon size={18} className={cn(
-                    location.pathname === item.path ? "text-blue-600" : "text-slate-400"
+                    location.pathname === item.path ? "text-brand" : "text-slate-400"
                   )} />
                   {item.label}
                 </Link>

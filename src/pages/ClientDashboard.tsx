@@ -34,7 +34,7 @@ export default function ClientDashboard() {
               <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
                   { label: 'Status da Conexão', value: 'Operacional', icon: Globe, statusColor: 'text-green-600 bg-green-50' },
-                  { label: 'Última Amostragem', value: 'Sincronizado há 2m', icon: Database, statusColor: 'text-blue-600 bg-blue-50' },
+                  { label: 'Última Amostragem', value: 'Sincronizado há 2m', icon: Database, statusColor: 'text-brand bg-brand/10' },
                 ].map((item, idx) => (
                   <div key={idx} className="p-4 bg-slate-50 rounded-lg flex items-center gap-3 border border-slate-100">
                     <div className="p-2 bg-white rounded-md shadow-sm">
@@ -56,15 +56,15 @@ export default function ClientDashboard() {
             {[1, 2].map((i) => (
               <div key={i} className="bg-white p-6 border border-slate-200 rounded-xl shadow-sm">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-                    <Info size={16} className="text-blue-600" />
+                  <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center">
+                    <Info size={16} className="text-brand" />
                   </div>
                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-tight">Comunicado Institucional #{i}</h4>
                 </div>
                 <p className="text-xs text-slate-500 mb-4 leading-relaxed font-medium">
                   Informações importantes sobre as novas diretrizes da rede de afiliados para o próximo semestre. 
                 </p>
-                <button className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-2 hover:underline">
+                <button className="text-[10px] font-bold text-brand uppercase tracking-widest flex items-center gap-2 hover:underline">
                   Ler comunicado <ExternalLink size={12} />
                 </button>
               </div>
@@ -80,7 +80,7 @@ export default function ClientDashboard() {
               <span className="text-[10px] font-bold text-green-400">+4.2%</span>
             </div>
             <div className="h-1.5 w-full bg-white/10 rounded-full mb-3 flex overflow-hidden">
-              <div className="h-full bg-blue-500 w-1/4" />
+              <div className="h-full bg-brand w-1/4" />
             </div>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter italic">Meta Mensal: 25% Atingida</p>
           </div>
@@ -89,7 +89,7 @@ export default function ClientDashboard() {
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-tight mb-4">Acesso Rápido</h4>
             <div className="space-y-1">
               {['Central de Suporte', 'Base de Conhecimento', 'Material de Apoio'].map((item) => (
-                <button key={item} className="w-full text-left px-3 py-2.5 rounded-md text-slate-600 text-xs font-bold hover:bg-slate-50 hover:text-blue-600 transition-all flex justify-between items-center group">
+                <button key={item} className="w-full text-left px-3 py-2.5 rounded-md text-slate-600 text-xs font-bold hover:bg-slate-50 hover:text-brand transition-all flex justify-between items-center group">
                   {item}
                   <ChevronRight size={14} className="text-slate-300 group-hover:translate-x-0.5 transition-transform" />
                 </button>

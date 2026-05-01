@@ -10,7 +10,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 
 const metrics = [
-  { label: 'Total de Afiliados', value: '1,248', trend: +12, icon: Users, color: 'blue' },
+  { label: 'Total de Afiliados', value: '1,248', trend: +12, icon: Users, color: 'brand' },
   { label: 'Conversões Hoje', value: '84', trend: +5, icon: BarChart3, color: 'green' },
   { label: 'Ganhos Acumulados', value: 'R$ 45.200,00', trend: +8, icon: DollarSign, color: 'purple' },
   { label: 'Novos Cadastros', value: '12', trend: -2, icon: UserPlus, color: 'orange' },
@@ -36,7 +36,7 @@ export default function AdminDashboard() {
             className={clsx(
               "p-5 rounded-xl border shadow-sm transition-all relative overflow-hidden",
               idx === 3 
-                ? "bg-gradient-to-br from-blue-600 to-indigo-700 text-white border-transparent" 
+                ? "bg-gradient-to-br from-brand to-slate-800 text-white border-transparent" 
                 : "bg-white border-slate-200"
             )}
           >
@@ -72,7 +72,7 @@ export default function AdminDashboard() {
         <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl flex flex-col shadow-sm">
           <div className="p-4 border-b border-slate-100 flex justify-between items-center">
             <h3 className="font-bold text-xs text-slate-800 uppercase tracking-tight">Atividade do Sistema</h3>
-            <button className="text-[10px] text-blue-600 font-bold uppercase tracking-wider hover:underline">Ver tudo</button>
+            <button className="text-[10px] text-brand font-bold uppercase tracking-wider hover:underline">Ver tudo</button>
           </div>
           <div className="flex-1 overflow-auto max-h-[400px]">
             <table className="w-full text-left">
@@ -86,7 +86,7 @@ export default function AdminDashboard() {
               <tbody className="text-xs divide-y divide-slate-50">
                 {[
                   { name: 'Marco Antonio', status: 'Ativo', time: 'Hoje, 10:45', color: 'bg-orange-100 text-orange-600', initial: 'MA' },
-                  { name: 'Lucas Barbosa', status: 'Pendente', time: 'Ontem, 16:20', color: 'bg-blue-100 text-blue-600', initial: 'LB' },
+                  { name: 'Lucas Barbosa', status: 'Pendente', time: 'Ontem, 16:20', color: 'bg-brand/10 text-brand', initial: 'LB' },
                   { name: 'Sara Rocha', status: 'Ativo', time: '12/10, 09:12', color: 'bg-purple-100 text-purple-600', initial: 'SR' },
                   { name: 'Julio Cesar', status: 'Ativo', time: '12/10, 08:30', color: 'bg-green-100 text-green-600', initial: 'JC' },
                 ].map((row, i) => (
@@ -128,7 +128,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-blue-600 rounded-full transition-all duration-1000" 
+                    className="h-full bg-brand rounded-full transition-all duration-1000" 
                     style={{ width: `${meta.value}%` }} 
                   />
                 </div>

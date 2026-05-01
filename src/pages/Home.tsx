@@ -14,9 +14,9 @@ export default function Home() {
         className="text-center space-y-12 max-w-2xl px-6"
       >
         <div className="space-y-4">
-          <div className="mx-auto w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-xl shadow-blue-200">CS</div>
+          <div className="mx-auto w-16 h-16 bg-brand rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-xl shadow-brand/20">CS</div>
           <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">
-            Afiliados <span className="text-blue-600">Carlos Santos</span>
+            Afiliados <span className="text-brand">Carlos Santos</span>
           </h1>
           <p className="text-slate-500 text-lg font-medium leading-relaxed">
             Plataforma profissional de gestão de afiliados. Alta densidade de dados, performance e resultados.
@@ -43,7 +43,7 @@ export default function Home() {
               </Link>
               <Link 
                 to="/register" 
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-bold shadow-lg shadow-blue-100"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-brand text-white rounded-xl hover:bg-slate-800 transition-all font-bold shadow-lg shadow-brand/20"
               >
                 <UserPlus size={20} />
                 Criar Conta Agora
