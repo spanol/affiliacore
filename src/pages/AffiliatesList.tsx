@@ -146,33 +146,39 @@ export default function AffiliatesList() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                {filteredAffiliates.map((item) => (
-                  <tr key={item.id} className="hover:bg-brand/[0.02] dark:hover:bg-white/[0.02] transition-colors group">
+                {filteredAffiliates.map((item: any) => (
+                  <tr key={item.id || item._id || Math.random()} className="hover:bg-brand/[0.02] dark:hover:bg-white/[0.02] transition-colors group">
                     <td className="px-6 py-4 font-mono text-[10px] text-slate-400 group-hover:text-brand transition-colors">
-                      #{item.id}
+                      #{item.id || item._id || 'N/A'}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="font-bold text-slate-800 dark:text-slate-200">{item.name}</span>
-                        {item.brand && <span className="text-[10px] text-slate-400 dark:text-slate-500">{item.brand.name}</span>}
+                        <span className="font-bold text-slate-800 dark:text-slate-200">
+                          {item.name || item.fullName || item.nome || 'Sem Nome'}
+                        </span>
+                        {(item.brand || item.marca) && (
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                            {(item.brand?.name || item.marca?.nome || item.brand || item.marca)}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-medium">
-                      {item.email}
+                      {item.email || item.contato || 'N/A'}
                     </td>
                     <td className="px-6 py-4">
                       <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-bold text-slate-600 dark:text-slate-400">
-                        {item.brand?.name || '---'}
+                        {item.brand?.name || item.marca?.nome || item.brand || item.marca || '---'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span className={cn(
                         "inline-flex items-center px-2 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider",
-                        item.status === 'active' || item.status === 'Ativo' 
+                        (item.status === 'active' || item.status === 'Ativo' || item.status === 1) 
                           ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400" 
                           : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400"
                       )}>
-                        {item.status}
+                        {item.status || 'Pendente'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">

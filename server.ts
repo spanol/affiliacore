@@ -16,33 +16,42 @@ async function startServer() {
   app.get('/api/affiliates', async (req, res) => {
     try {
       const BASE_URL = process.env.VITE_AFFILIATE_API_BASE_URL || 'https://affiliate-api-prd.partnersotg.com';
-      const apiKey = process.env.VITE_AFFILIATE_API_KEY;
+      const apiKey = process.env.VITE_AFFILIATE_API_KEY || process.env.AFFILIATE_API_KEY;
 
       if (!apiKey) {
-        return res.status(500).json({ error: 'API Key not configured in environment' });
+        console.error('Affiliate API Error: API Key is missing in environment');
+        return res.status(500).json({ error: 'Chave de API não configurada no ambiente' });
       }
 
-      console.log('Proxying request to Affiliate API...');
+      const targetUrl = `${BASE_URL}/api/v2/external/affiliates`;
+      console.log(`Proxying request to: ${targetUrl}`);
       
-      const response = await fetch(`${BASE_URL}/api/v2/external/affiliates`, {
+      const response = await fetch(targetUrl, {
         method: 'GET',
         headers: {
           'x-api-key': apiKey,
           'Accept': 'application/json',
+          'User-Agent': 'AgenciaBoost-App/1.0',
         },
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('API Error Response:', errorText);
-        return res.status(response.status).json({ error: `API Error: ${response.status}`, details: errorText });
+        console.error(`External API Error (${response.status}):`, errorText);
+        return res.status(response.status).json({ 
+          error: `Erro na API Externa: ${response.status}`, 
+          details: errorText 
+        });
       }
 
       const data = await response.json();
       res.json(data);
     } catch (error) {
-      console.error('Proxy Error:', error);
-      res.status(500).json({ error: 'Internal Server Error', message: error instanceof Error ? error.message : String(error) });
+      console.error('Proxy Exception:', error);
+      res.status(500).json({ 
+        error: 'Erro interno no servidor proxy', 
+        message: error instanceof Error ? error.message : String(error) 
+      });
     }
   });
 
