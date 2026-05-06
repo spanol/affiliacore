@@ -49,6 +49,18 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["key", "value"]
+    },
+    "AffiliateConfig": {
+      "title": "Affiliate Config",
+      "description": "Configuration per affiliate for CPA and REV%",
+      "type": "object",
+      "properties": {
+        "affiliateId": { "type": "string" },
+        "cpaValue": { "type": "number" },
+        "revPercentage": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["affiliateId", "cpaValue", "revPercentage"]
     }
   },
   "firestore": {
@@ -67,6 +79,10 @@
     "/settings/{settingId}": {
       "schema": "AppSetting",
       "description": "Global settings accessible only by admin"
+    },
+    "/affiliate_configs/{affiliateId}": {
+      "schema": "AffiliateConfig",
+      "description": "Configurations for affiliates"
     }
   }
 }

@@ -5,11 +5,13 @@ import {
   Search, 
   Filter, 
   RefreshCw, 
-  ChevronRight,
   AlertCircle,
-  Loader2
+  Loader2,
+  Save,
+  CheckCircle,
+  Percent
 } from 'lucide-react';
-import { fetchAffiliates } from '../services/affiliateService';
+import { fetchAffiliates, fetchAffiliateConfigs, saveAffiliateConfig, AffiliateConfig } from '../services/affiliateService';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -30,9 +32,12 @@ export default function AffiliatesList() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
+  const [configs, setConfigs] = useState<Record<string, AffiliateConfig>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
 
   const isAdmin = profile?.role === 'admin';
   const pageTitle = isAdmin ? 'Gestão de Afiliados' : 'Meus Clientes';
@@ -44,8 +49,12 @@ export default function AffiliatesList() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchAffiliates();
-      setAffiliates(data);
+      const [affData, configData] = await Promise.all([
+        fetchAffiliates(),
+        fetchAffiliateConfigs()
+      ]);
+      setAffiliates(affData);
+      setConfigs(configData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar dados da API');
     } finally {
@@ -56,6 +65,40 @@ export default function AffiliatesList() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleConfigChange = (affiliateId: string, field: 'cpaValue' | 'revPercentage', value: string) => {
+    // allow empty string for easier typing, but convert to 0 for the state if needed
+    // Actually, it's better to keep it as string if we want to allow typing freely, 
+    // but the current state expects a number.
+    let numValue = parseFloat(value);
+    if (isNaN(numValue)) numValue = 0;
+    
+    // Prevent negative values
+    numValue = Math.max(0, numValue);
+
+    setConfigs(prev => ({
+      ...prev,
+      [affiliateId]: {
+        ...(prev[affiliateId] || { affiliateId, cpaValue: 0, revPercentage: 0 }),
+        [field]: numValue
+      }
+    }));
+  };
+
+  const handleSaveConfig = async (affiliateId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSavingId(affiliateId);
+    try {
+      const config = configs[affiliateId] || { affiliateId, cpaValue: 0, revPercentage: 0 };
+      await saveAffiliateConfig(config);
+      setSavedId(affiliateId);
+      setTimeout(() => setSavedId(null), 2000);
+    } catch (err) {
+      console.error('Failed to save config:', err);
+    } finally {
+      setSavingId(null);
+    }
+  };
 
   const filteredAffiliates = Array.isArray(affiliates) 
     ? affiliates.filter(item => 
@@ -142,67 +185,93 @@ export default function AffiliatesList() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800 text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
-                  <th className="px-6 py-4">ID</th>
                   <th className="px-6 py-4">Nome / Empresa</th>
-                  <th className="px-6 py-4">Contato</th>
-                  <th className="px-6 py-4">Marca</th>
-                  <th className="px-6 py-4 text-center">Status</th>
-                  <th className="px-6 py-4 text-right">Ações</th>
+                  {isAdmin && (
+                    <>
+                      <th className="px-6 py-4">Config. CPA (R$)</th>
+                      <th className="px-6 py-4">Config. REV (%)</th>
+                      <th className="px-6 py-4 text-right">Ação</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                {filteredAffiliates.map((item: any) => (
-                  <tr 
-                    key={item.id || item._id || Math.random()} 
-                    className="hover:bg-brand/[0.02] dark:hover:bg-white/[0.02] transition-colors group cursor-pointer"
-                    onClick={() => handleOpenDetails(item)}
-                  >
-                    <td className="px-6 py-4 font-mono text-[10px] text-slate-400 group-hover:text-brand transition-colors">
-                      #{item.id || item._id || 'N/A'}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-slate-800 dark:text-slate-200">
-                          {item.name || item.fullName || item.nome || 'Sem Nome'}
-                        </span>
-                        {(item.brand || item.marca) && (
-                          <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                            {(item.brand?.name || item.marca?.nome || item.brand || item.marca)}
+                {filteredAffiliates.map((item: any) => {
+                  const affiliateId = item.id || item._id;
+                  const config = configs[affiliateId] || { affiliateId, cpaValue: 0, revPercentage: 0 };
+                  
+                  return (
+                    <tr 
+                      key={affiliateId || Math.random()} 
+                      className="hover:bg-brand/[0.02] dark:hover:bg-white/[0.02] transition-colors group cursor-pointer"
+                      onClick={() => handleOpenDetails(item)}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-800 dark:text-slate-200">
+                            {item.name || item.fullName || item.nome || 'Sem Nome'}
                           </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-medium">
-                      {item.email || item.contato || 'N/A'}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-bold text-slate-600 dark:text-slate-400">
-                        {item.brand?.name || item.marca?.nome || item.brand || item.marca || '---'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={cn(
-                        "inline-flex items-center px-2 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider",
-                        (item.status === 'active' || item.status === 'Ativo' || item.status === 1) 
-                          ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400" 
-                          : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400"
-                      )}>
-                        {item.status || 'Pendente'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenDetails(item);
-                        }}
-                        className="p-2 text-slate-300 hover:text-brand dark:text-slate-600 dark:hover:text-brand transition-all hover:bg-brand/5 dark:hover:bg-brand/20 rounded-lg"
-                      >
-                        <ChevronRight size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                          {(item.brand || item.marca) && (
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                              {(item.brand?.name || item.marca?.nome || item.brand || item.marca)}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      {isAdmin && (
+                        <>
+                          <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                            <div className="relative group/input">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">R$</span>
+                              <input 
+                                type="number" 
+                                min="0"
+                                step="0.01"
+                                value={config.cpaValue}
+                                onChange={(e) => handleConfigChange(affiliateId, 'cpaValue', e.target.value)}
+                                className="w-24 pl-7 pr-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-lg text-[11px] font-bold outline-none focus:ring-1 focus:ring-brand transition-all dark:text-white"
+                              />
+                            </div>
+                          </td>
+                          <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                            <div className="relative group/input">
+                              <Percent size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300" />
+                              <input 
+                                type="number" 
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                value={config.revPercentage}
+                                onChange={(e) => handleConfigChange(affiliateId, 'revPercentage', e.target.value)}
+                                className="w-24 pl-6 pr-2 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-lg text-[11px] font-bold outline-none focus:ring-1 focus:ring-brand transition-all dark:text-white"
+                              />
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                            <button 
+                              onClick={(e) => handleSaveConfig(affiliateId, e)}
+                              disabled={savingId === affiliateId}
+                              className={cn(
+                                "p-2 rounded-lg transition-all",
+                                savedId === affiliateId 
+                                  ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                                  : "bg-brand/5 text-brand hover:bg-brand hover:text-white"
+                              )}
+                            >
+                              {savingId === affiliateId ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : savedId === affiliateId ? (
+                                <CheckCircle size={14} />
+                              ) : (
+                                <Save size={14} />
+                              )}
+                            </button>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -4,51 +4,92 @@ import {
   Users, 
   DollarSign, 
   BarChart3, 
-  ArrowUpRight, 
-  ArrowDownRight,
-  UserPlus,
-  Zap,
-  Globe,
-  Loader2
+  TrendingUp,
+  Loader2,
+  HelpCircle
 } from 'lucide-react';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  Legend,
+  Cell
+} from 'recharts';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
-import { fetchAffiliates } from '../services/affiliateService';
+import { fetchAffiliates, fetchAllResults } from '../services/affiliateService';
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
-  const [affiliatesCount, setAffiliatesCount] = useState<string | number>('---');
+  const [affiliatesCount, setAffiliatesCount] = useState<number>(0);
+  const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totals, setTotals] = useState({
+    commission: 0,
+    cpa: 0,
+    rev: 0
+  });
 
   useEffect(() => {
-    async function getStats() {
+    async function getDashboardData() {
       try {
-        const affiliates = await fetchAffiliates();
+        setLoading(true);
+        const [affiliates, allResults] = await Promise.all([
+          fetchAffiliates(),
+          fetchAllResults()
+        ]);
+        
         setAffiliatesCount(affiliates.length);
+        setResults(allResults);
+
+        // Calculate totals
+        const calculatedTotals = allResults.reduce((acc, curr) => ({
+          commission: acc.commission + (curr.total_commission || 0),
+          cpa: acc.cpa + (curr.cpa || 0),
+          rev: acc.rev + (curr.rvs || 0)
+        }), { commission: 0, cpa: 0, rev: 0 });
+
+        setTotals(calculatedTotals);
       } catch (err) {
-        console.error('Error fetching dashboard stats:', err);
+        console.error('Error fetching dashboard data:', err);
       } finally {
         setLoading(false);
       }
     }
-    getStats();
+    getDashboardData();
   }, []);
 
   const metrics = [
-    { label: 'Total de Afiliados', value: affiliatesCount.toString(), trend: +12, icon: Users, color: 'brand' },
-    { label: 'Conversões Hoje', value: '0', trend: 0, icon: BarChart3, color: 'green' },
-    { label: 'Ganhos Acumulados', value: 'R$ 0,00', trend: 0, icon: DollarSign, color: 'purple' },
-    { label: 'Novos Cadastros', value: affiliatesCount.toString(), trend: +affiliatesCount === 0 ? 0 : 100, icon: UserPlus, color: 'orange' },
+    { label: 'Total de Afiliados', value: affiliatesCount.toString(), icon: Users, color: 'brand' },
+    { label: 'Total comissão', value: `R$ ${totals.commission.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: DollarSign, color: 'green' },
+    { label: 'Total CPA', value: `R$ ${totals.cpa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: BarChart3, color: 'blue' },
+    { label: 'Total REV', value: `R$ ${totals.rev.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: TrendingUp, color: 'purple' },
   ];
 
+  // Prepare data for the chart - top 10 affiliates by commission
+  const chartData = [...results]
+    .sort((a, b) => (b.total_commission || 0) - (a.total_commission || 0))
+    .slice(0, 10)
+    .map(item => ({
+      name: item.affiliate_name || item.affiliate_id || '---',
+      shortName: (item.affiliate_name || item.affiliate_id || '---').substring(0, 12),
+      Comissão: item.total_commission || 0,
+      CPA: item.cpa || 0,
+      REV: item.rvs || 0
+    }));
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-20">
       <header>
-        <h1 className="text-3xl font-light text-gray-900 dark:text-white">Dashboard Administrativo</h1>
-        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Bem-vindo de volta, {profile?.name}. Aqui estão os números de hoje.</p>
+        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Dashboard Administrativo</h1>
+        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Bem-vindo de volta, {profile?.name}. Visão geral do desempenho da rede.</p>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {metrics.map((metric, idx) => (
           <motion.div
             key={idx}
@@ -56,47 +97,37 @@ export default function AdminDashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.05 }}
             className={cn(
-              "p-5 rounded-xl border shadow-sm transition-all relative overflow-hidden",
+              "p-6 rounded-2xl border shadow-sm transition-all relative overflow-hidden",
               idx === 0 
-                ? "bg-gradient-to-br from-brand/90 to-brand text-white border-transparent" 
-                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                ? "bg-slate-900 text-white border-transparent" 
+                : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800"
             )}
           >
-            {loading && idx < 1 ? (
+            {loading ? (
               <div className="flex items-center justify-center h-20">
-                <Loader2 className="animate-spin" />
+                <Loader2 className="animate-spin text-brand" />
               </div>
             ) : (
               <>
                 <div className="flex justify-between items-start mb-4">
                   <div className={cn(
-                    "p-2 rounded-lg",
-                    idx === 0 ? "bg-white/10" : {
-                      'bg-brand/10': metric.color === 'brand',
-                      'bg-green-100': metric.color === 'green',
-                      'bg-purple-100': metric.color === 'purple',
-                      'bg-orange-100': metric.color === 'orange'
-                    }
+                    "p-2.5 rounded-xl",
+                    idx === 0 ? "bg-white/10" : "bg-slate-50 dark:bg-slate-800"
                   )}>
                     <metric.icon size={20} className={cn(
-                      idx === 0 ? "text-white" : {
-                        'text-brand': metric.color === 'brand',
-                        'text-green-600': metric.color === 'green',
-                        'text-purple-600': metric.color === 'purple',
-                        'text-orange-600': metric.color === 'orange'
-                      }
+                      idx === 0 ? "text-white" : "text-brand"
                     )} />
                   </div>
                 </div>
                 
                 <div>
                   <p className={cn(
-                    "text-[10px] uppercase font-bold tracking-wider mb-1",
-                    idx === 0 ? "text-white/70" : "text-slate-500 dark:text-slate-400"
+                    "text-[10px] uppercase font-black tracking-widest mb-1",
+                    idx === 0 ? "text-slate-400" : "text-slate-400"
                   )}>
                     {metric.label}
                   </p>
-                  <h3 className="text-2xl font-bold dark:text-white">{metric.value}</h3>
+                  <h3 className="text-xl font-black dark:text-white truncate">{metric.value}</h3>
                 </div>
               </>
             )}
@@ -104,101 +135,88 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {/* Connection Status Section */}
-      <section className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-xl flex items-center justify-center">
-              <Zap size={24} />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">API de Captura de Dados</h3>
-              <p className="text-xs text-slate-500 font-medium">Status operacional: Todos os sistemas estão online e sincronizados.</p>
-            </div>
+      {/* Chart Section */}
+      <section className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
+              Desempenho por Afiliado <HelpCircle size={14} className="text-slate-300" />
+            </h3>
+            <p className="text-xs text-slate-500 font-medium">Top 10 parceiros por volume de comissão</p>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
-            <Globe size={16} className="text-brand" />
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Latência: 124ms</span>
+          <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl">
+             <TrendingUp size={16} className="text-brand" />
+             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest italic">Performance em tempo real</span>
           </div>
+        </div>
+
+        <div className="h-[400px] w-full">
+          {loading ? (
+            <div className="w-full h-full flex items-center justify-center text-slate-400 font-medium">
+              Carregando dados do gráfico...
+            </div>
+          ) : chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={chartData}
+                margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" opacity={0.5} />
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fontWeight: 700, fill: '#64748B' }} 
+                  angle={-45} 
+                  textAnchor="end"
+                  interval={0}
+                  tickFormatter={(value) => value.length > 15 ? `${value.substring(0, 12)}...` : value}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fontWeight: 700, fill: '#64748B' }}
+                  tickFormatter={(value) => `R$ ${value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value}`}
+                />
+                <Tooltip 
+                  cursor={{ fill: '#F1F5F9', radius: 10 }}
+                  contentStyle={{ 
+                    borderRadius: '16px', 
+                    border: 'none', 
+                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                    padding: '12px'
+                  }}
+                  itemStyle={{ fontSize: '12px', fontWeight: 700 }}
+                  labelStyle={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', marginBottom: '8px' }}
+                  formatter={(value: number, name: string) => [
+                    `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+                    name
+                  ]}
+                />
+                <Legend 
+                  verticalAlign="top" 
+                  align="right" 
+                  iconType="circle" 
+                  wrapperStyle={{ paddingBottom: '20px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' }} 
+                />
+                <Bar name="Comissão" dataKey="Comissão" fill="#64748B" radius={[4, 4, 0, 0]} barSize={20} />
+                <Bar name="CPA" dataKey="CPA" fill="#94A3B8" radius={[4, 4, 0, 0]} barSize={20} />
+                <Bar name="REV" dataKey="REV" fill="#CBD5E1" radius={[4, 4, 0, 0]} barSize={20} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-4">
+              <BarChart3 size={48} className="opacity-20" />
+              <p className="font-bold text-sm uppercase tracking-widest">Sem dados disponíveis</p>
+            </div>
+          )}
         </div>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col shadow-sm">
-          <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-            <h3 className="font-bold text-xs text-slate-800 dark:text-slate-200 uppercase tracking-tight">Atividade do Sistema</h3>
-            <button className="text-[10px] text-brand font-bold uppercase tracking-wider hover:underline">Ver tudo</button>
-          </div>
-          <div className="flex-1 overflow-auto max-h-[400px]">
-            <table className="w-full text-left">
-              <thead className="bg-slate-50 dark:bg-slate-800 text-[10px] text-slate-400 uppercase tracking-wider sticky top-0">
-                <tr>
-                  <th className="px-6 py-3 font-bold">Evento</th>
-                  <th className="px-6 py-3 font-bold">Status</th>
-                  <th className="px-6 py-3 font-bold">Horário</th>
-                </tr>
-              </thead>
-              <tbody className="text-xs divide-y divide-slate-50 dark:divide-slate-800">
-                {[
-                  { name: 'Marco Antonio', status: 'Ativo', time: 'Hoje, 10:45', color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400', initial: 'MA' },
-                  { name: 'Lucas Barbosa', status: 'Pendente', time: 'Ontem, 16:20', color: 'bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand', initial: 'LB' },
-                  { name: 'Sara Rocha', status: 'Ativo', time: '12/10, 09:12', color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400', initial: 'SR' },
-                  { name: 'Julio Cesar', status: 'Ativo', time: '12/10, 08:30', color: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400', initial: 'JC' },
-                ].map((row, i) => (
-                  <tr key={i} className="hover:bg-brand/[0.03] dark:hover:bg-white/[0.03] transition-all cursor-default">
-                    <td className="px-6 py-4 flex items-center gap-3">
-                      <div className={cn("w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px]", row.color)}>
-                        {row.initial}
-                      </div>
-                      <span className="font-medium text-slate-700 dark:text-slate-300">{row.name}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={cn(
-                        "px-2 py-0.5 rounded-full text-[10px] font-bold",
-                        row.status === 'Ativo' ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400"
-                      )}>
-                        {row.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-slate-400 dark:text-slate-500 font-medium">{row.time}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-6 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm space-y-6">
-          <h3 className="font-bold text-xs text-slate-800 dark:text-slate-200 uppercase tracking-tight">Metas de Desempenho</h3>
-          <div className="space-y-6">
-            {[
-              { label: 'Novos Afiliados', value: 75 },
-              { label: 'Volume de Vendas', value: 42 },
-              { label: 'Retenção de Clientes', value: 91 },
-            ].map((meta, i) => (
-              <div key={i}>
-                <div className="flex justify-between text-[11px] mb-2 font-bold uppercase tracking-tight">
-                  <span className="text-slate-500 dark:text-slate-400">{meta.label}</span>
-                  <span className="text-slate-900 dark:text-white">{meta.value}%</span>
-                </div>
-                <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-brand rounded-full transition-all duration-1000" 
-                    style={{ width: `${meta.value}%` }} 
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          <div className="pt-4 mt-4 border-t border-slate-50 dark:border-slate-800 text-[10px] text-slate-400 italic">
-            * Dados atualizados automaticamente a cada 5 minutos.
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
+
 
 function clsx(...classes: any[]) {
   return classes.filter(Boolean).join(' ');

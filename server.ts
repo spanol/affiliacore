@@ -23,9 +23,10 @@ async function startServer() {
         return res.status(500).json({ error: 'Chave de API não configurada' });
       }
 
+      const queryString = new URLSearchParams(req.query as any).toString();
       const targetUrl = id 
-        ? `${BASE_URL}/api/v2/external/${endpoint}/${id}`
-        : `${BASE_URL}/api/v2/external/${endpoint}`;
+        ? `${BASE_URL}/api/v2/external/${endpoint}/${id}${queryString ? '?' + queryString : ''}`
+        : `${BASE_URL}/api/v2/external/${endpoint}${queryString ? '?' + queryString : ''}`;
         
       console.log(`Proxying request to: ${targetUrl}`);
       
