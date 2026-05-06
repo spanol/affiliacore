@@ -183,6 +183,42 @@ export async function fetchAllResults(): Promise<any[]> {
   }
 }
 
+export async function createUser(userData: { uid: string, name: string, email: string, role: 'admin' | 'client' }): Promise<void> {
+  try {
+    const docRef = doc(db, 'users', userData.uid);
+    await setDoc(docRef, {
+      ...userData,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error creating user:', error);
+    throw error;
+  }
+}
+
+export async function fetchSetting(key: string): Promise<string | null> {
+  try {
+    const docRef = doc(db, 'settings', key);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return docSnap.data().value;
+    }
+    
+    // Fallback search by key property if not found by ID
+    const q = query(collection(db, 'settings'), where('key', '==', key));
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      return querySnapshot.docs[0].data().value;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`Error fetching setting ${key}:`, error);
+    return null;
+  }
+}
+
 function extractArray(data: any): Affiliate[] {
   if (!data) return [];
   
