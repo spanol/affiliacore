@@ -23,8 +23,8 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-3xl font-light text-gray-900">Dashboard Administrativo</h1>
-        <p className="text-gray-500 text-sm mt-1">Bem-vindo de volta, {profile?.name}. Aqui estão os números de hoje.</p>
+        <h1 className="text-3xl font-light text-gray-900 dark:text-white">Dashboard Administrativo</h1>
+        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Bem-vindo de volta, {profile?.name}. Aqui estão os números de hoje.</p>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -38,7 +38,7 @@ export default function AdminDashboard() {
               "p-5 rounded-xl border shadow-sm transition-all relative overflow-hidden",
               idx === 3 
                 ? "bg-gradient-to-br from-brand to-slate-800 text-white border-transparent" 
-                : "bg-white border-slate-200"
+                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
             )}
           >
             <div className="flex justify-between items-start mb-4">
@@ -74,14 +74,14 @@ export default function AdminDashboard() {
             <div>
               <p className={cn(
                 "text-[10px] uppercase font-bold tracking-wider mb-1",
-                idx === 3 ? "text-white/70" : "text-slate-500"
+                idx === 3 ? "text-white/70" : "text-slate-500 dark:text-slate-400"
               )}>
                 {metric.label}
               </p>
-              <h3 className="text-2xl font-bold">{metric.value}</h3>
+              <h3 className="text-2xl font-bold dark:text-white">{metric.value}</h3>
               <div className={cn(
                 "text-[10px] mt-2 font-medium",
-                idx === 3 ? "text-white/80" : "text-slate-400"
+                idx === 3 ? "text-white/80" : "text-slate-400 dark:text-slate-500"
               )}>
                 {idx === 3 ? "Meta mensal: 82%" : idx === 2 ? "Meta acumulada" : "Estável esta semana"}
               </div>
@@ -91,43 +91,43 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl flex flex-col shadow-sm">
-          <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-            <h3 className="font-bold text-xs text-slate-800 uppercase tracking-tight">Atividade do Sistema</h3>
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col shadow-sm">
+          <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+            <h3 className="font-bold text-xs text-slate-800 dark:text-slate-200 uppercase tracking-tight">Atividade do Sistema</h3>
             <button className="text-[10px] text-brand font-bold uppercase tracking-wider hover:underline">Ver tudo</button>
           </div>
           <div className="flex-1 overflow-auto max-h-[400px]">
             <table className="w-full text-left">
-              <thead className="bg-slate-50 text-[10px] text-slate-400 uppercase tracking-wider sticky top-0">
+              <thead className="bg-slate-50 dark:bg-slate-800 text-[10px] text-slate-400 uppercase tracking-wider sticky top-0">
                 <tr>
                   <th className="px-6 py-3 font-bold">Evento</th>
                   <th className="px-6 py-3 font-bold">Status</th>
                   <th className="px-6 py-3 font-bold">Horário</th>
                 </tr>
               </thead>
-              <tbody className="text-xs divide-y divide-slate-50">
+              <tbody className="text-xs divide-y divide-slate-50 dark:divide-slate-800">
                 {[
-                  { name: 'Marco Antonio', status: 'Ativo', time: 'Hoje, 10:45', color: 'bg-orange-100 text-orange-600', initial: 'MA' },
-                  { name: 'Lucas Barbosa', status: 'Pendente', time: 'Ontem, 16:20', color: 'bg-brand/10 text-brand', initial: 'LB' },
-                  { name: 'Sara Rocha', status: 'Ativo', time: '12/10, 09:12', color: 'bg-purple-100 text-purple-600', initial: 'SR' },
-                  { name: 'Julio Cesar', status: 'Ativo', time: '12/10, 08:30', color: 'bg-green-100 text-green-600', initial: 'JC' },
+                  { name: 'Marco Antonio', status: 'Ativo', time: 'Hoje, 10:45', color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400', initial: 'MA' },
+                  { name: 'Lucas Barbosa', status: 'Pendente', time: 'Ontem, 16:20', color: 'bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand', initial: 'LB' },
+                  { name: 'Sara Rocha', status: 'Ativo', time: '12/10, 09:12', color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400', initial: 'SR' },
+                  { name: 'Julio Cesar', status: 'Ativo', time: '12/10, 08:30', color: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400', initial: 'JC' },
                 ].map((row, i) => (
-                  <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                  <tr key={i} className="hover:bg-brand/[0.03] dark:hover:bg-white/[0.03] transition-all cursor-default">
                     <td className="px-6 py-4 flex items-center gap-3">
                       <div className={cn("w-7 h-7 rounded-full flex items-center justify-center font-bold text-[10px]", row.color)}>
                         {row.initial}
                       </div>
-                      <span className="font-medium text-slate-700">{row.name}</span>
+                      <span className="font-medium text-slate-700 dark:text-slate-300">{row.name}</span>
                     </td>
                     <td className="px-6 py-4">
                       <span className={cn(
                         "px-2 py-0.5 rounded-full text-[10px] font-bold",
-                        row.status === 'Ativo' ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                        row.status === 'Ativo' ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400"
                       )}>
                         {row.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-slate-400 font-medium">{row.time}</td>
+                    <td className="px-6 py-4 text-slate-400 dark:text-slate-500 font-medium">{row.time}</td>
                   </tr>
                 ))}
               </tbody>
@@ -135,8 +135,8 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="bg-white p-6 border border-slate-200 rounded-xl shadow-sm space-y-6">
-          <h3 className="font-bold text-xs text-slate-800 uppercase tracking-tight">Metas de Desempenho</h3>
+        <div className="bg-white dark:bg-slate-900 p-6 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm space-y-6">
+          <h3 className="font-bold text-xs text-slate-800 dark:text-slate-200 uppercase tracking-tight">Metas de Desempenho</h3>
           <div className="space-y-6">
             {[
               { label: 'Novos Afiliados', value: 75 },
@@ -145,10 +145,10 @@ export default function AdminDashboard() {
             ].map((meta, i) => (
               <div key={i}>
                 <div className="flex justify-between text-[11px] mb-2 font-bold uppercase tracking-tight">
-                  <span className="text-slate-500">{meta.label}</span>
-                  <span className="text-slate-900">{meta.value}%</span>
+                  <span className="text-slate-500 dark:text-slate-400">{meta.label}</span>
+                  <span className="text-slate-900 dark:text-white">{meta.value}%</span>
                 </div>
-                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-brand rounded-full transition-all duration-1000" 
                     style={{ width: `${meta.value}%` }} 
@@ -158,7 +158,7 @@ export default function AdminDashboard() {
             ))}
           </div>
           
-          <div className="pt-4 mt-4 border-t border-slate-50 text-[10px] text-slate-400 italic">
+          <div className="pt-4 mt-4 border-t border-slate-50 dark:border-slate-800 text-[10px] text-slate-400 italic">
             * Dados atualizados automaticamente a cada 5 minutos.
           </div>
         </div>

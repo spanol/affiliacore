@@ -12,13 +12,17 @@ import {
   X, 
   ChevronRight,
   TrendingUp,
-  Inbox
+  Inbox,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function DashboardLayout() {
   const { profile } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -51,12 +55,11 @@ export default function DashboardLayout() {
   ];
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-white border-r border-slate-200">
-      <div className="p-6">
-        <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center text-white font-bold transition-transform group-hover:scale-105">AB</div>
-          <h1 className="text-sm font-bold leading-tight text-slate-900">
-            Agência<br/><span className="text-brand">Boost</span>
+    <div className="flex flex-col h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800">
+      <div className="p-6 pb-2">
+        <Link to="/" className="flex items-center group">
+          <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-brand transition-colors">
+            Agência <span className="text-brand">Boost</span>
           </h1>
         </Link>
       </div>
@@ -74,10 +77,10 @@ export default function DashboardLayout() {
                   to={item.path}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-md transition-all text-sm font-medium",
+                    "flex items-center gap-3 px-3 py-2 rounded-md transition-all text-sm font-medium border border-transparent",
                     location.pathname === item.path 
-                      ? "bg-brand/10 text-brand font-bold" 
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      ? "bg-brand/10 text-brand font-bold border-brand/20 shadow-sm" 
+                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white hover:border-slate-200 dark:hover:border-slate-700 hover:shadow-sm"
                   )}
                 >
                   <item.icon size={18} className={cn(
@@ -91,25 +94,25 @@ export default function DashboardLayout() {
         ))}
       </nav>
 
-      <div className="mt-auto border-t border-slate-100 p-4">
-        <div className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg border border-slate-100 mb-4">
+      <div className="mt-auto border-t border-slate-100 dark:border-slate-800 p-4">
+        <div className="flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800 mb-4">
           <div className="relative">
             <img 
               src={profile?.avatarUrl} 
               alt={profile?.name} 
-              className="w-9 h-9 rounded-full object-cover bg-slate-200 border border-white shadow-sm"
+              className="w-9 h-9 rounded-full object-cover bg-slate-200 border border-white dark:border-slate-700 shadow-sm"
             />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold text-slate-900 truncate">{profile?.name}</p>
-            <p className="text-[10px] text-slate-500 font-medium truncate">
+            <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{profile?.name}</p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">
               {profile?.role === 'admin' ? 'Administrador' : 'Cliente'}
             </p>
           </div>
         </div>
         <button 
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all text-xs font-bold"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-slate-500 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 hover:shadow-sm transition-all text-xs font-bold border border-transparent hover:border-red-100 dark:hover:border-red-900/30"
         >
           <LogOut size={16} />
           Encerrar Sessão
@@ -119,7 +122,7 @@ export default function DashboardLayout() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className={cn("min-h-screen bg-slate-50 dark:bg-slate-950 flex transition-colors duration-300", theme === 'dark' ? 'dark' : '')}>
       {/* Desktop Sidebar */}
       <div className="hidden lg:block w-64 h-screen sticky top-0">
         <SidebarContent />
@@ -128,15 +131,28 @@ export default function DashboardLayout() {
       {/* Main Content */}
       <main className="flex-1 min-w-0 flex flex-col">
         {/* Header */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-20">
-          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+        <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 sticky top-0 z-20 transition-colors duration-300">
+          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider dark:text-slate-200">
             {location.pathname === '/admin' ? 'Painel Administrativo' : location.pathname === '/client' ? 'Painel do Cliente' : 'Minha Conta'}
           </h2>
           <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-2 text-[10px] font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full uppercase tracking-tight">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              Sistema Online
-            </div>
+            <button 
+              onClick={toggleTheme}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-200 border border-transparent hover:border-slate-300 dark:hover:border-slate-600 transition-all shadow-sm"
+              title={theme === 'light' ? 'Mudar para tema escuro' : 'Mudar para tema claro'}
+            >
+              {theme === 'light' ? (
+                <>
+                  <Moon size={14} className="text-slate-600" />
+                  <span className="text-[10px] font-bold uppercase tracking-tight">Tema Escuro</span>
+                </>
+              ) : (
+                <>
+                  <Sun size={14} className="text-amber-500" />
+                  <span className="text-[10px] font-bold uppercase tracking-tight">Tema Claro</span>
+                </>
+              )}
+            </button>
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
               className="lg:hidden p-2 text-slate-500 hover:bg-slate-50 rounded-md"
@@ -167,7 +183,7 @@ export default function DashboardLayout() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed right-0 top-0 bottom-0 w-80 bg-white z-40 lg:hidden shadow-2xl"
+              className="fixed right-0 top-0 bottom-0 w-80 bg-white dark:bg-slate-900 z-40 lg:hidden shadow-2xl"
             >
               <div className="p-4 flex justify-end">
                 <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-gray-500">

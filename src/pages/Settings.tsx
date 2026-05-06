@@ -91,11 +91,11 @@ export default function Settings() {
   return (
     <div className="max-w-4xl space-y-8">
       <header>
-        <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+        <h1 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
           <SettingsIcon size={24} className="text-brand" />
           Configurações do Sistema
         </h1>
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">Gerencie chaves de API e integração Firebase</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-1">Gerencie chaves de API e integração Firebase</p>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -103,30 +103,30 @@ export default function Settings() {
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden"
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden"
         >
-          <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+          <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex items-center gap-2">
             <Key size={16} className="text-brand" />
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-tight">API de Captura de Dados</h3>
+            <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">API de Captura de Dados</h3>
           </div>
           <div className="p-6 space-y-6">
-            <p className="text-xs text-slate-500 leading-relaxed">
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
               Insira abaixo a chave da API que será utilizada pelo sistema para capturar e processar os dados dos clientes vinculados aos seus afiliados.
             </p>
             
             <form onSubmit={handleSaveApiKey} className="space-y-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Chave da API (Secret)</label>
+                <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Chave da API (Secret)</label>
                 <div className="relative">
                   <input 
                     type="password"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx"
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-brand transition-all outline-none"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-sm dark:text-white focus:ring-1 focus:ring-brand transition-all outline-none"
                   />
                   <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <ShieldCheck size={16} className="text-slate-300" title="Armazenamento Seguro" />
+                    <ShieldCheck size={16} className="text-slate-300 dark:text-slate-600" title="Armazenamento Seguro" />
                   </div>
                 </div>
               </div>
@@ -141,7 +141,7 @@ export default function Settings() {
               <button 
                 type="submit"
                 disabled={loading}
-                className="w-full bg-brand text-white py-3 rounded-lg text-xs font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                className="w-full bg-brand text-white py-3 rounded-lg text-xs font-bold hover:bg-brand/90 dark:hover:bg-brand/80 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
               >
                 {loading ? <RefreshCw size={14} className="animate-spin" /> : saveSuccess ? <Check size={14} /> : <Save size={14} />}
                 {saveSuccess ? 'Chave Salva!' : 'Salvar Configuração'}
@@ -155,15 +155,15 @@ export default function Settings() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden"
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden"
         >
-          <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+          <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex items-center gap-2">
             <Database size={16} className="text-brand" />
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-tight">Infraestrutura Firebase</h3>
+            <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight">Infraestrutura Firebase</h3>
           </div>
           <div className="p-6 h-full">
             <div className="flex justify-between items-center mb-3">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Configuração Atual</span>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Configuração Atual</span>
               <button 
                 onClick={() => copyToClipboard(fbConfig)}
                 className="text-[10px] font-bold text-brand uppercase flex items-center gap-1 hover:underline"
@@ -173,26 +173,26 @@ export default function Settings() {
               </button>
             </div>
             <div className="relative group">
-              <pre className="bg-slate-900 text-slate-300 p-4 rounded-lg text-[10px] font-mono overflow-x-auto max-h-[180px] border border-slate-800 scrollbar-hide">
+              <pre className="bg-slate-900 dark:bg-black text-slate-300 dark:text-slate-400 p-4 rounded-lg text-[10px] font-mono overflow-x-auto max-h-[180px] border border-slate-800 dark:border-slate-800 scrollbar-hide">
                 {fbConfig}
               </pre>
               <div className="absolute inset-0 bg-brand/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none rounded-lg" />
             </div>
-            <p className="mt-4 text-[10px] text-slate-400 italic">
-              * Para alterar o projeto do Firebase, edite o arquivo <code className="bg-slate-100 px-1 rounded">firebase-applet-config.json</code> no ambiente de desenvolvimento.
+            <p className="mt-4 text-[10px] text-slate-400 dark:text-slate-500 italic">
+              * Para alterar o projeto do Firebase, edite o arquivo <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">firebase-applet-config.json</code> no ambiente de desenvolvimento.
             </p>
           </div>
         </motion.div>
       </div>
 
       {/* Security Info */}
-      <div className="bg-brand/5 border border-brand/10 p-4 rounded-xl flex gap-4 items-start">
-        <div className="p-2 bg-white rounded-lg shadow-sm border border-brand/10">
+      <div className="bg-brand/5 dark:bg-brand/10 border border-brand/10 dark:border-brand/20 p-4 rounded-xl flex gap-4 items-start">
+        <div className="p-2 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-brand/10 dark:border-brand/20">
           <ShieldCheck size={20} className="text-brand" />
         </div>
         <div>
-          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-tight mb-1">Segurança de Dados</h4>
-          <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+          <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-tight mb-1">Segurança de Dados</h4>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
             Todas as chaves de API inseridas nesta área são armazenadas no Google Cloud Firestore com criptografia em repouso. 
             O acesso a estes dados é restrito via Security Rules do Firebase, permitindo leitura e escrita exclusivamente para usuários com função de administrador autenticados.
           </p>

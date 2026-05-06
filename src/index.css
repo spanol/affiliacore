@@ -3,3 +3,23 @@
 @theme {
   --color-brand: #141C2A;
 }
+
+/* Explicit class-based dark mode selector for Tailwind v4 */
+@variant dark (.dark &);
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+  
+  html.dark {
+    background-color: #020617;
+    color: #f1f5f9;
+  }
+  
+  html {
+    background-color: #f8fafc;
+    color: #0f172a;
+    @apply antialiased transition-colors duration-300;
+  }
+}

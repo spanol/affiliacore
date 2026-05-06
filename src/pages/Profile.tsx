@@ -93,8 +93,8 @@ export default function Profile() {
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12">
       <header>
-        <h1 className="text-3xl font-light text-gray-900">Meu Perfil</h1>
-        <p className="text-gray-500 text-sm mt-1">Gerencie suas informações pessoais e segurança da conta.</p>
+        <h1 className="text-3xl font-light text-gray-900 dark:text-white">Meu Perfil</h1>
+        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Gerencie suas informações pessoais e segurança da conta.</p>
       </header>
 
       {message && (
@@ -114,23 +114,23 @@ export default function Profile() {
       <form onSubmit={handleUpdateProfile} className="space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Avatar Section */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col items-center h-fit">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-6 w-full text-center">Foto de Perfil</h3>
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center h-fit">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-6 w-full text-center">Foto de Perfil</h3>
             <div className="relative group mb-6">
               <img 
                 src={avatarUrl} 
                 alt="Avatar" 
-                className="w-28 h-28 rounded-full object-cover bg-slate-50 border-4 border-white shadow-lg"
+                className="w-28 h-28 rounded-full object-cover bg-slate-50 dark:bg-slate-800 border-4 border-white dark:border-slate-800 shadow-lg"
               />
               {uploading && (
-                <div className="absolute inset-0 bg-white/60 rounded-full flex items-center justify-center backdrop-blur-[1px]">
+                <div className="absolute inset-0 bg-white/60 dark:bg-slate-900/60 rounded-full flex items-center justify-center backdrop-blur-[1px]">
                   <Loader2 className="text-brand animate-spin" size={24} />
                 </div>
               )}
             </div>
             
             <div className="w-full">
-              <label className="w-full flex flex-col items-center justify-center gap-2 px-4 py-3 bg-slate-50 border border-slate-200 border-dashed rounded-xl cursor-pointer hover:bg-slate-100 hover:border-brand/30 transition-all text-slate-500 hover:text-brand bg-image-upload">
+              <label className="w-full flex flex-col items-center justify-center gap-2 px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 border-dashed rounded-xl cursor-pointer hover:bg-brand/5 dark:hover:bg-brand/10 hover:border-brand/50 transition-all text-slate-500 dark:text-slate-400 hover:text-brand bg-image-upload shadow-sm hover:shadow-md">
                 <Upload size={18} />
                 <span className="text-[10px] font-bold uppercase tracking-tight">Alterar Foto</span>
                 <input 
@@ -141,62 +141,62 @@ export default function Profile() {
                   disabled={uploading}
                 />
               </label>
-              <p className="text-[9px] text-center text-slate-400 mt-3 font-medium px-2">Suporte para JPG, PNG ou SVG. Recomendado 400x400px.</p>
+              <p className="text-[9px] text-center text-slate-400 dark:text-slate-500 mt-3 font-medium px-2">Suporte para JPG, PNG ou SVG. Recomendado 400x400px.</p>
             </div>
           </div>
 
           {/* Form Section */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Dados Pessoais</h3>
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Dados Pessoais</h3>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Nome Completo</label>
+                  <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Nome Completo</label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={16} />
                     <input 
                       type="text" 
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       required
-                      className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-brand transition-all outline-none"
+                      className="w-full pl-10 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs dark:text-white focus:ring-1 focus:ring-brand transition-all outline-none"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">E-mail</label>
+                  <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">E-mail</label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={16} />
                     <input 
                       type="email" 
                       value={profile?.email}
                       disabled
-                      className="w-full pl-10 pr-3 py-2 bg-slate-100 border border-transparent rounded text-xs text-slate-400 cursor-not-allowed"
+                      className="w-full pl-10 pr-3 py-2 bg-slate-100 dark:bg-slate-800/50 border border-transparent rounded text-xs text-slate-400 dark:text-slate-500 cursor-not-allowed"
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Segurança</h3>
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Segurança</h3>
               
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Nova Senha</label>
+                <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Nova Senha</label>
                 <div className="relative max-w-xs">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={16} />
                   <input 
                     type="password" 
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="••••••••"
                     minLength={6}
-                    className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded text-xs focus:ring-1 focus:ring-brand transition-all outline-none"
+                    className="w-full pl-10 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs dark:text-white focus:ring-1 focus:ring-brand transition-all outline-none"
                   />
                 </div>
-                <p className="text-[9px] text-slate-400 mt-1 italic">Mínimo 6 caracteres para alteração.</p>
+                <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-1 italic">Mínimo 6 caracteres para alteração.</p>
               </div>
             </div>
 
@@ -204,7 +204,7 @@ export default function Profile() {
               <button 
                 type="submit"
                 disabled={loading}
-                className="bg-brand text-white px-6 py-2.5 rounded-md text-xs font-bold hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                className="bg-brand text-white px-6 py-2.5 rounded-md text-xs font-bold hover:bg-brand/90 dark:hover:bg-brand/80 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center gap-2 shadow-sm"
               >
                 {loading ? 'Salvando...' : <><Save size={16} /> Salvar Alterações</>}
               </button>
