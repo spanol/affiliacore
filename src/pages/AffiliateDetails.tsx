@@ -270,123 +270,84 @@ export default function AffiliateDetails() {
                     </div>
                   </div>
 
-                  {/* Conversion Funnel */}
-                  <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden relative">
-                    <div className="flex justify-between items-center mb-10">
-                      <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Funil de conversão</h3>
-                      <div className="flex items-center gap-3">
+                  {/* Primary Performance Metrics */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Stage 1: Registrations */}
+                    <motion.div 
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm group hover:border-brand/20 transition-all duration-500"
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl text-slate-400 group-hover:text-brand transition-colors">
+                          <UserPlus size={20} />
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] font-black text-green-500 bg-green-500/10 px-2 py-1 rounded-lg">
+                          <TrendingUp size={10} /> +12%
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cadastros</p>
+                        <h4 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{res.registrations || 0}</h4>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Leads Qualificados</p>
+                      </div>
+                    </motion.div>
+
+                    {/* Stage 2: FTDs */}
+                    <motion.div 
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 }}
+                      className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm group hover:border-brand/20 transition-all duration-500"
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl text-slate-400 group-hover:text-brand transition-colors">
+                          <Building size={20} />
+                        </div>
                         <div className="flex items-center gap-2">
-                           <div className="w-2 h-2 rounded-full bg-slate-900 dark:bg-slate-400"></div>
-                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Volume total</span>
+                           <div className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
+                             <span className="text-[10px] font-black text-slate-500">
+                               {res.registrations > 0 ? ((res.first_deposits / res.registrations) * 100).toFixed(1) : 0}% conv.
+                             </span>
+                           </div>
                         </div>
                       </div>
-                    </div>
-                    
-                    <div className="relative">
-                      {/* Data Labels */}
-                      <div className="grid grid-cols-3 gap-8 relative z-20 mb-12">
-                        <div className="bg-slate-50/50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 group hover:border-brand/20 transition-all">
-                          <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Cadastros</p>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-3xl font-black text-slate-900 dark:text-white">{res.registrations || 0}</span>
-                            <span className="text-[11px] font-bold text-green-500 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-lg">+17k%</span>
-                          </div>
-                        </div>
-
-                        <div className="bg-slate-50/50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 relative group hover:border-brand/20 transition-all">
-                          <div className="absolute -left-4 top-1/2 -translate-y-1/2 z-30">
-                            <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 px-2 py-1 rounded-full shadow-sm text-[9px] font-black text-brand">
-                              46.4%
-                            </div>
-                          </div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase mb-2">FTDs (Primeiros Depósitos)</p>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-3xl font-black text-slate-900 dark:text-white">{res.first_deposits || 0}</span>
-                            <span className="text-[11px] font-bold text-green-500 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-lg">+900%</span>
-                          </div>
-                        </div>
-
-                        <div className="bg-brand/5 dark:bg-brand/10 p-4 rounded-2xl border border-brand/10 dark:border-brand/20 relative group hover:border-brand/30 transition-all">
-                           <div className="absolute -left-4 top-1/2 -translate-y-1/2 z-30">
-                            <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 px-2 py-1 rounded-full shadow-sm text-[9px] font-black text-brand">
-                              13.3%
-                            </div>
-                          </div>
-                          <p className="text-[10px] font-black text-brand uppercase mb-2">CPA Qualificado</p>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-3xl font-black text-brand">{res.qualified_cpa || 0}</span>
-                            <span className="text-[11px] font-bold text-brand bg-brand/5 px-2 py-0.5 rounded-lg">+767%</span>
-                          </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Primeiros Depósitos</p>
+                        <h4 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{res.first_deposits || 0}</h4>
+                        <div className="flex items-center gap-1.5 mt-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse"></div>
+                          <p className="text-[10px] font-bold text-brand uppercase tracking-widest leading-none">Contas Ativas</p>
                         </div>
                       </div>
+                    </motion.div>
 
-                      {/* Funnel Visualisation - High Fidelity SVG Wave */}
-                      <div className="h-48 w-full relative group">
-                        <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 1000 200">
-                          <defs>
-                            <linearGradient id="funnelGradient1" x1="0%" y1="0%" x2="0%" y2="100%">
-                              <stop offset="0%" stopColor="#1e293b" />
-                              <stop offset="100%" stopColor="#0f172a" />
-                            </linearGradient>
-                            <linearGradient id="funnelGradient2" x1="0%" y1="0%" x2="0%" y2="100%">
-                              <stop offset="0%" stopColor="#334155" />
-                              <stop offset="100%" stopColor="#1e293b" />
-                            </linearGradient>
-                            <linearGradient id="brandFunnelGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                              <stop offset="0%" stopColor="#fbbf24" />
-                              <stop offset="100%" stopColor="#d97706" />
-                            </linearGradient>
-                            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-                              <feGaussianBlur stdDeviation="3" result="blur" />
-                              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                            </filter>
-                          </defs>
-                          
-                          {/* Stage 1 (Registrations) - Large Curve */}
-                          <path 
-                            d="M 0 20 Q 150 25 333 45 L 333 155 Q 150 175 0 180 Z" 
-                            fill="url(#funnelGradient1)"
-                            className="transition-all duration-700 hover:opacity-90"
-                          />
-                          
-                          {/* Stage 2 (FTDs) - Medium Curve */}
-                          <path 
-                            d="M 333 45 Q 500 55 666 75 L 666 125 Q 500 145 333 155 Z" 
-                            fill="url(#funnelGradient2)"
-                            className="transition-all duration-700 hover:opacity-90"
-                          />
-                          
-                          {/* Stage 3 (CPA) - Narrower Section */}
-                          <path 
-                            d="M 666 75 Q 833 82 1000 88 L 1000 112 Q 833 118 666 125 Z" 
-                            fill="url(#brandFunnelGradient)"
-                            filter="url(#glow)"
-                            className="transition-all duration-700 hover:brightness-110"
-                          />
-                          
-                          {/* Decorative Accent Lines */}
-                          <path d="M 0 100 L 1000 100" stroke="white" strokeWidth="0.5" strokeDasharray="4 4" opacity="0.1" />
-                          
-                          {/* Lines separating stages */}
-                          <line x1="333" y1="45" x2="333" y2="155" className="stroke-white/5" strokeWidth="1" />
-                          <line x1="666" y1="75" x2="666" y2="125" className="stroke-white/5" strokeWidth="1" />
-                        </svg>
-                        
-                        {/* Interactive Markers */}
-                        <div className="absolute top-1/2 left-[15%] -translate-y-1/2 flex flex-col items-center opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none">
-                           <div className="w-1 h-12 bg-white/10 rounded-full mb-2"></div>
-                           <span className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-tighter bg-slate-900 px-2 py-0.5 rounded shadow-xl">Topo do Funil</span>
+                    {/* Stage 3: Qualified CPA */}
+                    <motion.div 
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                      className="bg-brand/5 dark:bg-brand/10 p-8 rounded-[2.5rem] border border-brand/20 dark:border-brand/40 shadow-sm group hover:border-brand/40 transition-all duration-500 relative overflow-hidden"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-br from-brand/5 to-transparent pointer-events-none"></div>
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 bg-white dark:bg-slate-900 rounded-2xl text-brand shadow-sm">
+                            <Shield size={20} />
+                          </div>
+                          <div className="bg-brand/10 border border-brand/20 px-2 py-1 rounded-lg">
+                             <span className="text-[10px] font-black text-brand">
+                               {res.first_deposits > 0 ? ((res.qualified_cpa / res.first_deposits) * 100).toFixed(1) : 0}% conv.
+                             </span>
+                          </div>
                         </div>
-                        <div className="absolute top-1/2 left-[50%] -translate-y-1/2 flex flex-col items-center opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none">
-                           <div className="w-1 h-8 bg-white/10 rounded-full mb-2"></div>
-                           <span className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-tighter bg-slate-900 px-2 py-0.5 rounded shadow-xl">Meio do Funil</span>
-                        </div>
-                        <div className="absolute top-1/2 left-[85%] -translate-y-1/2 flex flex-col items-center opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none">
-                           <div className="w-1 h-4 bg-brand/20 rounded-full mb-2"></div>
-                           <span className="text-[8px] font-black text-brand uppercase tracking-tighter bg-slate-900 px-2 py-0.5 rounded shadow-brand/20">Fundo do Funil</span>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-black text-brand uppercase tracking-[0.2em]">CPA Qualificado</p>
+                          <h4 className="text-4xl font-black text-brand tracking-tighter">{res.qualified_cpa || 0}</h4>
+                          <p className="text-[10px] font-bold text-brand uppercase tracking-widest mt-2 opacity-60">Meta Alcançada</p>
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   </div>
 
                   {/* Charts par Casa */}
