@@ -14,7 +14,8 @@ import {
   TrendingUp,
   Inbox,
   Sun,
-  Moon
+  Moon,
+  Users
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -40,6 +41,11 @@ export default function DashboardLayout() {
           label: 'Dashboard', 
           path: profile?.role === 'admin' ? '/admin' : '/client', 
           icon: LayoutDashboard 
+        },
+        {
+          label: profile?.role === 'admin' ? 'Afiliados' : 'Clientes',
+          path: '/affiliates',
+          icon: Users
         },
         ...(profile?.role === 'admin' ? [
           { label: 'Configurações do Sistema', path: '/settings', icon: Settings }

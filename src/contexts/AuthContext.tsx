@@ -32,7 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           console.log('Fetching profile for:', currentUser.uid, 'on path: users/' + currentUser.uid);
           const docRef = doc(db, 'users', currentUser.uid);
-          const docSnap = await getDocFromServer(docRef);
+          const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
             console.log('Profile found:', docSnap.data());
             setProfile(docSnap.data() as UserProfile);
