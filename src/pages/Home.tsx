@@ -1,8 +1,27 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { createContactInquiry } from '../services/contactService';
 
 const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`;
 type DashboardTab = 'desktop' | 'mobile';
+type ContactFormData = {
+  name: string;
+  email: string;
+  phone: string;
+  instagram: string;
+  affiliateExperience: 'sim' | 'nao' | '';
+  presentation: string;
+};
+type ContactFormErrors = Partial<Record<keyof ContactFormData, string>>;
+
+const initialContactForm: ContactFormData = {
+  name: '',
+  email: '',
+  phone: '',
+  instagram: '',
+  affiliateExperience: '',
+  presentation: '',
+};
 
 const stats = [
   {
@@ -114,6 +133,66 @@ const footerLinksRight = [
   { label: 'Contato', href: '#contato' },
 ];
 
+function formatPhone(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+
+  if (digits.length <= 2) {
+    return digits ? `(${digits}` : '';
+  }
+
+  if (digits.length <= 6) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  }
+
+  if (digits.length <= 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+function formatInstagram(value: string) {
+  const cleaned = value.replace(/\s+/g, '').replace(/[^a-zA-Z0-9._@]/g, '');
+  const withoutAt = cleaned.replace(/^@+/, '').slice(0, 30);
+
+  return withoutAt ? `@${withoutAt}` : '';
+}
+
+function validateContactForm(form: ContactFormData) {
+  const errors: ContactFormErrors = {};
+  const trimmedName = form.name.trim();
+  const trimmedEmail = form.email.trim();
+  const phoneDigits = form.phone.replace(/\D/g, '');
+  const trimmedInstagram = form.instagram.trim();
+  const trimmedPresentation = form.presentation.trim();
+
+  if (trimmedName.length < 3) {
+    errors.name = 'Informe seu nome completo.';
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    errors.email = 'Digite um e-mail valido.';
+  }
+
+  if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+    errors.phone = 'Digite um telefone com DDD valido.';
+  }
+
+  if (!/^@[a-zA-Z0-9._]{2,30}$/.test(trimmedInstagram)) {
+    errors.instagram = 'Informe um Instagram valido, como @seuperfil.';
+  }
+
+  if (!form.affiliateExperience) {
+    errors.affiliateExperience = 'Selecione uma opcao.';
+  }
+
+  if (trimmedPresentation.length < 20) {
+    errors.presentation = 'Conte um pouco mais sobre sua operacao.';
+  }
+
+  return errors;
+}
+
 function SectionTag({ children, dark = false }: { children: string; dark?: boolean }) {
   return (
     <div
@@ -160,6 +239,100 @@ function WhiteButton({
 
 export default function Home() {
   const [dashboardTab, setDashboardTab] = useState<DashboardTab>('desktop');
+  const [contactForm, setContactForm] = useState<ContactFormData>(initialContactForm);
+  const [contactErrors, setContactErrors] = useState<ContactFormErrors>({});
+  const [contactStatus, setContactStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isSubmittingContact, setIsSubmittingContact] = useState(false);
+
+  const handleContactFieldChange = (
+    field: keyof ContactFormData,
+    value: string,
+  ) => {
+    const formattedValue =
+      field === 'phone'
+        ? formatPhone(value)
+        : field === 'instagram'
+          ? formatInstagram(value)
+          : value;
+
+    setContactForm((current) => ({
+      ...current,
+      [field]: formattedValue as ContactFormData[keyof ContactFormData],
+    }));
+
+    setContactErrors((current) => {
+      if (!current[field]) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+
+    if (contactStatus) {
+      setContactStatus(null);
+    }
+  };
+
+  const handleContactBlur = (field: keyof ContactFormData) => {
+    const validation = validateContactForm(contactForm);
+
+    setContactErrors((current) => {
+      const next = { ...current };
+
+      if (validation[field]) {
+        next[field] = validation[field];
+      } else {
+        delete next[field];
+      }
+
+      return next;
+    });
+  };
+
+  const handleContactSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const validation = validateContactForm(contactForm);
+    if (Object.keys(validation).length > 0) {
+      setContactErrors(validation);
+      setContactStatus({
+        type: 'error',
+        message: 'Revise os campos destacados para enviar seu contato.',
+      });
+      return;
+    }
+
+    try {
+      setIsSubmittingContact(true);
+      setContactStatus(null);
+
+      await createContactInquiry({
+        name: contactForm.name.trim(),
+        email: contactForm.email.trim().toLowerCase(),
+        phone: contactForm.phone,
+        instagram: contactForm.instagram.trim(),
+        affiliateExperience: contactForm.affiliateExperience as 'sim' | 'nao',
+        presentation: contactForm.presentation.trim(),
+      });
+
+      setContactForm(initialContactForm);
+      setContactErrors({});
+      setContactStatus({
+        type: 'success',
+        message: 'Recebemos seu contato. Nosso time vai analisar seu perfil e retornar em breve.',
+      });
+    } catch (error) {
+      console.error('Error submitting contact form:', error);
+      setContactStatus({
+        type: 'error',
+        message: 'Nao foi possivel enviar agora. Tente novamente em instantes.',
+      });
+    } finally {
+      setIsSubmittingContact(false);
+    }
+  };
 
   return (
     <div id="top" className="min-h-screen bg-[#050c1a] text-white">
@@ -514,43 +687,115 @@ export default function Home() {
               <div className="relative w-full max-w-[622px] rounded-tl-[20px] rounded-tr-[20px] bg-gradient-to-b from-[#0f1624] to-transparent px-10 py-[25px]">
                 <div className="absolute inset-0 rounded-tl-[20px] rounded-tr-[20px] bg-gradient-to-b from-[#232a38] to-transparent opacity-40" />
                 <div className="relative">
-                  <form className="space-y-6">
-                    <Field label="Nome *" placeholder="Nome" />
-                    <Field label="Email *" placeholder="nome@email.com" />
+                  <form className="space-y-6" onSubmit={handleContactSubmit}>
+                    <FormField
+                      label="Nome *"
+                      name="name"
+                      placeholder="Nome"
+                      value={contactForm.name}
+                      onChange={(value) => handleContactFieldChange('name', value)}
+                      onBlur={() => handleContactBlur('name')}
+                      error={contactErrors.name}
+                    />
+                    <FormField
+                      label="Email *"
+                      name="email"
+                      type="email"
+                      placeholder="nome@email.com"
+                      value={contactForm.email}
+                      onChange={(value) => handleContactFieldChange('email', value)}
+                      onBlur={() => handleContactBlur('email')}
+                      error={contactErrors.email}
+                    />
 
                     <div className="grid gap-6 md:grid-cols-2">
-                      <Field label="Telefone *" placeholder="(00) 00000-0000" />
-                      <Field label="Instagram *" placeholder="@seuperfil" />
+                      <FormField
+                        label="Telefone *"
+                        name="phone"
+                        inputMode="numeric"
+                        placeholder="(00) 00000-0000"
+                        value={contactForm.phone}
+                        onChange={(value) => handleContactFieldChange('phone', value)}
+                        onBlur={() => handleContactBlur('phone')}
+                        error={contactErrors.phone}
+                      />
+                      <FormField
+                        label="Instagram *"
+                        name="instagram"
+                        placeholder="@seuperfil"
+                        value={contactForm.instagram}
+                        onChange={(value) => handleContactFieldChange('instagram', value)}
+                        onBlur={() => handleContactBlur('instagram')}
+                        error={contactErrors.instagram}
+                      />
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-[16px] leading-[16px] text-[#364153]">
+                      <label
+                        htmlFor="affiliateExperience"
+                        className="mb-2 block text-[16px] leading-[16px] text-[#364153]"
+                      >
                         Você já trabalha no mercado de afiliação?
                       </label>
-                      <div className="relative rounded-[10px] border border-[#232a38] bg-[#19202e] px-[15px] py-[14px] text-[16px] leading-[24px] text-white">
-                        Sim
+                      <div className="relative">
+                        <select
+                          id="affiliateExperience"
+                          value={contactForm.affiliateExperience}
+                          onChange={(event) =>
+                            handleContactFieldChange('affiliateExperience', event.target.value)
+                          }
+                          onBlur={() => handleContactBlur('affiliateExperience')}
+                          className="w-full appearance-none rounded-[10px] border border-[#232a38] bg-[#19202e] px-[15px] py-[14px] pr-10 text-[16px] leading-[24px] text-white outline-none transition focus:border-white/30"
+                        >
+                          <option value="" disabled>
+                            Selecione
+                          </option>
+                          <option value="sim">Sim</option>
+                          <option value="nao">Não</option>
+                        </select>
                         <img
                           src={asset('/boost-home/select-arrow.svg')}
                           alt=""
-                          className="absolute right-[10px] top-1/2 h-[11px] w-[11px] -translate-y-1/2"
+                          className="pointer-events-none absolute right-[10px] top-1/2 h-[11px] w-[11px] -translate-y-1/2"
                         />
                       </div>
+                      {contactErrors.affiliateExperience ? (
+                        <p className="mt-2 text-[13px] leading-[18px] text-[#ff8c8c]">
+                          {contactErrors.affiliateExperience}
+                        </p>
+                      ) : null}
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-[16px] leading-[16px] text-[#364153]">
+                      <label
+                        htmlFor="presentation"
+                        className="mb-2 block text-[16px] leading-[16px] text-[#364153]"
+                      >
                         Apresente-se *
                       </label>
-                      <div className="min-h-[152px] rounded-[10px] border border-[#232a38] bg-[#19202e] px-[17px] py-[16.25px] text-[16px] leading-[22.4px] text-white/60">
-                        Conte-nos sobre sua operação e volume atual...
-                      </div>
+                      <textarea
+                        id="presentation"
+                        value={contactForm.presentation}
+                        onChange={(event) =>
+                          handleContactFieldChange('presentation', event.target.value)
+                        }
+                        onBlur={() => handleContactBlur('presentation')}
+                        placeholder="Conte-nos sobre sua operação e volume atual..."
+                        className="min-h-[152px] w-full rounded-[10px] border border-[#232a38] bg-[#19202e] px-[17px] py-[16.25px] text-[16px] leading-[22.4px] text-white outline-none transition placeholder:text-white/60 focus:border-white/30"
+                      />
+                      {contactErrors.presentation ? (
+                        <p className="mt-2 text-[13px] leading-[18px] text-[#ff8c8c]">
+                          {contactErrors.presentation}
+                        </p>
+                      ) : null}
                     </div>
 
                     <button
-                      type="button"
-                      className="flex w-full items-center justify-center gap-2 rounded-[8px] border border-white bg-gradient-to-b from-white to-[#bbc9e2] p-[17px] text-[16px] font-medium leading-[16px] text-black"
+                      type="submit"
+                      disabled={isSubmittingContact}
+                      className="flex w-full items-center justify-center gap-2 rounded-[8px] border border-white bg-gradient-to-b from-white to-[#bbc9e2] p-[17px] text-[16px] font-medium leading-[16px] text-black transition disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      Quero fazer parte
+                      {isSubmittingContact ? 'Enviando...' : 'Quero fazer parte'}
                       <img src={asset('/boost-home/button-arrow.svg')} alt="" className="h-5 w-5" />
                     </button>
                   </form>
@@ -558,6 +803,16 @@ export default function Home() {
                   <p className="mt-6 text-center text-[14px] leading-[21px] text-[#6a7282]">
                     Nosso time irá analisar o perfil e entrar em contato
                   </p>
+                  {contactStatus ? (
+                    <p
+                      className={[
+                        'mt-3 text-center text-[14px] leading-[21px]',
+                        contactStatus.type === 'success' ? 'text-[#a9d3b0]' : 'text-[#ff8c8c]',
+                      ].join(' ')}
+                    >
+                      {contactStatus.message}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -627,13 +882,47 @@ export default function Home() {
   );
 }
 
-function Field({ label, placeholder }: { label: string; placeholder: string }) {
+function FormField({
+  label,
+  name,
+  value,
+  onChange,
+  onBlur,
+  error,
+  type = 'text',
+  placeholder,
+  inputMode,
+}: {
+  label: string;
+  name: string;
+  value: string;
+  onChange: (value: string) => void;
+  onBlur: () => void;
+  error?: string;
+  type?: 'text' | 'email';
+  placeholder: string;
+  inputMode?: InputHTMLAttributes<HTMLInputElement>['inputMode'];
+}) {
   return (
     <div>
-      <label className="mb-2 block text-[16px] leading-[16px] text-[#364153]">{label}</label>
-      <div className="rounded-[10px] border border-[#232a38] bg-[#19202e] px-[17px] py-[18px] text-[16px] text-white/60">
-        {placeholder}
-      </div>
+      <label htmlFor={name} className="mb-2 block text-[16px] leading-[16px] text-[#364153]">
+        {label}
+      </label>
+      <input
+        id={name}
+        name={name}
+        type={type}
+        value={value}
+        inputMode={inputMode}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
+        placeholder={placeholder}
+        className={[
+          'w-full rounded-[10px] border bg-[#19202e] px-[17px] py-[18px] text-[16px] text-white outline-none transition placeholder:text-white/60 focus:border-white/30',
+          error ? 'border-[#ff8c8c]' : 'border-[#232a38]',
+        ].join(' ')}
+      />
+      {error ? <p className="mt-2 text-[13px] leading-[18px] text-[#ff8c8c]">{error}</p> : null}
     </div>
   );
 }
