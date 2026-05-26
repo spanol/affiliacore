@@ -126,11 +126,6 @@ async function startServer() {
     }
   });
 
-  // Keep the old /api/affiliates for backward compatibility or just redirect it
-  app.get('/api/affiliates', (req, res) => {
-    res.redirect('/api/external/affiliates');
-  });
-
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

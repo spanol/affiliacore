@@ -53,6 +53,12 @@ export default function AffiliatesList() {
     setLoading(true);
     setError(null);
     try {
+      if (!isAdmin) {
+        setAffiliates([]);
+        setConfigs({});
+        return;
+      }
+
       const [affData, configData, registeredUsers] = await Promise.all([
         fetchAffiliates(),
         fetchAffiliateConfigs(),
@@ -89,7 +95,7 @@ export default function AffiliatesList() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [isAdmin]);
 
   const handleConfigChange = (affiliateId: string, field: 'cpaValue' | 'revPercentage', value: string) => {
     // allow empty string for easier typing, but convert to 0 for the state if needed
@@ -132,6 +138,7 @@ export default function AffiliatesList() {
         item.id?.toString().includes(searchTerm)
       )
     : [];
+  const visibleAffiliates = isAdmin ? filteredAffiliates : [];
 
   const handleOpenDetails = (affiliate: any) => {
     navigate(`/affiliates/${affiliate.id}`);
@@ -243,13 +250,15 @@ export default function AffiliatesList() {
             <Loader2 size={40} className="text-brand animate-spin" />
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Sincronizando com a API...</p>
           </div>
-        ) : filteredAffiliates.length === 0 ? (
+        ) : visibleAffiliates.length === 0 ? (
           <div className="p-24 text-center">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 mb-4">
               <Users size={24} />
             </div>
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1">Nenhum resultado encontrado</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Tente ajustar seus filtros de busca.</p>
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1">Nenhum cliente associado</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              A lista ficará disponível quando os clientes forem vinculados ao seu ID de afiliado.
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -269,7 +278,7 @@ export default function AffiliatesList() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-                {filteredAffiliates.map((item: any) => {
+                {visibleAffiliates.map((item: any) => {
                   const affiliateId = item.id || item._id;
                   const config = configs[affiliateId] || { affiliateId, cpaValue: 0, revPercentage: 0 };
                   
@@ -384,7 +393,7 @@ export default function AffiliatesList() {
         
         <div className="p-4 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <p className="text-[10px] text-slate-400 font-bold uppercase italic">
-            Exibindo {filteredAffiliates.length} de {affiliates.length} registros
+            Exibindo {visibleAffiliates.length} de {isAdmin ? affiliates.length : 0} registros
           </p>
           <div className="flex gap-2">
             <button className="px-3 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded text-[10px] font-bold text-slate-400 disabled:opacity-30" disabled>Anterior</button>

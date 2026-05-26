@@ -58,8 +58,8 @@ export async function saveAffiliateConfig(config: AffiliateConfig): Promise<void
 
 export async function fetchAffiliates(): Promise<Affiliate[]> {
   try {
-    console.log('Fetching affiliates from /api/affiliates...');
-    const response = await fetch('/api/affiliates', {
+    console.log('Fetching affiliates from /api/external/affiliates...');
+    const response = await fetch('/api/external/affiliates', {
       method: 'GET',
       headers: {
         'Accept': 'application/json',

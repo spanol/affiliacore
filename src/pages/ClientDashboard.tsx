@@ -120,6 +120,7 @@ export default function ClientDashboard() {
     qualified_cpa: 0,
     rvs: 0,
   };
+  const clientRows: Array<{ name: string; firstDeposit: string; createdAt: string }> = [];
   const resultsToRender = results.length > 0 ? results : [emptyResult];
 
   return (
@@ -348,38 +349,41 @@ export default function ClientDashboard() {
                   </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl flex flex-col shadow-sm overflow-hidden mb-20">
-                  <div className="p-6 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-slate-50/50">
-                    <h3 className="font-black text-xs text-slate-800 dark:text-white uppercase tracking-widest">Lista de Clientes</h3>
-                    <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      0 registros
-                    </div>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                      <thead className="bg-slate-50 dark:bg-slate-800/50 text-[10px] text-slate-400 uppercase tracking-widest sticky top-0 backdrop-blur-sm z-10 border-b border-slate-100 dark:border-slate-800">
-                        <tr>
-                          <th className="px-8 py-5 font-black">Nome</th>
-                          <th className="px-8 py-5 font-black">Valor do primeiro depósito</th>
-                          <th className="px-8 py-5 font-black">Data de cadastro</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td colSpan={3} className="px-8 py-20 text-center">
-                            <div className="flex flex-col items-center gap-2 opacity-30">
-                              <User size={32} />
-                              <p className="text-xs font-bold uppercase tracking-widest">Lista zerada ate associar os clientes ao ID</p>
-                            </div>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
               </div>
             );
           })}
+
+          <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl flex flex-col shadow-sm overflow-hidden mb-20">
+            <div className="p-6 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-slate-50/50">
+              <h3 className="font-black text-xs text-slate-800 dark:text-white uppercase tracking-widest">Lista de Clientes</h3>
+              <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                {clientRows.length} registros
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-slate-50 dark:bg-slate-800/50 text-[10px] text-slate-400 uppercase tracking-widest sticky top-0 backdrop-blur-sm z-10 border-b border-slate-100 dark:border-slate-800">
+                  <tr>
+                    <th className="px-8 py-5 font-black">Nome</th>
+                    <th className="px-8 py-5 font-black">Valor do primeiro depósito</th>
+                    <th className="px-8 py-5 font-black">Data de cadastro</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clientRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="px-8 py-20 text-center">
+                        <div className="flex flex-col items-center gap-2 opacity-30">
+                          <User size={32} />
+                          <p className="text-xs font-bold uppercase tracking-widest">Lista zerada ate associar os clientes ao ID</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     </div>
