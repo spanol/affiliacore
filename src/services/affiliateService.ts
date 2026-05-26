@@ -35,6 +35,38 @@ interface ApiErrorInfo {
   noData: boolean;
 }
 
+const AFFILIATE_API_BASE_URL = (import.meta.env.VITE_AFFILIATE_API_BASE_URL || 'https://affiliate-api-prd.partnersotg.com').replace(/\/+$/, '');
+const AFFILIATE_API_KEY = import.meta.env.VITE_AFFILIATE_API_KEY || '';
+
+async function fetchAffiliateApi(endpoint: string, query?: URLSearchParams): Promise<Response> {
+  const proxyUrl = `/api/external/${endpoint}${query && query.toString() ? `?${query.toString()}` : ''}`;
+  const proxyResponse = await fetch(proxyUrl, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (proxyResponse.status !== 404) {
+    return proxyResponse;
+  }
+
+  console.warn(`Proxy route unavailable for ${endpoint}, retrying against external affiliate API directly.`);
+
+  if (!AFFILIATE_API_KEY) {
+    return proxyResponse;
+  }
+
+  const directUrl = `${AFFILIATE_API_BASE_URL}/api/v2/external/${endpoint}${query && query.toString() ? `?${query.toString()}` : ''}`;
+  return fetch(directUrl, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      'x-api-key': AFFILIATE_API_KEY,
+    },
+  });
+}
+
 export async function fetchAffiliateConfigs(): Promise<Record<string, AffiliateConfig>> {
   try {
     const querySnapshot = await getDocs(collection(db, 'affiliate_configs'));
@@ -64,13 +96,8 @@ export async function saveAffiliateConfig(config: AffiliateConfig): Promise<void
 
 export async function fetchAffiliates(): Promise<Affiliate[]> {
   try {
-    console.log('Fetching affiliates from /api/external/affiliates...');
-    const response = await fetch('/api/external/affiliates', {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
+    console.log('Fetching affiliates from affiliate API...');
+    const response = await fetchAffiliateApi('affiliates');
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -97,12 +124,7 @@ export async function fetchAffiliates(): Promise<Affiliate[]> {
 
 export async function fetchAffiliateById(id: string): Promise<any> {
   try {
-    const response = await fetch(`/api/external/affiliates/${id}`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
+    const response = await fetchAffiliateApi(`affiliates/${id}`);
 
     if (!response.ok) {
       if (response.status === 404) {
@@ -152,12 +174,7 @@ export async function fetchAffiliateResults(id: string): Promise<any> {
       affiliateIds: id
     });
 
-    const response = await fetch(`/api/external/results?${params.toString()}`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
+    const response = await fetchAffiliateApi('results', params);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -193,12 +210,7 @@ export async function fetchAllResults(): Promise<any[]> {
       groupBy: 'affiliate'
     });
 
-    const response = await fetch(`/api/external/results?${params.toString()}`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
+    const response = await fetchAffiliateApi('results', params);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));

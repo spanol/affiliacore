@@ -39,11 +39,22 @@ export default function AdminDashboard() {
     async function getDashboardData() {
       try {
         setLoading(true);
-        const [affiliates, allResults] = await Promise.all([
+        const [affiliatesResult, allResultsResult] = await Promise.allSettled([
           fetchAffiliates(),
           fetchAllResults()
         ]);
-        
+
+        const affiliates = affiliatesResult.status === 'fulfilled' ? affiliatesResult.value : [];
+        const allResults = allResultsResult.status === 'fulfilled' ? allResultsResult.value : [];
+
+        if (affiliatesResult.status === 'rejected') {
+          console.error('Error fetching affiliates for dashboard:', affiliatesResult.reason);
+        }
+
+        if (allResultsResult.status === 'rejected') {
+          console.error('Error fetching results for dashboard:', allResultsResult.reason);
+        }
+
         setAffiliatesCount(affiliates.length);
         setResults(allResults);
 
