@@ -107,16 +107,31 @@ async function startServer() {
         },
       });
 
+      const responseText = await response.text();
+      let responseBody: any = null;
+      try {
+        responseBody = responseText ? JSON.parse(responseText) : null;
+      } catch {
+        responseBody = null;
+      }
+
       if (!response.ok) {
-        const errorText = await response.text();
         return res.status(response.status).json({ 
-          error: `Erro na API Externa (${endpoint}): ${response.status}`, 
-          details: errorText 
+          error: `Erro na API Externa (${endpoint}): ${response.status}`,
+          code: responseBody?.code || responseBody?.errorCode,
+          message: responseBody?.message || responseBody?.error || response.statusText,
+          details: responseBody?.details || responseBody || responseText
         });
       }
 
-      const data = await response.json();
-      res.json(data);
+      if (responseBody !== null) {
+        return res.json(responseBody);
+      }
+
+      return res.status(502).json({
+        error: `Resposta inválida da API Externa (${endpoint})`,
+        details: responseText
+      });
     } catch (error) {
       console.error('Proxy Exception:', error);
       res.status(500).json({ 

@@ -29,6 +29,12 @@ export interface AffiliateConfig {
   updatedAt?: any;
 }
 
+interface ApiErrorInfo {
+  code?: string;
+  message: string;
+  noData: boolean;
+}
+
 export async function fetchAffiliateConfigs(): Promise<Record<string, AffiliateConfig>> {
   try {
     const querySnapshot = await getDocs(collection(db, 'affiliate_configs'));
@@ -72,6 +78,15 @@ export async function fetchAffiliates(): Promise<Affiliate[]> {
     }
 
     const data = await response.json();
+    const apiError = extractApiError(data);
+    if (apiError) {
+      if (apiError.noData) {
+        console.warn(`Affiliate API returned no data (${apiError.code || 'no-code'}): ${apiError.message}`);
+        return [];
+      }
+      throw new Error(apiError.message);
+    }
+
     console.log('API Response received');
     return extractArray(data);
   } catch (error) {
@@ -101,6 +116,17 @@ export async function fetchAffiliateById(id: string): Promise<any> {
     }
 
     const data = await response.json();
+    const apiError = extractApiError(data);
+    if (apiError) {
+      if (apiError.noData) {
+        const allAffiliates = await fetchAffiliates();
+        const found = allAffiliates.find((a: any) => String(a.id || a._id) === id);
+        if (found) return found;
+        return null;
+      }
+      throw new Error(apiError.message);
+    }
+
     return data.data || data;
   } catch (error) {
     console.error(`Error fetching affiliate ${id}:`, error);
@@ -139,6 +165,14 @@ export async function fetchAffiliateResults(id: string): Promise<any> {
     }
 
     const data = await response.json();
+    const apiError = extractApiError(data);
+    if (apiError) {
+      if (apiError.noData) {
+        return [];
+      }
+      throw new Error(apiError.message);
+    }
+
     // The response structure for results is { data: { data: [...] } }
     if (data.data && Array.isArray(data.data.data)) {
       return data.data.data;
@@ -172,6 +206,13 @@ export async function fetchAllResults(): Promise<any[]> {
     }
 
     const data = await response.json();
+    const apiError = extractApiError(data);
+    if (apiError) {
+      if (apiError.noData) {
+        return [];
+      }
+      throw new Error(apiError.message);
+    }
     
     if (data.data && Array.isArray(data.data.data)) {
       return data.data.data;
@@ -437,4 +478,70 @@ function extractArray(data: any): Affiliate[] {
   }
 
   return [];
+}
+
+function extractApiError(payload: any): ApiErrorInfo | null {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const candidates = [payload, payload.data, payload.error, payload.meta].filter(Boolean);
+
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'object') continue;
+
+    const rawCode = candidate.code ?? candidate.errorCode ?? candidate.statusCode ?? candidate.status;
+    const code = rawCode != null ? String(rawCode).trim() : '';
+    const rawMessage =
+      candidate.message ??
+      candidate.error ??
+      candidate.details ??
+      candidate.description;
+    const message = typeof rawMessage === 'string' ? rawMessage.trim() : '';
+    const success = candidate.success;
+    const hasExplicitFailure = success === false || Boolean(code && code !== '200' && code !== '201');
+
+    if (!hasExplicitFailure && !messageLooksLikeError(message)) {
+      continue;
+    }
+
+    const noData = isNoDataError(code, message);
+    return {
+      code: code || undefined,
+      message: message || (noData ? 'Nenhum dado encontrado.' : 'Erro retornado pela API externa.'),
+      noData
+    };
+  }
+
+  return null;
+}
+
+function isNoDataError(code: string, message: string): boolean {
+  const normalizedCode = code.replace(/^0+/, '') || code;
+  const normalizedMessage = message.toLowerCase();
+
+  return (
+    code === '040' ||
+    normalizedCode === '40' ||
+    normalizedMessage.includes('nenhum') ||
+    normalizedMessage.includes('nao encontrado') ||
+    normalizedMessage.includes('não encontrado') ||
+    normalizedMessage.includes('not found') ||
+    normalizedMessage.includes('no data') ||
+    normalizedMessage.includes('sem dados')
+  );
+}
+
+function messageLooksLikeError(message: string): boolean {
+  const normalizedMessage = message.toLowerCase();
+  return (
+    normalizedMessage.includes('erro') ||
+    normalizedMessage.includes('error') ||
+    normalizedMessage.includes('invalid') ||
+    normalizedMessage.includes('unauthorized') ||
+    normalizedMessage.includes('forbidden') ||
+    normalizedMessage.includes('not found') ||
+    normalizedMessage.includes('não encontrado') ||
+    normalizedMessage.includes('nao encontrado')
+  );
 }
