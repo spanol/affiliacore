@@ -93,7 +93,7 @@ export default function Settings() {
       <header>
         <h1 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
           <SettingsIcon size={24} className="text-brand" />
-          Configurações do Sistema
+          Configurações
         </h1>
         <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-1">Gerencie chaves de API e integração Firebase</p>
       </header>

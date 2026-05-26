@@ -47,7 +47,7 @@ export default function DashboardLayout() {
           icon: Users
         },
         ...(profile?.role === 'admin' ? [
-          { label: 'Configurações do Sistema', path: '/settings', icon: Settings }
+          { label: 'Configurações', path: '/settings', icon: Settings }
         ] : [])
       ] 
     },
@@ -66,7 +66,7 @@ export default function DashboardLayout() {
           <img
             src={boostLogo}
             alt="Boost"
-            className="h-[24px] w-auto"
+            className="h-[30px] w-auto"
           />
         </Link>
       </div>
@@ -86,12 +86,12 @@ export default function DashboardLayout() {
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded-md transition-all text-sm font-medium border border-transparent",
                     location.pathname === item.path 
-                      ? "bg-brand/10 text-brand font-bold border-brand/20 shadow-sm" 
+                      ? "bg-amber-500/15 text-amber-500 font-bold border-amber-500/30 shadow-sm" 
                       : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white hover:border-slate-200 dark:hover:border-slate-700 hover:shadow-sm"
                   )}
                 >
                   <item.icon size={18} className={cn(
-                    location.pathname === item.path ? "text-brand" : "text-slate-400"
+                    location.pathname === item.path ? "text-amber-500" : "text-slate-400"
                   )} />
                   {item.label}
                 </Link>
