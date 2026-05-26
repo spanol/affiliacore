@@ -11,7 +11,7 @@ import {
   CheckCircle,
   Percent
 } from 'lucide-react';
-import { fetchAffiliates, fetchAffiliateConfigs, saveAffiliateConfig, updateAffiliateStatus, createAuditLog, fetchRegisteredUsers, updateUserRole, AffiliateConfig } from '../services/affiliateService';
+import { fetchAffiliates, fetchAffiliateConfigs, fetchAffiliateStatuses, saveAffiliateConfig, updateAffiliateStatus, createAuditLog, fetchRegisteredUsers, updateUserRole, AffiliateConfig } from '../services/affiliateService';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -59,9 +59,10 @@ export default function AffiliatesList() {
         return;
       }
 
-      const [affData, configData, registeredUsers] = await Promise.all([
+      const [affData, configData, statusData, registeredUsers] = await Promise.all([
         fetchAffiliates(),
         fetchAffiliateConfigs(),
+        fetchAffiliateStatuses(),
         fetchRegisteredUsers()
       ]);
 
@@ -84,7 +85,12 @@ export default function AffiliatesList() {
         status: 'inactive'
       } as Affiliate));
 
-      setAffiliates([...registeredAffiliates, ...remaining]);
+      const mergedAffiliates = [...registeredAffiliates, ...remaining].map((affiliate) => ({
+        ...affiliate,
+        status: statusData[affiliate.id]?.status || affiliate.status || 'inactive'
+      }));
+
+      setAffiliates(mergedAffiliates);
       setConfigs(configData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar dados da API');

@@ -30,6 +30,13 @@ async function startServer() {
 
   app.use(express.json());
 
+  const serializeTimestamp = (value: any) => {
+    if (value?.toDate && typeof value.toDate === 'function') {
+      return value.toDate().toISOString();
+    }
+    return value ?? null;
+  };
+
   app.post('/api/create-user', async (req, res) => {
     if (!adminApp || !adminDb) {
       return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
@@ -77,6 +84,123 @@ async function startServer() {
     } catch (error: any) {
       console.error('Error creating auth user:', error);
       return res.status(500).json({ error: error.message || 'Erro interno criando usuário.' });
+    }
+  });
+
+  app.get('/api/affiliate-statuses', async (_req, res) => {
+    if (!adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+
+    try {
+      const snapshot = await adminDb.collection('affiliate_statuses').get();
+      const statuses = snapshot.docs.reduce<Record<string, { status: string; updatedAt: string | null }>>((acc, item) => {
+        const data = item.data();
+        acc[item.id] = {
+          status: data.status || 'inactive',
+          updatedAt: serializeTimestamp(data.updatedAt)
+        };
+        return acc;
+      }, {});
+
+      return res.json(statuses);
+    } catch (error: any) {
+      console.error('Error fetching affiliate statuses:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno listando status.' });
+    }
+  });
+
+  app.patch('/api/affiliates/:affiliateId', async (req, res) => {
+    if (!adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+
+    try {
+      const { affiliateId } = req.params;
+      const { status } = req.body ?? {};
+
+      if (!affiliateId) {
+        return res.status(400).json({ error: 'affiliateId é obrigatório.' });
+      }
+
+      if (status !== 'active' && status !== 'inactive') {
+        return res.status(400).json({ error: 'Status inválido. Use active ou inactive.' });
+      }
+
+      await adminDb.collection('affiliate_statuses').doc(String(affiliateId)).set({
+        status,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      return res.json({ affiliateId, status });
+    } catch (error: any) {
+      console.error('Error updating affiliate status:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno atualizando status.' });
+    }
+  });
+
+  app.get('/api/audit-logs', async (_req, res) => {
+    if (!adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+
+    try {
+      const snapshot = await adminDb
+        .collection('audit_logs')
+        .orderBy('createdAt', 'desc')
+        .limit(200)
+        .get();
+
+      const logs = snapshot.docs.map((item) => {
+        const data = item.data();
+        return {
+          id: item.id,
+          ...data,
+          createdAt: serializeTimestamp(data.createdAt),
+          updatedAt: serializeTimestamp(data.updatedAt)
+        };
+      });
+
+      return res.json(logs);
+    } catch (error: any) {
+      console.error('Error fetching audit logs:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno listando logs.' });
+    }
+  });
+
+  app.post('/api/audit-logs', async (req, res) => {
+    if (!adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+
+    try {
+      const { affiliateId, actorId, actorName, action, reason } = req.body ?? {};
+
+      if (!affiliateId || !action) {
+        return res.status(400).json({ error: 'affiliateId e action são obrigatórios.' });
+      }
+
+      const payload = {
+        affiliateId: String(affiliateId),
+        actorId: actorId ? String(actorId) : null,
+        actorName: actorName ? String(actorName) : null,
+        action: String(action),
+        reason: reason ? String(reason) : null,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      const docRef = await adminDb.collection('audit_logs').add(payload);
+
+      return res.status(201).json({
+        id: docRef.id,
+        ...payload,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    } catch (error: any) {
+      console.error('Error creating audit log:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno criando log.' });
     }
   });
 

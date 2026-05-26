@@ -29,6 +29,11 @@ export interface AffiliateConfig {
   updatedAt?: any;
 }
 
+export interface AffiliateStatusConfig {
+  status: 'active' | 'inactive';
+  updatedAt?: string | null;
+}
+
 interface ApiErrorInfo {
   code?: string;
   message: string;
@@ -91,6 +96,26 @@ export async function saveAffiliateConfig(config: AffiliateConfig): Promise<void
   } catch (error) {
     console.error('Error saving affiliate config:', error);
     throw error;
+  }
+}
+
+export async function fetchAffiliateStatuses(): Promise<Record<string, AffiliateStatusConfig>> {
+  try {
+    const response = await fetch('/api/affiliate-statuses', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || errorData.message || `Erro na API: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data && typeof data === 'object' ? data : {};
+  } catch (error) {
+    console.error('Error fetching affiliate statuses:', error);
+    return {};
   }
 }
 
