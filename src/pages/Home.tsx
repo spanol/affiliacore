@@ -110,7 +110,7 @@ const featureCards = [
   {
     title: ['Modo Administrativo', 'Contextual'],
     description: ['Gestão estratégica', 'da operação.'],
-    image: asset('/boost-home/feature-4.webp'),
+    image: asset('/boost-home/feature-4.png'),
     imageClassName: 'absolute bottom-0 left-[77px] w-[375px]',
     containerClassName:
       'overflow-hidden bg-[radial-gradient(circle_at_top_left,_#cfddf6_0%,_#98aed4_50%,_#607eb2_100%)]',
@@ -393,7 +393,7 @@ export default function Home() {
 
             <div id="plataforma" className="mt-[158px]">
               <img
-                src={asset('/boost-home/hero-platform.webp')}
+                src={asset('/boost-home/dashboard-escuro.png')}
                 alt="Plataforma Boost"
                 className="mx-auto w-full max-w-[1048px]"
               />
@@ -441,10 +441,16 @@ export default function Home() {
                       <img src={stat.icon} alt="" className="h-8 w-8" />
                     )}
                   </div>
-                  <p className="pt-[17.25px] text-[16px] font-bold leading-[19.2px]">
+                  <p className={[
+                    'pt-[17.25px] text-[16px] font-bold leading-[19.2px]',
+                    stat.label.toLowerCase().includes('cpa') ? 'text-white' : '',
+                  ].join(' ')}>
                     {stat.value}
                   </p>
-                  <p className="text-[16px] leading-[24px] text-[#273b5e]">{stat.label}</p>
+                  <p className={[
+                    'text-[16px] leading-[24px]',
+                    stat.label.toLowerCase().includes('cpa') ? 'text-white/90 font-medium' : 'text-[#273b5e]'
+                  ].join(' ')}>{stat.label}</p>
                 </div>
               ))}
             </div>
@@ -606,7 +612,7 @@ export default function Home() {
               <div className="mt-[70px]">
                 {dashboardTab === 'desktop' ? (
                   <img
-                    src={asset('/boost-home/dashboard.webp')}
+                    src={asset('/boost-home/dashboard-claro.png')}
                     alt="Dashboard Boost na versão desktop"
                     className="w-full"
                   />
@@ -619,9 +625,9 @@ export default function Home() {
                       <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[#0f1725]">
                         <div className="h-[560px] overflow-hidden">
                           <img
-                            src={asset('/boost-home/dashboard.webp')}
+                            src={asset('/boost-home/mobile-dash-1.png')}
                             alt="Dashboard Boost na versão mobile"
-                            className="h-full w-full origin-top scale-[1.92] object-cover object-top"
+                            className="h-full w-full origin-top object-cover object-top"
                           />
                         </div>
                       </div>

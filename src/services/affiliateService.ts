@@ -183,14 +183,177 @@ export async function fetchAllResults(): Promise<any[]> {
   }
 }
 
-export async function createUser(userData: { uid: string, name: string, email: string, role: 'admin' | 'client' }): Promise<void> {
+export async function updateAffiliateStatus(affiliateId: string, status: 'active' | 'inactive'): Promise<any> {
   try {
-    const docRef = doc(db, 'users', userData.uid);
+    const response = await fetch(`/api/affiliates/${affiliateId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ status })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || errorData.message || `Erro na API: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error(`Error updating affiliate ${affiliateId} status:`, error);
+    throw error;
+  }
+}
+
+export interface AuditLog {
+  id?: string;
+  affiliateId: string;
+  actorId?: string;
+  actorName?: string;
+  action: string;
+  reason?: string;
+  createdAt?: any;
+}
+
+export async function createAuditLog(log: AuditLog): Promise<AuditLog> {
+  try {
+    const response = await fetch('/api/audit-logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(log)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || errorData.message || `Erro na API: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error creating audit log:', error);
+    throw error;
+  }
+}
+
+export async function fetchAuditLogs(): Promise<AuditLog[]> {
+  try {
+    const response = await fetch('/api/audit-logs', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || errorData.message || `Erro na API: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : (data.data || []);
+  } catch (error) {
+    console.error('Error fetching audit logs:', error);
+    throw error;
+  }
+}
+
+export async function fetchRegisteredUsers(): Promise<Array<{ uid: string; affiliateId?: string; name?: string; email?: string; role?: string }>> {
+  try {
+    const q = query(collection(db, 'users'));
+    const snapshot = await getDocs(q);
+    const users: Array<{ uid: string; affiliateId?: string; name?: string; email?: string; role?: string }> = [];
+    snapshot.forEach(docSnap => {
+      const data = docSnap.data();
+      users.push({ uid: docSnap.id, affiliateId: data.affiliateId, name: data.name, email: data.email, role: data.role });
+    });
+    return users;
+  } catch (err) {
+    console.error('Error fetching registered users:', err);
+    return [];
+  }
+}
+
+export async function updateUserRole(uid: string, role: 'admin' | 'client'): Promise<void> {
+  try {
+    const userRef = doc(db, 'users', uid);
+    await setDoc(userRef, { role, updatedAt: serverTimestamp() }, { merge: true });
+  } catch (err) {
+    console.error('Error updating user role:', err);
+    throw err;
+  }
+}
+
+export async function isUserRegistered(uidOrAffiliateId: string): Promise<boolean> {
+  try {
+    const normalizedId = String(uidOrAffiliateId);
+    const docRef = doc(db, 'users', normalizedId);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return true;
+    }
+
+    const affiliateQuery = query(collection(db, 'users'), where('affiliateId', '==', normalizedId));
+    const affiliateSnapshot = await getDocs(affiliateQuery);
+    return !affiliateSnapshot.empty;
+  } catch (err) {
+    console.error('Error checking user registration:', err);
+    return false;
+  }
+}
+
+export interface AffiliateUserData {
+  uid?: string;
+  affiliateId?: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'client';
+  password?: string;
+  mustChangePassword?: boolean;
+}
+
+export async function createUser(userData: AffiliateUserData): Promise<void> {
+  if (userData.password) {
+    try {
+      const response = await fetch('/api/create-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(userData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || `Erro ao criar usuário: ${response.status}`);
+      }
+
+      return;
+    } catch (error) {
+      console.error('Error creating user via backend:', error);
+      throw error;
+    }
+  }
+
+  try {
+    const userId = userData.uid;
+    if (!userId) {
+      throw new Error('O ID do usuário não foi definido ao criar a conta.');
+    }
+
+    const docRef = doc(db, 'users', userId);
     await setDoc(docRef, {
-      ...userData,
+      uid: userId,
+      name: userData.name,
+      email: userData.email,
+      role: userData.role,
+      affiliateId: userData.affiliateId || null,
+      mustChangePassword: userData.mustChangePassword ?? false,
+      avatarUrl: `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(userData.name)}`,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
-    });
+    }, { merge: true });
   } catch (error) {
     console.error('Error creating user:', error);
     throw error;

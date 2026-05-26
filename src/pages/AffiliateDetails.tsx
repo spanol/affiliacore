@@ -31,6 +31,7 @@ import {
   AffiliateConfig,
   createUser,
   fetchSetting
+  , isUserRegistered
 } from '../services/affiliateService';
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
@@ -50,6 +51,7 @@ export default function AffiliateDetails() {
   const [userPassword, setUserPassword] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [registerSuccess, setRegisterSuccess] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
 
   // Link Modal State
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
@@ -85,26 +87,41 @@ export default function AffiliateDetails() {
     }
   };
 
+  const generateTemporaryPassword = () => {
+    const randomString = Math.random().toString(36).substring(2).toUpperCase();
+    const password = `${randomString.slice(0, 4)}-${randomString.slice(4, 8)}`;
+    setUserPassword(password);
+    return password;
+  };
+
+  const handleOpenUserModal = () => {
+    generateTemporaryPassword();
+    setRegisterError(null);
+    setIsUserModalOpen(true);
+  };
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!affiliate || !userEmail) return;
 
     try {
+      setRegisterError(null);
       setIsRegistering(true);
-      const initialPassword = Math.random().toString(36).slice(-8); // Generate 8-char password
-      setUserPassword(initialPassword);
+      const password = userPassword || generateTemporaryPassword();
 
       await createUser({
-        uid: affiliate.id.toString(),
         name: affiliate.name || affiliate.label || 'Sem Nome',
-        email: userEmail,
-        role: 'client'
+        email: userEmail.trim().toLowerCase(),
+        role: 'client',
+        password,
+        mustChangePassword: true,
+        affiliateId: String(affiliate.id)
       });
 
       setRegisterSuccess(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating user:', err);
-      // We could set an error state here
+      setRegisterError(err?.message || 'Erro ao cadastrar usuário.');
     } finally {
       setIsRegistering(false);
     }
@@ -113,7 +130,25 @@ export default function AffiliateDetails() {
   const handleGenerateLink = async () => {
     try {
       setIsGeneratingLink(true);
-      const baseUrl = await fetchSetting('affiliate_base_url') || 'https://goatech.com/go/';
+      // Prefer env-configured domain (APP_URL) then DB setting then fallback
+      let baseUrl = null;
+      try {
+        const envUrl = (import.meta.env && import.meta.env.APP_URL) ? String(import.meta.env.APP_URL) : '';
+        if (envUrl) {
+          try { baseUrl = new URL(envUrl).origin + '/go/'; } catch { baseUrl = envUrl; }
+        }
+      } catch (e) {
+        // ignore
+      }
+      baseUrl = baseUrl || await fetchSetting('affiliate_base_url') || 'https://goatech.com/go/';
+      // Ensure user is registered in Firestore before generating link
+      const registered = await isUserRegistered(String(affiliate.id));
+      if (!registered) {
+        // Open create-user modal so admin can register
+        setIsUserModalOpen(true);
+        setIsGeneratingLink(false);
+        return;
+      }
       const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase() + 
                          Math.random().toString(36).substring(2, 8).toUpperCase();
       const code = randomCode.slice(0, 12);
@@ -192,7 +227,7 @@ export default function AffiliateDetails() {
 
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => setIsUserModalOpen(true)}
+            onClick={handleOpenUserModal}
             className="flex items-center gap-2 px-4 py-2.5 bg-brand text-white rounded-xl hover:bg-brand-dark transition-all font-bold text-xs uppercase tracking-wider shadow-sm shadow-brand/20"
           >
             <UserPlus size={16} /> Cadastrar Usuário
@@ -223,7 +258,7 @@ export default function AffiliateDetails() {
                   <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-6">
                     <div>
                       <div className="flex items-center gap-1 text-xs font-bold text-slate-500 mb-2">
-                        Comissão total <HelpCircle size={14} className="text-slate-300" />
+                        Comissão total <HelpCircle size={14} className="text-slate-500 dark:text-slate-300" />
                       </div>
                       <div className="flex items-baseline gap-4">
                         <h2 className="text-4xl font-black text-slate-900 dark:text-white">
@@ -242,7 +277,7 @@ export default function AffiliateDetails() {
                             R$
                           </div>
                           <div>
-                            <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                            <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest mb-1">
                               CPA Calculado (R$ {config?.cpaValue || 0}/CPA) <HelpCircle size={10} />
                             </div>
                             <p className="text-xl font-black text-slate-800 dark:text-white">
@@ -258,7 +293,7 @@ export default function AffiliateDetails() {
                             <TrendingUp size={20} />
                           </div>
                           <div>
-                            <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                            <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest mb-1">
                               REV Share ({config?.revPercentage || 0}%) <HelpCircle size={10} />
                             </div>
                             <p className="text-xl font-black text-slate-800 dark:text-white">
@@ -327,25 +362,22 @@ export default function AffiliateDetails() {
                       initial={{ opacity: 0, y: 20 }}
                       whileInView={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2 }}
-                      className="bg-brand/5 dark:bg-brand/10 p-8 rounded-[2.5rem] border border-brand/20 dark:border-brand/40 shadow-sm group hover:border-brand/40 transition-all duration-500 relative overflow-hidden"
+                      className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm group hover:border-brand/20 transition-all duration-500"
                     >
-                      <div className="absolute inset-0 bg-gradient-to-br from-brand/5 to-transparent pointer-events-none"></div>
-                      <div className="relative z-10">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="p-3 bg-white dark:bg-slate-900 rounded-2xl text-brand shadow-sm">
-                            <Shield size={20} />
-                          </div>
-                          <div className="bg-brand/10 border border-brand/20 px-2 py-1 rounded-lg">
-                             <span className="text-[10px] font-black text-brand">
-                               {res.first_deposits > 0 ? ((res.qualified_cpa / res.first_deposits) * 100).toFixed(1) : 0}% conv.
-                             </span>
-                          </div>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl text-slate-400 group-hover:text-brand transition-colors">
+                          <Shield size={20} />
                         </div>
-                        <div className="space-y-1">
-                          <p className="text-[10px] font-black text-brand uppercase tracking-[0.2em]">CPA Qualificado</p>
-                          <h4 className="text-4xl font-black text-brand tracking-tighter">{res.qualified_cpa || 0}</h4>
-                          <p className="text-[10px] font-bold text-brand uppercase tracking-widest mt-2 opacity-60">Meta Alcançada</p>
+                        <div className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
+                           <span className="text-[10px] font-black text-slate-500">
+                             {res.first_deposits > 0 ? ((res.qualified_cpa / res.first_deposits) * 100).toFixed(1) : 0}% conv.
+                           </span>
                         </div>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">CPA Qualificado</p>
+                        <h4 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{res.qualified_cpa || 0}</h4>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2 opacity-60">Meta Alcançada</p>
                       </div>
                     </motion.div>
                   </div>
@@ -354,7 +386,7 @@ export default function AffiliateDetails() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8">
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
                       <div className="flex items-center gap-1 text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest mb-8">
-                        REV (R$) por Casa <HelpCircle size={14} className="text-slate-300" />
+                        REV (R$) por Casa <HelpCircle size={14} className="text-slate-500 dark:text-slate-300" />
                       </div>
                       <div className="space-y-6">
                         <div className="space-y-4">
@@ -382,7 +414,7 @@ export default function AffiliateDetails() {
                     <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
                       <div className="flex items-center justify-between mb-8">
                         <div className="flex items-center gap-1 text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
-                          CPA (R$) por Casa <HelpCircle size={14} className="text-slate-300" />
+                          CPA (R$) por Casa <HelpCircle size={14} className="text-slate-500 dark:text-slate-300" />
                         </div>
                         <div className="flex bg-slate-50 dark:bg-slate-800 p-1 rounded-lg border border-slate-100 dark:border-slate-700">
                           <button className="px-3 py-1 bg-white dark:bg-slate-700 text-[10px] font-bold text-slate-900 dark:text-white rounded shadow-sm">R$</button>
@@ -475,6 +507,8 @@ export default function AffiliateDetails() {
                   setIsUserModalOpen(false);
                   setRegisterSuccess(false);
                   setUserEmail('');
+                  setUserPassword('');
+                  setRegisterError(null);
                 }}
                 className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
               >
@@ -494,7 +528,7 @@ export default function AffiliateDetails() {
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">E-mail para Login</label>
                     <div className="relative">
-                      <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 dark:text-slate-300" />
                       <input 
                         type="email"
                         required
@@ -505,12 +539,42 @@ export default function AffiliateDetails() {
                       />
                     </div>
                   </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Senha Temporária</label>
+                      <button 
+                        type="button"
+                        onClick={generateTemporaryPassword}
+                        className="text-[10px] uppercase tracking-widest font-bold text-brand hover:text-brand-dark transition-colors"
+                      >
+                        Gerar nova senha
+                      </button>
+                    </div>
+                    <div className="relative rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-3 font-mono text-sm text-slate-700 dark:text-slate-200 flex items-center justify-between gap-3">
+                      <span className="break-all">{userPassword || 'Clique em gerar senha'}</span>
+                      <button 
+                        type="button"
+                        disabled={!userPassword}
+                        onClick={() => userPassword && navigator.clipboard.writeText(userPassword)}
+                        className="rounded-xl bg-slate-900 text-white p-2 disabled:opacity-40 transition-all hover:bg-slate-800"
+                      >
+                        <Copy size={16} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
+
+                {registerError && (
+                  <div className="rounded-2xl bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-200">
+                    {registerError}
+                  </div>
+                )}
 
                 <button 
                   type="submit"
-                  disabled={isRegistering}
-                  className="w-full py-4 bg-slate-900 dark:bg-brand text-white dark:text-slate-900 font-black text-xs uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-slate-900/10 dark:shadow-brand/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                  disabled={isRegistering || !userPassword}
+                  className="w-full py-4 bg-slate-900 text-white font-black text-xs uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-slate-900/10 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 dark:bg-gradient-to-r dark:from-cyan-300 dark:via-sky-300 dark:to-brand dark:text-slate-950 dark:ring-1 dark:ring-white/20 dark:shadow-[0_18px_50px_rgba(56,189,248,0.28)] dark:hover:brightness-105"
                 >
                   {isRegistering ? <Loader2 size={18} className="animate-spin" /> : <UserPlus size={18} />}
                   Confirmar Cadastro
@@ -600,9 +664,10 @@ export default function AffiliateDetails() {
                     <button 
                       onClick={copyToClipboard}
                       className={cn(
-                        "p-4 rounded-xl transition-all shadow-sm flex items-center justify-center group-hover:scale-110",
-                        isCopied ? "bg-green-500 text-white" : "bg-slate-900 dark:bg-brand text-white dark:text-slate-900"
+                        "p-4 rounded-xl transition-all shadow-md flex items-center justify-center group-hover:scale-110 border",
+                        isCopied ? "bg-green-500 text-white border-green-600" : "bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900 dark:border-slate-200"
                       )}
+                      title="Copiar link para a área de transferência"
                     >
                       {isCopied ? <Check size={20} /> : <Copy size={20} />}
                     </button>

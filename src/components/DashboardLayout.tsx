@@ -47,7 +47,8 @@ export default function DashboardLayout() {
           icon: Users
         },
         ...(profile?.role === 'admin' ? [
-          { label: 'Configurações', path: '/settings', icon: Settings }
+          { label: 'Configurações', path: '/settings', icon: Settings },
+          { label: 'Contatos', path: '/contacts', icon: User }
         ] : [])
       ] 
     },
@@ -66,7 +67,7 @@ export default function DashboardLayout() {
           <img
             src={boostLogo}
             alt="Boost"
-            className="h-[30px] w-auto"
+            className="h-[30px] w-auto invert dark:invert-0"
           />
         </Link>
       </div>
@@ -91,7 +92,7 @@ export default function DashboardLayout() {
                   )}
                 >
                   <item.icon size={18} className={cn(
-                    location.pathname === item.path ? "text-amber-500" : "text-slate-400"
+                    location.pathname === item.path ? "text-amber-500" : "text-slate-600 dark:text-slate-300"
                   )} />
                   {item.label}
                 </Link>

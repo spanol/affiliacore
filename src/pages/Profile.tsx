@@ -64,13 +64,26 @@ export default function Profile() {
 
     const currentPath = `users/${user.uid}`;
     try {
+      const forcePasswordChange = profile?.mustChangePassword;
+      if (forcePasswordChange && !newPassword) {
+        setMessage({ type: 'error', text: 'Você precisa definir uma nova senha antes de continuar.' });
+        setLoading(false);
+        return;
+      }
+
+      const updatePayload: Record<string, any> = {
+        name: name.trim(),
+        avatarUrl,
+        updatedAt: serverTimestamp()
+      };
+
+      if (forcePasswordChange && newPassword) {
+        updatePayload.mustChangePassword = false;
+      }
+
       // Update Firestore
       try {
-        await updateDoc(doc(db, 'users', user.uid), {
-          name: name.trim(),
-          avatarUrl,
-          updatedAt: serverTimestamp()
-        });
+        await updateDoc(doc(db, 'users', user.uid), updatePayload);
       } catch (firestoreErr) {
         handleFirestoreError(firestoreErr, OperationType.UPDATE, currentPath);
       }
@@ -96,6 +109,12 @@ export default function Profile() {
         <h1 className="text-3xl font-light text-gray-900 dark:text-white">Meu Perfil</h1>
         <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Gerencie suas informações pessoais e segurança da conta.</p>
       </header>
+      {profile?.mustChangePassword && (
+        <div className="p-4 rounded-3xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-amber-900 dark:text-amber-100">
+          <p className="text-sm font-bold">Primeiro acesso: é necessário alterar a senha temporária antes de continuar.</p>
+          <p className="text-xs mt-1 text-slate-600 dark:text-slate-300">Use o campo abaixo para criar uma nova senha segura.</p>
+        </div>
+      )}
 
       {message && (
         <motion.div 
@@ -154,7 +173,7 @@ export default function Profile() {
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">Nome Completo</label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={16} />
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 dark:text-slate-300" size={16} />
                     <input 
                       type="text" 
                       value={name}
@@ -168,7 +187,7 @@ export default function Profile() {
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">E-mail</label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={16} />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 dark:text-slate-300" size={16} />
                     <input 
                       type="email" 
                       value={profile?.email}

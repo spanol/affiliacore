@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import admin from 'firebase-admin';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -7,11 +8,77 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+let adminApp: admin.app.App | null = null;
+let adminDb: admin.firestore.Firestore | null = null;
+
+try {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+    adminApp = admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+  } else {
+    adminApp = admin.initializeApp();
+  }
+  adminDb = adminApp.firestore();
+  console.log('Firebase Admin initialized');
+} catch (error) {
+  console.error('Firebase Admin initialization failed:', error);
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
+
+  app.post('/api/create-user', async (req, res) => {
+    if (!adminApp || !adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+
+    try {
+      const { name, email, password, role, affiliateId, mustChangePassword } = req.body;
+      if (!email || !password || !name || !role) {
+        return res.status(400).json({ error: 'Dados incompletos para criar usuário.' });
+      }
+
+      const normalizedEmail = String(email).trim().toLowerCase();
+      const normalizedName = String(name).trim();
+      const normalizedRole = String(role);
+      let userRecord: admin.auth.UserRecord;
+
+      try {
+        userRecord = await adminApp.auth().createUser({
+          email: normalizedEmail,
+          password: String(password),
+          displayName: normalizedName,
+        });
+      } catch (error: any) {
+        if (error.code === 'auth/email-already-exists') {
+          userRecord = await adminApp.auth().getUserByEmail(normalizedEmail);
+        } else {
+          throw error;
+        }
+      }
+
+      const userDoc = adminDb.collection('users').doc(userRecord.uid);
+      await userDoc.set({
+        uid: userRecord.uid,
+        name: normalizedName,
+        email: normalizedEmail,
+        role: normalizedRole,
+        affiliateId: affiliateId ? String(affiliateId) : null,
+        mustChangePassword: !!mustChangePassword,
+        avatarUrl: `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(normalizedName)}`,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      return res.json({ uid: userRecord.uid });
+    } catch (error: any) {
+      console.error('Error creating auth user:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno criando usuário.' });
+    }
+  });
 
   // Proxy route for Affiliate API to handle multiple endpoints dynamically
   app.get('/api/external/:endpoint/:id?', async (req, res) => {

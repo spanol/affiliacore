@@ -1,7 +1,8 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { ToastProvider } from './contexts/ToastContext';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -9,12 +10,14 @@ import AdminDashboard from './pages/AdminDashboard';
 import ClientDashboard from './pages/ClientDashboard';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
+import Contacts from './pages/Contacts';
 import AffiliatesList from './pages/AffiliatesList';
 import AffiliateDetails from './pages/AffiliateDetails';
 import DashboardLayout from './components/DashboardLayout';
 
 const ProtectedRoute = ({ children, role }: { children: React.ReactNode, role?: 'admin' | 'client' }) => {
   const { user, profile, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) return (
     <div className="flex items-center justify-center h-screen bg-slate-50 dark:bg-slate-950">
@@ -32,6 +35,10 @@ const ProtectedRoute = ({ children, role }: { children: React.ReactNode, role?: 
   }
 
   // If we have a user but no profile (and not loading), something is wrong with the account
+  if (user && profile?.mustChangePassword && location.pathname !== '/profile') {
+    return <Navigate to="/profile" replace />;
+  }
+
   if (user && !profile && !loading && role) {
     return <Navigate to="/profile" replace />;
   }
@@ -44,6 +51,7 @@ export default function App() {
     <Router>
       <ThemeProvider>
         <AuthProvider>
+          <ToastProvider>
           <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
@@ -67,11 +75,17 @@ export default function App() {
             } />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/contacts" element={
+              <ProtectedRoute role="admin">
+                <Contacts />
+              </ProtectedRoute>
+            } />
             <Route path="/affiliates" element={<AffiliatesList />} />
             <Route path="/affiliates/:id" element={<AffiliateDetails />} />
           </Route>
-        </Routes>
-      </AuthProvider>
+          </Routes>
+        </ToastProvider>
+        </AuthProvider>
     </ThemeProvider>
   </Router>
   );
