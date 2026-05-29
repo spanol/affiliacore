@@ -34,6 +34,7 @@ import {
   createUser,
   createAccessInvite
 } from '../services/affiliateService';
+import { useAuth } from '../contexts/AuthContext';
 import BrandBreakdown from '../components/BrandBreakdown';
 import DailyPerformanceChart from '../components/DailyPerformanceChart';
 import DateRangePicker from '../components/DateRangePicker';
@@ -44,6 +45,10 @@ import { motion } from 'motion/react';
 export default function AffiliateDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  // Admin vê a página como gestão (voltar p/ lista, cadastrar usuário, gerar convite).
+  // O afiliado vê a MESMA página como seu próprio painel — sem esses controles.
+  const isAdmin = profile?.role === 'admin';
   const [affiliate, setAffiliate] = useState<any>(null);
   const [results, setResults] = useState<any[]>([]);
   const [brandResults, setBrandResults] = useState<any[]>([]);
@@ -193,12 +198,14 @@ export default function AffiliateDetails() {
       {/* Header */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <button 
-            onClick={() => navigate('/affiliates')}
-            className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:text-brand transition-all shadow-sm"
-          >
-            <ArrowLeft size={20} />
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => navigate('/affiliates')}
+              className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:text-brand transition-all shadow-sm"
+            >
+              <ArrowLeft size={20} />
+            </button>
+          )}
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
@@ -219,20 +226,24 @@ export default function AffiliateDetails() {
 
         <div className="flex flex-wrap items-center gap-3">
           <DateRangePicker value={range} onChange={setRange} />
-          <button
-            onClick={handleOpenUserModal}
-            className="flex items-center gap-2 px-4 py-2.5 bg-brand text-white rounded-xl hover:bg-brand-dark transition-all font-bold text-xs uppercase tracking-wider shadow-sm shadow-brand/20"
-          >
-            <UserPlus size={16} /> Cadastrar Usuário
-          </button>
-          <button 
-            onClick={handleGenerateLink}
-            disabled={isGeneratingLink}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:border-brand/40 transition-all font-bold text-xs uppercase tracking-wider shadow-sm"
-          >
-            {isGeneratingLink ? <Loader2 size={16} className="animate-spin" /> : <Link size={16} />}
-            Gerar Convite
-          </button>
+          {isAdmin && (
+            <>
+              <button
+                onClick={handleOpenUserModal}
+                className="flex items-center gap-2 px-4 py-2.5 bg-brand text-white rounded-xl hover:bg-brand-dark transition-all font-bold text-xs uppercase tracking-wider shadow-sm shadow-brand/20"
+              >
+                <UserPlus size={16} /> Cadastrar Usuário
+              </button>
+              <button
+                onClick={handleGenerateLink}
+                disabled={isGeneratingLink}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:border-brand/40 transition-all font-bold text-xs uppercase tracking-wider shadow-sm"
+              >
+                {isGeneratingLink ? <Loader2 size={16} className="animate-spin" /> : <Link size={16} />}
+                Gerar Convite
+              </button>
+            </>
+          )}
         </div>
       </header>
 

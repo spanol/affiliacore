@@ -36,10 +36,12 @@ export default function DashboardLayout() {
     { 
       label: 'Geral', 
       items: [
-        { 
-          label: 'Dashboard', 
-          path: profile?.role === 'admin' ? '/admin' : '/client', 
-          icon: LayoutDashboard 
+        {
+          label: 'Dashboard',
+          path: profile?.role === 'admin'
+            ? '/admin'
+            : (profile?.affiliateId ? `/affiliates/${profile.affiliateId}` : '/profile'),
+          icon: LayoutDashboard
         },
         {
           label: profile?.role === 'admin' ? 'Afiliados' : 'Clientes',

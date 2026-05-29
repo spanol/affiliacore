@@ -17,6 +17,11 @@ import AffiliateDetails from './pages/AffiliateDetails';
 import NotFound from './pages/NotFound';
 import DashboardLayout from './components/DashboardLayout';
 
+// Página inicial do afiliado: a própria visão de dados em /affiliates/{id}.
+// Sem affiliateId vinculado, cai no perfil.
+const clientHome = (profile: { affiliateId?: string | null } | null) =>
+  profile?.affiliateId ? `/affiliates/${profile.affiliateId}` : '/profile';
+
 const ProtectedRoute = ({ children, role }: { children: React.ReactNode, role?: 'admin' | 'client' }) => {
   const { user, profile, loading } = useAuth();
   const location = useLocation();
@@ -33,7 +38,7 @@ const ProtectedRoute = ({ children, role }: { children: React.ReactNode, role?: 
   if (!user) return <Navigate to="/login" replace />;
   
   if (role && profile && profile.role !== role) {
-    return <Navigate to={profile.role === 'admin' ? '/admin' : '/client'} replace />;
+    return <Navigate to={profile.role === 'admin' ? '/admin' : clientHome(profile)} replace />;
   }
 
   // If we have a user but no profile (and not loading), something is wrong with the account
@@ -103,7 +108,7 @@ function DashboardRedirect() {
   if (loading) return null;
   
   if (profile?.role === 'admin') return <Navigate to="/admin" replace />;
-  if (profile?.role === 'client') return <Navigate to="/client" replace />;
+  if (profile?.role === 'client') return <Navigate to={clientHome(profile)} replace />;
 
   // Default fallback if role is missing but user is logged in
   return <Navigate to="/admin" replace />;
