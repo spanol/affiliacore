@@ -311,8 +311,8 @@ export default function AdminDashboard() {
                   }}
                   itemStyle={{ fontSize: '12px', fontWeight: 700, color: theme === 'dark' ? '#E2E8F0' : '#334155' }}
                   labelStyle={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: theme === 'dark' ? '#94A3B8' : '#64748B', marginBottom: '8px' }}
-                  formatter={(value: number, name: string) => [
-                    `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+                  formatter={(value: any, name: any) => [
+                    `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
                     name
                   ]}
                 />
