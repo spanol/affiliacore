@@ -540,8 +540,31 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    // Hashed assets podem ser cacheados; o index.html precisa sempre revalidar
+    // para que um deploy novo (com novos hashes) seja pego de imediato.
+    app.use(express.static(distPath, {
+      index: false,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('index.html')) {
+          res.setHeader('Cache-Control', 'no-cache');
+        }
+      },
+    }));
     app.get('*', (req, res) => {
+      // O fallback SPA é só para rotas de cliente. Se um request de ARQUIVO
+      // (com extensão, ex.: /assets/index-*.js) chega aqui, o arquivo não existe
+      // nesta build — devolver 404 em vez do index.html, que o browser carregaria
+      // com o MIME errado ("Expected a JavaScript module…").
+      if (path.extname(req.path)) {
+        return res.status(404).type('html').send(
+          renderErrorPage({
+            status: 404,
+            title: 'Recurso não encontrado',
+            message: 'O arquivo solicitado não existe nesta versão da aplicação.',
+          })
+        );
+      }
+      res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
