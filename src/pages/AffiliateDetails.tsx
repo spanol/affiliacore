@@ -340,42 +340,9 @@ export default function AffiliateDetails() {
                     </div>
                   </div>
 
-                  {/* B1 · Lucro líquido da agência — ADMIN ONLY (o afiliado não vê a margem retida).
-                      Regra provisória: ver comentário em affiliateService.calcNetProfit. */}
-                  {isAdmin && (() => {
-                    const houseCommission = res.total_commission || 0;
-                    const agencyMargin = houseCommission - totalCommission;
-                    return (
-                      <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
-                        <div className="flex items-center gap-1 text-xs font-bold text-slate-500 mb-4">
-                          Lucro líquido da agência <HelpCircle size={14} className="text-slate-500 dark:text-slate-300" />
-                          <span className="ml-1 text-[10px] font-medium italic text-slate-400 normal-case">
-                            (regra provisória — a confirmar)
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-                            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest mb-1">Recebido das casas</p>
-                            <p className="text-xl font-black text-slate-800 dark:text-white">
-                              R$ {houseCommission.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
-                          </div>
-                          <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-                            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest mb-1">Repassado ao afiliado</p>
-                            <p className="text-xl font-black text-slate-800 dark:text-white">
-                              R$ {totalCommission.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
-                          </div>
-                          <div className="p-6 bg-emerald-50/60 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40">
-                            <p className="text-[10px] font-bold text-emerald-700/70 dark:text-emerald-400/80 uppercase tracking-widest mb-1">Margem (lucro líquido)</p>
-                            <p className="text-xl font-black text-emerald-700 dark:text-emerald-400">
-                              R$ {agencyMargin.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  {/* Lucro líquido NÃO aparece na view de afiliado (decisão do Carlos, 2026-05-29):
+                      a margem da agência fica só no dashboard do master (/admin · AdminDashboard).
+                      O afiliado vê apenas o próprio ganho ("Comissão total"). */}
 
                   {/* Primary Performance Metrics */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
