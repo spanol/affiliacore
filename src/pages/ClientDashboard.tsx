@@ -15,14 +15,20 @@ import {
   fetchAffiliateById,
   fetchAffiliateConfigs,
   fetchAffiliateResults,
+  fetchAffiliateResultsByBrand,
+  fetchAffiliateDailyResults,
   fetchAffiliates,
 } from '../services/affiliateService';
+import BrandBreakdown from '../components/BrandBreakdown';
+import DailyPerformanceChart from '../components/DailyPerformanceChart';
 import { cn } from '../lib/utils';
 
 export default function ClientDashboard() {
   const { profile } = useAuth();
   const [affiliate, setAffiliate] = useState<any>(null);
   const [results, setResults] = useState<any[]>([]);
+  const [brandResults, setBrandResults] = useState<any[]>([]);
+  const [dailyResults, setDailyResults] = useState<any[]>([]);
   const [config, setConfig] = useState<AffiliateConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +47,8 @@ export default function ClientDashboard() {
       let affiliateDetails: any = null;
       let allConfigs: Record<string, AffiliateConfig> = {};
       let resultsData: any[] = [];
+      let brandData: any[] = [];
+      let dailyData: any[] = [];
 
       if (affiliateId) {
         affiliateDetails = await fetchAffiliateById(affiliateId).catch(() => null);
@@ -55,7 +63,7 @@ export default function ClientDashboard() {
       }
 
       if (affiliateId) {
-        [resultsData, allConfigs] = await Promise.all([
+        [resultsData, allConfigs, brandData, dailyData] = await Promise.all([
           fetchAffiliateResults(affiliateId).catch((err) => {
             console.error('Error fetching results:', err);
             return [];
@@ -64,6 +72,8 @@ export default function ClientDashboard() {
             console.error('Error fetching configs:', err);
             return {};
           }),
+          fetchAffiliateResultsByBrand(affiliateId),
+          fetchAffiliateDailyResults(affiliateId),
         ]);
       }
 
@@ -77,6 +87,8 @@ export default function ClientDashboard() {
 
       setAffiliate(affiliateDetails || fallbackAffiliate);
       setResults(Array.isArray(resultsData) ? resultsData : []);
+      setBrandResults(Array.isArray(brandData) ? brandData : []);
+      setDailyResults(Array.isArray(dailyData) ? dailyData : []);
       setConfig(affiliateId ? allConfigs[affiliateId] || null : null);
       setError(null);
     } catch (err) {
@@ -89,6 +101,8 @@ export default function ClientDashboard() {
         status: 'Ativo',
       });
       setResults([]);
+      setBrandResults([]);
+      setDailyResults([]);
       setConfig(null);
       setError(null);
     } finally {
@@ -283,76 +297,26 @@ export default function ClientDashboard() {
                   </motion.div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8">
-                  <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
-                    <div className="flex items-center gap-1 text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest mb-8">
-                      REV (R$) por Casa <HelpCircle size={14} className="text-slate-500 dark:text-slate-300" />
-                    </div>
-                    <div className="space-y-6">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-6 h-6 rounded bg-red-600 flex items-center justify-center text-white font-black text-[10px]">S</div>
-                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Superbet</span>
-                          </div>
-                          <span className="text-xs font-bold text-slate-400">
-                            R$ {Number(res.rvs || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                        <div className="h-6 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden relative">
-                          <div className="h-full bg-slate-700 dark:bg-slate-600 rounded-full w-[90%]"></div>
-                          <div className="absolute inset-0 flex justify-between px-4 items-center">
-                            <span className="text-[10px] text-slate-400">0</span>
-                            <span className="text-[10px] text-slate-400">7.5</span>
-                            <span className="text-[10px] text-slate-400">15</span>
-                            <span className="text-[10px] text-slate-400">22.5</span>
-                            <span className="text-[10px] text-slate-100">30</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
-                    <div className="flex items-center justify-between mb-8">
-                      <div className="flex items-center gap-1 text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
-                        CPA (R$) por Casa <HelpCircle size={14} className="text-slate-500 dark:text-slate-300" />
-                      </div>
-                      <div className="flex bg-slate-50 dark:bg-slate-800 p-1 rounded-lg border border-slate-100 dark:border-slate-700">
-                        <button className="px-3 py-1 bg-white dark:bg-slate-700 text-[10px] font-bold text-slate-900 dark:text-white rounded shadow-sm">R$</button>
-                        <button className="px-3 py-1 text-[10px] font-bold text-slate-400">Qtd.</button>
-                      </div>
-                    </div>
-                    <div className="space-y-6">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-6 h-6 rounded bg-red-600 flex items-center justify-center text-white font-black text-[10px]">S</div>
-                            <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Superbet</span>
-                          </div>
-                          <span className="text-xs font-bold text-slate-400">
-                            R$ {calculatedCpa.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                        <div className="h-6 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden relative">
-                          <div className="h-full bg-slate-700 dark:bg-slate-600 rounded-full w-[95%]"></div>
-                          <div className="absolute inset-0 flex justify-between px-4 items-center">
-                            <span className="text-[10px] text-slate-400">0</span>
-                            <span className="text-[10px] text-slate-400">1,3k</span>
-                            <span className="text-[10px] text-slate-400">2,5k</span>
-                            <span className="text-[10px] text-slate-400">3,8k</span>
-                            <span className="text-[10px] text-slate-100">5k</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                {/* Per-house breakdown (real data from groupBy=brand) */}
+                <BrandBreakdown data={brandResults} config={config} />
 
               </div>
             );
           })}
 
+          {/* Evolução diária (dados reais da API externa, groupBy=date) */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl flex flex-col shadow-sm overflow-hidden mb-20">
+            <div className="p-6 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-slate-50/50">
+              <h3 className="font-black text-xs text-slate-800 dark:text-white uppercase tracking-widest">Evolução Diária</h3>
+              <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Cadastros · Comissão
+              </div>
+            </div>
+            <DailyPerformanceChart data={dailyResults} />
+          </div>
+
+          {/* Lista de Clientes — desativada: a API de afiliados não expõe dados por
+              cliente/jogador. Mantida para reativar caso surja essa fonte de dados.
           <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl flex flex-col shadow-sm overflow-hidden mb-20">
             <div className="p-6 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-slate-50/50">
               <h3 className="font-black text-xs text-slate-800 dark:text-white uppercase tracking-widest">Lista de Clientes</h3>
@@ -384,6 +348,7 @@ export default function ClientDashboard() {
               </table>
             </div>
           </div>
+          */}
         </div>
       </div>
     </div>

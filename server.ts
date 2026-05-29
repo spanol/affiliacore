@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import crypto from 'crypto';
 import express from 'express';
 import admin from 'firebase-admin';
 import { createServer as createViteServer } from 'vite';
@@ -30,6 +31,45 @@ async function startServer() {
 
   app.use(express.json());
 
+  // --- Auth middlewares -----------------------------------------------------
+  // Clients send their Firebase ID token as `Authorization: Bearer <token>`.
+  const verifyBearer = async (req: express.Request) => {
+    if (!adminApp) return null;
+    const header = req.headers.authorization || '';
+    const match = header.match(/^Bearer (.+)$/);
+    if (!match) return null;
+    try {
+      return await adminApp.auth().verifyIdToken(match[1]);
+    } catch {
+      return null;
+    }
+  };
+
+  const requireAuth: express.RequestHandler = async (req, res, next) => {
+    if (!adminApp) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    const decoded = await verifyBearer(req);
+    if (!decoded) return res.status(401).json({ error: 'Não autenticado.' });
+    (req as any).user = { uid: decoded.uid, email: decoded.email };
+    next();
+  };
+
+  const requireAdmin: express.RequestHandler = async (req, res, next) => {
+    if (!adminApp || !adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    const decoded = await verifyBearer(req);
+    if (!decoded) return res.status(401).json({ error: 'Não autenticado.' });
+    try {
+      const snap = await adminDb.collection('users').doc(decoded.uid).get();
+      if (!snap.exists || snap.data()?.role !== 'admin') {
+        return res.status(403).json({ error: 'Acesso restrito a administradores.' });
+      }
+    } catch {
+      return res.status(500).json({ error: 'Erro ao verificar permissões.' });
+    }
+    (req as any).user = { uid: decoded.uid, email: decoded.email };
+    next();
+  };
+  // --------------------------------------------------------------------------
+
   const serializeTimestamp = (value: any) => {
     if (value?.toDate && typeof value.toDate === 'function') {
       return value.toDate().toISOString();
@@ -37,7 +77,7 @@ async function startServer() {
     return value ?? null;
   };
 
-  app.post('/api/create-user', async (req, res) => {
+  app.post('/api/create-user', requireAdmin, async (req, res) => {
     if (!adminApp || !adminDb) {
       return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     }
@@ -87,7 +127,7 @@ async function startServer() {
     }
   });
 
-  app.get('/api/affiliate-statuses', async (_req, res) => {
+  app.get('/api/affiliate-statuses', requireAdmin, async (_req, res) => {
     if (!adminDb) {
       return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     }
@@ -110,7 +150,7 @@ async function startServer() {
     }
   });
 
-  app.patch('/api/affiliates/:affiliateId', async (req, res) => {
+  app.patch('/api/affiliates/:affiliateId', requireAdmin, async (req, res) => {
     if (!adminDb) {
       return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     }
@@ -139,7 +179,7 @@ async function startServer() {
     }
   });
 
-  app.get('/api/audit-logs', async (_req, res) => {
+  app.get('/api/audit-logs', requireAdmin, async (_req, res) => {
     if (!adminDb) {
       return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     }
@@ -168,7 +208,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/audit-logs', async (req, res) => {
+  app.post('/api/audit-logs', requireAdmin, async (req, res) => {
     if (!adminDb) {
       return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     }
@@ -204,8 +244,186 @@ async function startServer() {
     }
   });
 
+  const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+  const fetchExternalAffiliates = async (): Promise<any[]> => {
+    const BASE_URL = process.env.VITE_AFFILIATE_API_BASE_URL || 'https://affiliate-api-prd.partnersotg.com';
+    const apiKey = process.env.VITE_AFFILIATE_API_KEY || process.env.AFFILIATE_API_KEY;
+    if (!apiKey) throw new Error('Chave de API externa não configurada.');
+
+    const response = await fetch(`${BASE_URL}/api/v2/external/affiliates`, {
+      headers: { 'x-api-key': apiKey, 'Accept': 'application/json', 'User-Agent': 'AgenciaBoost-App/1.0' },
+    });
+    if (!response.ok) {
+      throw new Error(`Erro na API externa ao listar afiliados: ${response.status}`);
+    }
+    const body = await response.json();
+    // External shape: { data: { data: [...] } }
+    const list = body?.data?.data ?? body?.data ?? body;
+    return Array.isArray(list) ? list : [];
+  };
+
+  // Sync the external affiliate list into the local `affiliates` collection.
+  app.post('/api/affiliates/sync', requireAdmin, async (_req, res) => {
+    if (!adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+    try {
+      const affiliates = await fetchExternalAffiliates();
+      let written = 0;
+      // Firestore batches are capped at 500 ops; chunk to stay safe.
+      for (let i = 0; i < affiliates.length; i += 400) {
+        const slice = affiliates.slice(i, i + 400);
+        const batch = adminDb.batch();
+        for (const aff of slice) {
+          const externalId = String(aff.id ?? aff._id ?? '').trim();
+          if (!externalId) continue;
+          const ref = adminDb.collection('affiliates').doc(externalId);
+          batch.set(ref, {
+            id: externalId,
+            name: aff.name ?? aff.label ?? 'Sem Nome',
+            siteId: aff.siteId ?? null,
+            brand: aff.brand ?? null,
+            syncedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true });
+          written++;
+        }
+        await batch.commit();
+      }
+      return res.json({ synced: written, total: affiliates.length });
+    } catch (error: any) {
+      console.error('Error syncing affiliates:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno sincronizando afiliados.' });
+    }
+  });
+
+  // Admin generates an access invite for an affiliate.
+  app.post('/api/invites', requireAdmin, async (req, res) => {
+    if (!adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+    try {
+      const { affiliateId, affiliateName } = req.body ?? {};
+      if (!affiliateId) {
+        return res.status(400).json({ error: 'affiliateId é obrigatório.' });
+      }
+
+      const token = crypto.randomBytes(24).toString('hex');
+      const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + INVITE_TTL_MS);
+
+      await adminDb.collection('invites').doc(token).set({
+        token,
+        affiliateId: String(affiliateId),
+        affiliateName: affiliateName ? String(affiliateName) : null,
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt,
+      });
+
+      return res.status(201).json({ token, expiresAt: expiresAt.toDate().toISOString() });
+    } catch (error: any) {
+      console.error('Error creating invite:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno criando convite.' });
+    }
+  });
+
+  // Public: validate an invite token and return the affiliate it is bound to.
+  app.get('/api/invites/:token', async (req, res) => {
+    if (!adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+    try {
+      const { token } = req.params;
+      const snap = await adminDb.collection('invites').doc(String(token)).get();
+      if (!snap.exists) {
+        return res.status(404).json({ error: 'Convite não encontrado.' });
+      }
+      const data = snap.data()!;
+      if (data.status === 'used') {
+        return res.status(410).json({ error: 'Este convite já foi utilizado.' });
+      }
+      if (data.expiresAt?.toMillis && data.expiresAt.toMillis() < Date.now()) {
+        return res.status(410).json({ error: 'Este convite expirou.' });
+      }
+      return res.json({
+        affiliateId: data.affiliateId,
+        affiliateName: data.affiliateName ?? null,
+        status: data.status,
+      });
+    } catch (error: any) {
+      console.error('Error fetching invite:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno lendo convite.' });
+    }
+  });
+
+  // Public: affiliate accepts an invite, creating their own login linked to the affiliateId.
+  app.post('/api/accept-invite', async (req, res) => {
+    if (!adminApp || !adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+    try {
+      const { token, email, password } = req.body ?? {};
+      if (!token || !email || !password) {
+        return res.status(400).json({ error: 'Token, e-mail e senha são obrigatórios.' });
+      }
+
+      const inviteRef = adminDb.collection('invites').doc(String(token));
+      const inviteSnap = await inviteRef.get();
+      if (!inviteSnap.exists) {
+        return res.status(404).json({ error: 'Convite não encontrado.' });
+      }
+      const invite = inviteSnap.data()!;
+      if (invite.status === 'used') {
+        return res.status(410).json({ error: 'Este convite já foi utilizado.' });
+      }
+      if (invite.expiresAt?.toMillis && invite.expiresAt.toMillis() < Date.now()) {
+        return res.status(410).json({ error: 'Este convite expirou.' });
+      }
+
+      const normalizedEmail = String(email).trim().toLowerCase();
+      const affiliateName = invite.affiliateName || normalizedEmail;
+
+      let userRecord: admin.auth.UserRecord;
+      try {
+        userRecord = await adminApp.auth().createUser({
+          email: normalizedEmail,
+          password: String(password),
+          displayName: affiliateName,
+        });
+      } catch (error: any) {
+        if (error.code === 'auth/email-already-exists') {
+          return res.status(409).json({ error: 'Este e-mail já está cadastrado. Faça login.' });
+        }
+        throw error;
+      }
+
+      await adminDb.collection('users').doc(userRecord.uid).set({
+        uid: userRecord.uid,
+        name: affiliateName,
+        email: normalizedEmail,
+        role: 'client',
+        affiliateId: String(invite.affiliateId),
+        mustChangePassword: false,
+        avatarUrl: `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(affiliateName)}`,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      await inviteRef.set({
+        status: 'used',
+        usedByUid: userRecord.uid,
+        usedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      return res.status(201).json({ uid: userRecord.uid, affiliateId: String(invite.affiliateId) });
+    } catch (error: any) {
+      console.error('Error accepting invite:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno aceitando convite.' });
+    }
+  });
+
   // Proxy route for Affiliate API to handle multiple endpoints dynamically
-  app.get('/api/external/:endpoint/:id?', async (req, res) => {
+  app.get('/api/external/:endpoint/:id?', requireAuth, async (req, res) => {
     try {
       const { endpoint, id } = req.params;
       const BASE_URL = process.env.VITE_AFFILIATE_API_BASE_URL || 'https://affiliate-api-prd.partnersotg.com';

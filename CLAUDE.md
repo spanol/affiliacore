@@ -1,0 +1,100 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project
+
+**Agência Boost** — an affiliate-management platform (React SPA) for a marketing agency. Admins manage affiliates (CPA/REV configuration, activation status, audit logs, contact inquiries); affiliates ("clients") view their own results. UI text and most domain naming are in **Portuguese (pt-BR)** — match this when writing user-facing strings and error messages.
+
+Originated as a Google AI Studio applet (see README / `firebase-applet-config.json` / `metadata.json`).
+
+## Commands
+
+```bash
+npm install          # install deps
+npm run dev          # start the app (Express + Vite middleware) on PORT (default 3000)
+npm start            # same as dev (tsx server.ts) — used in production with NODE_ENV=production
+npm run build        # vite build -> dist/
+npm run preview      # vite preview of the built bundle
+npm run lint         # tsc --noEmit (type-check only; there is no ESLint)
+npm run clean        # rm -rf dist
+
+# Firebase (CLI, project: agencia-boost-app)
+firebase deploy --only firestore:rules    # deploy firestore.rules after editing
+firebase projects:list                    # confirm logged-in account / projects
+```
+
+There is **no test runner** configured. `npm run lint` (TypeScript type-check) is the only automated check.
+
+Dev and production both run through `server.ts` via `tsx` — there is no `vite dev` standalone path. In dev the Express server mounts Vite as middleware (`appType: 'spa'`); in production (`NODE_ENV=production`) it serves static `dist/` and falls back to `dist/index.html` for SPA routing.
+
+## Architecture
+
+This is a **single Express server wrapping a Vite/React SPA** — not two separate apps. `server.ts` is the entry point for both serving the frontend and exposing the backend API.
+
+### API authentication (`server.ts`)
+Clients send their Firebase ID token as `Authorization: Bearer <token>` (added by `authFetch` in `src/lib/api.ts`, used throughout `affiliateService.ts`). Two middlewares guard routes: `requireAuth` (verifies the token) and `requireAdmin` (verifies token **and** `users/{uid}.role === 'admin'`). Admin routes (`create-user`, `affiliate-statuses`, `PATCH /affiliates/:id`, `audit-logs`, `affiliates/sync`, `invites` POST) use `requireAdmin`; the external proxy uses `requireAuth`; `GET /api/invites/:token` and `POST /api/accept-invite` are intentionally public (the affiliate has no account yet). **Remaining gap:** the proxy doesn't scope `affiliateIds` to the caller, so a signed-in client could query another affiliate's `/results` — per-affiliate scoping is still TODO.
+
+### Backend (`server.ts`)
+Express server that:
+- Initializes **Firebase Admin SDK** (from `FIREBASE_SERVICE_ACCOUNT_KEY` env var if present, else default app credentials). All `/api/*` routes return 500 if Admin failed to initialize.
+- Exposes API routes:
+  - `POST /api/create-user` — creates a Firebase Auth user **and** the matching `users/{uid}` Firestore doc (admin-privileged; this is why user creation goes through the server, not the client SDK).
+  - `GET/PATCH /api/affiliate-statuses` / `/api/affiliates/:id` — affiliate active/inactive status stored in the `affiliate_statuses` collection.
+  - `GET/POST /api/audit-logs` — audit trail in the `audit_logs` collection.
+  - `GET /api/external/:endpoint/:id?` — **proxy to the external Affiliate API** (`VITE_AFFILIATE_API_BASE_URL`, default `https://affiliate-api-prd.partnersotg.com/api/v2/external/...`). Injects the `x-api-key` header server-side so the key never reaches the browser. Forwards query strings.
+  - **Affiliate onboarding ("model C" invite flow)** — Boost is a wrapper over the external API: `POST /api/affiliates/sync` mirrors the external affiliate list into the `affiliates` collection; `POST /api/invites` (admin) creates a single-use, 7-day token in `invites/{token}` bound to an `affiliateId`; `GET /api/invites/:token` (public) validates it; `POST /api/accept-invite` (public) lets the affiliate self-register with their own email/password, creating their Auth user + `users/{uid}` doc (role `client`, linked `affiliateId`) and marking the invite used. The affiliate then logs in and `ClientDashboard` shows only their own `/results`. The `invites` collection is server-only (no Firestore rule → clients are denied).
+
+### Frontend (`src/`)
+- **Routing/auth** — `src/App.tsx`. `ProtectedRoute` gates routes by auth state and `role` (`admin` | `client`). Users with `mustChangePassword` are forced to `/profile`. `/dashboard` redirects to `/admin` or `/client` by role.
+- **Contexts** (`src/contexts/`) — `AuthContext` (Firebase auth + live `users/{uid}` profile via `onSnapshot`), `ThemeContext` (dark mode), `ToastContext` (notifications). All three wrap the app in `App.tsx`.
+- **Services** (`src/services/`) — the data layer. Components should call services, not Firestore/fetch directly.
+  - `affiliateService.ts` — central service. Mixes **two data sources**: external Affiliate API (via the `/api/external` proxy) for affiliate/results data, and Firestore for app-owned data (`affiliate_configs`, `users`, `settings`). Also wraps the server's status/audit/create-user endpoints.
+  - `contactService.ts` — contact inquiries (`contacts` collection), real-time via `onSnapshot`.
+- **Pages** (`src/pages/`) — `Home`, `Login`, `Register`, `AdminDashboard`, `ClientDashboard`, `Profile`, `Settings`, `Contacts`, `AffiliatesList`, `AffiliateDetails`.
+- **`src/lib/firebase.ts`** — client Firebase init from `firebase-applet-config.json`. Exports `db`, `auth`, `storage`, and the shared `handleFirestoreError` / `OperationType` error helper used by contexts/services.
+
+### Affiliate API response handling
+The external API has inconsistent response shapes, so `affiliateService.ts` is deliberately defensive:
+- `extractArray` probes many nested paths (`data.data`, `affiliates`, `results`, etc.) to find the payload array.
+- `extractApiError` / `isNoDataError` distinguish a real error from an empty "no data" result (e.g. code `040`) so the UI can show empty state instead of an error.
+- `fetchAffiliateById` falls back to scanning the full affiliate list when the by-id endpoint 404s or returns no data.
+
+When touching affiliate data fetching, preserve these fallbacks rather than assuming a single canonical shape.
+
+## Configuration & conventions
+
+- **Path alias**: `@/*` → repo root (configured in both `vite.config.ts` and `tsconfig.json`).
+- **Env vars**: `VITE_`-prefixed vars are exposed to the browser (`import.meta.env`); non-prefixed vars (`FIREBASE_SERVICE_ACCOUNT_KEY`, `PORT`, `AFFILIATE_API_KEY`) are server-only. `.env*` is gitignored except `.env.example`.
+- **Styling**: Tailwind CSS v4 via `@tailwindcss/vite` (no `tailwind.config.js`; config lives in `src/index.css`). UI uses `lucide-react` icons, `recharts` charts, `motion` animations, and the `clsx` + `tailwind-merge` (`cn`) pattern in `src/lib/utils.ts`.
+- **HMR**: controlled by `DISABLE_HMR` env var — disabled inside AI Studio to prevent flicker during agent edits. Don't re-enable it unconditionally.
+
+## Firebase setup
+
+- **Project: `agencia-boost-app`** (created May 2026; the original `agencia-boost` project from the first dev is inaccessible). Web config lives in `firebase-applet-config.json`; Firestore is in `southamerica-east1`.
+- **Server Admin SDK** authenticates via `GOOGLE_APPLICATION_CREDENTIALS=./service-account.json` (gitignored). Without it, all `/api/*` routes fail with "Unable to detect a Project Id". `server.ts` falls back to `admin.initializeApp()` (ADC) when `FIREBASE_SERVICE_ACCOUNT_KEY` is unset.
+- **`firestore.rules`** is role-based (`isAdmin()` checks `users/{uid}.role == 'admin'`). Deploy changes with `firebase deploy --only firestore:rules`. Known hardening gap: self-register currently lets a client set its own `role` (needed to bootstrap the first admin) — lock this down once admin/affiliate creation is fully server-side.
+
+## Deploy (Firebase App Hosting)
+
+Production runs on **Firebase App Hosting** (Cloud Run under the hood, same `agencia-boost-app` project). App Hosting doesn't have a Vite server adapter, so it falls back to the **generic Node.js buildpack**: it runs the `build` script (`npm run build` → `dist/`) then the `start` script (`npm start` → `tsx server.ts`). With `NODE_ENV=production` the server serves `dist/` + `/api/*`. `PORT` is injected by Cloud Run; `server.ts` already listens on `0.0.0.0:$PORT`.
+
+- **Config**: `apphosting.yaml` (repo root) — `runConfig` + env. Secrets (`FIREBASE_SERVICE_ACCOUNT_KEY`, `AFFILIATE_API_KEY`) come from Cloud Secret Manager; plain env (`NODE_ENV`, `VITE_AFFILIATE_API_BASE_URL`) is inline. `tsx` and `vite` are in `dependencies` (not just `devDependencies`) so `npm start` works in the runtime container.
+- **One-time setup**:
+  ```bash
+  # Create the two secrets (paste the service-account.json contents / the x-api-key)
+  firebase apphosting:secrets:set firebase-service-account-key
+  firebase apphosting:secrets:set affiliate-api-key
+  # Create the backend (pick region southamerica-east1 to match Firestore; connect the GitHub repo)
+  firebase apphosting:backends:create --project agencia-boost-app
+  ```
+- **Deploy**: push to the connected branch (App Hosting auto-builds), or trigger manually:
+  ```bash
+  firebase apphosting:rollouts:create <backend-id> --project agencia-boost-app
+  ```
+- Firebase Admin auth in production uses `FIREBASE_SERVICE_ACCOUNT_KEY` (the secret), same as local — no ADC/IAM-role wiring needed. `firestore.rules` is still deployed separately with `firebase deploy --only firestore:rules`.
+
+## Important caveats
+
+- `firebase-applet-config.json` contains the (public, client-side) Firebase web config committed to the repo. The sensitive `service-account.json`, `FIREBASE_SERVICE_ACCOUNT_KEY`, and affiliate `x-api-key` are server-side only and gitignored.
+- `src/lib/firebase.ts` runs a `testConnection()` write to `system/connection_test_ping` on load (debug aid). With the new role-based rules this write is **denied** (the `system/` path has no rule) and logs a permission error — harmless, but worth removing.

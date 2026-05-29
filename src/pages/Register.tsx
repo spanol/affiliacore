@@ -48,7 +48,7 @@ export default function Register() {
       }
       
       // Create user profile in Firestore
-      const role = email.trim().toLowerCase() === 'goatechbr@gmail.com' ? 'admin' : 'client';
+      const role = email.trim().toLowerCase() === 'carlos@carlossantos.org' ? 'admin' : 'client';
       currentPath = `users/${user.uid}`;
       
       try {

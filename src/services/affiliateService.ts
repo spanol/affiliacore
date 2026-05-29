@@ -9,6 +9,7 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { authFetch } from '../lib/api';
 
 interface Affiliate {
   id: string;
@@ -45,7 +46,7 @@ const AFFILIATE_API_KEY = import.meta.env.VITE_AFFILIATE_API_KEY || '';
 
 async function fetchAffiliateApi(endpoint: string, query?: URLSearchParams): Promise<Response> {
   const proxyUrl = `/api/external/${endpoint}${query && query.toString() ? `?${query.toString()}` : ''}`;
-  const proxyResponse = await fetch(proxyUrl, {
+  const proxyResponse = await authFetch(proxyUrl, {
     method: 'GET',
     headers: {
       'Accept': 'application/json',
@@ -101,7 +102,7 @@ export async function saveAffiliateConfig(config: AffiliateConfig): Promise<void
 
 export async function fetchAffiliateStatuses(): Promise<Record<string, AffiliateStatusConfig>> {
   try {
-    const response = await fetch('/api/affiliate-statuses', {
+    const response = await authFetch('/api/affiliate-statuses', {
       method: 'GET',
       headers: { 'Accept': 'application/json' }
     });
@@ -147,45 +148,82 @@ export async function fetchAffiliates(): Promise<Affiliate[]> {
   }
 }
 
+// The external API has no GET /affiliates/:id endpoint (it 404s). We read from the
+// local `affiliates` mirror (populated by syncAffiliates) and only fall back to a
+// full-list scan if the affiliate hasn't been synced yet.
 export async function fetchAffiliateById(id: string): Promise<any> {
+  const normalizedId = String(id);
+
   try {
-    const response = await fetchAffiliateApi(`affiliates/${id}`);
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        console.warn(`Affiliate ${id} not found via direct endpoint, falling back to list lookup...`);
-        const allAffiliates = await fetchAffiliates();
-        const found = allAffiliates.find((a: any) => (a.id || a._id) === id);
-        if (found) return found;
-      }
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || errorData.message || `Erro na API: ${response.status}`);
+    const docSnap = await getDoc(doc(db, 'affiliates', normalizedId));
+    if (docSnap.exists()) {
+      return docSnap.data();
     }
-
-    const data = await response.json();
-    const apiError = extractApiError(data);
-    if (apiError) {
-      if (apiError.noData) {
-        const allAffiliates = await fetchAffiliates();
-        const found = allAffiliates.find((a: any) => String(a.id || a._id) === id);
-        if (found) return found;
-        return null;
-      }
-      throw new Error(apiError.message);
-    }
-
-    return data.data || data;
   } catch (error) {
-    console.error(`Error fetching affiliate ${id}:`, error);
-    // Even if it's another error, try fallback one last time
-    try {
-      const allAffiliates = await fetchAffiliates();
-      const found = allAffiliates.find((a: any) => (a.id || a._id) === id);
-      if (found) return found;
-    } catch (fallbackError) {
-      console.error('Fallback lookup failed too:', fallbackError);
-    }
-    throw error;
+    console.error(`Error reading local affiliate ${normalizedId}:`, error);
+  }
+
+  try {
+    const allAffiliates = await fetchAffiliates();
+    const found = allAffiliates.find((a: any) => String(a.id || a._id) === normalizedId);
+    if (found) return found;
+  } catch (error) {
+    console.error(`Fallback list lookup failed for affiliate ${normalizedId}:`, error);
+  }
+
+  return null;
+}
+
+interface ResultsQuery {
+  affiliateIds?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+async function fetchResultsGrouped(groupBy: 'affiliate' | 'brand' | 'date' | 'campaign', opts: ResultsQuery = {}): Promise<any[]> {
+  const today = new Date().toISOString().split('T')[0];
+  const params = new URLSearchParams({
+    startDate: opts.startDate || '2024-01-01',
+    endDate: opts.endDate || today,
+    groupBy
+  });
+  if (opts.affiliateIds) params.set('affiliateIds', opts.affiliateIds);
+
+  const response = await fetchAffiliateApi('results', params);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || errorData.message || `Erro na API: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const apiError = extractApiError(data);
+  if (apiError) {
+    if (apiError.noData) return [];
+    throw new Error(apiError.message);
+  }
+
+  if (data.data && Array.isArray(data.data.data)) return data.data.data;
+  return Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
+}
+
+// Per-house (brand) breakdown for an affiliate.
+export async function fetchAffiliateResultsByBrand(id: string): Promise<any[]> {
+  try {
+    return await fetchResultsGrouped('brand', { affiliateIds: id });
+  } catch (error) {
+    console.error(`Error fetching brand results for affiliate ${id}:`, error);
+    return [];
+  }
+}
+
+// Daily time series for an affiliate (defaults to the last ~90 days).
+export async function fetchAffiliateDailyResults(id: string, startDate?: string, endDate?: string): Promise<any[]> {
+  try {
+    const defaultStart = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    return await fetchResultsGrouped('date', { affiliateIds: id, startDate: startDate || defaultStart, endDate });
+  } catch (error) {
+    console.error(`Error fetching daily results for affiliate ${id}:`, error);
+    return [];
   }
 }
 
@@ -263,7 +301,7 @@ export async function fetchAllResults(): Promise<any[]> {
 
 export async function updateAffiliateStatus(affiliateId: string, status: 'active' | 'inactive'): Promise<any> {
   try {
-    const response = await fetch(`/api/affiliates/${affiliateId}`, {
+    const response = await authFetch(`/api/affiliates/${affiliateId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -297,7 +335,7 @@ export interface AuditLog {
 
 export async function createAuditLog(log: AuditLog): Promise<AuditLog> {
   try {
-    const response = await fetch('/api/audit-logs', {
+    const response = await authFetch('/api/audit-logs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(log)
@@ -318,7 +356,7 @@ export async function createAuditLog(log: AuditLog): Promise<AuditLog> {
 
 export async function fetchAuditLogs(): Promise<AuditLog[]> {
   try {
-    const response = await fetch('/api/audit-logs', {
+    const response = await authFetch('/api/audit-logs', {
       method: 'GET',
       headers: { 'Accept': 'application/json' }
     });
@@ -393,7 +431,7 @@ export interface AffiliateUserData {
 export async function createUser(userData: AffiliateUserData): Promise<void> {
   if (userData.password) {
     try {
-      const response = await fetch('/api/create-user', {
+      const response = await authFetch('/api/create-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -436,6 +474,75 @@ export async function createUser(userData: AffiliateUserData): Promise<void> {
     console.error('Error creating user:', error);
     throw error;
   }
+}
+
+export interface SyncResult {
+  synced: number;
+  total: number;
+}
+
+export async function syncAffiliates(): Promise<SyncResult> {
+  const response = await authFetch('/api/affiliates/sync', {
+    method: 'POST',
+    headers: { 'Accept': 'application/json' }
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || errorData.message || `Erro ao sincronizar: ${response.status}`);
+  }
+  return response.json();
+}
+
+export interface AccessInvite {
+  token: string;
+  url: string;
+  expiresAt?: string;
+}
+
+export async function createAccessInvite(affiliateId: string, affiliateName?: string): Promise<AccessInvite> {
+  const response = await authFetch('/api/invites', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ affiliateId, affiliateName })
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || errorData.message || `Erro ao gerar convite: ${response.status}`);
+  }
+  const data = await response.json();
+  const url = `${window.location.origin}/convite/${data.token}`;
+  return { token: data.token, url, expiresAt: data.expiresAt };
+}
+
+export interface InviteInfo {
+  affiliateId: string;
+  affiliateName: string | null;
+  status: string;
+}
+
+export async function fetchInvite(token: string): Promise<InviteInfo> {
+  const response = await fetch(`/api/invites/${encodeURIComponent(token)}`, {
+    method: 'GET',
+    headers: { 'Accept': 'application/json' }
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || errorData.message || `Convite inválido: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function acceptInvite(token: string, email: string, password: string): Promise<{ uid: string; affiliateId: string }> {
+  const response = await fetch('/api/accept-invite', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ token, email, password })
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || errorData.message || `Erro ao concluir cadastro: ${response.status}`);
+  }
+  return response.json();
 }
 
 export async function fetchSetting(key: string): Promise<string | null> {

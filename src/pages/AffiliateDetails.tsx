@@ -25,14 +25,17 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { 
-  fetchAffiliateById, 
-  fetchAffiliateResults, 
-  fetchAffiliateConfigs, 
+  fetchAffiliateById,
+  fetchAffiliateResults,
+  fetchAffiliateResultsByBrand,
+  fetchAffiliateDailyResults,
+  fetchAffiliateConfigs,
   AffiliateConfig,
   createUser,
-  fetchSetting
-  , isUserRegistered
+  createAccessInvite
 } from '../services/affiliateService';
+import BrandBreakdown from '../components/BrandBreakdown';
+import DailyPerformanceChart from '../components/DailyPerformanceChart';
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
 
@@ -41,6 +44,8 @@ export default function AffiliateDetails() {
   const navigate = useNavigate();
   const [affiliate, setAffiliate] = useState<any>(null);
   const [results, setResults] = useState<any[]>([]);
+  const [brandResults, setBrandResults] = useState<any[]>([]);
+  const [dailyResults, setDailyResults] = useState<any[]>([]);
   const [config, setConfig] = useState<AffiliateConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,16 +73,20 @@ export default function AffiliateDetails() {
   const loadDetails = async (affId: string) => {
     try {
       setLoading(true);
-      const [detailsData, resultsData, allConfigs] = await Promise.all([
+      const [detailsData, resultsData, allConfigs, brandData, dailyData] = await Promise.all([
         fetchAffiliateById(affId),
         fetchAffiliateResults(affId).catch(err => {
           console.error('Error fetching results:', err);
           return [];
         }),
-        fetchAffiliateConfigs()
+        fetchAffiliateConfigs(),
+        fetchAffiliateResultsByBrand(affId),
+        fetchAffiliateDailyResults(affId)
       ]);
       setAffiliate(detailsData);
       setResults(Array.isArray(resultsData) ? resultsData : []);
+      setBrandResults(Array.isArray(brandData) ? brandData : []);
+      setDailyResults(Array.isArray(dailyData) ? dailyData : []);
       setConfig(allConfigs[affId] || null);
       setError(null);
     } catch (err) {
@@ -128,34 +137,14 @@ export default function AffiliateDetails() {
   };
 
   const handleGenerateLink = async () => {
+    if (!affiliate) return;
     try {
       setIsGeneratingLink(true);
-      // Prefer env-configured domain (APP_URL) then DB setting then fallback
-      let baseUrl = null;
-      try {
-        const envUrl = (import.meta.env && import.meta.env.APP_URL) ? String(import.meta.env.APP_URL) : '';
-        if (envUrl) {
-          try { baseUrl = new URL(envUrl).origin + '/go/'; } catch { baseUrl = envUrl; }
-        }
-      } catch (e) {
-        // ignore
-      }
-      baseUrl = baseUrl || await fetchSetting('affiliate_base_url') || 'https://goatech.com/go/';
-      // Ensure user is registered in Firestore before generating link
-      const registered = await isUserRegistered(String(affiliate.id));
-      if (!registered) {
-        // Open create-user modal so admin can register
-        setIsUserModalOpen(true);
-        setIsGeneratingLink(false);
-        return;
-      }
-      const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase() + 
-                         Math.random().toString(36).substring(2, 8).toUpperCase();
-      const code = randomCode.slice(0, 12);
-      setAffiliateLink(`${baseUrl}${code}?aff=${affiliate.id}`);
+      const invite = await createAccessInvite(String(affiliate.id), affiliate.name || affiliate.label);
+      setAffiliateLink(invite.url);
       setIsLinkModalOpen(true);
     } catch (err) {
-      console.error('Error generating link:', err);
+      console.error('Error generating invite:', err);
     } finally {
       setIsGeneratingLink(false);
     }
@@ -237,8 +226,8 @@ export default function AffiliateDetails() {
             disabled={isGeneratingLink}
             className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-xl hover:border-brand/40 transition-all font-bold text-xs uppercase tracking-wider shadow-sm"
           >
-            {isGeneratingLink ? <Loader2 size={16} className="animate-spin" /> : <Link size={16} />} 
-            Gerar Link
+            {isGeneratingLink ? <Loader2 size={16} className="animate-spin" /> : <Link size={16} />}
+            Gerar Convite
           </button>
         </div>
       </header>
@@ -382,70 +371,22 @@ export default function AffiliateDetails() {
                     </motion.div>
                   </div>
 
-                  {/* Charts par Casa */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8">
-                    <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
-                      <div className="flex items-center gap-1 text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest mb-8">
-                        REV (R$) por Casa <HelpCircle size={14} className="text-slate-500 dark:text-slate-300" />
-                      </div>
-                      <div className="space-y-6">
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-6 h-6 rounded bg-red-600 flex items-center justify-center text-white font-black text-[10px]">S</div>
-                              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Superbet</span>
-                            </div>
-                            <span className="text-xs font-bold text-slate-400">R$ {res.rvs?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0,00'}</span>
-                          </div>
-                          <div className="h-6 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden relative">
-                            <div className="h-full bg-slate-700 dark:bg-slate-600 rounded-full w-[90%]"></div>
-                            <div className="absolute inset-0 flex justify-between px-4 items-center">
-                              <span className="text-[10px] text-slate-400">0</span>
-                              <span className="text-[10px] text-slate-400">7.5</span>
-                              <span className="text-[10px] text-slate-400">15</span>
-                              <span className="text-[10px] text-slate-400">22.5</span>
-                              <span className="text-[10px] text-slate-100">30</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                  {/* Per-house breakdown (real data from groupBy=brand) */}
+                  <BrandBreakdown data={brandResults} config={config} />
 
-                    <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
-                      <div className="flex items-center justify-between mb-8">
-                        <div className="flex items-center gap-1 text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
-                          CPA (R$) por Casa <HelpCircle size={14} className="text-slate-500 dark:text-slate-300" />
-                        </div>
-                        <div className="flex bg-slate-50 dark:bg-slate-800 p-1 rounded-lg border border-slate-100 dark:border-slate-700">
-                          <button className="px-3 py-1 bg-white dark:bg-slate-700 text-[10px] font-bold text-slate-900 dark:text-white rounded shadow-sm">R$</button>
-                          <button className="px-3 py-1 text-[10px] font-bold text-slate-400">Qtd.</button>
-                        </div>
-                      </div>
-                      <div className="space-y-6">
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-6 h-6 rounded bg-red-600 flex items-center justify-center text-white font-black text-[10px]">S</div>
-                              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Superbet</span>
-                            </div>
-                            <span className="text-xs font-bold text-slate-400">R$ 4,5k</span>
-                          </div>
-                          <div className="h-6 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden relative">
-                            <div className="h-full bg-slate-700 dark:bg-slate-600 rounded-full w-[95%]"></div>
-                            <div className="absolute inset-0 flex justify-between px-4 items-center">
-                              <span className="text-[10px] text-slate-400">0</span>
-                              <span className="text-[10px] text-slate-400">1,3k</span>
-                              <span className="text-[10px] text-slate-400">2,5k</span>
-                              <span className="text-[10px] text-slate-400">3,8k</span>
-                              <span className="text-[10px] text-slate-100">5k</span>
-                            </div>
-                          </div>
-                        </div>
+                  {/* Evolução diária (dados reais da API externa, groupBy=date) */}
+                  <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl flex flex-col shadow-sm overflow-hidden mb-20">
+                    <div className="p-6 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-slate-50/50">
+                      <h3 className="font-black text-xs text-slate-800 dark:text-white uppercase tracking-widest">Evolução Diária</h3>
+                      <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        Cadastros · Comissão
                       </div>
                     </div>
+                    <DailyPerformanceChart data={dailyResults} />
                   </div>
 
-                  {/* Clients Table Section */}
+                  {/* Lista de Clientes — desativada: a API de afiliados não expõe dados por
+                      cliente/jogador. Mantida para reativar caso surja essa fonte de dados.
                   <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl flex flex-col shadow-sm overflow-hidden mb-20">
                     <div className="p-6 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-slate-50/50">
                       <h3 className="font-black text-xs text-slate-800 dark:text-white uppercase tracking-widest">Lista de Clientes</h3>
@@ -463,7 +404,6 @@ export default function AffiliateDetails() {
                           </tr>
                         </thead>
                         <tbody>
-                          {/* Using empty state for now */}
                           <tr>
                             <td colSpan={3} className="px-8 py-20 text-center">
                               <div className="flex flex-col items-center gap-2 opacity-30">
@@ -476,6 +416,7 @@ export default function AffiliateDetails() {
                       </table>
                     </div>
                   </div>
+                  */}
                 </div>
               );
             })
@@ -636,7 +577,7 @@ export default function AffiliateDetails() {
             className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden"
           >
             <div className="p-6 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center">
-              <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">Link de Afiliado Gerado</h3>
+              <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">Convite de Acesso Gerado</h3>
               <button 
                 onClick={() => setIsLinkModalOpen(false)}
                 className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
@@ -650,13 +591,13 @@ export default function AffiliateDetails() {
                 <div className="w-16 h-16 bg-brand/10 text-brand rounded-full flex items-center justify-center mx-auto mb-4">
                   <Link size={32} />
                 </div>
-                <h4 className="text-lg font-black text-slate-900 dark:text-white">Seu Link Exclusivo</h4>
-                <p className="text-sm text-slate-500">Este link já inclui o código de rastreio de 12 caracteres.</p>
+                <h4 className="text-lg font-black text-slate-900 dark:text-white">Link de Ativação</h4>
+                <p className="text-sm text-slate-500">Envie este link ao afiliado. Ele cria a própria senha e o acesso já fica vinculado a este ID.</p>
               </div>
 
               <div className="space-y-4">
                 <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 relative group">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Link de Afiliado</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Link de Convite</p>
                   <div className="flex items-center gap-4">
                     <div className="flex-1 font-mono text-xs text-slate-600 dark:text-slate-400 break-all leading-relaxed bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
                       {affiliateLink}
@@ -684,12 +625,12 @@ export default function AffiliateDetails() {
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</p>
                     <div className="flex items-center gap-1.5">
                       <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Link Ativo</span>
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Pendente</span>
                     </div>
                   </div>
                   <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Rastreio</p>
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Cookie: 30 dias</span>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Validade</p>
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Uso único · 7 dias</span>
                   </div>
                 </div>
               </div>

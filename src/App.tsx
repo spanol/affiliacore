@@ -6,6 +6,7 @@ import { ToastProvider } from './contexts/ToastContext';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import InviteAccept from './pages/InviteAccept';
 import AdminDashboard from './pages/AdminDashboard';
 import ClientDashboard from './pages/ClientDashboard';
 import Profile from './pages/Profile';
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/convite/:token" element={<InviteAccept />} />
           
           <Route element={
             <ProtectedRoute>

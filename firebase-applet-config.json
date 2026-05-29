@@ -1,10 +1,9 @@
 {
-  "apiKey": "AIzaSyARiFL1pR3vlDGgBKzIZR5iId3shEiReXI",
-  "authDomain": "agencia-boost.firebaseapp.com",
-  "projectId": "agencia-boost",
-  "storageBucket": "agencia-boost.firebasestorage.app",
-  "messagingSenderId": "14347943641",
-  "appId": "1:14347943641:web:bc8d12077d5ac84c2188c8",
-  "measurementId": "G-KWK7FK936B",
+  "apiKey": "AIzaSyBlb-Di9hkcjhIBfaNTzLtQLRD_Gwrr888",
+  "authDomain": "agencia-boost-app.firebaseapp.com",
+  "projectId": "agencia-boost-app",
+  "storageBucket": "agencia-boost-app.firebasestorage.app",
+  "messagingSenderId": "753990812252",
+  "appId": "1:753990812252:web:c42bc1f8a98f9dc90fdc99",
   "firestoreDatabaseId": "(default)"
 }

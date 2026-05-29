@@ -1,8 +1,66 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc().role == 'admin';
+    }
+
+    // User profiles. A user reads/updates only their own doc; admins read/write all.
+    // NOTE (hardening TODO): self-create currently allows any role value, which the
+    // client Register flow relies on to bootstrap the first admin. Once admin/affiliate
+    // creation is fully server-side (Admin SDK), lock role here to 'client' on self-create.
+    match /users/{userId} {
+      allow read: if request.auth.uid == userId || isAdmin();
+      allow list: if isAdmin();
+      allow create: if request.auth.uid == userId;
+      // a user may update their own doc but cannot change their own role; admins can do anything
+      allow update: if isAdmin()
+        || (request.auth.uid == userId && request.resource.data.role == resource.data.role);
+      allow delete: if isAdmin();
+    }
+
+    // Local mirror of the external affiliate list (synced by admins).
+    match /affiliates/{affiliateId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // CPA / REV configuration per affiliate.
+    match /affiliate_configs/{affiliateId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Global application settings.
+    match /settings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Public contact form submissions: anyone may create; only admins may read/manage.
+    match /contacts/{contactId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Written/read server-side via the Admin SDK (which bypasses these rules).
+    // Block direct client access except admins.
+    match /affiliate_statuses/{statusId} {
+      allow read, write: if isAdmin();
+    }
+    match /audit_logs/{logId} {
+      allow read, write: if isAdmin();
     }
   }
 }

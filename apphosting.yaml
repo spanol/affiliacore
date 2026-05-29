@@ -1,0 +1,41 @@
+# Firebase App Hosting — runtime config
+# https://firebase.google.com/docs/app-hosting/configure
+#
+# Stack: Express (server.ts via tsx) envolvendo um SPA Vite/React.
+# Build:  npm run build  -> dist/   (buildpack genérico de Node.js)
+# Start:  npm start       -> tsx server.ts (serve dist/ + /api/* em produção)
+
+runConfig:
+  # Tool administrativo interno: cold start é aceitável, então minInstances: 0 economiza.
+  minInstances: 0
+  maxInstances: 2
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+
+env:
+  # Faz o server.ts servir dist/ estático (em vez de subir o Vite em middleware).
+  - variable: NODE_ENV
+    value: production
+    availability:
+      - RUNTIME
+
+  # Base da API externa de afiliados (não é segredo).
+  - variable: VITE_AFFILIATE_API_BASE_URL
+    value: https://affiliate-api-prd.partnersotg.com
+    availability:
+      - RUNTIME
+
+  # Credenciais do Firebase Admin SDK (conteúdo do service-account.json).
+  # Criar com:  firebase apphosting:secrets:set firebase-service-account-key
+  - variable: FIREBASE_SERVICE_ACCOUNT_KEY
+    secret: firebase-service-account-key
+    availability:
+      - RUNTIME
+
+  # Chave x-api-key da API externa de afiliados (injetada server-side no proxy).
+  # Criar com:  firebase apphosting:secrets:set affiliate-api-key
+  - variable: AFFILIATE_API_KEY
+    secret: affiliate-api-key
+    availability:
+      - RUNTIME

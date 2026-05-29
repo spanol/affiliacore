@@ -1,17 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { 
-  Users, 
-  Search, 
-  Filter, 
-  RefreshCw, 
+import {
+  Users,
+  Search,
+  Filter,
+  RefreshCw,
   AlertCircle,
   Loader2,
   Save,
   CheckCircle,
-  Percent
+  Percent,
+  DownloadCloud
 } from 'lucide-react';
-import { fetchAffiliates, fetchAffiliateConfigs, fetchAffiliateStatuses, saveAffiliateConfig, updateAffiliateStatus, createAuditLog, fetchRegisteredUsers, updateUserRole, AffiliateConfig } from '../services/affiliateService';
+import { fetchAffiliates, fetchAffiliateConfigs, fetchAffiliateStatuses, saveAffiliateConfig, updateAffiliateStatus, createAuditLog, fetchRegisteredUsers, updateUserRole, syncAffiliates, AffiliateConfig } from '../services/affiliateService';
+import { useToast } from '../contexts/ToastContext';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -32,7 +34,9 @@ interface Affiliate {
 
 export default function AffiliatesList() {
   const { profile } = useAuth();
+  const { push } = useToast();
   const navigate = useNavigate();
+  const [syncing, setSyncing] = useState(false);
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
   const [configs, setConfigs] = useState<Record<string, AffiliateConfig>>({});
   const [loading, setLoading] = useState(true);
@@ -102,6 +106,19 @@ export default function AffiliatesList() {
   useEffect(() => {
     loadData();
   }, [isAdmin]);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const result = await syncAffiliates();
+      push({ type: 'success', message: `${result.synced} afiliados sincronizados da API externa.` });
+      await loadData();
+    } catch (err) {
+      push({ type: 'error', message: err instanceof Error ? err.message : 'Falha ao sincronizar afiliados.' });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleConfigChange = (affiliateId: string, field: 'cpaValue' | 'revPercentage', value: string) => {
     // allow empty string for easier typing, but convert to 0 for the state if needed
@@ -206,14 +223,24 @@ export default function AffiliatesList() {
           </h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{pageSubTitle}</p>
         </div>
-        <button 
-          onClick={loadData}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm disabled:opacity-50"
-        >
-          <RefreshCw size={14} className={cn(loading && "animate-spin")} />
-          Atualizar Lista
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSync}
+            disabled={syncing || loading}
+            className="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded-lg text-xs font-bold hover:bg-brand/90 transition-all shadow-sm disabled:opacity-50"
+          >
+            <DownloadCloud size={14} className={cn(syncing && "animate-spin")} />
+            {syncing ? 'Sincronizando...' : 'Sincronizar afiliados'}
+          </button>
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={cn(loading && "animate-spin")} />
+            Atualizar Lista
+          </button>
+        </div>
       </header>
 
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden transition-colors">
