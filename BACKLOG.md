@@ -64,6 +64,12 @@ feature incompleta relacionada a isso (2026-05-28) cujo funcionamento ainda não
 
 **Dependências.** Escopo por afiliado no proxy (✅ feito) + novo modelo de hierarquia.
 
+**Pendência sinalizada (2026-05-29).** Hoje o afiliado loga direto no próprio painel
+(`/affiliates/{id}`), mas a sidebar ainda mostra o item **"Clientes" → `/affiliates`**
+(lista completa, que dá 403 no proxy para não-admin). Mantido visível por ora; ao
+implementar o "afiliado master", redefinir esse item para mostrar a **própria sub-rede**
+em vez de esconder/quebrar. Há um `TODO(B3 · afiliado master)` em `DashboardLayout.tsx`.
+
 ---
 
 ## B4 · Dados bancários do afiliado (para receber os repasses)

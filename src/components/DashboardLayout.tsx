@@ -44,6 +44,10 @@ export default function DashboardLayout() {
           icon: LayoutDashboard
         },
         {
+          // TODO(B3 · afiliado master): para o afiliado comum, este item leva à
+          // lista completa (/affiliates, que dá 403 no proxy p/ não-admin). Mantido
+          // visível por ora — revisar quando implementarmos o "afiliado master" que
+          // enxerga a própria sub-rede. Ver BACKLOG.md › B3.
           label: profile?.role === 'admin' ? 'Afiliados' : 'Clientes',
           path: '/affiliates',
           icon: Users
@@ -143,7 +147,11 @@ export default function DashboardLayout() {
         {/* Header */}
         <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 sticky top-0 z-20 transition-colors duration-300">
           <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider dark:text-slate-200">
-            {location.pathname === '/admin' ? 'Painel Administrativo' : location.pathname === '/client' ? 'Painel do Cliente' : 'Minha Conta'}
+            {location.pathname === '/admin'
+              ? 'Painel Administrativo'
+              : (location.pathname === '/client' || (profile?.role === 'client' && location.pathname.startsWith('/affiliates')))
+                ? 'Painel do Cliente'
+                : 'Minha Conta'}
           </h2>
           <div className="flex items-center gap-4">
             <button 
