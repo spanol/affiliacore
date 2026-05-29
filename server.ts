@@ -540,16 +540,22 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    // Hashed assets podem ser cacheados; o index.html precisa sempre revalidar
-    // para que um deploy novo (com novos hashes) seja pego de imediato.
-    app.use(express.static(distPath, {
-      index: false,
-      setHeaders: (res, filePath) => {
-        if (filePath.endsWith('index.html')) {
-          res.setHeader('Cache-Control', 'no-cache');
-        }
-      },
-    }));
+    // Assets têm hash no nome (imutáveis): cache do Express padrão é seguro —
+    // um build novo gera um nome novo, então não há staleness.
+    // `index: false` para que o index.html passe SEMPRE pelo fallback abaixo.
+    app.use(express.static(distPath, { index: false }));
+
+    // Serve o index.html sem cache nem validadores. CRÍTICO: o ETag default do
+    // Express é (tamanho + mtime); o index.html tem sempre 555 bytes e o buildpack
+    // do App Hosting preserva o mtime, então o ETag NÃO muda entre deploys. Com
+    // revalidação (no-cache) o browser recebia 304 e mantinha um index.html velho
+    // apontando p/ um hash de asset que o build novo apagou → 404 / tela branca a
+    // cada deploy. `no-store` + etag/lastModified desligados elimina o 304.
+    const sendIndex = (res: express.Response) => {
+      res.setHeader('Cache-Control', 'no-store, must-revalidate');
+      res.sendFile(path.join(distPath, 'index.html'), { etag: false, lastModified: false });
+    };
+
     app.get('*', (req, res) => {
       // O fallback SPA é só para rotas de cliente. Se um request de ARQUIVO
       // (com extensão, ex.: /assets/index-*.js) chega aqui, o arquivo não existe
@@ -564,8 +570,7 @@ async function startServer() {
           })
         );
       }
-      res.setHeader('Cache-Control', 'no-cache');
-      res.sendFile(path.join(distPath, 'index.html'));
+      sendIndex(res);
     });
   }
 
