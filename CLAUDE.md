@@ -108,4 +108,4 @@ Production runs on **Firebase App Hosting** (Cloud Run under the hood, same `age
 ## Important caveats
 
 - `firebase-applet-config.json` contains the (public, client-side) Firebase web config committed to the repo. The sensitive `service-account.json`, `FIREBASE_SERVICE_ACCOUNT_KEY`, and affiliate `x-api-key` are server-side only and gitignored.
-- `src/lib/firebase.ts` runs a `testConnection()` write to `system/connection_test_ping` on load (debug aid). With the new role-based rules this write is **denied** (the `system/` path has no rule) and logs a permission error — harmless, but worth removing.
+- `src/lib/firebase.ts` no longer runs the old `testConnection()` debug write (it pinged `system/connection_test_ping` on load and failed with a permission error under the role-based rules). Removed along with the noisy/PII console logs (Firebase config dump, profile data, theme, affiliate-fetch breadcrumbs) — keep production console clean; don't reintroduce debug `console.log`s of config or user data.

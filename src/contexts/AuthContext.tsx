@@ -40,14 +40,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (currentUser) {
         const path = `users/${currentUser.uid}`;
         try {
-          console.log('Fetching profile for:', currentUser.uid, 'on path: users/' + currentUser.uid);
           const docRef = doc(db, 'users', currentUser.uid);
           unsubscribeProfile = onSnapshot(docRef, (docSnap) => {
             if (docSnap.exists()) {
-              console.log('Profile found:', docSnap.data());
               setProfile(docSnap.data() as UserProfile);
             } else {
-              console.log('Profile not found in Firestore');
               setProfile(null);
             }
             setLoading(false);

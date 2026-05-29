@@ -69,9 +69,7 @@ export default function Register() {
       }
 
       setSuccess(true);
-      // Simulate welcome email
-      console.log('E-mail de confirmação e boas vindas enviado para:', email);
-      
+
       setTimeout(() => {
         navigate('/dashboard');
       }, 2000);

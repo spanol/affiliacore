@@ -123,7 +123,6 @@ export async function fetchAffiliateStatuses(): Promise<Record<string, Affiliate
 
 export async function fetchAffiliates(): Promise<Affiliate[]> {
   try {
-    console.log('Fetching affiliates from affiliate API...');
     const response = await fetchAffiliateApi('affiliates');
 
     if (!response.ok) {
@@ -141,7 +140,6 @@ export async function fetchAffiliates(): Promise<Affiliate[]> {
       throw new Error(apiError.message);
     }
 
-    console.log('API Response received');
     return extractArray(data);
   } catch (error) {
     console.error('Affiliate fetch error:', error);
