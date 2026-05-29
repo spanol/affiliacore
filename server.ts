@@ -46,10 +46,24 @@ async function startServer() {
   };
 
   const requireAuth: express.RequestHandler = async (req, res, next) => {
-    if (!adminApp) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    if (!adminApp || !adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     const decoded = await verifyBearer(req);
     if (!decoded) return res.status(401).json({ error: 'Não autenticado.' });
-    (req as any).user = { uid: decoded.uid, email: decoded.email };
+
+    let role: string | null = null;
+    let affiliateId: string | null = null;
+    try {
+      const snap = await adminDb.collection('users').doc(decoded.uid).get();
+      if (snap.exists) {
+        const data = snap.data();
+        role = data?.role ?? null;
+        affiliateId = data?.affiliateId ?? null;
+      }
+    } catch {
+      // fall through with null role/affiliateId
+    }
+
+    (req as any).user = { uid: decoded.uid, email: decoded.email, role, affiliateId };
     next();
   };
 
@@ -431,6 +445,20 @@ async function startServer() {
 
       if (!apiKey) {
         return res.status(500).json({ error: 'Chave de API não configurada' });
+      }
+
+      // Per-affiliate scoping: non-admins may only read their OWN results.
+      // The server forces affiliateIds to the caller's own id, ignoring any
+      // client-supplied value, and blocks every other external endpoint.
+      const user = (req as any).user;
+      if (user?.role !== 'admin') {
+        if (endpoint !== 'results' || id) {
+          return res.status(403).json({ error: 'Acesso restrito ao seu próprio desempenho.' });
+        }
+        if (!user?.affiliateId) {
+          return res.status(403).json({ error: 'Sua conta não está vinculada a um afiliado.' });
+        }
+        req.query.affiliateIds = String(user.affiliateId);
       }
 
       const queryString = new URLSearchParams(req.query as any).toString();
