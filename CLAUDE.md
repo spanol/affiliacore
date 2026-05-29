@@ -8,6 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Originated as a Google AI Studio applet (see README / `firebase-applet-config.json` / `metadata.json`).
 
+## Planning & roadmap
+
+- **`INTEGRATION-PLAN.md`** — current roadmap: data sources (v2 ✅ / v1 ❌ / Firebase), Fase 0 (done), trilhas A–D, blockers, and the recommended next step (**B2 · date filters**, which also fixes the OTG×Boost commission discrepancy). The external **v1 API is NOT accessible** with our `x-api-key` (401); clicks/wager/channels/payment-cycle are blocked pending OTG access.
+- **`BACKLOG.md`** — sketches B1 (lucro líquido), B2 (date filters), B3 (sub-affiliates), B4 (banking data), B5 (admin access/visibility settings).
+- **`public/mvp-inventario.html`** — static page (served at `/mvp-inventario.html`) cataloguing OTG dashboard data for the boss to qualify MVP scope.
+
 ## Commands
 
 ```bash
