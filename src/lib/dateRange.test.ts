@@ -27,6 +27,14 @@ describe('getPresetRange', () => {
     expect(getPresetRange('today', NOW)).toEqual({ startDate: '2026-05-29', endDate: '2026-05-29' });
   });
 
+  it('yesterday: início == fim == ontem', () => {
+    expect(getPresetRange('yesterday', NOW)).toEqual({ startDate: '2026-05-28', endDate: '2026-05-28' });
+  });
+
+  it('yesterday vira o mês corretamente no dia 1', () => {
+    expect(getPresetRange('yesterday', new Date(2026, 5, 1))).toEqual({ startDate: '2026-05-31', endDate: '2026-05-31' });
+  });
+
   it('last7: 7 dias incluindo hoje', () => {
     expect(getPresetRange('last7', NOW)).toEqual({ startDate: '2026-05-23', endDate: '2026-05-29' });
   });
@@ -62,6 +70,7 @@ describe('getDefaultRange', () => {
 describe('matchPreset', () => {
   it('reconhece cada preset a partir do intervalo', () => {
     expect(matchPreset(getPresetRange('today', NOW), NOW)).toBe('today');
+    expect(matchPreset(getPresetRange('yesterday', NOW), NOW)).toBe('yesterday');
     expect(matchPreset(getPresetRange('last7', NOW), NOW)).toBe('last7');
     expect(matchPreset(getPresetRange('thisMonth', NOW), NOW)).toBe('thisMonth');
     expect(matchPreset(getPresetRange('lastMonth', NOW), NOW)).toBe('lastMonth');

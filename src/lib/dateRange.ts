@@ -8,6 +8,7 @@ export interface DateRange {
 
 export type DateRangePresetId =
   | 'today'
+  | 'yesterday'
   | 'last7'
   | 'last30'
   | 'thisMonth'
@@ -31,6 +32,12 @@ export function getPresetRange(preset: DateRangePresetId, now: Date = new Date()
   switch (preset) {
     case 'today':
       return { startDate: today, endDate: today };
+    case 'yesterday': {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 1);
+      const iso = toISODate(d);
+      return { startDate: iso, endDate: iso };
+    }
     case 'last7': {
       const start = new Date(now);
       start.setDate(start.getDate() - 6); // inclui hoje => 7 dias
@@ -58,6 +65,7 @@ export function getPresetRange(preset: DateRangePresetId, now: Date = new Date()
 
 export const DATE_RANGE_PRESETS: Array<{ id: DateRangePresetId; label: string }> = [
   { id: 'today', label: 'Hoje' },
+  { id: 'yesterday', label: 'Ontem' },
   { id: 'last7', label: 'Últimos 7 dias' },
   { id: 'last30', label: 'Últimos 30 dias' },
   { id: 'thisMonth', label: 'Mês atual' },
