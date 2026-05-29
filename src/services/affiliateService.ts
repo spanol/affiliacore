@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { authFetch } from '../lib/api';
+import { getDefaultRange } from '../lib/dateRange';
 
 interface Affiliate {
   id: string;
@@ -181,10 +182,10 @@ interface ResultsQuery {
 }
 
 async function fetchResultsGrouped(groupBy: 'affiliate' | 'brand' | 'date' | 'campaign', opts: ResultsQuery = {}): Promise<any[]> {
-  const today = new Date().toISOString().split('T')[0];
+  const defaults = getDefaultRange();
   const params = new URLSearchParams({
-    startDate: opts.startDate || '2024-01-01',
-    endDate: opts.endDate || today,
+    startDate: opts.startDate || defaults.startDate,
+    endDate: opts.endDate || defaults.endDate,
     groupBy
   });
   if (opts.affiliateIds) params.set('affiliateIds', opts.affiliateIds);
@@ -206,93 +207,44 @@ async function fetchResultsGrouped(groupBy: 'affiliate' | 'brand' | 'date' | 'ca
   return Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
 }
 
+export interface DateRangeOpts {
+  startDate?: string;
+  endDate?: string;
+}
+
 // Per-house (brand) breakdown for an affiliate.
-export async function fetchAffiliateResultsByBrand(id: string): Promise<any[]> {
+export async function fetchAffiliateResultsByBrand(id: string, opts: DateRangeOpts = {}): Promise<any[]> {
   try {
-    return await fetchResultsGrouped('brand', { affiliateIds: id });
+    return await fetchResultsGrouped('brand', { affiliateIds: id, ...opts });
   } catch (error) {
     console.error(`Error fetching brand results for affiliate ${id}:`, error);
     return [];
   }
 }
 
-// Daily time series for an affiliate (defaults to the last ~90 days).
+// Daily time series for an affiliate. Defaults to the dashboard range (current month)
+// when no explicit start/end is supplied.
 export async function fetchAffiliateDailyResults(id: string, startDate?: string, endDate?: string): Promise<any[]> {
   try {
-    const defaultStart = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    return await fetchResultsGrouped('date', { affiliateIds: id, startDate: startDate || defaultStart, endDate });
+    return await fetchResultsGrouped('date', { affiliateIds: id, startDate, endDate });
   } catch (error) {
     console.error(`Error fetching daily results for affiliate ${id}:`, error);
     return [];
   }
 }
 
-export async function fetchAffiliateResults(id: string): Promise<any> {
+export async function fetchAffiliateResults(id: string, opts: DateRangeOpts = {}): Promise<any> {
   try {
-    const today = new Date().toISOString().split('T')[0];
-    const params = new URLSearchParams({
-      startDate: '2024-01-01',
-      endDate: today,
-      groupBy: 'affiliate',
-      affiliateIds: id
-    });
-
-    const response = await fetchAffiliateApi('results', params);
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || errorData.message || `Erro na API: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const apiError = extractApiError(data);
-    if (apiError) {
-      if (apiError.noData) {
-        return [];
-      }
-      throw new Error(apiError.message);
-    }
-
-    // The response structure for results is { data: { data: [...] } }
-    if (data.data && Array.isArray(data.data.data)) {
-      return data.data.data;
-    }
-    return data.data || data;
+    return await fetchResultsGrouped('affiliate', { affiliateIds: id, ...opts });
   } catch (error) {
     console.error(`Error fetching results for affiliate ${id}:`, error);
     throw error;
   }
 }
 
-export async function fetchAllResults(): Promise<any[]> {
+export async function fetchAllResults(opts: DateRangeOpts = {}): Promise<any[]> {
   try {
-    const today = new Date().toISOString().split('T')[0];
-    const params = new URLSearchParams({
-      startDate: '2024-01-01',
-      endDate: today,
-      groupBy: 'affiliate'
-    });
-
-    const response = await fetchAffiliateApi('results', params);
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || errorData.message || `Erro na API: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const apiError = extractApiError(data);
-    if (apiError) {
-      if (apiError.noData) {
-        return [];
-      }
-      throw new Error(apiError.message);
-    }
-    
-    if (data.data && Array.isArray(data.data.data)) {
-      return data.data.data;
-    }
-    return Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
+    return await fetchResultsGrouped('affiliate', opts);
   } catch (error) {
     console.error('Error fetching all results:', error);
     throw error;
@@ -567,7 +519,7 @@ export async function fetchSetting(key: string): Promise<string | null> {
   }
 }
 
-function extractArray(data: any): Affiliate[] {
+export function extractArray(data: any): Affiliate[] {
   if (!data) return [];
   
   if (Array.isArray(data)) {
@@ -624,7 +576,7 @@ function extractArray(data: any): Affiliate[] {
   return [];
 }
 
-function extractApiError(payload: any): ApiErrorInfo | null {
+export function extractApiError(payload: any): ApiErrorInfo | null {
   if (!payload || typeof payload !== 'object') {
     return null;
   }
@@ -660,7 +612,7 @@ function extractApiError(payload: any): ApiErrorInfo | null {
   return null;
 }
 
-function isNoDataError(code: string, message: string): boolean {
+export function isNoDataError(code: string, message: string): boolean {
   const normalizedCode = code.replace(/^0+/, '') || code;
   const normalizedMessage = message.toLowerCase();
 
@@ -676,7 +628,7 @@ function isNoDataError(code: string, message: string): boolean {
   );
 }
 
-function messageLooksLikeError(message: string): boolean {
+export function messageLooksLikeError(message: string): boolean {
   const normalizedMessage = message.toLowerCase();
   return (
     normalizedMessage.includes('erro') ||

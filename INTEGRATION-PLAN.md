@@ -31,7 +31,7 @@ do v1 dependem de a OTG liberar acesso (ver Trilha C).
 
 | Item | Escopo | Observação |
 |------|--------|------------|
-| **B2 · Filtros de data** | date range picker (admin + client) propagando `startDate`/`endDate` ao proxy | **Também conserta a divergência OTG×Boost** (hoje o Boost soma histórico fixo) |
+| **B2 · Filtros de data** ✅ | date range picker (admin + client) propagando `startDate`/`endDate` ao proxy | **Feito** — `DateRangePicker` + `lib/dateRange` (presets: hoje/7d/30d/mês atual/mês passado/personalizado); padrão = mês atual; client filtra livremente. Removido o `2024-01-01` fixo do `affiliateService`. Conserta a divergência OTG×Boost ao permitir alinhar o período. |
 | **B1 · Lucro líquido** | `Σ comissão da casa (results.total_commission) − Σ repasse ao afiliado (config)` | Card no AdminDashboard + por afiliado |
 | **Depósitos** | surfacing do campo `deposit` (já vem no results) | trivial |
 | **Multi-marca** | sincronizar/onboard afiliados da **SportingBet** (hoje só Superbet) | v2 já suporta `groupBy=brand` |
@@ -54,6 +54,21 @@ Não existem na v2 e o v1 exige JWT de sessão (nossa `x-api-key` dá 401).
 - **B3 · Sub-afiliados** — antes de desenhar, entender a "feature incompleta" e se a OTG
   expõe hierarquia. Provável modelo local (`parentAffiliateId`) + papel "afiliado master".
 
+## Trilha E — Testes 🧪 (em andamento)
+Antes não havia test runner. Fundação montada com **Vitest + React Testing Library + jsdom**
+(`vitest.config.ts`, setup em `src/test/setup.ts`). Scripts: `npm test`, `npm run test:watch`,
+`npm run coverage`. Convenção: arquivos `*.test.ts(x)` ao lado do código.
+
+| Cobertura | Estado |
+|-----------|--------|
+| `lib/dateRange` (presets, fuso, matchPreset) | ✅ coberto |
+| `affiliateService` — helpers defensivos (`extractArray`/`extractApiError`/`isNoDataError`) | ✅ coberto |
+| `components/DateRangePicker` (presets, intervalo custom, normalização) | ✅ coberto |
+| Demais services, contexts e páginas | ⬜ crescer por fase |
+| Handlers de API do `server.ts` (com mock do Firebase Admin) | ⬜ pendente |
+
+**Regra de ouro:** cada nova fase (B1, multi-marca, etc.) entra com seus testes junto.
+
 ---
 
 ## Bloqueadores a resolver (fora de código)
@@ -73,6 +88,6 @@ Não existem na v2 e o v1 exige JWT de sessão (nossa `x-api-key` dá 401).
 ---
 
 ## Sequenciamento recomendado
-1. **B2** (rápido + corrige a divergência) → 2. **B1** (lucro líquido) → 3. **Multi-marca + Por Campanha**
+1. ~~**B2** (rápido + corrige a divergência)~~ ✅ → 2. **B1** (lucro líquido) → 3. **Multi-marca + Por Campanha**
    → 4. **B4/B5** (após decisão do chefe) → 5. **Trilha C** (quando a OTG liberar v1)
    → 6. **B3** (após discovery).

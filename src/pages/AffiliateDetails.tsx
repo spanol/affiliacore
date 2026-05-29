@@ -36,6 +36,8 @@ import {
 } from '../services/affiliateService';
 import BrandBreakdown from '../components/BrandBreakdown';
 import DailyPerformanceChart from '../components/DailyPerformanceChart';
+import DateRangePicker from '../components/DateRangePicker';
+import { DateRange, getDefaultRange } from '../lib/dateRange';
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
 
@@ -49,6 +51,7 @@ export default function AffiliateDetails() {
   const [config, setConfig] = useState<AffiliateConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [range, setRange] = useState<DateRange>(() => getDefaultRange());
 
   // User Modal State
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -68,20 +71,20 @@ export default function AffiliateDetails() {
     if (id) {
       loadDetails(id);
     }
-  }, [id]);
+  }, [id, range.startDate, range.endDate]);
 
   const loadDetails = async (affId: string) => {
     try {
       setLoading(true);
       const [detailsData, resultsData, allConfigs, brandData, dailyData] = await Promise.all([
         fetchAffiliateById(affId),
-        fetchAffiliateResults(affId).catch(err => {
+        fetchAffiliateResults(affId, range).catch(err => {
           console.error('Error fetching results:', err);
           return [];
         }),
         fetchAffiliateConfigs(),
-        fetchAffiliateResultsByBrand(affId),
-        fetchAffiliateDailyResults(affId)
+        fetchAffiliateResultsByBrand(affId, range),
+        fetchAffiliateDailyResults(affId, range.startDate, range.endDate)
       ]);
       setAffiliate(detailsData);
       setResults(Array.isArray(resultsData) ? resultsData : []);
@@ -214,8 +217,9 @@ export default function AffiliateDetails() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button 
+        <div className="flex flex-wrap items-center gap-3">
+          <DateRangePicker value={range} onChange={setRange} />
+          <button
             onClick={handleOpenUserModal}
             className="flex items-center gap-2 px-4 py-2.5 bg-brand text-white rounded-xl hover:bg-brand-dark transition-all font-bold text-xs uppercase tracking-wider shadow-sm shadow-brand/20"
           >

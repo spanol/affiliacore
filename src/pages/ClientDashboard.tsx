@@ -21,6 +21,8 @@ import {
 } from '../services/affiliateService';
 import BrandBreakdown from '../components/BrandBreakdown';
 import DailyPerformanceChart from '../components/DailyPerformanceChart';
+import DateRangePicker from '../components/DateRangePicker';
+import { DateRange, getDefaultRange } from '../lib/dateRange';
 import { cn } from '../lib/utils';
 
 export default function ClientDashboard() {
@@ -32,12 +34,13 @@ export default function ClientDashboard() {
   const [config, setConfig] = useState<AffiliateConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [range, setRange] = useState<DateRange>(() => getDefaultRange());
 
   useEffect(() => {
     if (profile?.affiliateId || profile?.email) {
       loadClientData();
     }
-  }, [profile?.affiliateId, profile?.email]);
+  }, [profile?.affiliateId, profile?.email, range.startDate, range.endDate]);
 
   const loadClientData = async () => {
     try {
@@ -64,7 +67,7 @@ export default function ClientDashboard() {
 
       if (affiliateId) {
         [resultsData, allConfigs, brandData, dailyData] = await Promise.all([
-          fetchAffiliateResults(affiliateId).catch((err) => {
+          fetchAffiliateResults(affiliateId, range).catch((err) => {
             console.error('Error fetching results:', err);
             return [];
           }),
@@ -72,8 +75,8 @@ export default function ClientDashboard() {
             console.error('Error fetching configs:', err);
             return {};
           }),
-          fetchAffiliateResultsByBrand(affiliateId),
-          fetchAffiliateDailyResults(affiliateId),
+          fetchAffiliateResultsByBrand(affiliateId, range),
+          fetchAffiliateDailyResults(affiliateId, range.startDate, range.endDate),
         ]);
       }
 
@@ -139,7 +142,7 @@ export default function ClientDashboard() {
 
   return (
     <div className="space-y-8 pb-20">
-      <header className="flex flex-col gap-3">
+      <header className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
             Bem-vindo, {profile?.name || affiliate.name || affiliate.label || 'parceiro'}.
@@ -163,6 +166,7 @@ export default function ClientDashboard() {
             ID Externo: #{affiliate.id}
           </p>
         </div>
+        <DateRangePicker value={range} onChange={setRange} />
       </header>
 
       <div className="grid grid-cols-1 gap-8">

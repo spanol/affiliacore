@@ -22,6 +22,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
 import { fetchAffiliates, fetchAllResults } from '../services/affiliateService';
+import DateRangePicker from '../components/DateRangePicker';
+import { DateRange, getDefaultRange } from '../lib/dateRange';
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
@@ -29,33 +31,26 @@ export default function AdminDashboard() {
   const [affiliatesCount, setAffiliatesCount] = useState<number>(0);
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState<DateRange>(() => getDefaultRange());
   const [totals, setTotals] = useState({
     commission: 0,
     cpa: 0,
     rev: 0
   });
 
+  // Contagem de afiliados independe do período — busca uma vez.
   useEffect(() => {
-    async function getDashboardData() {
+    fetchAffiliates()
+      .then((affiliates) => setAffiliatesCount(affiliates.length))
+      .catch((err) => console.error('Error fetching affiliates for dashboard:', err));
+  }, []);
+
+  // Resultados/comissões respeitam o intervalo de datas selecionado (B2).
+  useEffect(() => {
+    async function getResults() {
       try {
         setLoading(true);
-        const [affiliatesResult, allResultsResult] = await Promise.allSettled([
-          fetchAffiliates(),
-          fetchAllResults()
-        ]);
-
-        const affiliates = affiliatesResult.status === 'fulfilled' ? affiliatesResult.value : [];
-        const allResults = allResultsResult.status === 'fulfilled' ? allResultsResult.value : [];
-
-        if (affiliatesResult.status === 'rejected') {
-          console.error('Error fetching affiliates for dashboard:', affiliatesResult.reason);
-        }
-
-        if (allResultsResult.status === 'rejected') {
-          console.error('Error fetching results for dashboard:', allResultsResult.reason);
-        }
-
-        setAffiliatesCount(affiliates.length);
+        const allResults = await fetchAllResults(range);
         setResults(allResults);
 
         // Calculate totals
@@ -68,12 +63,14 @@ export default function AdminDashboard() {
         setTotals(calculatedTotals);
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
+        setResults([]);
+        setTotals({ commission: 0, cpa: 0, rev: 0 });
       } finally {
         setLoading(false);
       }
     }
-    getDashboardData();
-  }, []);
+    getResults();
+  }, [range.startDate, range.endDate]);
 
   const metrics = [
     { label: 'Total de Afiliados', value: affiliatesCount.toString(), icon: Users, color: 'brand' },
@@ -126,9 +123,12 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-8 pb-20">
-      <header>
-        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Dashboard</h1>
-        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Bem-vindo de volta, {profile?.name}. Visão geral do desempenho da rede.</p>
+      <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Dashboard</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Bem-vindo de volta, {profile?.name}. Visão geral do desempenho da rede.</p>
+        </div>
+        <DateRangePicker value={range} onChange={setRange} />
       </header>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
