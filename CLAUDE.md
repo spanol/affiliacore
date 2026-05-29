@@ -25,12 +25,17 @@ npm run preview      # vite preview of the built bundle
 npm run lint         # tsc --noEmit (type-check only; there is no ESLint)
 npm run clean        # rm -rf dist
 
+# Tests (Vitest + React Testing Library + jsdom)
+npm test             # run the suite once (vitest run)
+npm run test:watch   # watch mode
+npm run coverage     # v8 coverage report
+
 # Firebase (CLI, project: agencia-boost-app)
 firebase deploy --only firestore:rules    # deploy firestore.rules after editing
 firebase projects:list                    # confirm logged-in account / projects
 ```
 
-There is **no test runner** configured. `npm run lint` (TypeScript type-check) is the only automated check.
+**Testing.** Test runner is **Vitest** (`vitest.config.ts`, jsdom env, setup in `src/test/setup.ts` registering jest-dom matchers). Convention: `*.test.ts(x)` colocated with the code. Current coverage is the B2 work (`lib/dateRange`, the `affiliateService` parsing helpers, `DateRangePicker`); see **Trilha E** in `INTEGRATION-PLAN.md` for the strategy — each new phase ships with its tests. `npm run lint` (TypeScript type-check) remains the other automated check.
 
 Dev and production both run through `server.ts` via `tsx` — there is no `vite dev` standalone path. In dev the Express server mounts Vite as middleware (`appType: 'spa'`); in production (`NODE_ENV=production`) it serves static `dist/` and falls back to `dist/index.html` for SPA routing.
 
