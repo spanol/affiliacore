@@ -251,6 +251,33 @@ export async function fetchAllResults(opts: DateRangeOpts = {}): Promise<any[]> 
   }
 }
 
+// --- B1 · Lucro líquido ------------------------------------------------------
+// ⚠️ REGRA DE NEGÓCIO PROVISÓRIA — CONFIRMAR COM O CHEFE antes de tratar como final.
+// Assumimos que:
+//   (a) a "comissão recebida da casa" é EXATAMENTE o `total_commission` reportado
+//       pela OTG (sem acordo diferente por casa); e
+//   (b) NÃO há custos fixos da agência (operacional, taxas) a descontar.
+// Pontos a validar com o chefe:
+//   - Existe acordo/percentual diferente por casa para o que a agência recebe?
+//   - Há custos fixos/variáveis a subtrair do lucro?
+//   - O lucro deve ser por casa/por período além do consolidado?
+// Enquanto não confirmado: lucro líquido = total_commission − repasse ao afiliado.
+
+// Repasse devido ao afiliado para um result (mesmo cálculo exibido nos dashboards):
+// CPA qualificado × valor de CPA + REV × (percentual / 100).
+export function calcAffiliatePayout(result: any, config?: AffiliateConfig | null): number {
+  const cpa = (result?.qualified_cpa || 0) * (config?.cpaValue || 0);
+  const rev = (result?.rvs || 0) * ((config?.revPercentage || 0) / 100);
+  return cpa + rev;
+}
+
+// Lucro líquido da agência para um result: comissão da casa − repasse ao afiliado.
+// Ver a REGRA PROVISÓRIA acima.
+export function calcNetProfit(result: any, config?: AffiliateConfig | null): number {
+  const houseCommission = result?.total_commission || 0;
+  return houseCommission - calcAffiliatePayout(result, config);
+}
+
 export async function updateAffiliateStatus(affiliateId: string, status: 'active' | 'inactive'): Promise<any> {
   try {
     const response = await authFetch(`/api/affiliates/${affiliateId}`, {

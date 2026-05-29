@@ -21,7 +21,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
-import { fetchAffiliates, fetchAllResults } from '../services/affiliateService';
+import { fetchAffiliates, fetchAllResults, fetchAffiliateConfigs, calcAffiliatePayout } from '../services/affiliateService';
 import DateRangePicker from '../components/DateRangePicker';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
 
@@ -37,6 +37,8 @@ export default function AdminDashboard() {
     cpa: 0,
     rev: 0
   });
+  // B1 · lucro líquido consolidado do período (comissão das casas − repasse aos afiliados).
+  const [netProfit, setNetProfit] = useState(0);
 
   // Contagem de afiliados independe do período — busca uma vez.
   useEffect(() => {
@@ -50,7 +52,10 @@ export default function AdminDashboard() {
     async function getResults() {
       try {
         setLoading(true);
-        const allResults = await fetchAllResults(range);
+        const [allResults, configs] = await Promise.all([
+          fetchAllResults(range),
+          fetchAffiliateConfigs(),
+        ]);
         setResults(allResults);
 
         // Calculate totals
@@ -61,10 +66,18 @@ export default function AdminDashboard() {
         }), { commission: 0, cpa: 0, rev: 0 });
 
         setTotals(calculatedTotals);
+
+        // B1 · lucro líquido = Σ comissão das casas − Σ repasse aos afiliados (por config).
+        const totalPayout = allResults.reduce(
+          (sum, r) => sum + calcAffiliatePayout(r, configs[String(r.affiliate_id ?? r.id ?? '')]),
+          0
+        );
+        setNetProfit(calculatedTotals.commission - totalPayout);
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
         setResults([]);
         setTotals({ commission: 0, cpa: 0, rev: 0 });
+        setNetProfit(0);
       } finally {
         setLoading(false);
       }
@@ -176,6 +189,37 @@ export default function AdminDashboard() {
           </motion.div>
         ))}
       </div>
+
+      {/* B1 · Lucro líquido (regra provisória — ver comentário em affiliateService.calcNetProfit) */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="p-6 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 shadow-sm flex items-center justify-between gap-4"
+      >
+        {loading ? (
+          <div className="flex items-center justify-center h-16 w-full">
+            <Loader2 className="animate-spin text-emerald-500" />
+          </div>
+        ) : (
+          <>
+            <div>
+              <p className="text-[10px] uppercase font-black tracking-widest text-emerald-700/70 dark:text-emerald-400/80 mb-1">
+                Lucro líquido da agência (período)
+              </p>
+              <h3 className="text-3xl font-black text-emerald-700 dark:text-emerald-400">
+                R$ {netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </h3>
+              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1.5">
+                Comissão recebida das casas − repasse aos afiliados.{' '}
+                <span className="italic">Regra provisória (a confirmar): sem custos fixos e usando o total reportado pela casa.</span>
+              </p>
+            </div>
+            <div className="shrink-0 p-3 rounded-xl bg-emerald-500/10 text-emerald-500">
+              <DollarSign size={24} />
+            </div>
+          </>
+        )}
+      </motion.div>
 
       {/* Chart Section */}
       <section className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
