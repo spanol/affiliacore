@@ -136,10 +136,14 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-8 pb-20">
-      <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <header className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Dashboard</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Bem-vindo de volta, {profile?.name}. Visão geral do desempenho da rede.</p>
+          <span className="inline-flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-slate-900/5 dark:bg-white/5 border border-slate-900/10 dark:border-white/10 text-slate-500 dark:text-neutral-300 text-[10px] font-bold uppercase tracking-widest">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Visão geral
+          </span>
+          <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tighter">Dashboard</h1>
+          <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">Bem-vindo de volta, {profile?.name}. Visão geral do desempenho da rede.</p>
         </div>
         <DateRangePicker value={range} onChange={setRange} />
       </header>
@@ -152,37 +156,45 @@ export default function AdminDashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.05 }}
             className={cn(
-              "p-6 rounded-2xl border shadow-sm transition-all relative overflow-hidden",
-              idx === 0 
-                ? "bg-slate-900 text-white border-transparent" 
-                : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800"
+              "group p-6 rounded-2xl border transition-all relative overflow-hidden",
+              idx === 0
+                ? "bg-slate-900 dark:bg-neutral-900 text-white border-slate-800 dark:border-neutral-800 shadow-xl shadow-slate-900/10 dark:shadow-black/30"
+                : "bg-white dark:bg-neutral-900/60 border-slate-200/70 dark:border-neutral-800 shadow-sm hover:border-slate-300 dark:hover:border-neutral-700"
             )}
           >
+            {idx === 0 && (
+              <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
+            )}
             {loading ? (
               <div className="flex items-center justify-center h-20">
-                <Loader2 className="animate-spin text-brand" />
+                <Loader2 className="animate-spin text-brand dark:text-white" />
               </div>
             ) : (
               <>
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex justify-between items-start mb-4 relative">
                   <div className={cn(
-                    "p-2.5 rounded-xl",
-                    idx === 0 ? "bg-white/10" : "bg-slate-50 dark:bg-slate-800"
+                    "p-2.5 rounded-xl border transition-transform group-hover:scale-105",
+                    idx === 0
+                      ? "bg-white/5 border-white/10"
+                      : "bg-slate-50 dark:bg-neutral-800/60 border-slate-100 dark:border-neutral-700/60"
                   )}>
                     <metric.icon size={20} className={cn(
-                      idx === 0 ? "text-white" : "text-slate-900 dark:text-slate-100"
+                      idx === 0 ? "text-white" : "text-slate-900 dark:text-neutral-100"
                     )} />
                   </div>
                 </div>
-                
-                <div>
+
+                <div className="relative">
                   <p className={cn(
-                    "text-[10px] uppercase font-black tracking-widest mb-1",
-                    idx === 0 ? "text-slate-400" : "text-slate-400"
+                    "text-[10px] uppercase font-bold tracking-widest mb-1.5",
+                    idx === 0 ? "text-neutral-400" : "text-slate-400 dark:text-neutral-500"
                   )}>
                     {metric.label}
                   </p>
-                  <h3 className="text-xl font-black dark:text-white truncate">{metric.value}</h3>
+                  <h3 className={cn(
+                    "text-2xl font-bold tracking-tight truncate",
+                    idx === 0 ? "text-white" : "text-slate-900 dark:text-white"
+                  )}>{metric.value}</h3>
                 </div>
               </>
             )}
@@ -194,27 +206,28 @@ export default function AdminDashboard() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="p-6 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 shadow-sm flex items-center justify-between gap-4"
+        className="relative overflow-hidden p-6 md:p-7 rounded-2xl border border-emerald-200/70 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 shadow-sm flex items-center justify-between gap-4"
       >
+        <div className="absolute top-0 right-0 w-56 h-56 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
         {loading ? (
           <div className="flex items-center justify-center h-16 w-full">
             <Loader2 className="animate-spin text-emerald-500" />
           </div>
         ) : (
           <>
-            <div>
-              <p className="text-[10px] uppercase font-black tracking-widest text-emerald-700/70 dark:text-emerald-400/80 mb-1">
+            <div className="relative">
+              <span className="inline-flex items-center gap-2 px-2.5 py-1 mb-3 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-widest">
                 Lucro líquido da agência (período)
-              </p>
-              <h3 className="text-3xl font-black text-emerald-700 dark:text-emerald-400">
+              </span>
+              <h3 className="text-3xl md:text-4xl font-bold tracking-tighter text-emerald-700 dark:text-emerald-400">
                 R$ {netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </h3>
-              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1.5">
+              <p className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 mt-2 max-w-2xl">
                 Comissão recebida das casas − repasse aos afiliados.{' '}
                 <span className="italic">Regra provisória (a confirmar): sem custos fixos e usando o total reportado pela casa.</span>
               </p>
             </div>
-            <div className="shrink-0 p-3 rounded-xl bg-emerald-500/10 text-emerald-500">
+            <div className="relative shrink-0 p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500">
               <DollarSign size={24} />
             </div>
           </>
@@ -222,17 +235,17 @@ export default function AdminDashboard() {
       </motion.div>
 
       {/* Chart Section */}
-      <section className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
+      <section className="relative overflow-hidden bg-white dark:bg-neutral-900/60 p-6 md:p-8 rounded-3xl border border-slate-200/70 dark:border-neutral-800 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
-              Desempenho por Afiliado <HelpCircle size={14} className="text-slate-500 dark:text-slate-300" />
+            <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+              Desempenho por Afiliado <HelpCircle size={14} className="text-slate-400 dark:text-neutral-500" />
             </h3>
-            <p className="text-xs text-slate-500 font-medium">Top parceiros por volume de comissão — mostra 5 por vez, use o controle para ver os próximos.</p>
+            <p className="text-xs text-slate-500 dark:text-neutral-400 font-medium mt-1">Top parceiros por volume de comissão — mostra 5 por vez, use o controle para ver os próximos.</p>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl">
-             <TrendingUp size={16} className="text-slate-700 dark:text-slate-200" />
-             <span className="text-[10px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest italic">Performance em tempo real</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10">
+             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+             <span className="text-[10px] font-bold text-slate-500 dark:text-neutral-300 uppercase tracking-widest">Performance em tempo real</span>
           </div>
         </div>
 
@@ -247,7 +260,7 @@ export default function AdminDashboard() {
                   type="button"
                   onClick={() => setChartPage((prev) => Math.max(prev - 1, 0))}
                   disabled={chartPage === 0}
-                  className="px-3 py-2 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 disabled:opacity-40"
+                  className="px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-slate-700 dark:text-neutral-200 hover:border-slate-300 dark:hover:border-neutral-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Anterior
                 </button>
@@ -255,7 +268,7 @@ export default function AdminDashboard() {
                   type="button"
                   onClick={() => setChartPage((prev) => Math.min(prev + 1, pageCount - 1))}
                   disabled={chartPage === pageCount - 1}
-                  className="px-3 py-2 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 disabled:opacity-40"
+                  className="px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-slate-700 dark:text-neutral-200 hover:border-slate-300 dark:hover:border-neutral-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Próximo
                 </button>
@@ -338,9 +351,4 @@ export default function AdminDashboard() {
 
     </div>
   );
-}
-
-
-function clsx(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
 }
