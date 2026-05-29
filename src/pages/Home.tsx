@@ -385,7 +385,7 @@ export default function Home() {
         </section>
 
         {/* Application form */}
-        <section
+        {/* <section
           id="contato"
           className="max-w-7xl mx-auto px-6 pt-16 pb-24 border-t border-neutral-800/50"
         >
@@ -520,7 +520,7 @@ export default function Home() {
               )}
             </div>
           </div>
-        </section>
+        </section> */}
       </main>
 
       {/* Footer */}
