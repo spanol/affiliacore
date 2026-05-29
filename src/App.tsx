@@ -104,7 +104,7 @@ function DashboardRedirect() {
   
   if (profile?.role === 'admin') return <Navigate to="/admin" replace />;
   if (profile?.role === 'client') return <Navigate to="/client" replace />;
-  
+
   // Default fallback if role is missing but user is logged in
-  return <Navigate to="/profile" replace />;
+  return <Navigate to="/admin" replace />;
 }

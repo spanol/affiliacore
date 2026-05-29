@@ -256,16 +256,17 @@ export default function AdminDashboard() {
                   tick={{ fontSize: 10, fontWeight: 700, fill: theme === 'dark' ? '#CBD5E1' : '#475569' }}
                   tickFormatter={(value) => `R$ ${value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value}`}
                 />
-                <Tooltip 
-                  cursor={{ fill: '#F1F5F9', radius: 10 }}
-                  contentStyle={{ 
-                    borderRadius: '16px', 
-                    border: 'none', 
-                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                <Tooltip
+                  cursor={{ fill: theme === 'dark' ? 'rgba(148, 163, 184, 0.12)' : '#F1F5F9', radius: 10 }}
+                  contentStyle={{
+                    borderRadius: '16px',
+                    border: theme === 'dark' ? '1px solid #1E293B' : 'none',
+                    backgroundColor: theme === 'dark' ? '#0F172A' : '#FFFFFF',
+                    boxShadow: theme === 'dark' ? '0 10px 25px -5px rgb(0 0 0 / 0.6)' : '0 10px 15px -3px rgb(0 0 0 / 0.1)',
                     padding: '12px'
                   }}
-                  itemStyle={{ fontSize: '12px', fontWeight: 700 }}
-                  labelStyle={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', marginBottom: '8px' }}
+                  itemStyle={{ fontSize: '12px', fontWeight: 700, color: theme === 'dark' ? '#E2E8F0' : '#334155' }}
+                  labelStyle={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: theme === 'dark' ? '#94A3B8' : '#64748B', marginBottom: '8px' }}
                   formatter={(value: number, name: string) => [
                     `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
                     name
