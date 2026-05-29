@@ -70,11 +70,14 @@ export default function AffiliatesList() {
         fetchRegisteredUsers()
       ]);
 
+      // Admins (afiliados master) NÃO devem aparecer na listagem de afiliados.
+      const affiliateUsers = registeredUsers.filter(u => u.role !== 'admin');
+
       // Create a lookup of registered affiliate IDs for quick checks
-      const regLookup = new Set(registeredUsers.map(u => String(u.affiliateId || u.uid)));
+      const regLookup = new Set(affiliateUsers.map(u => String(u.affiliateId || u.uid)));
 
       // Prioritize registered affiliates: map registered users to affiliate objects if present
-      const registeredAffiliates: Affiliate[] = registeredUsers.map(u => {
+      const registeredAffiliates: Affiliate[] = affiliateUsers.map(u => {
         const affiliateKey = String(u.affiliateId || u.uid);
         const found = affData.find((a: any) => String(a.id) === affiliateKey || String(a._id) === affiliateKey);
         if (found) {
@@ -124,17 +127,15 @@ export default function AffiliatesList() {
     // allow empty string for easier typing, but convert to 0 for the state if needed
     // Actually, it's better to keep it as string if we want to allow typing freely, 
     // but the current state expects a number.
-    let numValue = parseFloat(value);
-    if (isNaN(numValue)) numValue = 0;
-    
-    // Prevent negative values
-    numValue = Math.max(0, numValue);
+    // Keep the raw string while editing so the field can be cleared (delete the 0)
+    // and retyped. Values are coerced to numbers on save (handleSaveConfig).
+    const next = value === '' ? '' : Math.max(0, parseFloat(value) || 0);
 
     setConfigs(prev => ({
       ...prev,
       [affiliateId]: {
         ...(prev[affiliateId] || { affiliateId, cpaValue: 0, revPercentage: 0 }),
-        [field]: numValue
+        [field]: next as any
       }
     }));
   };
@@ -143,7 +144,12 @@ export default function AffiliatesList() {
     e.stopPropagation();
     setSavingId(affiliateId);
     try {
-      const config = configs[affiliateId] || { affiliateId, cpaValue: 0, revPercentage: 0 };
+      const raw = configs[affiliateId] || { affiliateId, cpaValue: 0, revPercentage: 0 };
+      const config = {
+        affiliateId,
+        cpaValue: Number(raw.cpaValue) || 0,
+        revPercentage: Number(raw.revPercentage) || 0,
+      };
       await saveAffiliateConfig(config);
       setSavedId(affiliateId);
       setTimeout(() => setSavedId(null), 2000);

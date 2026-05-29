@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Boost · Inventário de Dados para o MVP</title>
+<style>
+  :root {
+    --brand: #141C2A;
+    --brand-light: #2A3547;
+    --ok: #16a34a;
+    --warn: #d97706;
+    --no: #64748b;
+    --bg: #f1f5f9;
+    --card: #ffffff;
+    --line: #e2e8f0;
+    --ink: #0f172a;
+    --muted: #64748b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  header {
+    background: var(--brand); color: #fff; padding: 28px 32px;
+  }
+  header h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: .5px; }
+  header p { margin: 0; color: #94a3b8; font-size: 13px; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 18px; margin-top: 16px; font-size: 12px;
+  }
+  .meta span { color: #cbd5e1; }
+  .meta b { color: #fff; }
+  main { max-width: 1080px; margin: 0 auto; padding: 24px 16px 80px; }
+
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 16px; margin: 20px 0; font-size: 12px; position: sticky; top: 0; z-index: 5;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px;
+    border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap;
+  }
+  .b-ok   { background: #dcfce7; color: var(--ok); }
+  .b-warn { background: #fef3c7; color: var(--warn); }
+  .b-no   { background: #e2e8f0; color: var(--no); }
+
+  .tally { margin-left: auto; font-size: 12px; color: var(--muted); font-weight: 600; }
+  .tally b { color: var(--ink); }
+
+  section { margin-top: 28px; }
+  .sec-title {
+    display: flex; align-items: baseline; gap: 10px; margin: 0 0 12px;
+  }
+  .sec-title h2 { font-size: 15px; margin: 0; text-transform: uppercase; letter-spacing: 1px; }
+  .sec-title small { color: var(--muted); font-size: 12px; font-weight: 500; }
+
+  .grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  .row {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px; display: grid;
+    grid-template-columns: 1fr auto auto; gap: 14px; align-items: center;
+  }
+  .row.dim { opacity: .72; }
+  .name { font-weight: 700; font-size: 14px; }
+  .name small { display: block; font-weight: 500; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .value { font-variant-numeric: tabular-nums; font-weight: 800; color: var(--brand); font-size: 14px; text-align: right; }
+  .value small { display:block; font-weight:600; color: var(--muted); font-size: 11px; }
+
+  .decide { display: flex; gap: 6px; }
+  .decide button {
+    border: 1px solid var(--line); background: #fff; color: var(--muted);
+    font-size: 11px; font-weight: 700; padding: 6px 10px; border-radius: 8px; cursor: pointer;
+    transition: all .12s;
+  }
+  .decide button:hover { border-color: var(--brand-light); }
+  .decide button.sel-sim { background: var(--ok); color: #fff; border-color: var(--ok); }
+  .decide button.sel-talvez { background: var(--warn); color: #fff; border-color: var(--warn); }
+  .decide button.sel-nao { background: var(--no); color: #fff; border-color: var(--no); }
+
+  .note {
+    background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412;
+    border-radius: 10px; padding: 10px 14px; font-size: 12.5px; margin-top: 10px;
+  }
+  .toolbar { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
+  .toolbar button {
+    border: 1px solid var(--line); background: #fff; color: var(--ink);
+    font-size: 12px; font-weight: 700; padding: 9px 16px; border-radius: 10px; cursor: pointer;
+  }
+  .toolbar button.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+  #out {
+    width: 100%; margin-top: 14px; min-height: 90px; border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px; font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+    display: none;
+  }
+  @media (max-width: 640px) {
+    .row { grid-template-columns: 1fr; }
+    .value { text-align: left; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Boost · Inventário de Dados para o MVP</h1>
+  <p>Baseado na dashboard oficial da OTG (partners.grupootg.com). Marque o que importa para o MVP.</p>
+  <div class="meta">
+    <span>Período exemplo: <b>01–31 mai 2026</b></span>
+    <span>Casas: <b>SportingBet · Superbet</b></span>
+    <span>Conta: <b>Agência</b></span>
+    <span>Fonte dos valores: <b>dashboard OTG (dados reais)</b></span>
+  </div>
+</header>
+
+<main>
+  <div class="legend">
+    <span class="badge b-ok">✅ Disponível (nossa API v2)</span>
+    <span class="badge b-warn">⚠️ Parcial</span>
+    <span class="badge b-no">❌ Requer API v1 da OTG</span>
+    <span class="tally" id="tally">Sim: <b id="n-sim">0</b> · Talvez: <b id="n-talvez">0</b> · Não: <b id="n-nao">0</b></span>
+  </div>
+
+  <!-- 1. KPIs -->
+  <section>
+    <div class="sec-title"><h2>1 · Visão Geral (KPIs)</h2><small>cards de topo</small></div>
+    <div class="grid" id="grp"></div>
+  </section>
+
+  <div class="toolbar">
+    <button class="primary" onclick="marcarTodos('sim')">Marcar tudo: Sim</button>
+    <button onclick="marcarTodos('')">Limpar</button>
+    <button onclick="gerarResumo()">Gerar resumo das decisões</button>
+  </div>
+  <textarea id="out" readonly placeholder="O resumo aparecerá aqui..."></textarea>
+</main>
+
+<script>
+  // Cada item: grupo, nome, descrição, valor de exemplo, disponibilidade (ok|warn|no)
+  const ITEMS = [
+    ['1 · Visão Geral (KPIs)', 'cards de topo', [
+      ['Comissão Total', 'CPA + REV no período', 'R$ 140.461,71', 'ok'],
+      ['CPA (R$)', 'custo por aquisição', 'R$ 140.400,00', 'ok'],
+      ['REV (R$)', 'revenue share', 'R$ 61,71', 'ok'],
+      ['Depósitos (R$)', 'volume depositado pelos jogadores', 'R$ 47.110,28', 'ok'],
+    ]],
+    ['2 · Funil de Conversão', 'Cadastros → FTDs → CPA Qualificados', [
+      ['Cadastros', 'novos registros', '731', 'ok'],
+      ['FTDs (Primeiros Depósitos)', 'jogadores que depositaram', '489', 'ok'],
+      ['CPA Qualificados', 'atingiram a meta de qualificação', '468', 'ok'],
+      ['Taxas de conversão', 'FTD/Cadastro e CPAQ/FTD', '66,9% · 95,7%', 'ok'],
+    ]],
+    ['3 · Por Casa (marca)', 'SportingBet / Superbet', [
+      ['Breakdown por casa', 'métricas separadas por casa de aposta', 'groupBy=brand', 'ok'],
+      ['REV por casa', 'barra de REV por casa', 'Superbet R$ 61,71', 'ok'],
+      ['CPA por casa', 'barra de CPA por casa (R$/Qtd)', 'Superbet R$ 140,4k', 'ok'],
+    ]],
+    ['4 · Evolução Temporal', 'série diária', [
+      ['Cadastros e FTDs ao longo do tempo', 'gráfico de linha/barra por dia', 'groupBy=date', 'ok'],
+    ]],
+    ['5 · Tabela Detalhada', 'visão tabular + exportação', [
+      ['Tabela por casa', 'Cadastros, FTDs, CPA Qual., Conv%, Depósito, CPA, REV, Total', 'completo', 'ok'],
+      ['Exportar XLSX / CSV', 'baixar os dados da tabela', 'gerado no front', 'ok'],
+    ]],
+    ['6 · Resultado Analítico', 'por afiliado / por campanha', [
+      ['Por afiliado', 'métricas agregadas por afiliado', 'groupBy=affiliate', 'ok'],
+      ['Por campanha', 'métricas agregadas por campanha', 'groupBy=campaign', 'ok'],
+      ['Cliques', 'nº de cliques no link do afiliado', 'sem dados na v2', 'no'],
+      ['Valores em Aposta', 'volume apostado (handle)', 'sem dados na v2', 'no'],
+    ]],
+    ['7 · Canais', 'desempenho por canal de divulgação', [
+      ['Visão por canal', 'agrupamento por canal (vazio no consolidado da OTG)', 'não confirmado', 'no'],
+    ]],
+    ['8 · Ciclo de Pagamento', 'pagamentos / fechamento de comissão', [
+      ['Ciclo de pagamento / comissão', 'status e fechamento de pagamentos ao afiliado', 'endpoint v1', 'no'],
+    ]],
+    ['9 · Gestão de Links', 'área /my-links da OTG', [
+      ['Links do afiliado', 'criar/gerenciar links de rastreio', 'a definir', 'warn'],
+    ]],
+  ];
+
+  const main = document.querySelector('main');
+  const firstGrid = document.getElementById('grp');
+  const badges = { ok: ['b-ok','✅ v2'], warn: ['b-warn','⚠️ parcial'], no: ['b-no','❌ v1'] };
+  let idx = 0;
+
+  function makeRow(name, desc, value, avail) {
+    const id = 'item-' + (idx++);
+    const [cls, txt] = badges[avail];
+    const row = document.createElement('div');
+    row.className = 'row' + (avail === 'no' ? ' dim' : '');
+    row.dataset.id = id; row.dataset.name = name;
+    row.innerHTML = `
+      <div class="name">${name}<small>${desc}</small></div>
+      <div class="value">${value}<small><span class="badge ${cls}">${txt}</span></small></div>
+      <div class="decide">
+        <button data-v="sim" onclick="decide(this,'sim')">Sim</button>
+        <button data-v="talvez" onclick="decide(this,'talvez')">Talvez</button>
+        <button data-v="nao" onclick="decide(this,'nao')">Não</button>
+      </div>`;
+    return row;
+  }
+
+  // build sections
+  ITEMS.forEach((grp, gi) => {
+    const [title, sub, items] = grp;
+    let grid;
+    if (gi === 0) {
+      grid = firstGrid;
+    } else {
+      const sec = document.createElement('section');
+      sec.innerHTML = `<div class="sec-title"><h2>${title}</h2><small>${sub}</small></div>`;
+      grid = document.createElement('div'); grid.className = 'grid';
+      sec.appendChild(grid);
+      // insert before the toolbar
+      main.insertBefore(sec, document.querySelector('.toolbar'));
+    }
+    items.forEach(it => grid.appendChild(makeRow(...it)));
+  });
+
+  function decide(btn, v) {
+    const row = btn.closest('.row');
+    const already = btn.classList.contains('sel-' + v);
+    row.querySelectorAll('.decide button').forEach(b => b.className = '');
+    row.dataset.decision = '';
+    if (!already) { btn.className = 'sel-' + v; row.dataset.decision = v; }
+    updateTally();
+  }
+  function marcarTodos(v) {
+    document.querySelectorAll('.row').forEach(row => {
+      row.querySelectorAll('.decide button').forEach(b => b.className = '');
+      row.dataset.decision = '';
+      if (v) {
+        const b = row.querySelector(`.decide button[data-v="${v}"]`);
+        if (b) { b.className = 'sel-' + v; row.dataset.decision = v; }
+      }
+    });
+    updateTally();
+  }
+  function updateTally() {
+    const c = { sim: 0, talvez: 0, nao: 0 };
+    document.querySelectorAll('.row').forEach(r => { if (r.dataset.decision) c[r.dataset.decision]++; });
+    document.getElementById('n-sim').textContent = c.sim;
+    document.getElementById('n-talvez').textContent = c.talvez;
+    document.getElementById('n-nao').textContent = c.nao;
+  }
+  function gerarResumo() {
+    const buckets = { sim: [], talvez: [], nao: [] };
+    document.querySelectorAll('.row').forEach(r => {
+      if (r.dataset.decision) buckets[r.dataset.decision].push(r.dataset.name);
+    });
+    const fmt = (t, arr) => `${t} (${arr.length}):\n` + (arr.length ? arr.map(x => '  - ' + x).join('\n') : '  —');
+    const out = document.getElementById('out');
+    out.style.display = 'block';
+    out.value = [
+      'DECISÕES DO MVP — Boost',
+      '',
+      fmt('IMPORTA (Sim)', buckets.sim),
+      '',
+      fmt('TALVEZ', buckets.talvez),
+      '',
+      fmt('NÃO IMPORTA', buckets.nao),
+    ].join('\n');
+    out.scrollIntoView({ behavior: 'smooth' });
+  }
+</script>
+</body>
+</html>
