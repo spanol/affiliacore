@@ -143,17 +143,17 @@ export default function ClientDashboard() {
   return (
     <div className="space-y-8 pb-20">
       <header className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-slate-500 dark:text-neutral-400 truncate">
             Bem-vindo, {profile?.name || affiliate.name || affiliate.label || 'parceiro'}.
           </p>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+          <div className="flex items-center gap-3 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight truncate">
               {affiliate.name || affiliate.label || profile?.name || 'Sem Nome'}
             </h1>
             <span
               className={cn(
-                'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider',
+                'shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider',
                 affiliate.status === 'active' || affiliate.status === 'Ativo' || affiliate.status === 1
                   ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
                   : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400'
@@ -178,10 +178,10 @@ export default function ClientDashboard() {
 
             return (
               <div key={idx} className="space-y-8">
-                <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-6">
+                <div className="bg-white dark:bg-neutral-900 p-8 rounded-3xl border border-slate-100 dark:border-neutral-800 shadow-sm space-y-6">
                   <div>
                     <div className="flex items-center gap-1 text-xs font-bold text-slate-500 mb-2">
-                      Comissão total <HelpCircle size={14} className="text-slate-500 dark:text-slate-300" />
+                      Comissão total <HelpCircle size={14} className="text-slate-500 dark:text-neutral-300" />
                     </div>
                     <div className="flex items-baseline gap-4">
                       <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white break-words">
@@ -194,13 +194,13 @@ export default function ClientDashboard() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between group hover:border-brand/20 transition-all">
+                    <div className="p-6 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800 flex items-center justify-between group hover:border-brand/20 transition-all">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-brand transition-colors shadow-sm text-xs font-black">
+                        <div className="w-10 h-10 rounded-xl bg-white dark:bg-neutral-800 flex items-center justify-center text-slate-400 group-hover:text-brand transition-colors shadow-sm text-xs font-black">
                           R$
                         </div>
                         <div>
-                          <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest mb-1">
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-neutral-300 uppercase tracking-widest mb-1">
                             CPA Calculado (R$ {config?.cpaValue || 0}/CPA) <HelpCircle size={10} />
                           </div>
                           <p className="text-xl font-black text-slate-800 dark:text-white">
@@ -210,13 +210,13 @@ export default function ClientDashboard() {
                       </div>
                     </div>
 
-                    <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between group hover:border-brand/20 transition-all">
+                    <div className="p-6 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800 flex items-center justify-between group hover:border-brand/20 transition-all">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-brand transition-colors shadow-sm">
+                        <div className="w-10 h-10 rounded-xl bg-white dark:bg-neutral-800 flex items-center justify-center text-slate-400 group-hover:text-brand transition-colors shadow-sm">
                           <TrendingUp size={20} />
                         </div>
                         <div>
-                          <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest mb-1">
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-neutral-300 uppercase tracking-widest mb-1">
                             REV Share ({config?.revPercentage || 0}%) <HelpCircle size={10} />
                           </div>
                           <p className="text-xl font-black text-slate-800 dark:text-white">
@@ -232,10 +232,10 @@ export default function ClientDashboard() {
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
-                    className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm group hover:border-brand/20 transition-all duration-500"
+                    className="bg-white dark:bg-neutral-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-neutral-800 shadow-sm group hover:border-brand/20 transition-all duration-500"
                   >
                     <div className="flex items-center justify-between mb-4">
-                      <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl text-slate-400 group-hover:text-brand transition-colors">
+                      <div className="p-3 bg-slate-50 dark:bg-neutral-800 rounded-2xl text-slate-400 group-hover:text-brand transition-colors">
                         <UserPlus size={20} />
                       </div>
                       <div className="flex items-center gap-1 text-[10px] font-black text-green-500 bg-green-500/10 px-2 py-1 rounded-lg">
@@ -253,14 +253,14 @@ export default function ClientDashboard() {
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
-                    className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm group hover:border-brand/20 transition-all duration-500"
+                    className="bg-white dark:bg-neutral-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-neutral-800 shadow-sm group hover:border-brand/20 transition-all duration-500"
                   >
                     <div className="flex items-center justify-between mb-4">
-                      <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl text-slate-400 group-hover:text-brand transition-colors">
+                      <div className="p-3 bg-slate-50 dark:bg-neutral-800 rounded-2xl text-slate-400 group-hover:text-brand transition-colors">
                         <Building size={20} />
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
+                        <div className="bg-slate-100 dark:bg-neutral-800 px-2 py-1 rounded-lg">
                           <span className="text-[10px] font-black text-slate-500">
                             {res.registrations > 0 ? ((res.first_deposits / res.registrations) * 100).toFixed(1) : 0}% conv.
                           </span>
@@ -281,13 +281,13 @@ export default function ClientDashboard() {
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
-                    className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm group hover:border-brand/20 transition-all duration-500"
+                    className="bg-white dark:bg-neutral-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-neutral-800 shadow-sm group hover:border-brand/20 transition-all duration-500"
                   >
                     <div className="flex items-center justify-between mb-4">
-                      <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl text-slate-400 group-hover:text-brand transition-colors">
+                      <div className="p-3 bg-slate-50 dark:bg-neutral-800 rounded-2xl text-slate-400 group-hover:text-brand transition-colors">
                         <Shield size={20} />
                       </div>
-                      <div className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
+                      <div className="bg-slate-100 dark:bg-neutral-800 px-2 py-1 rounded-lg">
                         <span className="text-[10px] font-black text-slate-500">
                           {res.first_deposits > 0 ? ((res.qualified_cpa / res.first_deposits) * 100).toFixed(1) : 0}% conv.
                         </span>
@@ -309,10 +309,10 @@ export default function ClientDashboard() {
           })}
 
           {/* Evolução diária (dados reais da API externa, groupBy=date) */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl flex flex-col shadow-sm overflow-hidden mb-20">
-            <div className="p-6 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-slate-50/50">
+          <div className="bg-white dark:bg-neutral-900 border border-slate-100 dark:border-neutral-800 rounded-3xl flex flex-col shadow-sm overflow-hidden mb-20">
+            <div className="p-6 border-b border-slate-50 dark:border-neutral-800 flex justify-between items-center bg-slate-50/50">
               <h3 className="font-black text-xs text-slate-800 dark:text-white uppercase tracking-widest">Evolução Diária</h3>
-              <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-neutral-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                 Cadastros · Comissão
               </div>
             </div>
@@ -321,16 +321,16 @@ export default function ClientDashboard() {
 
           {/* Lista de Clientes — desativada: a API de afiliados não expõe dados por
               cliente/jogador. Mantida para reativar caso surja essa fonte de dados.
-          <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl flex flex-col shadow-sm overflow-hidden mb-20">
-            <div className="p-6 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-slate-50/50">
+          <div className="bg-white dark:bg-neutral-900 border border-slate-100 dark:border-neutral-800 rounded-3xl flex flex-col shadow-sm overflow-hidden mb-20">
+            <div className="p-6 border-b border-slate-50 dark:border-neutral-800 flex justify-between items-center bg-slate-50/50">
               <h3 className="font-black text-xs text-slate-800 dark:text-white uppercase tracking-widest">Lista de Clientes</h3>
-              <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-neutral-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                 {clientRows.length} registros
               </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-slate-50 dark:bg-slate-800/50 text-[10px] text-slate-400 uppercase tracking-widest sticky top-0 backdrop-blur-sm z-10 border-b border-slate-100 dark:border-slate-800">
+                <thead className="bg-slate-50 dark:bg-neutral-800/50 text-[10px] text-slate-400 uppercase tracking-widest sticky top-0 backdrop-blur-sm z-10 border-b border-slate-100 dark:border-neutral-800">
                   <tr>
                     <th className="px-8 py-5 font-black">Nome</th>
                     <th className="px-8 py-5 font-black">Valor do primeiro depósito</th>

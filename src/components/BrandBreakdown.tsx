@@ -25,13 +25,13 @@ export default function BrandBreakdown({ data, config }: BrandBreakdownProps) {
   const maxCpa = Math.max(1, ...brands.map((b) => b.cpa));
 
   const renderCard = (title: string, metric: 'rev' | 'cpa', max: number) => (
-    <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
+    <div className="bg-white dark:bg-neutral-900 p-8 rounded-3xl border border-slate-100 dark:border-neutral-800 shadow-sm">
       <div className="flex items-center gap-2 mb-8">
-        <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300">
+        <div className="p-2 rounded-xl bg-slate-100 dark:bg-neutral-800 text-slate-500 dark:text-neutral-300">
           <Store size={16} />
         </div>
         <div className="flex items-center gap-1 text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
-          {title} <HelpCircle size={14} className="text-slate-400 dark:text-slate-500" />
+          {title} <HelpCircle size={14} className="text-slate-400 dark:text-neutral-500" />
         </div>
       </div>
       {brands.length === 0 ? (
@@ -48,13 +48,13 @@ export default function BrandBreakdown({ data, config }: BrandBreakdownProps) {
                     <div className="w-6 h-6 rounded bg-brand flex items-center justify-center text-white font-black text-[10px]">
                       {b.name.charAt(0).toUpperCase()}
                     </div>
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{b.name}</span>
+                    <span className="text-xs font-bold text-slate-700 dark:text-neutral-300">{b.name}</span>
                   </div>
                   <span className="text-xs font-bold text-slate-400">{formatBRL(value)}</span>
                 </div>
-                <div className="h-6 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div className="h-6 bg-slate-100 dark:bg-neutral-800 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-brand dark:bg-slate-600 rounded-full transition-all"
+                    className="h-full bg-brand dark:bg-neutral-600 rounded-full transition-all"
                     style={{ width: `${pct}%` }}
                   ></div>
                 </div>
