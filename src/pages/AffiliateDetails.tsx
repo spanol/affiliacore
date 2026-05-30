@@ -258,7 +258,7 @@ export default function AffiliateDetails() {
                 </span>
               </div>
             </div>
-            <p className="text-slate-500 font-mono text-xs uppercase tracking-widest mt-1">ID Externo: #{affiliate.id}</p>
+            <p className="text-slate-500 font-mono text-xs uppercase tracking-widest mt-1 break-all">ID Externo: #{affiliate.id}</p>
           </div>
         </div>
 
@@ -303,7 +303,7 @@ export default function AffiliateDetails() {
                         Comissão total <HelpCircle size={14} className="text-slate-500 dark:text-slate-300" />
                       </div>
                       <div className="flex items-baseline gap-4">
-                        <h2 className="text-4xl font-black text-slate-900 dark:text-white">
+                        <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white break-words">
                           R$ {totalCommission.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </h2>
                         <div className="flex items-center gap-1 text-brand font-bold text-sm bg-brand/5 px-2 py-0.5 rounded-lg">
