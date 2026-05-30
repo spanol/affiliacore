@@ -25,8 +25,9 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
-import { fetchAffiliates, fetchAllResults, fetchAffiliateConfigs, calcAffiliatePayout } from '../services/affiliateService';
+import { fetchAffiliates, fetchAllResults, fetchAllResultsByCampaign, fetchAffiliateConfigs, calcAffiliatePayout, CampaignRow } from '../services/affiliateService';
 import DateRangePicker from '../components/DateRangePicker';
+import CampaignBreakdown from '../components/CampaignBreakdown';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
 
 export default function AdminDashboard() {
@@ -48,6 +49,8 @@ export default function AdminDashboard() {
   });
   // B1 · lucro líquido consolidado do período (comissão das casas − repasse aos afiliados).
   const [netProfit, setNetProfit] = useState(0);
+  // Por Campanha — desempenho agregado da rede por campanha (groupBy=campaign).
+  const [campaignRows, setCampaignRows] = useState<CampaignRow[]>([]);
 
   // Contagem de afiliados independe do período — busca uma vez.
   useEffect(() => {
@@ -61,11 +64,13 @@ export default function AdminDashboard() {
     async function getResults() {
       try {
         setLoading(true);
-        const [allResults, configs] = await Promise.all([
+        const [allResults, configs, campaigns] = await Promise.all([
           fetchAllResults(range),
           fetchAffiliateConfigs(),
+          fetchAllResultsByCampaign(range),
         ]);
         setResults(allResults);
+        setCampaignRows(campaigns);
 
         // Calculate totals (financeiro + funil agregado da rede)
         const calculatedTotals = allResults.reduce((acc, curr) => ({
@@ -91,6 +96,7 @@ export default function AdminDashboard() {
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
         setResults([]);
+        setCampaignRows([]);
         setTotals({ commission: 0, cpa: 0, rev: 0, registrations: 0, firstDeposits: 0, qualifiedCpa: 0, deposit: 0 });
         setNetProfit(0);
       } finally {
@@ -409,6 +415,32 @@ export default function AdminDashboard() {
             </div>
           )}
         </div>
+      </section>
+
+      {/* Por Campanha — desempenho agregado da rede (groupBy=campaign).
+          Comissão exibida = total reportado pelas casas (visão do master). */}
+      <section>
+        <h3 className="text-[10px] uppercase font-bold tracking-widest text-slate-400 dark:text-neutral-500 mb-3 px-1">
+          Desempenho por campanha (rede)
+        </h3>
+        {loading ? (
+          <div className="flex items-center justify-center h-32 rounded-3xl border border-slate-200/70 dark:border-neutral-800 bg-white dark:bg-neutral-900/60">
+            <Loader2 className="animate-spin text-brand dark:text-white" />
+          </div>
+        ) : (
+          <CampaignBreakdown
+            commissionLabel="Comissão (casa)"
+            subtitle="Soma de todos os afiliados do master no período"
+            rows={campaignRows.map((c) => ({
+              name: c.name,
+              registrations: c.registrations,
+              firstDeposits: c.first_deposits,
+              deposit: c.deposit,
+              qualifiedCpa: c.qualified_cpa,
+              commission: c.total_commission,
+            }))}
+          />
+        )}
       </section>
 
     </div>

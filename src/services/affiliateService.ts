@@ -249,6 +249,89 @@ export async function fetchAllResults(opts: DateRangeOpts = {}): Promise<any[]> 
   }
 }
 
+// --- Por Campanha ------------------------------------------------------------
+// Visão analítica por campanha (results?groupBy=campaign). Disponível em dois lugares:
+//   - por afiliado (AffiliateDetails / painel do cliente), escopado via affiliateIds;
+//   - agregada da rede (AdminDashboard), sem affiliateIds (somente admin no proxy).
+
+// Linha de campanha normalizada — soma das métricas cruas da API por campanha.
+export interface CampaignRow {
+  id: string;
+  name: string;
+  total_commission: number;
+  cpa: number;
+  rvs: number;
+  registrations: number;
+  first_deposits: number;
+  qualified_cpa: number;
+  deposit: number;
+}
+
+const num = (v: any): number => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+// Agrega linhas cruas de results?groupBy=campaign por campanha, somando as métricas.
+// Defensivo porque (a) a API externa varia os nomes de campo e (b) a chamada da rede
+// pode devolver uma linha por afiliado×campanha — agrupamos por id/nome da campanha
+// para um total por campanha independentemente do shape recebido.
+export function aggregateByCampaign(rows: any[]): CampaignRow[] {
+  const byKey = new Map<string, CampaignRow>();
+
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!row || typeof row !== 'object') continue;
+    const name = String(
+      row.campaign_name ?? row.campaign ?? row.label ?? row.name ?? row.campaign_id ?? row.id ?? 'Campanha'
+    );
+    const id = String(row.campaign_id ?? row.id ?? name);
+
+    const existing = byKey.get(id);
+    const acc = existing ?? {
+      id,
+      name,
+      total_commission: 0,
+      cpa: 0,
+      rvs: 0,
+      registrations: 0,
+      first_deposits: 0,
+      qualified_cpa: 0,
+      deposit: 0,
+    };
+
+    acc.total_commission += num(row.total_commission);
+    acc.cpa += num(row.cpa);
+    acc.rvs += num(row.rvs);
+    acc.registrations += num(row.registrations);
+    acc.first_deposits += num(row.first_deposits);
+    acc.qualified_cpa += num(row.qualified_cpa);
+    acc.deposit += num(row.deposit);
+
+    byKey.set(id, acc);
+  }
+
+  return Array.from(byKey.values()).sort((a, b) => b.total_commission - a.total_commission);
+}
+
+// Campanhas de um afiliado específico.
+export async function fetchAffiliateResultsByCampaign(id: string, opts: DateRangeOpts = {}): Promise<CampaignRow[]> {
+  try {
+    const rows = await fetchResultsGrouped('campaign', { affiliateIds: id, ...opts });
+    return aggregateByCampaign(rows);
+  } catch (error) {
+    console.error(`Error fetching campaign results for affiliate ${id}:`, error);
+    return [];
+  }
+}
+
+// Campanhas agregadas de toda a rede (somente admin — o proxy bloqueia non-admin sem affiliateIds).
+export async function fetchAllResultsByCampaign(opts: DateRangeOpts = {}): Promise<CampaignRow[]> {
+  try {
+    const rows = await fetchResultsGrouped('campaign', opts);
+    return aggregateByCampaign(rows);
+  } catch (error) {
+    console.error('Error fetching network campaign results:', error);
+    return [];
+  }
+}
+
 // --- B1 · Lucro líquido ------------------------------------------------------
 // ⚠️ REGRA DE NEGÓCIO PROVISÓRIA — CONFIRMAR COM O CHEFE antes de tratar como final.
 // Assumimos que:

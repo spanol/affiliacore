@@ -10,6 +10,7 @@ import {
   extractApiError,
   isNoDataError,
   messageLooksLikeError,
+  aggregateByCampaign,
 } from './affiliateService';
 
 describe('extractArray', () => {
@@ -96,5 +97,54 @@ describe('extractApiError', () => {
   it('detecta erro por mensagem mesmo sem flag de sucesso', () => {
     const err = extractApiError({ message: 'unauthorized' });
     expect(err).not.toBeNull();
+  });
+});
+
+describe('aggregateByCampaign', () => {
+  it('retorna [] para entrada não-array / vazia', () => {
+    expect(aggregateByCampaign(null as any)).toEqual([]);
+    expect(aggregateByCampaign([])).toEqual([]);
+  });
+
+  it('soma as métricas de linhas da mesma campanha', () => {
+    const rows = [
+      { campaign_id: 'c1', campaign_name: 'Black Friday', total_commission: 100, registrations: 5, first_deposits: 3, deposit: 250, qualified_cpa: 2, rvs: 40 },
+      { campaign_id: 'c1', campaign_name: 'Black Friday', total_commission: 50, registrations: 2, first_deposits: 1, deposit: 100, qualified_cpa: 1, rvs: 10 },
+    ];
+    const result = aggregateByCampaign(rows);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: 'c1',
+      name: 'Black Friday',
+      total_commission: 150,
+      registrations: 7,
+      first_deposits: 4,
+      deposit: 350,
+      qualified_cpa: 3,
+      rvs: 50,
+    });
+  });
+
+  it('mantém campanhas distintas separadas e ordena por comissão desc', () => {
+    const rows = [
+      { campaign_id: 'low', total_commission: 10 },
+      { campaign_id: 'high', total_commission: 90 },
+      { campaign_id: 'mid', total_commission: 40 },
+    ];
+    expect(aggregateByCampaign(rows).map((c) => c.id)).toEqual(['high', 'mid', 'low']);
+  });
+
+  it('faz fallback entre variações de nome de campo para id/nome', () => {
+    const rows = [{ campaign: 'Promo X', total_commission: 5 }];
+    const [row] = aggregateByCampaign(rows);
+    expect(row.name).toBe('Promo X');
+    expect(row.id).toBe('Promo X');
+  });
+
+  it('converte campos numéricos ausentes/inválidos para zero', () => {
+    const rows = [{ campaign_id: 'c1', total_commission: 'oops', registrations: undefined }];
+    const [row] = aggregateByCampaign(rows);
+    expect(row.total_commission).toBe(0);
+    expect(row.registrations).toBe(0);
   });
 });

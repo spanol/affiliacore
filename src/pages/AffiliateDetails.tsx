@@ -24,19 +24,23 @@ import {
   X,
   CheckCircle
 } from 'lucide-react';
-import { 
+import {
   fetchAffiliateById,
   fetchAffiliateResults,
   fetchAffiliateResultsByBrand,
+  fetchAffiliateResultsByCampaign,
   fetchAffiliateDailyResults,
   fetchAffiliateConfigs,
+  calcAffiliatePayout,
   AffiliateConfig,
+  CampaignRow,
   createUser,
   createAccessInvite,
   isUserRegistered
 } from '../services/affiliateService';
 import { useAuth } from '../contexts/AuthContext';
 import BrandBreakdown from '../components/BrandBreakdown';
+import CampaignBreakdown from '../components/CampaignBreakdown';
 import DailyPerformanceChart from '../components/DailyPerformanceChart';
 import DateRangePicker from '../components/DateRangePicker';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
@@ -53,6 +57,7 @@ export default function AffiliateDetails() {
   const [affiliate, setAffiliate] = useState<any>(null);
   const [results, setResults] = useState<any[]>([]);
   const [brandResults, setBrandResults] = useState<any[]>([]);
+  const [campaignResults, setCampaignResults] = useState<CampaignRow[]>([]);
   const [dailyResults, setDailyResults] = useState<any[]>([]);
   const [config, setConfig] = useState<AffiliateConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -84,7 +89,7 @@ export default function AffiliateDetails() {
   const loadDetails = async (affId: string) => {
     try {
       setLoading(true);
-      const [detailsData, resultsData, allConfigs, brandData, dailyData] = await Promise.all([
+      const [detailsData, resultsData, allConfigs, brandData, campaignData, dailyData] = await Promise.all([
         fetchAffiliateById(affId),
         fetchAffiliateResults(affId, range).catch(err => {
           console.error('Error fetching results:', err);
@@ -92,11 +97,13 @@ export default function AffiliateDetails() {
         }),
         fetchAffiliateConfigs(),
         fetchAffiliateResultsByBrand(affId, range),
+        fetchAffiliateResultsByCampaign(affId, range),
         fetchAffiliateDailyResults(affId, range.startDate, range.endDate)
       ]);
       setAffiliate(detailsData);
       setResults(Array.isArray(resultsData) ? resultsData : []);
       setBrandResults(Array.isArray(brandData) ? brandData : []);
+      setCampaignResults(Array.isArray(campaignData) ? campaignData : []);
       setDailyResults(Array.isArray(dailyData) ? dailyData : []);
       setConfig(allConfigs[affId] || null);
 
@@ -423,6 +430,21 @@ export default function AffiliateDetails() {
 
                   {/* Per-house breakdown (real data from groupBy=brand) */}
                   <BrandBreakdown data={brandResults} config={config} />
+
+                  {/* Por Campanha (dados reais da API externa, groupBy=campaign).
+                      O afiliado vê a PRÓPRIA comissão (CPA+REV via config), nunca a margem da agência. */}
+                  <CampaignBreakdown
+                    commissionLabel="Sua comissão"
+                    subtitle="Resultados por campanha no período selecionado"
+                    rows={campaignResults.map((c) => ({
+                      name: c.name,
+                      registrations: c.registrations,
+                      firstDeposits: c.first_deposits,
+                      deposit: c.deposit,
+                      qualifiedCpa: c.qualified_cpa,
+                      commission: calcAffiliatePayout(c, config),
+                    }))}
+                  />
 
                   {/* Evolução diária (dados reais da API externa, groupBy=date) */}
                   <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl flex flex-col shadow-sm overflow-hidden mb-20">
