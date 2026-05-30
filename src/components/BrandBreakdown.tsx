@@ -1,5 +1,5 @@
 import React from 'react';
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, Store } from 'lucide-react';
 import type { AffiliateConfig } from '../services/affiliateService';
 
 interface BrandBreakdownProps {
@@ -26,8 +26,13 @@ export default function BrandBreakdown({ data, config }: BrandBreakdownProps) {
 
   const renderCard = (title: string, metric: 'rev' | 'cpa', max: number) => (
     <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
-      <div className="flex items-center gap-1 text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest mb-8">
-        {title} <HelpCircle size={14} className="text-slate-500 dark:text-slate-300" />
+      <div className="flex items-center gap-2 mb-8">
+        <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300">
+          <Store size={16} />
+        </div>
+        <div className="flex items-center gap-1 text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
+          {title} <HelpCircle size={14} className="text-slate-400 dark:text-slate-500" />
+        </div>
       </div>
       {brands.length === 0 ? (
         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest py-6 text-center opacity-50">Sem dados por casa</p>
