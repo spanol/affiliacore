@@ -87,7 +87,7 @@ export default function AffiliatesList() {
       });
 
       // Remaining affiliates from API that are not registered
-      const remaining = affData.filter((a: any) => !regLookup.has(String(a.id) || String(a._id))).map((a: any) => ({
+      const remaining = affData.filter((a: any) => !regLookup.has(String(a.id ?? a._id ?? ''))).map((a: any) => ({
         ...a,
         status: 'inactive'
       } as Affiliate));
@@ -97,7 +97,19 @@ export default function AffiliatesList() {
         status: statusData[affiliate.id]?.status || affiliate.status || 'inactive'
       }));
 
-      setAffiliates(mergedAffiliates);
+      // Deduplica por id (mantém a 1ª ocorrência → registrados vêm primeiro).
+      // Sem isso, dois usuários com o mesmo affiliateId (ou ids repetidos na API)
+      // geram chaves React duplicadas e linhas repetidas na lista.
+      const seenIds = new Set<string>();
+      const uniqueAffiliates = mergedAffiliates.filter((a) => {
+        const key = String(a.id ?? (a as any)._id ?? '');
+        if (!key) return true; // sem id: não dá para deduplicar, mantém
+        if (seenIds.has(key)) return false;
+        seenIds.add(key);
+        return true;
+      });
+
+      setAffiliates(uniqueAffiliates);
       setConfigs(configData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar dados da API');
