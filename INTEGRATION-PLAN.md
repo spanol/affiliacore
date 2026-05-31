@@ -34,8 +34,8 @@ do v1 dependem de a OTG liberar acesso (ver Trilha C).
 | **B2 · Filtros de data** ✅ | date range picker (admin + client) propagando `startDate`/`endDate` ao proxy | **Feito** — `DateRangePicker` + `lib/dateRange` (presets: hoje/7d/30d/mês atual/mês passado/personalizado); padrão = mês atual; client filtra livremente. Removido o `2024-01-01` fixo do `affiliateService`. Conserta a divergência OTG×Boost ao permitir alinhar o período. |
 | **B1 · Lucro líquido** | `Σ comissão da casa (results.total_commission) − Σ repasse ao afiliado (config)` | Card no AdminDashboard + por afiliado |
 | **Depósitos** | surfacing do campo `deposit` (já vem no results) | trivial |
-| **Multi-marca** | sincronizar/onboard afiliados da **SportingBet** (hoje só Superbet) | v2 já suporta `groupBy=brand` |
-| **Por Campanha** | visão analítica por campanha | usa `campaigns` + `results?groupBy=campaign` |
+| **Multi-marca** ⚙️ UI pronta · 🔴 dados bloqueados na OTG | UI multi-marca implementada (filtro por marca + badge no AdminDashboard e AffiliatesList; `lib/brand`). **Verificado 2026-05-30: a API externa retorna SÓ Superbet (37/37 afiliados, `groupBy=brand` só traz Superbet).** O filtro fica oculto com 1 marca e aparece sozinho quando a OTG vincular afiliados SportingBet à nossa `x-api-key`. **Não é tarefa de código — é onboarding operacional na OTG.** |
+| **Por Campanha** ✅ | visão analítica por campanha | **Feito** — `aggregateByCampaign` + `CampaignBreakdown` (tabela em sm+, cards no mobile) no `/admin` (rede) e no painel do afiliado (própria comissão). |
 
 ## Trilha B — Produto / decisão (v2 + Firebase)
 
