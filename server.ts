@@ -423,10 +423,15 @@ async function startServer() {
       return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     }
     try {
-      const { token, email, password } = req.body ?? {};
+      const { token, email, password, phone, instagram } = req.body ?? {};
       if (!token || !email || !password) {
         return res.status(400).json({ error: 'Token, e-mail e senha são obrigatórios.' });
       }
+      const normalizedPhone = String(phone ?? '').trim();
+      if (!normalizedPhone) {
+        return res.status(400).json({ error: 'O telefone é obrigatório.' });
+      }
+      const normalizedInstagram = String(instagram ?? '').trim();
 
       const inviteRef = adminDb.collection('invites').doc(String(token));
       const inviteSnap = await inviteRef.get();
@@ -464,6 +469,8 @@ async function startServer() {
         email: normalizedEmail,
         role: 'client',
         affiliateId: String(invite.affiliateId),
+        phone: normalizedPhone,
+        instagram: normalizedInstagram,
         mustChangePassword: false,
         avatarUrl: `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(affiliateName)}`,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),

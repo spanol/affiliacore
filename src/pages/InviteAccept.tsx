@@ -4,7 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { fetchInvite, acceptInvite } from '../services/affiliateService';
-import { UserPlus, Mail, Lock, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { UserPlus, Mail, Lock, AlertCircle, CheckCircle, Loader2, Instagram, Phone } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
 
@@ -20,6 +20,8 @@ export default function InviteAccept() {
   const [affiliateName, setAffiliateName] = useState<string | null>(null);
 
   const [email, setEmail] = useState('');
+  const [instagram, setInstagram] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
@@ -51,11 +53,20 @@ export default function InviteAccept() {
       setError('As senhas não coincidem.');
       return;
     }
+    const trimmedPhone = phone.trim();
+    if (!trimmedPhone) {
+      setError('Informe um número de telefone para contato.');
+      return;
+    }
 
     setSubmitting(true);
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      await acceptInvite(token, normalizedEmail, password);
+      const normalizedInstagram = instagram.trim().replace(/^@+/, '');
+      await acceptInvite(token, normalizedEmail, password, {
+        phone: trimmedPhone,
+        instagram: normalizedInstagram ? `@${normalizedInstagram}` : '',
+      });
       setSuccess(true);
       // Sign the affiliate in so AuthContext loads the profile and redirects.
       try {
@@ -151,6 +162,35 @@ export default function InviteAccept() {
               required
               className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all outline-none"
               placeholder="nome@exemplo.com"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest ml-1">Telefone (WhatsApp)</label>
+          <div className="relative">
+            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500" size={16} />
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              required
+              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all outline-none"
+              placeholder="(11) 99999-9999"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest ml-1">Instagram <span className="text-slate-300 dark:text-neutral-600 normal-case font-medium">(opcional)</span></label>
+          <div className="relative">
+            <Instagram className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500" size={16} />
+            <input
+              type="text"
+              value={instagram}
+              onChange={(e) => setInstagram(e.target.value)}
+              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all outline-none"
+              placeholder="@seuperfil"
             />
           </div>
         </div>

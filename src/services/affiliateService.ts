@@ -666,11 +666,16 @@ export async function fetchInvite(token: string): Promise<InviteInfo> {
   return response.json();
 }
 
-export async function acceptInvite(token: string, email: string, password: string): Promise<{ uid: string; affiliateId: string }> {
+export interface InviteProfile {
+  phone?: string;
+  instagram?: string;
+}
+
+export async function acceptInvite(token: string, email: string, password: string, profile?: InviteProfile): Promise<{ uid: string; affiliateId: string }> {
   const response = await fetch('/api/accept-invite', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-    body: JSON.stringify({ token, email, password })
+    body: JSON.stringify({ token, email, password, phone: profile?.phone, instagram: profile?.instagram })
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
