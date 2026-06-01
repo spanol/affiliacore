@@ -22,7 +22,8 @@ import {
   Copy,
   Check,
   X,
-  CheckCircle
+  CheckCircle,
+  Crown
 } from 'lucide-react';
 import {
   fetchAffiliateById,
@@ -36,9 +37,14 @@ import {
   CampaignRow,
   createUser,
   createAccessInvite,
-  isUserRegistered
+  isUserRegistered,
+  fetchAffiliates,
+  fetchSpecialAffiliates,
+  fetchRegisteredUsers,
+  SpecialAffiliate
 } from '../services/affiliateService';
 import { useAuth } from '../contexts/AuthContext';
+import SpecialAffiliateModal from '../components/SpecialAffiliateModal';
 import BrandBreakdown from '../components/BrandBreakdown';
 import CampaignBreakdown from '../components/CampaignBreakdown';
 import DailyPerformanceChart from '../components/DailyPerformanceChart';
@@ -69,6 +75,37 @@ export default function AffiliateDetails() {
   const [range, setRange] = useState<DateRange>(() => getDefaultRange());
   // Cadastro próprio: o afiliado já criou acesso (existe users/{uid} com este affiliateId)?
   const [hasAccount, setHasAccount] = useState(false);
+
+  // B3 · gestão de afiliado especial a partir desta página (reusa o modal compartilhado)
+  const [specialOpen, setSpecialOpen] = useState(false);
+  const [specialPool, setSpecialPool] = useState<any[]>([]);
+  const [specials, setSpecials] = useState<Record<string, SpecialAffiliate>>({});
+  const [specialAffiliate, setSpecialAffiliate] = useState<{ id: string; name?: string; userUid?: string } | null>(null);
+  const [loadingSpecial, setLoadingSpecial] = useState(false);
+
+  const openSpecial = async () => {
+    if (!affiliate) return;
+    setLoadingSpecial(true);
+    try {
+      const [pool, sp, users] = await Promise.all([fetchAffiliates(), fetchSpecialAffiliates(), fetchRegisteredUsers()]);
+      setSpecialPool(pool);
+      setSpecials(sp);
+      const uid = users.find((u) => String(u.affiliateId) === String(affiliate.id))?.uid;
+      setSpecialAffiliate({ id: String(affiliate.id), name: affiliate.name || affiliate.label, userUid: uid });
+      setSpecialOpen(true);
+    } catch (e) {
+      console.error('Erro ao abrir gestão de especial:', e);
+    } finally {
+      setLoadingSpecial(false);
+    }
+  };
+
+  const isCurrentSpecialActive = !!specials[String(id)]?.active;
+
+  // Estado de "é especial?" só p/ refletir no botão (admin).
+  useEffect(() => {
+    if (isAdmin && id) fetchSpecialAffiliates().then(setSpecials).catch(() => {});
+  }, [id, isAdmin]);
 
   // User Modal State
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -289,15 +326,41 @@ export default function AffiliateDetails() {
                 {isGeneratingLink ? <Loader2 size={16} className="animate-spin" /> : <Link size={16} />}
                 Gerar Convite
               </button>
+              <button
+                onClick={openSpecial}
+                disabled={loadingSpecial}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all font-bold text-xs uppercase tracking-wider shadow-sm border disabled:opacity-50",
+                  isCurrentSpecialActive
+                    ? "bg-amber-500 text-white border-amber-500 hover:bg-amber-400"
+                    : "bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-800 text-slate-700 dark:text-neutral-300 hover:border-amber-500/40"
+                )}
+              >
+                {loadingSpecial ? <Loader2 size={16} className="animate-spin" /> : <Crown size={16} />}
+                {isCurrentSpecialActive ? 'Afiliado Especial' : 'Tornar Especial'}
+              </button>
             </>
           )}
         </div>
       </header>
 
+      {isAdmin && specialOpen && specialAffiliate && (
+        <SpecialAffiliateModal
+          affiliate={specialAffiliate}
+          allAffiliates={specialPool}
+          specials={specials}
+          onClose={() => setSpecialOpen(false)}
+          onSaved={() => fetchSpecialAffiliates().then(setSpecials).catch(() => {})}
+        />
+      )}
+
       <div className="grid grid-cols-1 gap-8">
         <div className="space-y-8">
-          {results.length > 0 ? (
-            results.map((res: any, idx: number) => {
+          {/* Sem dados: renderiza os cards zerados (em vez de um aviso de vazio). */}
+          {(results.length > 0
+            ? results
+            : [{ registrations: 0, first_deposits: 0, qualified_cpa: 0, rvs: 0, total_commission: 0, deposit: 0 }]
+          ).map((res: any, idx: number) => {
               // Calculate custom commissions based on config
               const calculatedCpa = (res.qualified_cpa || 0) * (config?.cpaValue || 0);
               const calculatedRev = (res.rvs || 0) * ((config?.revPercentage || 0) / 100);
@@ -499,17 +562,7 @@ export default function AffiliateDetails() {
                   */}
                 </div>
               );
-            })
-          ) : (
-            <div className="flex flex-col items-center justify-center py-20 text-center bg-white dark:bg-neutral-900 rounded-3xl border border-dashed border-slate-200 dark:border-neutral-800">
-              <div className="w-16 h-16 bg-slate-50 dark:bg-neutral-800 rounded-full flex items-center justify-center text-slate-300 mb-4 shadow-sm">
-                <Clock size={32} />
-              </div>
-              <p className="text-lg text-slate-500 font-bold max-w-sm px-6">
-                Nenhum dado de performance disponível para este afiliado no momento.
-              </p>
-            </div>
-          )}
+            })}
         </div>
       </div>
 

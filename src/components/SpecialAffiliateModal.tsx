@@ -1,0 +1,202 @@
+import React, { useState } from 'react';
+import { motion } from 'motion/react';
+import { Crown, X, Save, Loader2, Percent, Search } from 'lucide-react';
+import { cn } from '../lib/utils';
+import { saveSpecialAffiliate, setUserSpecialFlag, SpecialAffiliate } from '../services/affiliateService';
+import { useToast } from '../contexts/ToastContext';
+
+interface AffiliateLite {
+  id: string;
+  name?: string;
+  label?: string;
+  userUid?: string;
+}
+
+interface Props {
+  affiliate: AffiliateLite;                       // afiliado sendo gerido
+  allAffiliates: AffiliateLite[];                 // pool para escolher sub-afiliados
+  specials: Record<string, SpecialAffiliate>;     // estado atual dos especiais
+  onClose: () => void;
+  onSaved?: () => void;                           // refresh do chamador
+}
+
+// B3 · Modal de gestão do afiliado especial (compartilhado entre a lista de
+// afiliados e a página de dados do afiliado). Master promove/rebaixa, define a
+// taxa da sub-rede e vincula sub-afiliados (1 especial por afiliado, 1 nível).
+export default function SpecialAffiliateModal({ affiliate, allAffiliates, specials, onClose, onSaved }: Props) {
+  const { push } = useToast();
+  const espId = String(affiliate.id);
+  const existing = specials[espId];
+
+  const [active, setActive] = useState(existing?.active ?? false);
+  const [networkCpaValue, setNetworkCpaValue] = useState<number | string>(existing?.networkCpaValue ?? 0);
+  const [networkRevPercentage, setNetworkRevPercentage] = useState<number | string>(existing?.networkRevPercentage ?? 0);
+  const [subs, setSubs] = useState<string[]>(existing?.subAffiliateIds ?? []);
+  const [search, setSearch] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const toggleSub = (subId: string) =>
+    setSubs((prev) => (prev.includes(subId) ? prev.filter((s) => s !== subId) : [...prev, subId]));
+
+  const otherEspeciais = new Set(
+    Object.values(specials).filter((s) => s.active && String(s.affiliateId) !== espId).map((s) => String(s.affiliateId))
+  );
+  const takenByOthers = new Set<string>();
+  Object.values(specials).forEach((s) => {
+    if (String(s.affiliateId) !== espId && s.active) s.subAffiliateIds.forEach((id) => takenByOthers.add(String(id)));
+  });
+  const q = search.toLowerCase();
+  const eligible = allAffiliates.filter((a) => {
+    const id = String(a.id);
+    if (id === espId) return false;
+    if (otherEspeciais.has(id)) return false;
+    if (takenByOthers.has(id) && !subs.includes(id)) return false;
+    return !q || (a.name || '').toLowerCase().includes(q) || id.includes(q);
+  });
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await saveSpecialAffiliate({
+        affiliateId: espId,
+        active,
+        subAffiliateIds: active ? subs : [],
+        networkCpaValue: Number(networkCpaValue) || 0,
+        networkRevPercentage: Number(networkRevPercentage) || 0,
+      });
+      if (affiliate.userUid) {
+        await setUserSpecialFlag(affiliate.userUid, active);
+      }
+      push({ type: 'success', message: active ? 'Afiliado especial salvo.' : 'Afiliado especial desativado.' });
+      onSaved?.();
+      onClose();
+    } catch (err) {
+      push({ type: 'error', message: err instanceof Error ? err.message : 'Falha ao salvar afiliado especial.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="w-full max-w-lg bg-white dark:bg-neutral-900 rounded-3xl shadow-2xl border border-slate-200/70 dark:border-neutral-800 overflow-hidden flex flex-col max-h-[90vh]"
+      >
+        <div className="p-6 border-b border-slate-100 dark:border-neutral-800 flex items-start justify-between gap-4">
+          <div>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 mb-2 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest">
+              <Crown size={12} /> Afiliado especial
+            </span>
+            <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">{affiliate.name || affiliate.label || 'Sem Nome'}</h3>
+            <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400 dark:text-neutral-500 mt-0.5">ID #{espId}</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5 overflow-y-auto">
+          <label className="flex items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-neutral-800/40 border border-slate-100 dark:border-neutral-800 cursor-pointer">
+            <div>
+              <p className="text-sm font-bold text-slate-800 dark:text-neutral-100">Ativar como afiliado especial</p>
+              <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5">Dá a ele uma view da própria sub-rede.</p>
+            </div>
+            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="w-5 h-5 accent-amber-500" />
+          </label>
+
+          {active && (
+            <>
+              {!affiliate.userUid && (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+                  Este afiliado ainda não tem conta Boost — ele precisará se cadastrar (convite) para acessar a view de especial.
+                </p>
+              )}
+
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-2">
+                  Taxa do especial sobre a sub-rede
+                  <span className="ml-2 normal-case font-medium italic text-slate-400">(é o teto da comissão dos subs)</span>
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 dark:text-neutral-500">R$</span>
+                    <input
+                      type="number" min="0" step="0.01"
+                      value={networkCpaValue}
+                      onChange={(e) => setNetworkCpaValue(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0))}
+                      placeholder="CPA"
+                      className="w-full pl-7 pr-2 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white"
+                    />
+                  </div>
+                  <div className="relative">
+                    <Percent size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300 dark:text-neutral-500" />
+                    <input
+                      type="number" min="0" max="100" step="0.1"
+                      value={networkRevPercentage}
+                      onChange={(e) => setNetworkRevPercentage(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0))}
+                      placeholder="REV"
+                      className="w-full pl-6 pr-2 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest">Sub-afiliados</p>
+                  <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">{subs.length} selecionado(s)</span>
+                </div>
+                <div className="relative mb-2">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-400" size={14} />
+                  <input
+                    type="text"
+                    placeholder="Buscar afiliado..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white"
+                  />
+                </div>
+                <div className="max-h-52 overflow-y-auto rounded-xl border border-slate-100 dark:border-neutral-800 divide-y divide-slate-100 dark:divide-neutral-800">
+                  {eligible.length === 0 ? (
+                    <p className="p-4 text-center text-[11px] text-slate-400 dark:text-neutral-500">Nenhum afiliado disponível.</p>
+                  ) : eligible.map((a) => {
+                    const id = String(a.id);
+                    const checked = subs.includes(id);
+                    return (
+                      <label key={id} className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/[0.03]">
+                        <input type="checkbox" checked={checked} onChange={() => toggleSub(id)} className="w-4 h-4 accent-amber-500" />
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-xs font-semibold text-slate-700 dark:text-neutral-200 truncate">{a.name || a.label || 'Sem Nome'}</span>
+                          <span className="block text-[10px] font-mono text-slate-400 dark:text-neutral-500">#{id}</span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="p-6 border-t border-slate-100 dark:border-neutral-800 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 rounded-full bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-600 dark:text-neutral-200 hover:border-slate-300 dark:hover:border-neutral-600 transition-all"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-5 py-2.5 rounded-full bg-amber-500 text-white text-xs font-bold hover:bg-amber-400 transition-all shadow-sm shadow-amber-500/20 disabled:opacity-50 flex items-center gap-2"
+          >
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            Salvar
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
