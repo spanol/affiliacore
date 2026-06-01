@@ -44,25 +44,49 @@ A dashboard da OTG tem seletor de datas; o Boost precisa do mesmo.
 
 ---
 
-## B3 · Painel de sub-afiliados (afiliados com sub-rede)
+## B3 · Afiliado Especial (sub-afiliados / sub-rede)
 
-**Contexto.** Afiliados "master" que possuem **outros afiliados abaixo deles**. Notamos uma
-feature incompleta relacionada a isso (2026-05-28) cujo funcionamento ainda não entendemos —
-**precisa investigação** antes de desenhar.
+> Refinado com a diretoria em 2026-05-29. Decisões abaixo travadas; **modelo de comissão
+> (spread) ainda a confirmar com o Carlos** — ver "Roteiro p/ o Carlos".
 
-**Sketch conceitual (a validar).**
-- Hierarquia: um campo `parentAffiliateId` ligando afiliado → sub-afiliado. Provavelmente um
-  **modelo local do Boost**, já que a API v2 (`/affiliates`) não expõe relação pai/filho.
-- Novo papel/visão "afiliado master": vê os resultados **agregados da própria sub-rede** + os seus.
-- Comissão: override (%) do master sobre a produção dos sub-afiliados.
+**Conceito.** O MASTER promove um afiliado dele a **afiliado ESPECIAL** e vincula alguns dos
+seus afiliados como **sub-afiliados** do especial. O especial ganha uma view parecida com a
+do master, porém **escopada à própria sub-rede** e com menos features.
 
-**Investigação necessária (antes de virar task).**
-- A API da OTG (v1?) expõe relação de hierarquia entre afiliados?
-- Qual é exatamente a "feature incompleta" que vimos — onde aparece (dashboard da OTG ou nosso código)
-  e como se comporta hoje?
-- Como o escopo por afiliado (já implementado) se estende para "ver a própria sub-rede".
+**Decisões (travadas).**
+- **Papel:** especial = `client` com flag `isSpecial` (NÃO vira admin). Login normal, view diferente.
+- **Hierarquia:** modelo **local da Boost** (a OTG não expõe pai/filho). **1 nível** (sub não tem sub-rede própria); 1 especial por afiliado.
+- **Poderes do especial:** visualizar a sub-rede + **convidar/gerir** os próprios subs. **Não** mexe em comissão (isso é só do MASTER).
+- **Especial vê o próprio ganho** (o spread dele). A **margem da agência** sobre a sub-rede continua **só no MASTER** (regra do lucro líquido — ver [memória/BACKLOG B1]).
+- **Comissão = SPREAD ⚠️ (provisório):** o MASTER define (a) a taxa de cada sub (o que o sub recebe, pago pela agência) e (b) a taxa do especial sobre a produção da sub-rede; o **especial fica com a diferença**. A produção própria do especial é paga pelo `affiliate_config` normal dele.
 
-**Dependências.** Escopo por afiliado no proxy (✅ feito) + novo modelo de hierarquia.
+**Modelo de dados (proposto).**
+- `special_affiliates/{especialAffiliateId}` = `{ active, subAffiliateIds: string[], networkCpaValue, networkRevPercentage, updatedAt }` — marca o especial, lista os subs e guarda a taxa da sub-rede. **NÃO** guardar hierarquia no mirror `affiliates/` (o sync sobrescreve).
+- `users/{uid}.isSpecial` — flag de conveniência p/ roteamento/gating (espelha `special_affiliates`).
+- Comissões: `affiliate_configs/{id}` segue valendo p/ produção própria de cada um (especial e subs).
+
+**Permissões / escopo.**
+- Proxy: hoje força não-admin ao próprio `affiliateId`. Estender: se `isSpecial`, liberar `results` para os affiliateIds da própria sub-rede (own + subs), **validado no servidor** (lookup em `special_affiliates`).
+- `firestore.rules`: `special_affiliates` → leitura p/ signed-in (ou admin + o próprio especial), escrita só admin.
+
+**Fases.**
+1. **Modelo + setup do MASTER** — coleção + serviço + rules + UI na lista de afiliados (promover especial, vincular subs, setar as taxas). *(em andamento)*
+2. **Escopo no proxy + rules** para a sub-rede do especial.
+3. **View do especial** — dashboard escopado (funil da sub-rede + própria produção) + lista de subs + convites; esconder features de master.
+4. **Cálculo do spread + exibição** (ganho do especial; margem da agência só no master) — **bloqueado** até o Carlos confirmar o modelo de comissão.
+
+**Roteiro p/ o Carlos (confirmar antes da Fase 4).**
+1. A comissão do especial é **spread** mesmo (ele recebe a taxa da sub-rede e os subs recebem a taxa deles, ficando o especial com a diferença), ou é um **override** (subs recebem normal da agência e o especial ganha um % extra por cima)?
+2. O ganho do especial incide **só sobre a produção dos sub-afiliados**, ou também sobre a **produção própria** dele?
+3. A taxa do especial é no mesmo formato dos afiliados (**CPA em R$ + REV em %**) ou um **percentual único**?
+4. Existe **teto/piso** para a taxa dos subs (e o especial pode mexer nela dentro do teto, ou nunca)?
+5. Quem **paga** os subs: a agência direto, ou sai do bolo do especial?
+6. Um afiliado pode ser sub de **mais de um** especial? (assumimos que não.)
+7. Precisa de **multi-nível** (sub que também é especial) em algum momento? (assumimos 1 nível.)
+
+**Investigação aberta.** A "feature incompleta" notada em 2026-05-28 (OTG ou nosso código?) — checar se há algo a reaproveitar/migrar antes de finalizar.
+
+**Dependências.** Escopo por afiliado no proxy (✅ feito) + novo modelo de hierarquia (Fase 1).
 
 **Pendência sinalizada (2026-05-29).** Hoje o afiliado loga direto no próprio painel
 (`/affiliates/{id}`), mas a sidebar ainda mostra o item **"Clientes" → `/affiliates`**
