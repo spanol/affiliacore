@@ -448,9 +448,11 @@ async function startServer() {
         return res.status(500).json({ error: 'Chave de API não configurada' });
       }
 
-      // Per-affiliate scoping: non-admins may only read their OWN results.
-      // The server forces affiliateIds to the caller's own id, ignoring any
-      // client-supplied value, and blocks every other external endpoint.
+      // Per-affiliate scoping: non-admins may only read `results`, never another
+      // endpoint. Normal afiliados ficam restritos ao próprio id; o afiliado
+      // ESPECIAL (B3) pode ler a própria sub-rede (own + subs vinculados). O
+      // conjunto permitido é resolvido NO SERVIDOR (special_affiliates) e os
+      // affiliateIds pedidos pelo cliente são validados contra ele.
       const user = (req as any).user;
       if (user?.role !== 'admin') {
         if (endpoint !== 'results' || id) {
@@ -459,7 +461,30 @@ async function startServer() {
         if (!user?.affiliateId) {
           return res.status(403).json({ error: 'Sua conta não está vinculada a um afiliado.' });
         }
-        req.query.affiliateIds = String(user.affiliateId);
+        const ownId = String(user.affiliateId);
+
+        let allowedIds = [ownId];
+        if (adminDb) {
+          try {
+            const specialSnap = await adminDb.collection('special_affiliates').doc(ownId).get();
+            const special = specialSnap.exists ? (specialSnap.data() as any) : null;
+            if (special?.active && Array.isArray(special.subAffiliateIds)) {
+              allowedIds = [ownId, ...special.subAffiliateIds.map((s: any) => String(s))];
+            }
+          } catch (e) {
+            console.error('Erro ao carregar sub-rede do afiliado especial:', e);
+          }
+        }
+
+        const requested = String(req.query.affiliateIds || '')
+          .split(',').map((s) => s.trim()).filter(Boolean);
+        const scoped = requested.length
+          ? requested.filter((idr) => allowedIds.includes(idr))
+          : allowedIds;
+        if (scoped.length === 0) {
+          return res.status(403).json({ error: 'Acesso restrito à sua sub-rede.' });
+        }
+        req.query.affiliateIds = scoped.join(',');
       }
 
       const queryString = new URLSearchParams(req.query as any).toString();

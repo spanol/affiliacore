@@ -61,7 +61,7 @@ do master, porém **escopada à própria sub-rede** e com menos features.
 - **Poderes do especial:** visualizar a sub-rede + **convidar/gerir** os próprios subs + **definir a comissão dos próprios subs** (limitada à taxa que o MASTER setou para o especial = teto). *(Atualizado: antes era "não mexe em comissão".)*
 - **Especial vê o próprio ganho:** spread sobre os subs **+** a própria produção, com **cards separados por afiliado** (dados individuais de cada sub + os dele). A **margem da agência** sobre tudo continua **só no MASTER** (regra do lucro líquido).
 - **Comissão = SPREAD (confirmado):** o **MASTER** define a **taxa do especial** sobre os afiliados vinculados (o teto). O **ESPECIAL** define a **taxa de cada sub** (≤ teto). O especial fica com o **spread** = `(taxa do especial − taxa do sub) × produção do sub`, somado por sub, **+** a comissão da produção própria dele (`affiliate_config` normal). Base da casa = `total_commission` exato, **sem custos fixos** (confirmado).
-- **⏳ Em aberto (Q6):** quem **desembolsa** o repasse aos subs — agência direto ou sai do bolo do especial. Não bloqueia a exibição/cálculo no Boost (é operacional); reperguntar ao Carlos.
+- **Pagamento (Q6, confirmado):** **agência → especial → sub**. A Boost paga ao especial a taxa cheia (sobre a sub-rede + a produção própria); o especial repassa aos subs. Afeta só o relatório de pagamento — o cálculo do ganho é idêntico.
 
 **Modelo de dados (proposto).**
 - `special_affiliates/{especialAffiliateId}` = `{ active, subAffiliateIds: string[], networkCpaValue, networkRevPercentage, updatedAt }` — marca o especial, lista os subs e guarda a taxa da sub-rede. **NÃO** guardar hierarquia no mirror `affiliates/` (o sync sobrescreve).
@@ -84,7 +84,7 @@ do master, porém **escopada à própria sub-rede** e com menos features.
 3. **Spread** — o master seta a comissão do especial sobre os afiliados vinculados. ✅
 4. Ganho do especial = **subs + produção própria**, com **cards separados por afiliado** (dados individuais). ✅
 5. O **especial** define a comissão dos próprios subs (teto = a taxa que o master setou pra ele). ✅
-6. **⏳ Em aberto** — "não ficou clara". Reperguntar: quem desembolsa o repasse aos subs (agência direto vs. do bolo do especial). Não bloqueia o cálculo no Boost.
+6. Pagamento: **agência → especial → sub** (a Boost paga o especial a taxa cheia; ele repassa aos subs). ✅
 7. Lucro líquido **por casa e por período**: **sim.** ✅ *(B1 — novo item a construir)*
 
 Travado: 1 especial por afiliado; **1 nível**; o especial vê só a própria sub-rede.
