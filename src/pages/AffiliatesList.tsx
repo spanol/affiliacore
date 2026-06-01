@@ -10,9 +10,11 @@ import {
   Save,
   CheckCircle,
   Percent,
-  DownloadCloud
+  DownloadCloud,
+  Crown,
+  X
 } from 'lucide-react';
-import { fetchAffiliates, fetchAffiliateConfigs, fetchAffiliateStatuses, saveAffiliateConfig, updateAffiliateStatus, createAuditLog, fetchRegisteredUsers, updateUserRole, syncAffiliates, AffiliateConfig } from '../services/affiliateService';
+import { fetchAffiliates, fetchAffiliateConfigs, fetchAffiliateStatuses, saveAffiliateConfig, updateAffiliateStatus, createAuditLog, fetchRegisteredUsers, updateUserRole, syncAffiliates, AffiliateConfig, fetchSpecialAffiliates, saveSpecialAffiliate, setUserSpecialFlag, SpecialAffiliate } from '../services/affiliateService';
 import { useToast } from '../contexts/ToastContext';
 import { cn } from '../lib/utils';
 import BrandFilter from '../components/BrandFilter';
@@ -50,6 +52,12 @@ export default function AffiliatesList() {
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ open: boolean; affiliateId?: string; name?: string; pendingStatus?: 'active' | 'inactive' }>({ open: false });
 
+  // B3 · Afiliado especial (Fase 1 — setup do master)
+  const [specials, setSpecials] = useState<Record<string, SpecialAffiliate>>({});
+  const [specialModal, setSpecialModal] = useState<{ open: boolean; affiliate?: Affiliate }>({ open: false });
+  const [specialForm, setSpecialForm] = useState<{ active: boolean; networkCpaValue: number | string; networkRevPercentage: number | string; subs: string[]; search: string }>({ active: false, networkCpaValue: 0, networkRevPercentage: 0, subs: [], search: '' });
+  const [savingSpecial, setSavingSpecial] = useState(false);
+
   const isAdmin = profile?.role === 'admin';
   const pageTitle = isAdmin ? 'Gestão de Afiliados' : 'Meus Clientes';
   const pageSubTitle = isAdmin 
@@ -66,12 +74,14 @@ export default function AffiliatesList() {
         return;
       }
 
-      const [affData, configData, statusData, registeredUsers] = await Promise.all([
+      const [affData, configData, statusData, registeredUsers, specialData] = await Promise.all([
         fetchAffiliates(),
         fetchAffiliateConfigs(),
         fetchAffiliateStatuses(),
-        fetchRegisteredUsers()
+        fetchRegisteredUsers(),
+        fetchSpecialAffiliates()
       ]);
+      setSpecials(specialData);
 
       // Admins (afiliados master) NÃO devem aparecer na listagem de afiliados.
       const affiliateUsers = registeredUsers.filter(u => u.role !== 'admin');
@@ -221,6 +231,52 @@ export default function AffiliatesList() {
     }
   };
 
+  // --- B3 · Afiliado especial -------------------------------------------------
+  const handleOpenSpecial = (affiliate: Affiliate) => {
+    const existing = specials[affiliate.id];
+    setSpecialForm({
+      active: existing?.active ?? false,
+      networkCpaValue: existing?.networkCpaValue ?? 0,
+      networkRevPercentage: existing?.networkRevPercentage ?? 0,
+      subs: existing?.subAffiliateIds ?? [],
+      search: '',
+    });
+    setSpecialModal({ open: true, affiliate });
+  };
+
+  const toggleSub = (subId: string) => {
+    setSpecialForm(prev => ({
+      ...prev,
+      subs: prev.subs.includes(subId) ? prev.subs.filter(s => s !== subId) : [...prev.subs, subId],
+    }));
+  };
+
+  const handleSaveSpecial = async () => {
+    const affiliate = specialModal.affiliate;
+    if (!affiliate) return;
+    setSavingSpecial(true);
+    try {
+      await saveSpecialAffiliate({
+        affiliateId: String(affiliate.id),
+        active: specialForm.active,
+        subAffiliateIds: specialForm.active ? specialForm.subs : [],
+        networkCpaValue: Number(specialForm.networkCpaValue) || 0,
+        networkRevPercentage: Number(specialForm.networkRevPercentage) || 0,
+      });
+      // Espelha a flag no usuário (se o afiliado já tem conta) p/ a view do especial (Fase 3).
+      if (affiliate.userUid) {
+        await setUserSpecialFlag(affiliate.userUid, specialForm.active);
+      }
+      await loadData();
+      push({ type: 'success', message: specialForm.active ? 'Afiliado especial salvo.' : 'Afiliado especial desativado.' });
+      setSpecialModal({ open: false });
+    } catch (err) {
+      push({ type: 'error', message: err instanceof Error ? err.message : 'Falha ao salvar afiliado especial.' });
+    } finally {
+      setSavingSpecial(false);
+    }
+  };
+
   return (
     <div className="space-y-8 pb-12">
       {/* Confirmation Modal */}
@@ -244,6 +300,154 @@ export default function AffiliatesList() {
           </motion.div>
         </div>
       )}
+      {/* B3 · Modal de gestão do afiliado especial */}
+      {specialModal.open && specialModal.affiliate && (() => {
+        const esp = specialModal.affiliate!;
+        const espId = String(esp.id);
+        const otherEspeciais = new Set(
+          Object.values(specials).filter(s => s.active && s.affiliateId !== espId).map(s => String(s.affiliateId))
+        );
+        const takenByOthers = new Set<string>();
+        Object.values(specials).forEach(s => {
+          if (String(s.affiliateId) !== espId && s.active) s.subAffiliateIds.forEach(id => takenByOthers.add(String(id)));
+        });
+        const q = specialForm.search.toLowerCase();
+        const eligible = affiliates.filter(a => {
+          const id = String(a.id);
+          if (id === espId) return false;
+          if (otherEspeciais.has(id)) return false;
+          if (takenByOthers.has(id) && !specialForm.subs.includes(id)) return false;
+          return !q || a.name?.toLowerCase().includes(q) || id.includes(q);
+        });
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              className="w-full max-w-lg bg-white dark:bg-neutral-900 rounded-3xl shadow-2xl border border-slate-200/70 dark:border-neutral-800 overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="p-6 border-b border-slate-100 dark:border-neutral-800 flex items-start justify-between gap-4">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 mb-2 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest">
+                    <Crown size={12} /> Afiliado especial
+                  </span>
+                  <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">{esp.name || 'Sem Nome'}</h3>
+                  <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400 dark:text-neutral-500 mt-0.5">ID #{espId}</p>
+                </div>
+                <button onClick={() => setSpecialModal({ open: false })} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-5 overflow-y-auto">
+                <label className="flex items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-neutral-800/40 border border-slate-100 dark:border-neutral-800 cursor-pointer">
+                  <div>
+                    <p className="text-sm font-bold text-slate-800 dark:text-neutral-100">Ativar como afiliado especial</p>
+                    <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5">Dá a ele uma view da própria sub-rede.</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={specialForm.active}
+                    onChange={(e) => setSpecialForm(prev => ({ ...prev, active: e.target.checked }))}
+                    className="w-5 h-5 accent-amber-500"
+                  />
+                </label>
+
+                {specialForm.active && (
+                  <>
+                    {!esp.userUid && (
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+                        Este afiliado ainda não tem conta Boost — ele precisará se cadastrar (convite) para acessar a view de especial.
+                      </p>
+                    )}
+
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-2">
+                        Taxa do especial sobre a sub-rede
+                        <span className="ml-2 normal-case font-medium italic text-slate-400">(provisório — modelo de comissão a confirmar com o Carlos)</span>
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 dark:text-neutral-500">R$</span>
+                          <input
+                            type="number" min="0" step="0.01"
+                            value={specialForm.networkCpaValue}
+                            onChange={(e) => setSpecialForm(prev => ({ ...prev, networkCpaValue: e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0) }))}
+                            placeholder="CPA"
+                            className="w-full pl-7 pr-2 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white"
+                          />
+                        </div>
+                        <div className="relative">
+                          <Percent size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300 dark:text-neutral-500" />
+                          <input
+                            type="number" min="0" max="100" step="0.1"
+                            value={specialForm.networkRevPercentage}
+                            onChange={(e) => setSpecialForm(prev => ({ ...prev, networkRevPercentage: e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0) }))}
+                            placeholder="REV"
+                            className="w-full pl-6 pr-2 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest">Sub-afiliados</p>
+                        <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">{specialForm.subs.length} selecionado(s)</span>
+                      </div>
+                      <div className="relative mb-2">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-400" size={14} />
+                        <input
+                          type="text"
+                          placeholder="Buscar afiliado..."
+                          value={specialForm.search}
+                          onChange={(e) => setSpecialForm(prev => ({ ...prev, search: e.target.value }))}
+                          className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white"
+                        />
+                      </div>
+                      <div className="max-h-52 overflow-y-auto rounded-xl border border-slate-100 dark:border-neutral-800 divide-y divide-slate-100 dark:divide-neutral-800">
+                        {eligible.length === 0 ? (
+                          <p className="p-4 text-center text-[11px] text-slate-400 dark:text-neutral-500">Nenhum afiliado disponível.</p>
+                        ) : eligible.map((a: any) => {
+                          const id = String(a.id);
+                          const checked = specialForm.subs.includes(id);
+                          return (
+                            <label key={id} className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/[0.03]">
+                              <input type="checkbox" checked={checked} onChange={() => toggleSub(id)} className="w-4 h-4 accent-amber-500" />
+                              <span className="flex-1 min-w-0">
+                                <span className="block text-xs font-semibold text-slate-700 dark:text-neutral-200 truncate">{a.name || 'Sem Nome'}</span>
+                                <span className="block text-[10px] font-mono text-slate-400 dark:text-neutral-500">#{id}</span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="p-6 border-t border-slate-100 dark:border-neutral-800 flex justify-end gap-2">
+                <button
+                  onClick={() => setSpecialModal({ open: false })}
+                  className="px-4 py-2.5 rounded-full bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-600 dark:text-neutral-200 hover:border-slate-300 dark:hover:border-neutral-600 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveSpecial}
+                  disabled={savingSpecial}
+                  className="px-5 py-2.5 rounded-full bg-amber-500 text-white text-xs font-bold hover:bg-amber-400 transition-all shadow-sm shadow-amber-500/20 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {savingSpecial ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Salvar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        );
+      })()}
+
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span className="inline-flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-slate-900/5 dark:bg-white/5 border border-slate-900/10 dark:border-white/10 text-slate-500 dark:text-neutral-300 text-[10px] font-bold uppercase tracking-widest">
@@ -432,24 +636,38 @@ export default function AffiliatesList() {
                             </div>
                           </td>
                           <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                            <button 
-                              onClick={(e) => handleSaveConfig(affiliateId, e)}
-                              disabled={savingId === affiliateId}
-                              className={cn(
-                                "p-2 rounded-lg transition-all",
-                                savedId === affiliateId 
-                                  ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                                  : "bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-900/10 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white"
-                              )}
-                            >
-                              {savingId === affiliateId ? (
-                                <Loader2 size={14} className="animate-spin" />
-                              ) : savedId === affiliateId ? (
-                                <CheckCircle size={14} />
-                              ) : (
-                                <Save size={14} />
-                              )}
-                            </button>
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleOpenSpecial(item); }}
+                                title={specials[affiliateId]?.active ? 'Afiliado especial — gerir sub-rede' : 'Tornar afiliado especial'}
+                                className={cn(
+                                  "p-2 rounded-lg transition-all",
+                                  specials[affiliateId]?.active
+                                    ? "bg-amber-500 text-white"
+                                    : "bg-slate-50 text-slate-400 hover:text-amber-500 dark:bg-neutral-800/60 dark:text-neutral-500 dark:hover:text-amber-400"
+                                )}
+                              >
+                                <Crown size={14} />
+                              </button>
+                              <button
+                                onClick={(e) => handleSaveConfig(affiliateId, e)}
+                                disabled={savingId === affiliateId}
+                                className={cn(
+                                  "p-2 rounded-lg transition-all",
+                                  savedId === affiliateId
+                                    ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                                    : "bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-900/10 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white"
+                                )}
+                              >
+                                {savingId === affiliateId ? (
+                                  <Loader2 size={14} className="animate-spin" />
+                                ) : savedId === affiliateId ? (
+                                  <CheckCircle size={14} />
+                                ) : (
+                                  <Save size={14} />
+                                )}
+                              </button>
+                            </div>
                           </td>
                         </>
                       )}
@@ -547,6 +765,18 @@ export default function AffiliatesList() {
                       >
                         {savingId === affiliateId ? <Loader2 size={14} className="animate-spin" /> : savedId === affiliateId ? <CheckCircle size={14} /> : <Save size={14} />}
                         {savedId === affiliateId ? 'Salvo!' : 'Salvar configuração'}
+                      </button>
+                      <button
+                        onClick={() => handleOpenSpecial(item)}
+                        className={cn(
+                          "w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all",
+                          specials[affiliateId]?.active
+                            ? "bg-amber-500 text-white border-amber-500"
+                            : "bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-700 text-slate-600 dark:text-neutral-300 hover:border-amber-500/40"
+                        )}
+                      >
+                        <Crown size={14} />
+                        {specials[affiliateId]?.active ? 'Afiliado especial' : 'Tornar especial'}
                       </button>
                     </>
                   )}

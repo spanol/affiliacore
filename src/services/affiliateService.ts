@@ -101,6 +101,69 @@ export async function saveAffiliateConfig(config: AffiliateConfig): Promise<void
   }
 }
 
+// --- B3 · Afiliado especial (Fase 1: modelo + setup do master) ----------------
+// Marca um afiliado como ESPECIAL, lista seus sub-afiliados e guarda a taxa do
+// especial sobre a sub-rede. Coleção própria da Boost (NÃO o mirror `affiliates`,
+// que o sync sobrescreve). Comissão = spread (provisório — confirmar com o Carlos).
+export interface SpecialAffiliate {
+  affiliateId: string;
+  active: boolean;
+  subAffiliateIds: string[];
+  networkCpaValue: number;       // taxa do especial sobre a sub-rede — CPA (R$)
+  networkRevPercentage: number;  // taxa do especial sobre a sub-rede — REV (%)
+  updatedAt?: any;
+}
+
+export async function fetchSpecialAffiliates(): Promise<Record<string, SpecialAffiliate>> {
+  try {
+    const snap = await getDocs(collection(db, 'special_affiliates'));
+    const out: Record<string, SpecialAffiliate> = {};
+    snap.forEach((d) => {
+      const data = d.data() as any;
+      out[d.id] = {
+        affiliateId: d.id,
+        active: !!data.active,
+        subAffiliateIds: Array.isArray(data.subAffiliateIds) ? data.subAffiliateIds.map(String) : [],
+        networkCpaValue: Number(data.networkCpaValue) || 0,
+        networkRevPercentage: Number(data.networkRevPercentage) || 0,
+        updatedAt: data.updatedAt ?? null,
+      };
+    });
+    return out;
+  } catch (error) {
+    console.error('Error fetching special affiliates:', error);
+    return {};
+  }
+}
+
+export async function saveSpecialAffiliate(data: SpecialAffiliate): Promise<void> {
+  try {
+    const ref = doc(db, 'special_affiliates', String(data.affiliateId));
+    await setDoc(ref, {
+      active: !!data.active,
+      subAffiliateIds: (data.subAffiliateIds ?? []).map(String),
+      networkCpaValue: Number(data.networkCpaValue) || 0,
+      networkRevPercentage: Number(data.networkRevPercentage) || 0,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (error) {
+    console.error('Error saving special affiliate:', error);
+    throw error;
+  }
+}
+
+// Espelha a flag isSpecial no doc do usuário (conveniência p/ roteamento — Fase 3).
+export async function setUserSpecialFlag(uid: string, isSpecial: boolean): Promise<void> {
+  if (!uid) return;
+  try {
+    const ref = doc(db, 'users', String(uid));
+    await setDoc(ref, { isSpecial, updatedAt: serverTimestamp() }, { merge: true });
+  } catch (error) {
+    console.error('Error setting user special flag:', error);
+    throw error;
+  }
+}
+
 export async function fetchAffiliateStatuses(): Promise<Record<string, AffiliateStatusConfig>> {
   try {
     const response = await authFetch('/api/affiliate-statuses', {

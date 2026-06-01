@@ -42,6 +42,14 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // B3 · Afiliado especial: marca o especial + sub-rede + taxa da sub-rede.
+    // Só o master (admin) escreve; leitura liberada a signed-in (o especial
+    // precisa ler a própria sub-rede; escopo fino fica no proxy/servidor).
+    match /special_affiliates/{affiliateId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     // Global application settings.
     match /settings/{settingId} {
       allow read: if isSignedIn();
