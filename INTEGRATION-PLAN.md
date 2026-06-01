@@ -50,9 +50,11 @@ Dados: **Cliques · Valores em Aposta · Canais · Ciclo de pagamento.**
 Não existem na v2 e o v1 exige JWT de sessão (nossa `x-api-key` dá 401).
 **Ação necessária:** pedido formal à OTG (rascunho abaixo). Não é tarefa de código.
 
-## Trilha D — Discovery 🔵
-- **B3 · Sub-afiliados** — antes de desenhar, entender a "feature incompleta" e se a OTG
-  expõe hierarquia. Provável modelo local (`parentAffiliateId`) + papel "afiliado master".
+## Trilha D — B3 · Afiliado especial (sub-afiliados) 🟡 em implementação
+- A "feature incompleta" de 28/05 **era este afiliado especial** (não havia sistema legado).
+  Especificado e refinado no `BACKLOG.md › B3` (modelo local, 1 nível, comissão = spread provisório).
+- **Fase 1 feita** (modelo `special_affiliates` + setup do master). Faltam: Fase 2 (escopo no proxy),
+  Fase 3 (view do especial), Fase 4 (cálculo do spread — bloqueada até o Carlos confirmar a comissão).
 
 ## Trilha E — Testes 🧪 (em andamento)
 Antes não havia test runner. Fundação montada com **Vitest + React Testing Library + jsdom**
@@ -73,8 +75,9 @@ Antes não havia test runner. Fundação montada com **Vitest + React Testing Li
 
 ## Bloqueadores a resolver (fora de código)
 1. **Acesso à API v1 da OTG** → libera a Trilha C.
-2. **Origem da feature de sub-afiliado** → libera a Trilha D (B3).
-3. **Qualificação do MVP pelo chefe** → trava o escopo da Trilha B.
+2. ~~Origem da feature de sub-afiliado~~ ✅ **resolvido** — era o afiliado especial (B3), em implementação.
+3. **Comissão do especial + regras do lucro líquido (B1)** → roteiro consolidado pro Carlos em `BACKLOG.md › B3`; destrava o B1 e a Fase 4 do B3.
+4. **Qualificação do MVP pelo chefe** → trava o escopo da Trilha B.
 
 ## Rascunho — pedido de acesso à OTG (v1)
 > Olá, equipe OTG. Estamos integrando o painel Boost via a API externa

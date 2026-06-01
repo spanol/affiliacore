@@ -20,10 +20,12 @@ reporta). Os afiliados recebem o que está configurado em `affiliate_configs`
 - Coluna/linha por afiliado em `AffiliatesList` / `AffiliateDetails` (recebido vs. repassado vs. margem).
 - Cálculo no `affiliateService` (já temos as duas pontas: `total_commission` da OTG e a comissão calculada por config).
 
-**Perguntas em aberto.**
+**Perguntas em aberto** → consolidadas no **"Roteiro p/ o Carlos"** do B3 (mesmo tema de dinheiro), itens 1, 2 e 7:
 - "Comissão recebida da casa" = exatamente o `total_commission` da OTG, ou há acordo diferente por casa?
 - Existem custos fixos da agência a descontar (operacional, taxas)?
 - Mostrar lucro líquido também por casa e por período?
+
+Implementado como **provisório** (`calcNetProfit`: `total_commission` direto, sem custos fixos) — destrava ao Carlos responder.
 
 ---
 
@@ -75,16 +77,20 @@ do master, porém **escopada à própria sub-rede** e com menos features.
 3. **View do especial** — dashboard escopado (funil da sub-rede + própria produção) + lista de subs + convites; esconder features de master.
 4. **Cálculo do spread + exibição** (ganho do especial; margem da agência só no master) — **bloqueado** até o Carlos confirmar o modelo de comissão.
 
-**Roteiro p/ o Carlos (confirmar antes da Fase 4).**
-1. A comissão do especial é **spread** mesmo (ele recebe a taxa da sub-rede e os subs recebem a taxa deles, ficando o especial com a diferença), ou é um **override** (subs recebem normal da agência e o especial ganha um % extra por cima)?
-2. O ganho do especial incide **só sobre a produção dos sub-afiliados**, ou também sobre a **produção própria** dele?
-3. A taxa do especial é no mesmo formato dos afiliados (**CPA em R$ + REV em %**) ou um **percentual único**?
-4. Existe **teto/piso** para a taxa dos subs (e o especial pode mexer nela dentro do teto, ou nunca)?
-5. Quem **paga** os subs: a agência direto, ou sai do bolo do especial?
-6. Um afiliado pode ser sub de **mais de um** especial? (assumimos que não.)
-7. Precisa de **multi-nível** (sub que também é especial) em algum momento? (assumimos 1 nível.)
+**Roteiro p/ o Carlos — CONSOLIDADO** (cobre também as perguntas em aberto do **B1 · lucro líquido** — mesmo tema de dinheiro). 💰 **Comissão & lucro:**
+1. A base da "comissão recebida da casa" é exatamente o `total_commission` da OTG, ou há **acordo diferente por casa** (Superbet/SportingBet)? *(B1)*
+2. Há **custos fixos** da agência a descontar (operacional, taxas) antes do lucro líquido? *(B1)*
+3. O especial ganha por **spread** (recebe a taxa da sub-rede, repassa menor ao sub, fica com a diferença) ou **override** (sub recebe normal da agência e o especial ganha um % por cima)?
+4. O ganho do especial incide **só sobre a produção dos subs**, ou também sobre a **própria**?
+5. A taxa do especial é **CPA R$ + REV %** ou **% único**? Tem **teto**? O especial pode mexer ou só o master?
+6. Quem **paga** os subs: a agência direto, ou sai do bolo do especial?
+7. Mostrar lucro líquido também **por casa e por período**, além do consolidado? *(B1)*
 
-**Investigação aberta.** A "feature incompleta" notada em 2026-05-28 (OTG ou nosso código?) — checar se há algo a reaproveitar/migrar antes de finalizar.
+Travado por nós (confirmar só se for diferente): 1 especial por afiliado; **1 nível** (sem sub-do-sub); o especial vê só a própria sub-rede.
+
+Respostas **1/2/7** destravam o B1 (tirar o "provisório" do `calcNetProfit`); **3–6** destravam a **Fase 4** do especial.
+
+**Origem da feature (resolvido 2026-05-29).** A "feature de sub-afiliado incompleta" notada em 28/05 **É este afiliado especial** — não há sistema legado a investigar; está especificado aqui e em implementação (Fase 1 feita).
 
 **Dependências.** Escopo por afiliado no proxy (✅ feito) + novo modelo de hierarquia (Fase 1).
 
