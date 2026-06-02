@@ -57,7 +57,7 @@ import DateRangePicker from '../components/DateRangePicker';
 import InfoTooltip from '../components/InfoTooltip';
 import TrendBadge from '../components/TrendBadge';
 import { DateRange, getDefaultRange, getPreviousRange, percentChange } from '../lib/dateRange';
-import { cn } from '../lib/utils';
+import { cn, humanizeName } from '../lib/utils';
 import { motion } from 'motion/react';
 
 // B4 · mascara dados sensíveis (PIX, documento) — só os últimos dígitos.
@@ -294,7 +294,7 @@ export default function AffiliateDetails() {
           <div className="min-w-0">
             <div className="flex items-center gap-3 min-w-0">
               <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight truncate">
-                {affiliate.name || affiliate.label || 'Sem Nome'}
+                {humanizeName(affiliate.name || affiliate.label) || 'Sem Nome'}
               </h1>
               <div className="flex items-center gap-1.5 shrink-0">
                 <span className={cn(
@@ -658,7 +658,7 @@ export default function AffiliateDetails() {
                 <div className="space-y-4">
                   <div className="p-4 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nome do Afiliado</p>
-                    <p className="text-sm font-bold text-slate-900 dark:text-white">{affiliate.name || affiliate.label}</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">{humanizeName(affiliate.name || affiliate.label)}</p>
                     <p className="text-[10px] text-slate-400 font-mono mt-1">ID: #{affiliate.id}</p>
                   </div>
 

@@ -13,6 +13,7 @@ import {
 import SpecialAffiliateModal from '../components/SpecialAffiliateModal';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
+import { humanizeName } from '../lib/utils';
 
 interface AffiliateLite {
   id: string;
@@ -86,7 +87,7 @@ export default function SpecialAffiliatesList() {
 
   const nameFor = (id: string) => {
     const a = affById.get(String(id));
-    return a?.name || a?.label || `#${id}`;
+    return humanizeName(a?.name || a?.label || `#${id}`);
   };
 
   if (profile && !isAdmin) return <Navigate to="/dashboard" replace />;

@@ -16,7 +16,7 @@ import {
 import { fetchAffiliates, fetchAffiliateConfigs, fetchAffiliateStatuses, saveAffiliateConfig, updateAffiliateStatus, createAuditLog, fetchRegisteredUsers, updateUserRole, syncAffiliates, AffiliateConfig, fetchSpecialAffiliates, SpecialAffiliate } from '../services/affiliateService';
 import SpecialAffiliateModal from '../components/SpecialAffiliateModal';
 import { useToast } from '../contexts/ToastContext';
-import { cn } from '../lib/utils';
+import { cn, humanizeName } from '../lib/utils';
 import BrandFilter from '../components/BrandFilter';
 import { getBrandName, uniqueBrands, ALL_BRANDS } from '../lib/brand';
 import { useAuth } from '../contexts/AuthContext';
@@ -392,7 +392,7 @@ export default function AffiliatesList() {
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
                           <span className="font-bold text-slate-800 dark:text-neutral-100">
-                            {item.name || item.fullName || item.nome || 'Sem Nome'}
+                            {humanizeName(item.name || item.fullName || item.nome) || 'Sem Nome'}
                           </span>
                           {getBrandName(item) && (
                             <span className="inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-neutral-800 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
@@ -514,7 +514,7 @@ export default function AffiliatesList() {
                 <div key={affiliateId || Math.random()} className="p-4 space-y-4">
                   <div className="cursor-pointer" onClick={() => handleOpenDetails(item)}>
                     <span className="block font-bold text-sm text-slate-800 dark:text-neutral-100">
-                      {item.name || item.fullName || item.nome || 'Sem Nome'}
+                      {humanizeName(item.name || item.fullName || item.nome) || 'Sem Nome'}
                     </span>
                     {getBrandName(item) && (
                       <span className="inline-flex mt-1 items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-neutral-800 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">

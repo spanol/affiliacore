@@ -23,7 +23,7 @@ import {
 } from 'recharts';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { cn } from '../lib/utils';
+import { cn, humanizeName } from '../lib/utils';
 import { fetchAffiliates, fetchAllResults, fetchAllResultsByCampaign, fetchAffiliateConfigs, calcAffiliatePayout, CampaignRow } from '../services/affiliateService';
 import DateRangePicker from '../components/DateRangePicker';
 import CampaignBreakdown from '../components/CampaignBreakdown';
@@ -152,7 +152,7 @@ export default function AdminDashboard() {
     .map(item => {
       // A API externa nomeia o afiliado em `label` (e o id em `id`); sem isso as
       // barras do gráfico ficavam rotuladas "---".
-      const label = String(item.affiliate_name || item.name || item.label || item.affiliate_id || item.id || '---');
+      const label = humanizeName(String(item.affiliate_name || item.name || item.label || item.affiliate_id || item.id || '---'));
       return {
         name: label,
         Comissão: item.total_commission || 0,
