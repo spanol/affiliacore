@@ -282,14 +282,18 @@ export default function AffiliatesList() {
           <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">{pageSubTitle}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleSync}
-            disabled={syncing || loading}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-neutral-900 rounded-full text-xs font-bold hover:opacity-90 transition-all shadow-sm disabled:opacity-50"
-          >
-            <DownloadCloud size={14} className={cn(syncing && "animate-spin")} />
-            {syncing ? 'Sincronizando...' : 'Sincronizar afiliados'}
-          </button>
+          {/* Sincronizar é admin-only (o endpoint /api/affiliates/sync exige admin);
+              o afiliado especial não tem acesso, então o botão nem aparece pra ele. */}
+          {isAdmin && (
+            <button
+              onClick={handleSync}
+              disabled={syncing || loading}
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-neutral-900 rounded-full text-xs font-bold hover:opacity-90 transition-all shadow-sm disabled:opacity-50"
+            >
+              <DownloadCloud size={14} className={cn(syncing && "animate-spin")} />
+              {syncing ? 'Sincronizando...' : 'Sincronizar afiliados'}
+            </button>
+          )}
           <button
             onClick={loadData}
             disabled={loading}

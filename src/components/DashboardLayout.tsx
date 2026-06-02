@@ -46,15 +46,14 @@ export default function DashboardLayout() {
               : (profile?.affiliateId ? `/affiliates/${profile.affiliateId}` : '/profile'),
           icon: LayoutDashboard
         },
-        {
-          // TODO(B3 · afiliado master): para o afiliado comum, este item leva à
-          // lista completa (/affiliates, que dá 403 no proxy p/ não-admin). Mantido
-          // visível por ora — revisar quando implementarmos o "afiliado master" que
-          // enxerga a própria sub-rede. Ver BACKLOG.md › B3.
-          label: profile?.role === 'admin' ? 'Afiliados' : 'Clientes',
-          path: '/affiliates',
-          icon: Users
-        },
+        // Item "Afiliados": o master vê a lista completa (/affiliates); o afiliado
+        // ESPECIAL vê a própria sub-rede (/network). O afiliado comum não tem este
+        // módulo — o antigo "Clientes" levava a /affiliates (403) e não será usado.
+        ...(profile?.role === 'admin'
+          ? [{ label: 'Afiliados', path: '/affiliates', icon: Users }]
+          : profile?.isSpecial
+            ? [{ label: 'Afiliados', path: '/network', icon: Users }]
+            : []),
         ...(profile?.role === 'admin' ? [
           { label: 'Afiliados Especiais', path: '/special-affiliates', icon: Crown },
           { label: 'Configurações', path: '/settings', icon: Settings },
