@@ -23,7 +23,10 @@ import {
   Check,
   X,
   CheckCircle,
-  Crown
+  Crown,
+  Wallet,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import {
   fetchAffiliateById,
@@ -41,6 +44,8 @@ import {
   fetchAffiliates,
   fetchSpecialAffiliates,
   fetchRegisteredUsers,
+  fetchPaymentProfile,
+  PaymentProfile,
   SpecialAffiliate
 } from '../services/affiliateService';
 import { useAuth } from '../contexts/AuthContext';
@@ -54,6 +59,15 @@ import TrendBadge from '../components/TrendBadge';
 import { DateRange, getDefaultRange, getPreviousRange, percentChange } from '../lib/dateRange';
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
+
+// B4 · mascara dados sensíveis (PIX, documento) — só os últimos dígitos.
+const maskSensitive = (v?: string) => {
+  if (!v) return '—';
+  const s = String(v).trim();
+  if (!s) return '—';
+  if (s.length <= 4) return '•'.repeat(Math.max(1, s.length - 1)) + s.slice(-1);
+  return '•••• ' + s.slice(-4);
+};
 
 export default function AffiliateDetails() {
   const { id } = useParams<{ id: string }>();
@@ -82,6 +96,10 @@ export default function AffiliateDetails() {
   const [specials, setSpecials] = useState<Record<string, SpecialAffiliate>>({});
   const [specialAffiliate, setSpecialAffiliate] = useState<{ id: string; name?: string; userUid?: string } | null>(null);
   const [loadingSpecial, setLoadingSpecial] = useState(false);
+
+  // B4 · Dados de pagamento do afiliado (admin visualiza, mascarado).
+  const [paymentProfile, setPaymentProfile] = useState<PaymentProfile | null>(null);
+  const [revealPayment, setRevealPayment] = useState(false);
 
   const openSpecial = async () => {
     if (!affiliate) return;
@@ -158,6 +176,7 @@ export default function AffiliateDetails() {
       // afiliado vendo seu painel, ele está logado → por definição já é cadastrado.
       if (isAdmin) {
         setHasAccount(await isUserRegistered(affId).catch(() => false));
+        fetchPaymentProfile(affId).then(setPaymentProfile).catch(() => setPaymentProfile(null));
       } else {
         setHasAccount(true);
       }
@@ -500,6 +519,50 @@ export default function AffiliateDetails() {
 
                   {/* Per-house breakdown (real data from groupBy=brand) */}
                   <BrandBreakdown data={brandResults} config={config} />
+
+                  {/* B4 · Dados de pagamento do afiliado — admin visualiza (mascarado). */}
+                  {isAdmin && (
+                    <div className="bg-white dark:bg-neutral-900 border border-slate-100 dark:border-neutral-800 rounded-3xl shadow-sm overflow-hidden">
+                      <div className="p-6 border-b border-slate-50 dark:border-neutral-800 flex justify-between items-center bg-slate-50/50 dark:bg-neutral-800/30">
+                        <h3 className="flex items-center gap-2 font-black text-xs text-slate-800 dark:text-white uppercase tracking-widest">
+                          <Wallet size={14} className="text-amber-500" /> Dados de Pagamento
+                        </h3>
+                        {paymentProfile?.pixKey && (
+                          <button
+                            onClick={() => setRevealPayment((v) => !v)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-neutral-800 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-300 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                          >
+                            {revealPayment ? <EyeOff size={12} /> : <Eye size={12} />}
+                            {revealPayment ? 'Ocultar' : 'Revelar'}
+                          </button>
+                        )}
+                      </div>
+                      {paymentProfile?.pixKey ? (
+                        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">PIX · {(paymentProfile.pixKeyType || '—').toUpperCase()}</p>
+                            <p className="text-sm font-bold text-slate-800 dark:text-white break-words">{revealPayment ? paymentProfile.pixKey : maskSensitive(paymentProfile.pixKey)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{(paymentProfile.documentType || 'cpf').toUpperCase()}</p>
+                            <p className="text-sm font-bold text-slate-800 dark:text-white break-words">{paymentProfile.document ? (revealPayment ? paymentProfile.document : maskSensitive(paymentProfile.document)) : '—'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Razão social / Nome</p>
+                            <p className="text-sm font-bold text-slate-800 dark:text-white break-words">{paymentProfile.legalName || '—'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Endereço</p>
+                            <p className="text-sm font-bold text-slate-800 dark:text-white break-words">{paymentProfile.address || '—'}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-8 text-center">
+                          <p className="text-xs text-slate-400 dark:text-neutral-500">O afiliado ainda não cadastrou os dados de pagamento.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Por Campanha (dados reais da API externa, groupBy=campaign).
                       O afiliado vê a PRÓPRIA comissão (CPA+REV via config), nunca a margem da agência. */}
