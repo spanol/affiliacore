@@ -62,8 +62,7 @@ export default function DashboardLayout() {
           : []),
         ...(profile?.role === 'admin' ? [
           { label: 'Afiliados Especiais', path: '/special-affiliates', icon: Crown },
-          { label: 'Configurações', path: '/settings', icon: Settings },
-          { label: 'Contatos', path: '/contacts', icon: User }
+          { label: 'Configurações', path: '/settings', icon: Settings }
         ] : [])
       ] 
     },
