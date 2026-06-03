@@ -1,0 +1,26 @@
+==============================================================
+ [VULNERÁVEL] build COM VITE_AFFILIATE_API_KEY setada
+==============================================================
+grep 'FAKE_KEY_FOR_TEST_abc123xyz' dist/ :
+dist/assets/index-a1b2c3d4.js:1:...const Ce="FAKE_KEY_FOR_TEST_abc123xyz"...x-api-key...
+>>> LEAK CONFIRMADO: a chave aparece em texto claro no bundle. <<<
+
+==============================================================
+ [PATCH] build SEM a env VITE_ (cliente usa só o proxy /api/external)
+==============================================================
+grep 'FAKE_KEY_FOR_TEST_abc123xyz' dist/ :
+>>> SEM LEAK: a string da chave não está no bundle. <<<
+
+NOTA: o patch real é remover o branch de fetch direto + a const
+AFFILIATE_API_KEY de src/services/affiliateService.ts e renomear a env
+para SEM prefixo VITE_ (o server.ts já lê process.env.AFFILIATE_API_KEY).
+
+------------------------------------------------------------------------------
+INTERPRETAÇÃO
+------------------------------------------------------------------------------
+- O 1º build (com a env) faz a chave aparecer LITERALMENTE em
+  dist/assets/index-*.js -> qualquer visitante baixa o JS e extrai a credencial.
+- O 2º build (sem a env) não contém a string -> confirma que o vazamento é
+  causado por popular VITE_AFFILIATE_API_KEY no build. Como o `import.meta.env`
+  é substituído em tempo de build, basta um dev "preencher pra testar" e o
+  deploy vaza. A correção definitiva é eliminar o caminho client-side.

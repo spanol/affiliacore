@@ -1,0 +1,40 @@
+==============================================================================
+ exploit.mjs  (rules ATUAIS / vulneráveis)
+==============================================================================
+=== PoC-01 — CRITICAL privilege escalation (emulator) ===
+
+[1] Conta criada no Auth emulator. uid=Xy3kAbc...random
+[2] setDoc users/Xy3kAbc...random { role: 'admin' }  -> SUCESSO (regra não trava role!)
+[3] LEITURA de payment_profiles/AFF-1001 AUTORIZADA. Dados vazados:
+    {"affiliateId":"AFF-1001","pixKey":"123.456.789-00","legalName":"Maria Vitima da Silva","cpfCnpj":"12345678900","address":"Rua das Flores 123, São Paulo/SP"}
+
+>>> EXPLOIT CONFIRMADO: takeover total + vazamento de PII (LGPD). <<<
+
+==============================================================================
+ exploit.mjs  (DEPOIS do patch — copie firestore.patched.rules sobre firestore.rules)
+==============================================================================
+=== PoC-01 — CRITICAL privilege escalation (emulator) ===
+
+[1] Conta criada no Auth emulator. uid=Zz9...random
+
+ERRO inesperado (ou rules já corrigidas?): permission-denied
+Se você aplicou o patch, o passo [2] deve falhar com permission-denied — fix OK.
+
+==============================================================================
+ rules-unit-test.spec.ts  (vitest)
+==============================================================================
+ ✓ VULNERABLE rules (firestore.rules atual)
+   ✓ attacker pode auto-criar users/{uid} com role:admin (privesc)
+   ✓ com role:admin forjado, isAdmin() libera leitura de payment_profiles (PII)
+ ✓ PATCHED rules (role travado em create)
+   ✓ attacker NÃO consegue criar users/{uid} com role:admin
+   ✓ attacker AINDA pode criar a própria conta como client (fluxo legítimo intacto)
+   ✓ sem ser admin, leitura de payment_profiles é negada
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+
+INTERPRETAÇÃO: os 2 testes "VULNERABLE" passam porque o ataque TEM sucesso nas
+regras atuais; os 3 testes "PATCHED" passam porque o ataque é bloqueado e o
+fluxo legítimo continua funcionando. Ambos os grupos verdes = finding provado
++ patch validado.

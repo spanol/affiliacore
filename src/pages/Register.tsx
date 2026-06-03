@@ -49,8 +49,10 @@ export default function Register() {
         }
       }
 
-      // Create user profile in Firestore
-      const role = email.trim().toLowerCase() === 'carlos@carlossantos.org' ? 'admin' : 'client';
+      // Create user profile in Firestore. SECURITY (CRITICAL-1): o self-cadastro
+      // SEMPRE cria role 'client' — as rules bloqueiam qualquer outro valor. Promover
+      // a admin é feito fora do cliente (console / Admin SDK), nunca por e-mail aqui.
+      const role = 'client';
       currentPath = `users/${user.uid}`;
 
       try {

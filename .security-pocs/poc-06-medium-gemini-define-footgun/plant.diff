@@ -1,0 +1,20 @@
+--- a/src/main.tsx
++++ b/src/main.tsx
+@@ -1,6 +1,11 @@
+ import {StrictMode} from 'react';
+ import {createRoot} from 'react-dom/client';
+ import App from './App.tsx';
+ import './index.css';
+
++// [PoC-06] Linha HIPOTÉTICA que um dev poderia adicionar amanhã.
++// O vite.config.ts faz `define: { 'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY) }`,
++// então esta referência é SUBSTITUÍDA pelo valor real em build -> chave no bundle.
++import {GoogleGenAI} from '@google/genai';
++const ai = new GoogleGenAI({apiKey: process.env.GEMINI_API_KEY});
++console.log('gemini client ready', typeof ai);
++
+ createRoot(document.getElementById('root')!).render(
+   <StrictMode>
+     <App />
+   </StrictMode>,
+ );

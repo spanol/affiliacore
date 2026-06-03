@@ -1,0 +1,69 @@
+rules_version = '2';
+// PATCHED rules — aplica a correção sugerida no SECURITY-AUDIT.md (CRITICAL-1).
+// Diferença-chave vs firestore.rules atual: o self-create de users/{uid} só
+// pode criar role == 'client' e não pode forjar campos de confiança.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc().role == 'admin';
+    }
+
+    match /users/{userId} {
+      allow read: if request.auth.uid == userId || isAdmin();
+      allow list: if isAdmin();
+
+      // PATCH: self-create só cria 'client'; não pode forjar vínculos privilegiados.
+      allow create: if request.auth.uid == userId
+                    && request.resource.data.role == 'client'
+                    && request.resource.data.uid == userId
+                    && !('affiliateId' in request.resource.data.keys())
+                    && !('isSpecial' in request.resource.data.keys());
+
+      allow update: if isAdmin()
+        || (request.auth.uid == userId
+            && request.resource.data.role == resource.data.role);
+      allow delete: if isAdmin();
+    }
+
+    match /affiliates/{affiliateId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /affiliate_configs/{affiliateId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /special_affiliates/{affiliateId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /settings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /contacts/{contactId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+    match /affiliate_statuses/{statusId} {
+      allow read, write: if isAdmin();
+    }
+    match /audit_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+    match /payment_profiles/{affiliateId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

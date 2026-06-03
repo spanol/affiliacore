@@ -1,0 +1,27 @@
+================================================================
+ flood.mjs contra o server ATUAL (sem rate limit)  — VULNERÁVEL
+================================================================
+→ Flooding http://localhost:5000/api/accept-invite  N=100 concurrency=20
+
+Status distribution: {"404":100}
+Rate-limited (429): 0
+
+>>> Done 100/100 in 1.83s, 0 rate-limited (VULNERÁVEL). <<<
+
+(Nota: o status exato depende da config. Sem Firebase Admin no checkout limpo
+ você verá {"500":100}; com Admin + token inválido verá {"404":100}. O que
+ importa para o finding é: 429 == 0, ou seja, NENHUM limite. 100 requests
+ processados em ~2s sem qualquer freio.)
+
+================================================================
+ flood.mjs contra patched-endpoint-demo.mjs (porta 5001)  — PATCH OK
+================================================================
+TARGET=http://localhost:5001/api/accept-invite N=100 node flood.mjs
+
+Status distribution: {"404":10,"429":90}
+Rate-limited (429): 90
+
+>>> 90/100 receberam 429 — rate limit ATIVO (patch OK). <<<
+
+INTERPRETAÇÃO: com o limiter (10/min/IP), as 10 primeiras passam e as 90
+seguintes são barradas com 429. Prova que o patch (express-rate-limit) corrige.

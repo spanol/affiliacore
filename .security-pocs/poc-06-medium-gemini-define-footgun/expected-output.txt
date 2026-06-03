@@ -1,0 +1,26 @@
+==============================================================
+ [FOOTGUN] aplica plant.diff e builda com GEMINI_API_KEY setada
+==============================================================
+grep 'AIzaSyDoTestFakeKeyABCDEF123' dist/ :
+dist/assets/index-9f8e7d6c.js:1:...const ai=new tt({apiKey:"AIzaSyDoTestFakeKeyABCDEF123"})...
+>>> LEAK CONFIRMADO: a chave Gemini foi inlinada no bundle pelo define. <<<
+
+PATCH: remova o bloco define do vite.config.ts e mova toda chamada Gemini
+para o backend (server.ts, process.env.GEMINI_API_KEY lido em runtime no servidor).
+Com o define removido, mesmo a linha plantada não consegue inlinar a chave.
+
+→ Revertendo plant.diff (restaurando src/main.tsx)...
+  ✓ revertido
+
+------------------------------------------------------------------------------
+ Validação do PATCH (manual)
+------------------------------------------------------------------------------
+1. Comente/remova o bloco `define: { 'process.env.GEMINI_API_KEY': ... }` do
+   vite.config.ts.
+2. Re-rode reproduce.sh.
+3. grep não acha a chave -> `process.env.GEMINI_API_KEY` vira `undefined` no
+   bundle (não há valor para inlinar). Footgun neutralizado.
+
+NOTA: hoje NÃO há referência a process.env.GEMINI_API_KEY em src/ — por isso o
+finding é "latente" (MEDIUM). Esta PoC mostra que basta UMA linha futura para
+transformar o footgun em vazamento real.

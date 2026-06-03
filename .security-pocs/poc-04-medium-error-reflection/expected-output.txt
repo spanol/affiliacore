@@ -1,0 +1,25 @@
+=== Request que força erro upstream (param inválido) ===
+GET http://localhost:5000/api/external/results?affiliateIds=INVALID
+
+--- Resposta recebida pelo CLIENTE (proxy VULNERÁVEL): ---
+{"error":"Erro na API Externa (results): 400",
+  "code":"UPSTREAM_VALIDATION_ERR",
+  "message":"Invalid affiliateIds parameter",
+  "details":{"internal_query":"SELECT * FROM partner_secret_table WHERE api_client='boost' AND tier='gold'",
+  "api_version":"v3.beta-internal",
+  "upstream_host":"pg-primary-01.partnersotg.internal:5432",
+  "echoed_api_key_hint":"x-api-key starts with sk_live_PARTNER_...",
+  "stack":"at ResultsController.validate (/srv/partners/src/results.js:88:13)"}}
+
+----------------------------------------------------------------
+VULNERÁVEL: aparecem internal_query, upstream_host, stack, echoed_api_key_hint
+-> estrutura interna + host de banco + dica de credencial vazaram ao cliente.
+
+================================================================
+ Mesma request, proxy iniciado com PATCHED=1
+================================================================
+--- Resposta recebida pelo CLIENTE (proxy PATCHED): ---
+{"error":"Erro ao consultar a API externa.","requestId":"req_1839271"}
+
+-> Nenhum detalhe interno. O responseText cru só vai para o log server-side.
+   Finding mitigado.

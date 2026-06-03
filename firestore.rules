@@ -17,16 +17,26 @@ service cloud.firestore {
     }
 
     // User profiles. A user reads/updates only their own doc; admins read/write all.
-    // NOTE (hardening TODO): self-create currently allows any role value, which the
-    // client Register flow relies on to bootstrap the first admin. Once admin/affiliate
-    // creation is fully server-side (Admin SDK), lock role here to 'client' on self-create.
+    // SECURITY (CRITICAL-1): self-create só pode criar role == 'client' e não pode
+    // forjar campos de confiança (role/affiliateId/isSpecial). O vínculo a um
+    // affiliateId e a flag isSpecial são gravados SÓ pelo servidor (Admin SDK, que
+    // ignora estas regras). O primeiro admin é semeado fora do cliente (console /
+    // Admin SDK), nunca pelo fluxo de cadastro.
     match /users/{userId} {
       allow read: if request.auth.uid == userId || isAdmin();
       allow list: if isAdmin();
-      allow create: if request.auth.uid == userId;
-      // a user may update their own doc but cannot change their own role; admins can do anything
+      allow create: if request.auth.uid == userId
+                    && request.resource.data.role == 'client'
+                    && request.resource.data.uid == userId
+                    && !('affiliateId' in request.resource.data.keys())
+                    && !('isSpecial' in request.resource.data.keys());
+      // O próprio usuário atualiza o doc, mas NÃO pode mudar role nem o vínculo
+      // (affiliateId) — senão poderia se reapontar pra outro afiliado (IDOR) ou
+      // se promover. Admin faz qualquer coisa.
       allow update: if isAdmin()
-        || (request.auth.uid == userId && request.resource.data.role == resource.data.role);
+        || (request.auth.uid == userId
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.affiliateId == resource.data.affiliateId);
       allow delete: if isAdmin();
     }
 
@@ -57,8 +67,18 @@ service cloud.firestore {
     }
 
     // Public contact form submissions: anyone may create; only admins may read/manage.
+    // SECURITY (MEDIUM-2/LOW): o create anônimo é restrito ao shape esperado e a
+    // tamanhos máximos — evita abuso de storage e injeção de conteúdo arbitrário no
+    // painel admin. (Rate limit/captcha do formulário fica como follow-up — App Check.)
     match /contacts/{contactId} {
-      allow create: if true;
+      allow create: if request.resource.data.keys().hasOnly(
+                         ['name','email','phone','instagram','affiliateExperience','presentation','createdAt'])
+                    && request.resource.data.name is string && request.resource.data.name.size() <= 120
+                    && request.resource.data.email is string && request.resource.data.email.size() <= 200
+                    && request.resource.data.phone is string && request.resource.data.phone.size() <= 40
+                    && request.resource.data.instagram is string && request.resource.data.instagram.size() <= 120
+                    && request.resource.data.affiliateExperience in ['sim', 'nao']
+                    && request.resource.data.presentation is string && request.resource.data.presentation.size() <= 2000;
       allow read, update, delete: if isAdmin();
     }
 
