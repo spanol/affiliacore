@@ -376,6 +376,28 @@ export async function fetchAllResults(opts: DateRangeOpts = {}): Promise<any[]> 
   }
 }
 
+// Per-house (brand) breakdown for the whole accessible scope (sem affiliateIds).
+// Admin → rede inteira; afiliado especial → o proxy escopa à sub-rede (own + subs).
+export async function fetchAllResultsByBrand(opts: DateRangeOpts = {}): Promise<any[]> {
+  try {
+    return await fetchResultsGrouped('brand', opts);
+  } catch (error) {
+    console.error('Error fetching network brand results:', error);
+    return [];
+  }
+}
+
+// Daily time series for the whole accessible scope (sem affiliateIds).
+// Admin → rede inteira; afiliado especial → o proxy escopa à sub-rede (own + subs).
+export async function fetchAllDailyResults(opts: DateRangeOpts = {}): Promise<any[]> {
+  try {
+    return await fetchResultsGrouped('date', opts);
+  } catch (error) {
+    console.error('Error fetching network daily results:', error);
+    return [];
+  }
+}
+
 // --- Por Campanha ------------------------------------------------------------
 // Visão analítica por campanha (results?groupBy=campaign). Disponível em dois lugares:
 //   - por afiliado (AffiliateDetails / painel do cliente), escopado via affiliateIds;

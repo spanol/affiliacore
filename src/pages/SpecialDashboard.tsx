@@ -7,13 +7,20 @@ import { useToast } from '../contexts/ToastContext';
 import {
   fetchSpecialAffiliates,
   fetchAllResults,
+  fetchAllResultsByBrand,
+  fetchAllResultsByCampaign,
+  fetchAllDailyResults,
   fetchAffiliateConfigs,
   saveSubAffiliateConfig,
   calcAffiliatePayout,
   SpecialAffiliate,
   AffiliateConfig,
+  CampaignRow,
 } from '../services/affiliateService';
 import DateRangePicker from '../components/DateRangePicker';
+import BrandBreakdown from '../components/BrandBreakdown';
+import CampaignBreakdown from '../components/CampaignBreakdown';
+import DailyPerformanceChart from '../components/DailyPerformanceChart';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
 import { cn, humanizeName } from '../lib/utils';
 
@@ -29,6 +36,10 @@ export default function SpecialDashboard() {
   const [loading, setLoading] = useState(true);
   const [special, setSpecial] = useState<SpecialAffiliate | null>(null);
   const [results, setResults] = useState<any[]>([]);
+  // Visões analíticas da rede (own + subs), escopadas pelo proxy (B3 Fase 2).
+  const [brandResults, setBrandResults] = useState<any[]>([]);
+  const [campaignResults, setCampaignResults] = useState<CampaignRow[]>([]);
+  const [dailyResults, setDailyResults] = useState<any[]>([]);
   const [configs, setConfigs] = useState<Record<string, AffiliateConfig>>({});
   const [subEdits, setSubEdits] = useState<Record<string, { cpaValue: number | string; revPercentage: number | string }>>({});
   const [savingSub, setSavingSub] = useState<string | null>(null);
@@ -39,14 +50,22 @@ export default function SpecialDashboard() {
     if (!ownId) return;
     try {
       setLoading(true);
-      const [specials, rows, cfgs] = await Promise.all([
+      // brand/campaign/daily vão SEM affiliateIds — o proxy escopa à sub-rede do
+      // especial (own + subs). Agregados pela API por casa/campanha/dia.
+      const [specials, rows, byBrand, byCampaign, byDay, cfgs] = await Promise.all([
         fetchSpecialAffiliates(),
         fetchAllResults(range),
+        fetchAllResultsByBrand(range),
+        fetchAllResultsByCampaign(range),
+        fetchAllDailyResults(range),
         fetchAffiliateConfigs(),
       ]);
       const mine = specials[ownId] || null;
       setSpecial(mine);
       setResults(Array.isArray(rows) ? rows : []);
+      setBrandResults(Array.isArray(byBrand) ? byBrand : []);
+      setCampaignResults(Array.isArray(byCampaign) ? byCampaign : []);
+      setDailyResults(Array.isArray(byDay) ? byDay : []);
       setConfigs(cfgs);
       // semente dos inputs editáveis a partir dos configs salvos
       const seed: Record<string, { cpaValue: number | string; revPercentage: number | string }> = {};
@@ -58,6 +77,9 @@ export default function SpecialDashboard() {
     } catch (err) {
       console.error('Erro ao carregar painel da sub-rede:', err);
       setResults([]);
+      setBrandResults([]);
+      setCampaignResults([]);
+      setDailyResults([]);
     } finally {
       setLoading(false);
     }
@@ -98,6 +120,17 @@ export default function SpecialDashboard() {
     return sum + (calcAffiliatePayout(r, ownConfig) - calcAffiliatePayout(r, configs[id]));
   }, 0);
   const earnings = ownPayout + spreadTotal;
+
+  // Série diária: a API agrega own+subs por dia. Substituímos a comissão da CASA
+  // (total_commission cru) pela comissão DO ESPECIAL à taxa própria, mantendo a
+  // regra do lucro líquido (nunca expor a margem/receita bruta da agência).
+  const dailyChartData = useMemo(
+    () => dailyResults.map((r) => ({ ...r, total_commission: calcAffiliatePayout(r, ownConfig) })),
+    [dailyResults, ownConfig]
+  );
+
+  // Mesma lógica para "Por casa": o BrandBreakdown calcula a comissão a partir do
+  // config informado — passamos a taxa própria do especial (o que ele recebe).
 
   const funnel = [
     { label: 'Cadastros', value: funnelTotals.registrations.toLocaleString('pt-BR'), icon: UserPlus },
@@ -297,6 +330,49 @@ export default function SpecialDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {ownId && renderAffiliateCard(ownId, true, 0)}
           {subIds.map((id, i) => renderAffiliateCard(id, false, i + 1))}
+        </div>
+      </section>
+
+      {/* Por casa — distribuição da comissão da rede (own + subs) por casa de aposta,
+          calculada à TAXA PRÓPRIA do especial (o que ele recebe da agência). */}
+      <section>
+        <h3 className="text-[10px] uppercase font-bold tracking-widest text-slate-400 dark:text-neutral-500 mb-3 px-1">
+          Por casa (sua rede)
+        </h3>
+        <BrandBreakdown data={brandResults} config={ownConfig} />
+      </section>
+
+      {/* Por campanha — desempenho da rede por campanha. "Sua comissão" = repasse à
+          taxa própria do especial; a margem da agência continua só no master. */}
+      <section>
+        <h3 className="text-[10px] uppercase font-bold tracking-widest text-slate-400 dark:text-neutral-500 mb-3 px-1">
+          Por campanha (sua rede)
+        </h3>
+        <CampaignBreakdown
+          commissionLabel="Sua comissão"
+          subtitle="Soma da sua rede (sua produção + sub-afiliados) no período"
+          infoText="Desempenho da sua rede por campanha. 'Sua comissão' é o seu ganho à sua taxa (CPA + REV) sobre toda a rede no período."
+          rows={campaignResults.map((c) => ({
+            name: c.name,
+            registrations: c.registrations,
+            firstDeposits: c.first_deposits,
+            deposit: c.deposit,
+            qualifiedCpa: c.qualified_cpa,
+            commission: calcAffiliatePayout(c, ownConfig),
+          }))}
+        />
+      </section>
+
+      {/* Evolução diária da rede (own + subs) — comissão exibida à taxa própria. */}
+      <section>
+        <div className="bg-white dark:bg-neutral-900 border border-slate-100 dark:border-neutral-800 rounded-3xl flex flex-col shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-slate-50 dark:border-neutral-800 flex justify-between items-center bg-slate-50/50 dark:bg-neutral-800/30">
+            <h3 className="font-black text-xs text-slate-800 dark:text-white uppercase tracking-widest">Evolução Diária (sua rede)</h3>
+            <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-neutral-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Cadastros · Comissão
+            </div>
+          </div>
+          <DailyPerformanceChart data={dailyChartData} />
         </div>
       </section>
     </div>
