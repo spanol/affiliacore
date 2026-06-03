@@ -130,6 +130,7 @@ function DashboardRedirect() {
   if (profile?.role === 'admin') return <Navigate to="/admin" replace />;
   if (profile?.role === 'client') return <Navigate to={clientHome(profile)} replace />;
 
-  // Default fallback if role is missing but user is logged in
-  return <Navigate to="/admin" replace />;
+  // SECURITY (HIGH-2): fail-safe — papel desconhecido/ausente cai no MENOR
+  // privilégio (perfil), nunca na área de admin. Antes ia para /admin (fail-open).
+  return <Navigate to="/profile" replace />;
 }
