@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import crypto from 'crypto';
 import express from 'express';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import admin from 'firebase-admin';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
@@ -30,7 +32,28 @@ async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
-  app.use(express.json());
+  // SECURITY (LOW): cabeçalhos de segurança. CSP fica desligada aqui porque exige
+  // uma allowlist própria (Tailwind/Vite, Firebase, recharts, avatares dicebear) e
+  // precisa ser testada — fica como follow-up; os demais headers (nosniff,
+  // Referrer-Policy, HSTS, etc.) já entram. COEP off p/ não bloquear recursos
+  // cross-origin legítimos (avatares, storage).
+  app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+
+  // SECURITY (LOW): limite explícito do corpo JSON (evita payloads gigantes).
+  app.use(express.json({ limit: '32kb' }));
+
+  // SECURITY (MEDIUM-2): rate limit nas rotas PÚBLICAS de auth (criam/leem contas
+  // e convites). Sem isso, dá pra martelar /api/accept-invite (cria usuários reais)
+  // e enumerar e-mails. App.set('trust proxy', 1) p/ a chave por IP funcionar atrás
+  // do Cloud Run/App Hosting.
+  app.set('trust proxy', 1);
+  const publicAuthLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Muitas tentativas. Tente novamente em alguns minutos.' },
+  });
 
   // --- Auth middlewares -----------------------------------------------------
   // Clients send their Firebase ID token as `Authorization: Bearer <token>`.
@@ -362,7 +385,7 @@ async function startServer() {
 
   const fetchExternalAffiliates = async (): Promise<any[]> => {
     const BASE_URL = process.env.VITE_AFFILIATE_API_BASE_URL || 'https://affiliate-api-prd.partnersotg.com';
-    const apiKey = process.env.VITE_AFFILIATE_API_KEY || process.env.AFFILIATE_API_KEY;
+    const apiKey = process.env.AFFILIATE_API_KEY;
     if (!apiKey) throw new Error('Chave de API externa não configurada.');
 
     const response = await fetch(`${BASE_URL}/api/v2/external/affiliates`, {
@@ -442,7 +465,7 @@ async function startServer() {
   });
 
   // Public: validate an invite token and return the affiliate it is bound to.
-  app.get('/api/invites/:token', async (req, res) => {
+  app.get('/api/invites/:token', publicAuthLimiter, async (req, res) => {
     if (!adminDb) {
       return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     }
@@ -471,7 +494,7 @@ async function startServer() {
   });
 
   // Public: affiliate accepts an invite, creating their own login linked to the affiliateId.
-  app.post('/api/accept-invite', async (req, res) => {
+  app.post('/api/accept-invite', publicAuthLimiter, async (req, res) => {
     if (!adminApp || !adminDb) {
       return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     }
@@ -548,7 +571,7 @@ async function startServer() {
     try {
       const { endpoint, id } = req.params;
       const BASE_URL = process.env.VITE_AFFILIATE_API_BASE_URL || 'https://affiliate-api-prd.partnersotg.com';
-      const apiKey = process.env.VITE_AFFILIATE_API_KEY || process.env.AFFILIATE_API_KEY;
+      const apiKey = process.env.AFFILIATE_API_KEY;
 
       if (!apiKey) {
         return res.status(500).json({ error: 'Chave de API não configurada' });
@@ -636,11 +659,16 @@ async function startServer() {
       }
 
       if (!response.ok) {
-        return res.status(response.status).json({ 
-          error: `Erro na API Externa (${endpoint}): ${response.status}`,
+        // SECURITY (MEDIUM-1): o corpo bruto do upstream (details/message/host/IDs
+        // internos) fica SÓ no log do servidor; ao cliente vai um erro genérico +
+        // requestId p/ correlação. Mantém-se apenas o `code` curto (ex.: "040"),
+        // que a UI usa p/ distinguir "sem dados" de erro real — não é sensível.
+        const requestId = crypto.randomBytes(8).toString('hex');
+        console.error(`[external-proxy] ${requestId} upstream ${response.status} em ${endpoint}:`, responseText);
+        return res.status(response.status).json({
+          error: 'Falha ao consultar a API externa.',
           code: responseBody?.code || responseBody?.errorCode,
-          message: responseBody?.message || responseBody?.error || response.statusText,
-          details: responseBody?.details || responseBody || responseText
+          requestId,
         });
       }
 
@@ -648,9 +676,11 @@ async function startServer() {
         return res.json(responseBody);
       }
 
+      const requestId = crypto.randomBytes(8).toString('hex');
+      console.error(`[external-proxy] ${requestId} resposta não-JSON do upstream em ${endpoint}:`, responseText);
       return res.status(502).json({
-        error: `Resposta inválida da API Externa (${endpoint})`,
-        details: responseText
+        error: 'Resposta inválida da API externa.',
+        requestId,
       });
     } catch (error) {
       console.error('Proxy Exception:', error);
