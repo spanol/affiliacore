@@ -19,6 +19,35 @@ O achado dominante é uma **escalada de privilégio trivial e remota (CRITICAL)*
 
 ---
 
+## Status de remediação (2026-06-02)
+
+Correções aplicadas no código (commits `Sec:` na `main`). Validado: `tsc` limpo, 60
+testes verdes, `npm run build` OK e bundle **sem** `x-api-key`/`GEMINI_API_KEY`/`VITE_AFFILIATE_API_KEY`.
+
+| Finding | Status | Onde |
+|---|---|---|
+| CRITICAL-1 (privesc self-create admin) | ✅ Corrigido — **requer deploy de rules** | `firestore.rules` (create trava role 'client' + uid + sem affiliateId/isSpecial; update trava role+affiliateId) · `Register.tsx` (sempre 'client') |
+| HIGH-1 (chave do parceiro no bundle) | ✅ Corrigido — **rotacionar a chave se já foi a build com `VITE_`** | `affiliateService.ts` (sem fetch direto/sem env no client) · `server.ts` (só `AFFILIATE_API_KEY`) · `.env.example` |
+| HIGH-2 (fail-open → /admin) | ✅ Corrigido | `App.tsx` (fallback `/profile`) |
+| MEDIUM-1 (reflexão de erro do upstream) | ✅ Corrigido | `server.ts` (erro genérico + `requestId`, log server-side) |
+| MEDIUM-2 (sem rate limit / contacts aberto) | ✅ Corrigido (parcial) | `server.ts` (`express-rate-limit` em accept-invite/invites) · `firestore.rules` (contacts: shape + tamanho). **Follow-up:** App Check/captcha no formulário |
+| MEDIUM-3 (`define` GEMINI no bundle) | ✅ Corrigido | `vite.config.ts` (define removido) |
+| LOW (json limit + headers) | ✅ Corrigido (parcial) | `server.ts` (`helmet` + `express.json({limit:'32kb'})`). **Follow-up:** CSP com allowlist |
+| LOW (contacts validation) | ✅ Corrigido | `firestore.rules` |
+| LOW (PII em mensagem de erro) | ✅ Corrigido | `src/lib/firebase.ts` |
+| LOW (`error.message` nos 500) | ⏳ Deferido | genericizar os ~13 handlers do `server.ts` |
+
+**Ações operacionais pendentes (fora de código):**
+1. **`firebase deploy --only firestore:rules`** — sem isso, a CRITICAL-1 segue explorável em produção.
+2. **Rotacionar a `x-api-key`** do parceiro se ela já foi embarcada em algum build com prefixo `VITE_`.
+3. **Restrições de API key** no GCP Console (HTTP referrers / APIs) — ver INFO.
+
+**Deferidos (médio prazo):** CSP no helmet; migração de papel para **custom claims**
+(`request.auth.token.role`) em vez de `users/{uid}.role`; genericizar `error.message`
+nos handlers 500; App Check/reCAPTCHA no formulário de contato.
+
+---
+
 ## Findings (ordem por severidade)
 
 ### CRITICAL — Escalada de privilégio: qualquer usuário cria a própria conta como `admin`
