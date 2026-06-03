@@ -42,34 +42,17 @@ interface ApiErrorInfo {
   noData: boolean;
 }
 
-const AFFILIATE_API_BASE_URL = (import.meta.env.VITE_AFFILIATE_API_BASE_URL || 'https://affiliate-api-prd.partnersotg.com').replace(/\/+$/, '');
-const AFFILIATE_API_KEY = import.meta.env.VITE_AFFILIATE_API_KEY || '';
-
+// SECURITY (HIGH-1): o cliente NUNCA fala direto com a API de parceiros. A chave
+// (x-api-key) vive somente no servidor; todo acesso passa pelo proxy autenticado
+// `/api/external/...` (o `server.ts` injeta a chave server-side). Não há fallback
+// de fetch direto nem leitura de env `VITE_*` de credencial no browser — qualquer
+// VITE_* seria embarcado no bundle estático e vazaria a chave do parceiro.
 async function fetchAffiliateApi(endpoint: string, query?: URLSearchParams): Promise<Response> {
   const proxyUrl = `/api/external/${endpoint}${query && query.toString() ? `?${query.toString()}` : ''}`;
-  const proxyResponse = await authFetch(proxyUrl, {
+  return authFetch(proxyUrl, {
     method: 'GET',
     headers: {
       'Accept': 'application/json',
-    },
-  });
-
-  if (proxyResponse.status !== 404) {
-    return proxyResponse;
-  }
-
-  console.warn(`Proxy route unavailable for ${endpoint}, retrying against external affiliate API directly.`);
-
-  if (!AFFILIATE_API_KEY) {
-    return proxyResponse;
-  }
-
-  const directUrl = `${AFFILIATE_API_BASE_URL}/api/v2/external/${endpoint}${query && query.toString() ? `?${query.toString()}` : ''}`;
-  return fetch(directUrl, {
-    method: 'GET',
-    headers: {
-      'Accept': 'application/json',
-      'x-api-key': AFFILIATE_API_KEY,
     },
   });
 }
