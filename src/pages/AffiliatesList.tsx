@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Users,
@@ -195,6 +195,22 @@ export default function AffiliatesList() {
       })
     : [];
   const visibleAffiliates = isAdmin ? filteredAffiliates : [];
+
+  // Mapa sub-afiliado → afiliado especial dono (só especiais ATIVOS). Usado para
+  // exibir o badge "Pertence a <especial>" em cada parceiro vinculado a uma rede.
+  const ownerBySubId = useMemo(() => {
+    const nameById: Record<string, string> = {};
+    affiliates.forEach((a: any) => { nameById[String(a.id ?? a._id ?? '')] = a.name || a.label || ''; });
+    const map: Record<string, { id: string; name: string }> = {};
+    Object.values(specials).forEach((sp) => {
+      if (!sp?.active) return;
+      const ownerName = humanizeName(nameById[String(sp.affiliateId)] || `#${sp.affiliateId}`);
+      (sp.subAffiliateIds || []).forEach((subId) => {
+        map[String(subId)] = { id: String(sp.affiliateId), name: ownerName };
+      });
+    });
+    return map;
+  }, [specials, affiliates]);
 
   const handleOpenDetails = (affiliate: any) => {
     navigate(`/affiliates/${affiliate.id}`);
@@ -399,6 +415,11 @@ export default function AffiliatesList() {
                               {getBrandName(item)}
                             </span>
                           )}
+                          {ownerBySubId[String(affiliateId)] && (
+                            <span className="inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200/60 dark:border-amber-900/40 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                              <Crown size={10} /> Pertence a {ownerBySubId[String(affiliateId)].name}
+                            </span>
+                          )}
                         </div>
                       </td>
                       {isAdmin && (
@@ -519,6 +540,11 @@ export default function AffiliatesList() {
                     {getBrandName(item) && (
                       <span className="inline-flex mt-1 items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-neutral-800 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
                         {getBrandName(item)}
+                      </span>
+                    )}
+                    {ownerBySubId[String(affiliateId)] && (
+                      <span className="inline-flex mt-1 ml-1 items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200/60 dark:border-amber-900/40 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                        <Crown size={10} /> Pertence a {ownerBySubId[String(affiliateId)].name}
                       </span>
                     )}
                   </div>
