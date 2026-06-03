@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import { Crown, X, Save, Loader2, Search } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -75,14 +76,15 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="w-full max-w-lg bg-white dark:bg-neutral-900 rounded-3xl shadow-2xl border border-slate-200/70 dark:border-neutral-800 overflow-hidden flex flex-col max-h-[90vh]"
-      >
-        <div className="p-6 border-b border-slate-100 dark:border-neutral-800 flex items-start justify-between gap-4">
+  return createPortal(
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          className="w-full max-w-lg bg-white dark:bg-neutral-900 rounded-3xl shadow-2xl border border-slate-200/70 dark:border-neutral-800 overflow-hidden flex flex-col max-h-[calc(100vh-2rem)]"
+        >
+        <div className="shrink-0 p-6 border-b border-slate-100 dark:border-neutral-800 flex items-start justify-between gap-4">
           <div>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 mb-2 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest">
               <Crown size={12} /> Afiliado especial
@@ -95,7 +97,7 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
           </button>
         </div>
 
-        <div className="p-6 space-y-5 overflow-y-auto">
+        <div className="flex-1 min-h-0 p-6 space-y-5 overflow-y-auto">
           <label className="flex items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-neutral-800/40 border border-slate-100 dark:border-neutral-800 cursor-pointer">
             <div>
               <p className="text-sm font-bold text-slate-800 dark:text-neutral-100">Ativar como afiliado especial</p>
@@ -155,7 +157,7 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
           )}
         </div>
 
-        <div className="p-6 border-t border-slate-100 dark:border-neutral-800 flex justify-end gap-2">
+        <div className="shrink-0 p-6 border-t border-slate-100 dark:border-neutral-800 flex justify-end gap-2">
           <button
             onClick={onClose}
             className="px-4 py-2.5 rounded-full bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-600 dark:text-neutral-200 hover:border-slate-300 dark:hover:border-neutral-600 transition-all"
@@ -171,7 +173,9 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
             Salvar
           </button>
         </div>
-      </motion.div>
-    </div>
+        </motion.div>
+      </div>
+    </div>,
+    document.body
   );
 }
