@@ -46,12 +46,14 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
   
-  const jsonError = JSON.stringify(errInfo);
-  console.error('Firestore Error Detailed: ', jsonError);
-  
+  // SECURITY (LOW): logamos o detalhe (com PII do próprio usuário) só no console
+  // para diagnóstico, mas NÃO embutimos PII na mensagem do Error relançado — ele
+  // pode acabar exibido na UI (Register/Profile mostram `err.message`).
+  console.error('Firestore Error Detailed: ', errInfo);
+
   if (error instanceof Error && (error.message.includes('permission-denied') || error.message.includes('insufficient permissions'))) {
-    throw new Error(jsonError);
+    throw new Error('Sem permissão para concluir esta operação. Verifique seu acesso e tente novamente.');
   }
-  
+
   throw error;
 }
