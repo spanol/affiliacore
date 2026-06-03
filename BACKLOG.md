@@ -143,3 +143,21 @@ Ver também o bug já corrigido: admins não aparecem mais na listagem de afilia
 - Que "visualizações" exatamente queremos poder restringir (telas? métricas? casas?)?
 - Há níveis de admin (master vs. admin comum)?
 
+---
+
+## B6 · Remover a rota /contacts (não só esconder da sidebar)
+
+**Contexto.** O item "Contatos" foi removido da sidebar do admin (2026-06-02, commit `1aedfb8`),
+mas a rota `/contacts` continua existindo (acessível por URL, protegida por `requireAdmin`).
+O Carlos decidiu **não remover de vez por enquanto** — apenas escondeu.
+
+**Escopo aproximado (quando for remover).**
+- Tirar a `<Route path="/contacts">` de `src/App.tsx` e o import de `Contacts`.
+- Avaliar remover a página `src/pages/Contacts.tsx`, o `contactService.ts` e a coleção
+  `contacts` (Firestore + regra), se o formulário público de contato também sair.
+- Confirmar se o formulário de contato da landing (`Home`/`Register`) ainda alimenta `contacts`
+  antes de aposentar a coleção.
+
+**Pergunta em aberto.** Aposentar só a tela de admin ou todo o fluxo de contato (incluindo o
+formulário público que grava em `contacts`)?
+
