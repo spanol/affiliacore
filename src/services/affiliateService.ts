@@ -376,6 +376,21 @@ export async function fetchAllResults(opts: DateRangeOpts = {}): Promise<any[]> 
   }
 }
 
+// Resultados por afiliado para um CONJUNTO de ids (groupBy=affiliate). Usado pelo
+// master p/ ver a rede de um afiliado especial (own + subs) na AffiliateDetails.
+// O proxy expande o CSV em params repetidos (a API externa exige isso, não aceita
+// affiliateIds=a,b). Admin não sofre auto-escopo no servidor.
+export async function fetchResultsForAffiliates(ids: string[], opts: DateRangeOpts = {}): Promise<any[]> {
+  const clean = (ids || []).map(String).map((s) => s.trim()).filter(Boolean);
+  if (!clean.length) return [];
+  try {
+    return await fetchResultsGrouped('affiliate', { affiliateIds: clean.join(','), ...opts });
+  } catch (error) {
+    console.error('Error fetching results for affiliate set:', error);
+    return [];
+  }
+}
+
 // --- Por Campanha ------------------------------------------------------------
 // Visão analítica por campanha (results?groupBy=campaign). Disponível em dois lugares:
 //   - por afiliado (AffiliateDetails / painel do cliente), escopado via affiliateIds;

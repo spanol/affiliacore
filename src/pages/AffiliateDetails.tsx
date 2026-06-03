@@ -26,11 +26,14 @@ import {
   Crown,
   Wallet,
   Eye,
-  EyeOff
+  EyeOff,
+  Users,
+  ChevronRight
 } from 'lucide-react';
 import {
   fetchAffiliateById,
   fetchAffiliateResults,
+  fetchResultsForAffiliates,
   fetchAffiliateResultsByBrand,
   fetchAffiliateResultsByCampaign,
   fetchAffiliateDailyResults,
@@ -100,6 +103,13 @@ export default function AffiliateDetails() {
   // B4 · Dados de pagamento do afiliado (admin visualiza, mascarado).
   const [paymentProfile, setPaymentProfile] = useState<PaymentProfile | null>(null);
   const [revealPayment, setRevealPayment] = useState(false);
+
+  // Cadastros da rede de um afiliado especial — modal aberto pelo card "Cadastros".
+  // Mostra cada afiliado vinculado (own + subs) com seus cadastros/métricas.
+  const [cadastrosOpen, setCadastrosOpen] = useState(false);
+  const [networkRows, setNetworkRows] = useState<any[]>([]);
+  const [networkNames, setNetworkNames] = useState<Record<string, string>>({});
+  const [loadingNetwork, setLoadingNetwork] = useState(false);
 
   const openSpecial = async () => {
     if (!affiliate) return;
@@ -249,6 +259,35 @@ export default function AffiliateDetails() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
+  // Abre o modal e carrega os resultados por afiliado da rede do especial
+  // (own + subs). Admin não sofre auto-escopo no proxy → passamos os ids da rede.
+  const openCadastros = async () => {
+    if (!id) return;
+    setCadastrosOpen(true);
+    setLoadingNetwork(true);
+    try {
+      const sp = specials[String(id)];
+      const subIds = (sp?.subAffiliateIds || []).map(String);
+      const allIds = [String(id), ...subIds];
+      const [rows, list] = await Promise.all([
+        fetchResultsForAffiliates(allIds, { startDate: range.startDate, endDate: range.endDate }),
+        fetchAffiliates().catch(() => []),
+      ]);
+      setNetworkRows(Array.isArray(rows) ? rows : []);
+      const names: Record<string, string> = {};
+      (Array.isArray(list) ? list : []).forEach((a: any) => {
+        const aid = String(a.id ?? a._id ?? '');
+        if (aid) names[aid] = a.name || a.label || aid;
+      });
+      setNetworkNames(names);
+    } catch (e) {
+      console.error('Erro ao carregar cadastros da rede:', e);
+      setNetworkRows([]);
+    } finally {
+      setLoadingNetwork(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -277,6 +316,29 @@ export default function AffiliateDetails() {
       </div>
     );
   }
+
+  // Linhas do modal "Cadastros da rede": own (produção própria) + cada sub vinculado,
+  // com cadastros/métricas; subs sem produção aparecem zerados (nome do mirror).
+  const networkCadastros = (() => {
+    const sp = specials[String(id)];
+    const ids = [String(id), ...((sp?.subAffiliateIds || []).map(String))];
+    const byId: Record<string, any> = {};
+    networkRows.forEach((r) => { byId[String(r.id ?? r.affiliate_id ?? '')] = r; });
+    return ids.map((aid, idx) => {
+      const r = byId[aid] || {};
+      const fallback = idx === 0 ? (affiliate?.name || affiliate?.label) : '';
+      return {
+        id: aid,
+        isOwn: idx === 0,
+        name: humanizeName(r.label || r.name || networkNames[aid] || fallback || `#${aid}`),
+        registrations: r.registrations || 0,
+        firstDeposits: r.first_deposits || 0,
+        qualifiedCpa: r.qualified_cpa || 0,
+        deposit: r.deposit || 0,
+      };
+    });
+  })();
+  const networkTotalReg = networkCadastros.reduce((s, x) => s + x.registrations, 0);
 
   return (
     <div className="space-y-8 pb-20">
@@ -445,10 +507,17 @@ export default function AffiliateDetails() {
                   {/* Primary Performance Metrics */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Stage 1: Registrations */}
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       whileInView={{ opacity: 1, y: 0 }}
-                      className="bg-white dark:bg-neutral-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-neutral-800 shadow-sm group hover:border-brand/20 transition-all duration-500"
+                      onClick={isAdmin && isCurrentSpecialActive ? openCadastros : undefined}
+                      role={isAdmin && isCurrentSpecialActive ? 'button' : undefined}
+                      tabIndex={isAdmin && isCurrentSpecialActive ? 0 : undefined}
+                      onKeyDown={isAdmin && isCurrentSpecialActive ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCadastros(); } } : undefined}
+                      className={cn(
+                        "bg-white dark:bg-neutral-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-neutral-800 shadow-sm group hover:border-brand/20 transition-all duration-500",
+                        isAdmin && isCurrentSpecialActive && "cursor-pointer hover:shadow-md hover:border-amber-300/70 dark:hover:border-amber-800 outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40"
+                      )}
                     >
                       <div className="flex items-center justify-between mb-4">
                         <div className="p-3 bg-slate-50 dark:bg-neutral-800 rounded-2xl text-slate-400 group-hover:text-brand transition-colors">
@@ -459,7 +528,13 @@ export default function AffiliateDetails() {
                       <div className="space-y-1">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cadastros</p>
                         <h4 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{res.registrations || 0}</h4>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Leads Qualificados</p>
+                        {isAdmin && isCurrentSpecialActive ? (
+                          <p className="text-[10px] font-bold uppercase tracking-widest mt-2 inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                            Ver cadastros da rede <ChevronRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+                          </p>
+                        ) : (
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Leads Qualificados</p>
+                        )}
                       </div>
                     </motion.div>
 
@@ -838,6 +913,72 @@ export default function AffiliateDetails() {
                 Concluir
               </button>
             </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Modal · Cadastros da rede do afiliado especial (own + subs vinculados).
+          A API não expõe jogadores; "cadastros vinculados" = os afiliados da rede
+          do especial com seus números de cadastro/métricas. */}
+      {cadastrosOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white dark:bg-neutral-900 w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-100 dark:border-neutral-800 overflow-hidden flex flex-col max-h-[85vh]"
+          >
+            <div className="p-6 border-b border-slate-50 dark:border-neutral-800 flex justify-between items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="shrink-0 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500"><Users size={18} /></span>
+                <div className="min-w-0">
+                  <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm truncate">Cadastros da rede</h3>
+                  <p className="text-[11px] text-slate-400 dark:text-neutral-500 truncate">
+                    {humanizeName(affiliate.name || affiliate.label)} · {Math.max(0, networkCadastros.length - 1)} sub-afiliado(s) vinculado(s)
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setCadastrosOpen(false)} className="shrink-0 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 transition-colors"><X size={20} /></button>
+            </div>
+
+            {loadingNetwork ? (
+              <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 text-amber-500 animate-spin" /></div>
+            ) : (
+              <>
+                <div className="px-6 py-4 bg-slate-50/60 dark:bg-neutral-800/30 border-b border-slate-50 dark:border-neutral-800 flex items-center justify-between">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total de cadastros na rede</span>
+                  <span className="text-lg font-black text-slate-900 dark:text-white tabular-nums">{networkTotalReg.toLocaleString('pt-BR')}</span>
+                </div>
+                <div className="overflow-y-auto divide-y divide-slate-50 dark:divide-neutral-800">
+                  {networkCadastros.map((n) => (
+                    <div key={n.id} className="px-6 py-4 flex items-center justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-neutral-800/30 transition-colors">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className={cn(
+                          "shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-black border",
+                          n.isOwn
+                            ? "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                            : "bg-slate-50 dark:bg-neutral-800/60 border-slate-100 dark:border-neutral-700/60 text-slate-500 dark:text-neutral-400"
+                        )}>
+                          {n.isOwn ? <Crown size={15} /> : n.name.charAt(0).toUpperCase()}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-800 dark:text-white truncate">{n.name}</p>
+                          <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400 dark:text-neutral-500 truncate">
+                            {n.isOwn ? 'Produção própria' : `${n.firstDeposits} FTD · ${n.qualifiedCpa} CPA qualif.`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xl font-black text-slate-900 dark:text-white tabular-nums">{n.registrations.toLocaleString('pt-BR')}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">cadastros</p>
+                      </div>
+                    </div>
+                  ))}
+                  {networkCadastros.length === 0 && (
+                    <div className="px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest opacity-60">Nenhum afiliado vinculado</div>
+                  )}
+                </div>
+              </>
+            )}
           </motion.div>
         </div>
       )}
