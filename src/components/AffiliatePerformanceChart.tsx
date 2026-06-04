@@ -116,9 +116,11 @@ export default function AffiliatePerformanceChart({
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={visibleData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
               <defs>
+                {/* Comissão = cor "preta" do app (slate-900 no claro, branco no
+                    escuro — igual aos botões bg-slate-900 dark:bg-white). */}
                 <linearGradient id="commissionGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#7C3AED" stopOpacity={0.95} />
-                  <stop offset="95%" stopColor="#C084FC" stopOpacity={0.7} />
+                  <stop offset="5%" stopColor={theme === 'dark' ? '#FAFAFA' : '#0F172A'} stopOpacity={0.95} />
+                  <stop offset="95%" stopColor={theme === 'dark' ? '#A3A3A3' : '#475569'} stopOpacity={0.8} />
                 </linearGradient>
                 <linearGradient id="cpaGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#F97316" stopOpacity={0.95} />
