@@ -71,6 +71,22 @@ const maskSensitive = (v?: string) => {
   return '•••• ' + s.slice(-4);
 };
 
+// Soma N linhas (groupBy=affiliate) numa linha agregada. Usado quando o afiliado
+// é um especial com rede: a página deve contabilizar own + subs, não só a
+// produção própria do especial (que costuma ser zero). [[boost-special-as-scoped-master]]
+const sumResultRows = (rows: any[]) =>
+  (Array.isArray(rows) ? rows : []).reduce(
+    (acc, r) => ({
+      registrations: acc.registrations + (r?.registrations || 0),
+      first_deposits: acc.first_deposits + (r?.first_deposits || 0),
+      qualified_cpa: acc.qualified_cpa + (r?.qualified_cpa || 0),
+      rvs: acc.rvs + (r?.rvs || 0),
+      deposit: acc.deposit + (r?.deposit || 0),
+      total_commission: acc.total_commission + (r?.total_commission || 0),
+    }),
+    { registrations: 0, first_deposits: 0, qualified_cpa: 0, rvs: 0, deposit: 0, total_commission: 0 }
+  );
+
 export default function AffiliateDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -109,6 +125,8 @@ export default function AffiliateDetails() {
   const [networkRows, setNetworkRows] = useState<any[]>([]);
   const [networkNames, setNetworkNames] = useState<Record<string, string>>({});
   const [loadingNetwork, setLoadingNetwork] = useState(false);
+  // Quando o afiliado é um especial com rede, os cards agregam own + subs.
+  const [isNetworkView, setIsNetworkView] = useState(false);
 
   const openSpecial = async () => {
     if (!affiliate) return;
@@ -158,20 +176,35 @@ export default function AffiliateDetails() {
     try {
       setLoading(true);
       const prevRange = getPreviousRange(range);
+
+      // Afiliado especial COM rede → o master vê a página contabilizando own + subs
+      // (a produção própria do especial costuma ser zero; sem isto os cards zeravam).
+      // O proxy expande o CSV de affiliateIds em params repetidos. [[boost-special-as-scoped-master]]
+      const specialsMap = await fetchSpecialAffiliates().catch(() => ({} as Record<string, SpecialAffiliate>));
+      setSpecials(specialsMap);
+      const subIds = (specialsMap[String(affId)]?.subAffiliateIds || []).map(String);
+      const isNetwork = subIds.length > 0;
+      const networkIds = [String(affId), ...subIds];
+      const idsCsv = networkIds.join(',');
+      setIsNetworkView(isNetwork);
+
       const [detailsData, resultsData, allConfigs, brandData, campaignData, dailyData, prevResults] = await Promise.all([
         fetchAffiliateById(affId),
-        fetchAffiliateResults(affId, range).catch(err => {
+        (isNetwork ? fetchResultsForAffiliates(networkIds, range) : fetchAffiliateResults(affId, range)).catch(err => {
           console.error('Error fetching results:', err);
           return [];
         }),
         fetchAffiliateConfigs(),
-        fetchAffiliateResultsByBrand(affId, range),
-        fetchAffiliateResultsByCampaign(affId, range),
-        fetchAffiliateDailyResults(affId, range.startDate, range.endDate),
-        fetchAffiliateResults(affId, prevRange).catch(() => [])
+        fetchAffiliateResultsByBrand(isNetwork ? idsCsv : affId, range),
+        fetchAffiliateResultsByCampaign(isNetwork ? idsCsv : affId, range),
+        fetchAffiliateDailyResults(isNetwork ? idsCsv : affId, range.startDate, range.endDate),
+        (isNetwork ? fetchResultsForAffiliates(networkIds, prevRange) : fetchAffiliateResults(affId, prevRange)).catch(() => [])
       ]);
       setAffiliate(detailsData);
-      setResults(Array.isArray(resultsData) ? resultsData : []);
+      // groupBy=affiliate devolve 1 linha por afiliado; p/ a rede somamos numa linha só
+      // (a página renderiza um conjunto de cards por linha de `results`).
+      const resultsArr = Array.isArray(resultsData) ? resultsData : (resultsData ? [resultsData] : []);
+      setResults(isNetwork ? [sumResultRows(resultsArr)] : resultsArr);
       setBrandResults(Array.isArray(brandData) ? brandData : []);
       setCampaignResults(Array.isArray(campaignData) ? campaignData : []);
       setDailyResults(Array.isArray(dailyData) ? dailyData : []);
@@ -316,8 +349,8 @@ export default function AffiliateDetails() {
     );
   }
 
-  // Linhas do modal "Cadastros da rede": own (produção própria) + cada sub vinculado,
-  // com cadastros/métricas; subs sem produção aparecem zerados (nome do mirror).
+  // Linhas do modal "CPA da rede": own (produção própria) + cada sub vinculado,
+  // com CPA/métricas; subs sem produção aparecem zerados (nome do mirror).
   const networkCadastros = (() => {
     const sp = specials[String(id)];
     const ids = [String(id), ...((sp?.subAffiliateIds || []).map(String))];
@@ -337,7 +370,7 @@ export default function AffiliateDetails() {
       };
     });
   })();
-  const networkTotalReg = networkCadastros.reduce((s, x) => s + x.registrations, 0);
+  const networkTotalCpa = networkCadastros.reduce((s, x) => s + x.qualifiedCpa, 0);
 
   return (
     <div className="space-y-8 pb-20">
@@ -519,6 +552,17 @@ export default function AffiliateDetails() {
                       a margem da agência fica só no dashboard do master (/admin · AdminDashboard).
                       O afiliado vê apenas o próprio ganho ("Comissão total"). */}
 
+                  {/* Aviso: afiliado especial → os números abaixo contabilizam a REDE
+                      (produção própria + sub-afiliados vinculados), não só o link dele. */}
+                  {isNetworkView && (
+                    <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
+                      <Users size={15} className="shrink-0" />
+                      <p className="text-[11px] font-bold">
+                        Afiliado especial — os números abaixo somam a <strong>rede inteira</strong> (produção própria + sub-afiliados vinculados).
+                      </p>
+                    </div>
+                  )}
+
                   {/* Primary Performance Metrics */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Stage 1: Registrations (clientes que se cadastraram para o afiliado) */}
@@ -536,7 +580,7 @@ export default function AffiliateDetails() {
                       <div className="space-y-1">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cadastros</p>
                         <h4 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{res.registrations || 0}</h4>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Clientes cadastrados</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">{isNetworkView ? 'Clientes cadastrados na rede' : 'Clientes cadastrados'}</p>
                       </div>
                     </motion.div>
 
@@ -932,9 +976,9 @@ export default function AffiliateDetails() {
         </div>
       )}
 
-      {/* Modal · Cadastros da rede do afiliado especial (own + subs vinculados).
-          A API não expõe jogadores; "cadastros vinculados" = os afiliados da rede
-          do especial com seus números de cadastro/métricas. */}
+      {/* Modal · CPA da rede do afiliado especial (own + subs vinculados).
+          A API não expõe jogadores; listamos os afiliados da rede do especial
+          com seu CPA qualificado (decisão do Carlos: CPA, não cadastros). */}
       {cadastrosOpen && (
         <div onClick={() => setCadastrosOpen(false)} className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm">
           <div className="flex min-h-full items-center justify-center p-4">
@@ -948,7 +992,7 @@ export default function AffiliateDetails() {
               <div className="flex items-center gap-3 min-w-0">
                 <span className="shrink-0 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500"><Users size={18} /></span>
                 <div className="min-w-0">
-                  <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm truncate">Cadastros da rede</h3>
+                  <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm truncate">CPA da rede</h3>
                   <p className="text-[11px] text-slate-400 dark:text-neutral-500 truncate">
                     {humanizeName(affiliate.name || affiliate.label)} · {Math.max(0, networkCadastros.length - 1)} sub-afiliado(s) vinculado(s)
                   </p>
@@ -962,8 +1006,8 @@ export default function AffiliateDetails() {
             ) : (
               <>
                 <div className="shrink-0 px-6 py-4 bg-slate-50/60 dark:bg-neutral-800/30 border-b border-slate-50 dark:border-neutral-800 flex items-center justify-between">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total de cadastros na rede</span>
-                  <span className="text-lg font-black text-slate-900 dark:text-white tabular-nums">{networkTotalReg.toLocaleString('pt-BR')}</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total de CPA na rede</span>
+                  <span className="text-lg font-black text-slate-900 dark:text-white tabular-nums">{networkTotalCpa.toLocaleString('pt-BR')}</span>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-50 dark:divide-neutral-800">
                   {networkCadastros.map((n) => (
@@ -980,13 +1024,13 @@ export default function AffiliateDetails() {
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-slate-800 dark:text-white truncate">{n.name}</p>
                           <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400 dark:text-neutral-500 truncate">
-                            {n.isOwn ? 'Produção própria' : `${n.firstDeposits} FTD · ${n.qualifiedCpa} CPA qualif.`}
+                            {n.isOwn ? 'Produção própria' : `${n.firstDeposits} FTD`}
                           </p>
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-xl font-black text-slate-900 dark:text-white tabular-nums">{n.registrations.toLocaleString('pt-BR')}</p>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">cadastros</p>
+                        <p className="text-xl font-black text-slate-900 dark:text-white tabular-nums">{n.qualifiedCpa.toLocaleString('pt-BR')}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">CPA</p>
                       </div>
                     </div>
                   ))}
