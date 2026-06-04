@@ -19,6 +19,7 @@ import DateRangePicker from '../components/DateRangePicker';
 import BrandBreakdown from '../components/BrandBreakdown';
 import CampaignBreakdown from '../components/CampaignBreakdown';
 import DailyPerformanceChart from '../components/DailyPerformanceChart';
+import AffiliatePerformanceChart from '../components/AffiliatePerformanceChart';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
 import { cn, humanizeName } from '../lib/utils';
 
@@ -131,6 +132,21 @@ export default function SpecialDashboard() {
   const dailyChartData = useMemo(
     () => dailyResults.map((r) => ({ ...r, total_commission: calcAffiliatePayout(r, ownConfig) })),
     [dailyResults, ownConfig]
+  );
+
+  // Desempenho por afiliado da rede (own + subs), ordenado por comissão. TUDO à
+  // TAXA PRÓPRIA do especial (regra do lucro líquido [[boost-net-profit-rule]]):
+  // nunca a comissão bruta da casa — Comissão/CPA/REV são o que o especial recebe.
+  const affiliateChartData = useMemo(
+    () => [...results]
+      .map((r) => ({
+        name: humanizeName(String(r.affiliate_name || r.name || r.label || r.affiliate_id || r.id || '---')),
+        Comissão: calcAffiliatePayout(r, ownConfig),
+        CPA: (r.qualified_cpa || 0) * (ownConfig.cpaValue || 0),
+        REV: (r.rvs || 0) * ((ownConfig.revPercentage || 0) / 100),
+      }))
+      .sort((a, b) => b.Comissão - a.Comissão),
+    [results, ownConfig]
   );
 
   // Mesma lógica para "Por casa": o BrandBreakdown calcula a comissão a partir do
@@ -249,6 +265,15 @@ export default function SpecialDashboard() {
           ))}
         </div>
       </section>
+
+      {/* Desempenho por afiliado da rede (own + subs) — componente compartilhado com
+          o /admin, aqui escopado à rede e à taxa própria do especial. */}
+      <AffiliatePerformanceChart
+        data={affiliateChartData}
+        title="Desempenho por afiliado (sua rede)"
+        subtitle="Sua produção + sub-afiliados, por volume de comissão à sua taxa — 5 por vez."
+        infoText="Afiliados da sua rede (você + subs) por comissão no período. Comissão/CPA/REV são o seu ganho à sua taxa, nunca o bruto da casa."
+      />
 
       {/* Por casa — distribuição da comissão da rede (own + subs) por casa de aposta,
           calculada à TAXA PRÓPRIA do especial (o que ele recebe da agência). */}
