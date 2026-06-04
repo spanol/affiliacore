@@ -344,14 +344,22 @@ export default function AffiliateDetails() {
       {/* Header */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4 min-w-0">
-          {isAdmin && (
+          {isAdmin ? (
             <button
               onClick={() => navigate('/affiliates')}
               className="shrink-0 p-3 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl text-slate-500 hover:text-brand transition-all shadow-sm"
             >
               <ArrowLeft size={20} />
             </button>
-          )}
+          ) : profile?.isSpecial && id !== String(profile?.affiliateId) ? (
+            // Especial vendo um sub da própria rede: volta pra lista de afiliados dele.
+            <button
+              onClick={() => navigate('/network/afiliados')}
+              className="shrink-0 p-3 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl text-slate-500 hover:text-amber-500 transition-all shadow-sm"
+            >
+              <ArrowLeft size={20} />
+            </button>
+          ) : null}
           <div className="min-w-0">
             <div className="flex items-center gap-3 min-w-0">
               <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight truncate">
