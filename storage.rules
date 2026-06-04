@@ -1,0 +1,27 @@
+rules_version = '2';
+
+// Regras do Firebase Storage. Projetos novos nascem BLOQUEADOS (allow ... if false),
+// o que fazia o upload de avatar em /profile falhar com storage/unauthorized.
+// Deploy: firebase deploy --only storage
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Avatares de usuário: o dono (request.auth.uid == userId) escreve/apaga o
+    // próprio; leitura liberada a qualquer usuário autenticado (a URL de download
+    // tokenizada do getDownloadURL funciona no <img> independentemente disto).
+    // Limita a imagens de até 5 MB para evitar abuso.
+    match /avatars/{userId}/{fileName=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Tudo o mais permanece negado.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
