@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { updatePassword } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { auth, db, storage, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, storage } from '../lib/firebase';
 import { 
   User, 
   Mail, 
@@ -28,8 +28,21 @@ export default function Profile() {
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const inputEl = e.target;
+    const file = inputEl.files?.[0];
     if (!file || !user) return;
+
+    // Validação no cliente — evita upload inútil e dá mensagem clara.
+    if (!file.type.startsWith('image/')) {
+      setMessage({ type: 'error', text: 'Selecione um arquivo de imagem (JPG, PNG ou SVG).' });
+      inputEl.value = '';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage({ type: 'error', text: 'Imagem muito grande. O limite é 5 MB.' });
+      inputEl.value = '';
+      return;
+    }
 
     setUploading(true);
     setMessage(null);
@@ -38,21 +51,32 @@ export default function Profile() {
       const storageRef = ref(storage, `avatars/${user.uid}/${Date.now()}_${file.name}`);
       const snapshot = await uploadBytes(storageRef, file);
       const downloadURL = await getDownloadURL(snapshot.ref);
-      
+
       setAvatarUrl(downloadURL);
-      
-      // Update immediately in Firestore as well for better UX
+
+      // Persiste de imediato no Firestore (o onSnapshot do AuthContext propaga).
       await updateDoc(doc(db, 'users', user.uid), {
         avatarUrl: downloadURL,
         updatedAt: serverTimestamp()
       });
-      
+
       setMessage({ type: 'success', text: 'Foto de perfil enviada com sucesso!' });
     } catch (err: any) {
       console.error('Error uploading file:', err);
-      setMessage({ type: 'error', text: 'Erro ao enviar imagem. Verifique as dimensões ou permissões.' });
+      const code = err?.code || '';
+      if (code === 'storage/unauthorized') {
+        setMessage({ type: 'error', text: 'Sem permissão no Storage. As regras de Storage (storage.rules) precisam ser publicadas.' });
+      } else if (code === 'storage/unknown' || code === 'storage/object-not-found' || code === 'storage/no-default-bucket') {
+        setMessage({ type: 'error', text: 'Falha no Storage. Verifique se o Firebase Storage está habilitado neste projeto.' });
+      } else if (code === 'storage/canceled') {
+        setMessage({ type: 'error', text: 'Envio cancelado.' });
+      } else {
+        setMessage({ type: 'error', text: `Erro ao enviar imagem: ${err?.message || 'tente novamente'}.` });
+      }
     } finally {
       setUploading(false);
+      // Limpa o input p/ permitir reenviar o MESMO arquivo (onChange não dispara se o value não muda).
+      inputEl.value = '';
     }
   };
 
@@ -62,12 +86,18 @@ export default function Profile() {
     setLoading(true);
     setMessage(null);
 
-    const currentPath = `users/${user.uid}`;
     try {
       const forcePasswordChange = profile?.mustChangePassword;
       if (forcePasswordChange && !newPassword) {
         setMessage({ type: 'error', text: 'Você precisa definir uma nova senha antes de continuar.' });
-        setLoading(false);
+        return;
+      }
+      if (newPassword && newPassword.length < 6) {
+        setMessage({ type: 'error', text: 'A nova senha deve ter ao menos 6 caracteres.' });
+        return;
+      }
+      if (!name.trim()) {
+        setMessage({ type: 'error', text: 'Informe seu nome.' });
         return;
       }
 
@@ -76,28 +106,33 @@ export default function Profile() {
         avatarUrl,
         updatedAt: serverTimestamp()
       };
-
       if (forcePasswordChange && newPassword) {
         updatePayload.mustChangePassword = false;
       }
 
-      // Update Firestore
-      try {
-        await updateDoc(doc(db, 'users', user.uid), updatePayload);
-      } catch (firestoreErr) {
-        handleFirestoreError(firestoreErr, OperationType.UPDATE, currentPath);
-      }
+      // 1) Dados do perfil (Firestore). Se falhar, NÃO seguimos para a senha.
+      await updateDoc(doc(db, 'users', user.uid), updatePayload);
 
-      // Update Password if provided
+      // 2) Senha (Firebase Auth) — só quando informada.
       if (newPassword) {
         await updatePassword(user, newPassword);
+        setNewPassword('');
       }
 
       setMessage({ type: 'success', text: 'Perfil atualizado com sucesso!' });
-      setNewPassword('');
     } catch (err: any) {
-      console.error(err);
-      setMessage({ type: 'error', text: 'Erro ao atualizar perfil. Certifique-se de que fez login recentemente.' });
+      console.error('Erro ao atualizar perfil:', err);
+      const code = err?.code || '';
+      const msg = String(err?.message || '');
+      if (code === 'auth/requires-recent-login') {
+        setMessage({ type: 'error', text: 'Por segurança, saia e entre novamente antes de alterar a senha.' });
+      } else if (code === 'auth/weak-password') {
+        setMessage({ type: 'error', text: 'Senha fraca: use ao menos 6 caracteres.' });
+      } else if (code === 'permission-denied' || msg.includes('permission') || msg.includes('insufficient')) {
+        setMessage({ type: 'error', text: 'Sem permissão para salvar as alterações. Verifique seu acesso e tente novamente.' });
+      } else {
+        setMessage({ type: 'error', text: `Não foi possível salvar: ${err?.message || 'erro desconhecido'}.` });
+      }
     } finally {
       setLoading(false);
     }
@@ -200,7 +235,7 @@ export default function Profile() {
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-400" size={16} />
                     <input
                       type="email"
-                      value={profile?.email}
+                      value={profile?.email || ''}
                       disabled
                       className="w-full pl-10 pr-3 py-2.5 bg-slate-100 dark:bg-neutral-800/40 border border-transparent dark:border-neutral-800 rounded-xl text-xs text-slate-400 dark:text-neutral-500 cursor-not-allowed"
                     />
