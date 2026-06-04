@@ -15,6 +15,7 @@ import Contacts from './pages/Contacts';
 import AffiliatesList from './pages/AffiliatesList';
 import AffiliateDetails from './pages/AffiliateDetails';
 import SpecialDashboard from './pages/SpecialDashboard';
+import SpecialSubAffiliates from './pages/SpecialSubAffiliates';
 import SpecialAffiliatesList from './pages/SpecialAffiliatesList';
 import Financeiro from './pages/Financeiro';
 import NotFound from './pages/NotFound';
@@ -89,6 +90,11 @@ export default function App() {
             <Route path="/network" element={
               <ProtectedRoute role="client">
                 <SpecialDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/network/afiliados" element={
+              <ProtectedRoute role="client">
+                <SpecialSubAffiliates />
               </ProtectedRoute>
             } />
             <Route path="/financeiro" element={

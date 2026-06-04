@@ -38,23 +38,24 @@ export default function DashboardLayout() {
     { 
       label: 'Geral', 
       items: [
-        // O afiliado ESPECIAL não tem um "Dashboard" próprio: o /network é
-        // representado pelo item "Afiliados" abaixo. Sem isso, Dashboard e
-        // Afiliados apontavam ambos pra /network e os dois ficavam ativos.
-        ...(profile?.isSpecial ? [] : [{
+        // Dashboard: master → /admin; afiliado ESPECIAL → /network (dados gerais da
+        // rede); afiliado comum → a própria visão de dados.
+        {
           label: 'Dashboard',
           path: profile?.role === 'admin'
             ? '/admin'
-            : (profile?.affiliateId ? `/affiliates/${profile.affiliateId}` : '/profile'),
+            : profile?.isSpecial
+              ? '/network'
+              : (profile?.affiliateId ? `/affiliates/${profile.affiliateId}` : '/profile'),
           icon: LayoutDashboard
-        }]),
+        },
         // Item "Afiliados": o master vê a lista completa (/affiliates); o afiliado
-        // ESPECIAL vê a própria rede (/network). O afiliado comum não tem este
-        // módulo — o antigo "Clientes" levava a /affiliates (403) e não será usado.
+        // ESPECIAL vê a lista da própria rede (/network/afiliados), espelhando o
+        // master (Dashboard + Afiliados). O afiliado comum não tem este módulo.
         ...(profile?.role === 'admin'
           ? [{ label: 'Afiliados', path: '/affiliates', icon: Users }]
           : profile?.isSpecial
-            ? [{ label: 'Afiliados', path: '/network', icon: Users }]
+            ? [{ label: 'Afiliados', path: '/network/afiliados', icon: Users }]
             : []),
         // Financeiro (B4): coleta de PIX + dados de NF. Só pro afiliado (tem affiliateId).
         ...(profile?.role !== 'admin' && profile?.affiliateId
@@ -164,7 +165,9 @@ export default function DashboardLayout() {
                 ? 'Afiliados Especiais'
                 : location.pathname === '/financeiro'
                 ? 'Financeiro'
-                : location.pathname === '/network'
+                : location.pathname === '/network/afiliados'
+                  ? 'Meus Afiliados'
+                  : location.pathname === '/network'
                   ? 'Painel da Rede'
                   : (location.pathname === '/client' || (profile?.role === 'client' && location.pathname.startsWith('/affiliates')))
                     ? 'Painel do Cliente'
