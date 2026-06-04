@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Loader2, Users, ArrowUpRight, UserPlus, Wallet, Target, Crown, Save, Percent } from 'lucide-react';
+import { Loader2, Users, ArrowUpRight, UserPlus, Wallet, Target, Crown, Save, Percent, Search } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import {
@@ -14,8 +14,10 @@ import {
   AffiliateConfig,
 } from '../services/affiliateService';
 import DateRangePicker from '../components/DateRangePicker';
+import BrandFilter from '../components/BrandFilter';
+import { getBrandName, uniqueBrands, ALL_BRANDS } from '../lib/brand';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
-import { humanizeName } from '../lib/utils';
+import { cn, humanizeName } from '../lib/utils';
 
 const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -35,6 +37,12 @@ export default function SpecialSubAffiliates() {
   // Edição da comissão de cada sub (CPA/REV), com teto = taxa própria do especial.
   const [subEdits, setSubEdits] = useState<Record<string, { cpaValue: number | string; revPercentage: number | string }>>({});
   const [savingSub, setSavingSub] = useState<string | null>(null);
+  // Filtros — espelham a /affiliates do master, capados à rede do especial.
+  const [searchTerm, setSearchTerm] = useState('');
+  const [brandFilter, setBrandFilter] = useState<string>(ALL_BRANDS);
+  // "Status" escopado: o especial NÃO gerencia ativação (admin-only), então o
+  // análogo é a ATIVIDADE na rede — se o sub produziu no período selecionado.
+  const [activityFilter, setActivityFilter] = useState<'all' | 'producing' | 'idle'>('all');
 
   const ownId = profile?.affiliateId ? String(profile.affiliateId) : '';
 
@@ -79,6 +87,34 @@ export default function SpecialSubAffiliates() {
 
   const rowById = (id: string) => results.find((r) => String(r.affiliate_id ?? r.id ?? '') === String(id));
   const subIds = special?.subAffiliateIds?.map(String) || [];
+
+  // Enriquece cada sub com nome, marca e atividade (produção no período) para
+  // alimentar busca/filtros sem recomputar dentro do .map de renderização.
+  const subs = useMemo(() => subIds.map((id) => {
+    const r = rowById(id) || {};
+    const producing = (r.registrations || 0) > 0 || (r.first_deposits || 0) > 0 || (r.qualified_cpa || 0) > 0;
+    return {
+      id,
+      row: r,
+      name: humanizeName(r.affiliate_name || r.name || r.label || `#${id}`),
+      brand: getBrandName(r),
+      producing,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [special, results]);
+
+  const availableBrands = useMemo(() => uniqueBrands(subs.map((s) => s.row)), [subs]);
+
+  const filteredSubs = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return subs.filter((s) => {
+      const matchesSearch = !term || s.name.toLowerCase().includes(term) || s.id.toLowerCase().includes(term);
+      const matchesBrand = brandFilter === ALL_BRANDS || getBrandName(s.row) === brandFilter;
+      const matchesActivity =
+        activityFilter === 'all' || (activityFilter === 'producing' ? s.producing : !s.producing);
+      return matchesSearch && matchesBrand && matchesActivity;
+    });
+  }, [subs, searchTerm, brandFilter, activityFilter]);
 
   // Teto = taxa própria do especial: a comissão do sub não passa dela (spread ≥ 0).
   const handleSubChange = (id: string, field: 'cpaValue' | 'revPercentage', value: string) => {
@@ -140,10 +176,60 @@ export default function SpecialSubAffiliates() {
           <p className="text-xs text-slate-500 dark:text-neutral-400">Fale com o administrador para vincular afiliados à sua rede.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {subIds.map((id, idx) => {
-            const r = rowById(id) || {};
-            const name = humanizeName(r.affiliate_name || r.name || r.label || `#${id}`);
+        <>
+          {/* Filtros — busca, marca e atividade na rede. Espelham a /affiliates do
+              master, capados à rede do especial (princípio: especial = master escopado). */}
+          <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
+            <div className="relative w-full sm:max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-400" size={16} />
+              <input
+                type="text"
+                placeholder="Buscar por nome ou ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-neutral-900/60 border border-slate-200 dark:border-neutral-800 rounded-full text-xs outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white"
+              />
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <BrandFilter brands={availableBrands} value={brandFilter} onChange={setBrandFilter} />
+              <div className="flex items-center gap-1.5">
+                {([
+                  { k: 'all', l: 'Todos' },
+                  { k: 'producing', l: 'Com produção' },
+                  { k: 'idle', l: 'Sem produção' },
+                ] as const).map((opt) => {
+                  const active = activityFilter === opt.k;
+                  return (
+                    <button
+                      key={opt.k}
+                      type="button"
+                      onClick={() => setActivityFilter(opt.k)}
+                      className={cn(
+                        'px-3 py-1.5 rounded-full text-xs font-bold transition-all border',
+                        active
+                          ? 'bg-slate-900 dark:bg-white text-white dark:text-neutral-900 border-transparent shadow-sm'
+                          : 'bg-white dark:bg-neutral-900 text-slate-600 dark:text-neutral-300 border-slate-200 dark:border-neutral-800 hover:border-slate-300 dark:hover:border-neutral-700'
+                      )}
+                    >
+                      {opt.l}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {filteredSubs.length === 0 ? (
+            <div className="p-16 text-center rounded-3xl border border-slate-200/70 dark:border-neutral-800 bg-white dark:bg-neutral-900/60">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl border border-slate-100 dark:border-neutral-700/60 bg-slate-50 dark:bg-neutral-800/60 text-slate-500 dark:text-neutral-300 mb-4">
+                <Search size={24} />
+              </div>
+              <h3 className="text-sm font-bold text-slate-800 dark:text-neutral-100 mb-1">Nenhum sub-afiliado encontrado</h3>
+              <p className="text-xs text-slate-500 dark:text-neutral-400">Ajuste a busca ou os filtros para ver sua rede.</p>
+            </div>
+          ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredSubs.map(({ id, row: r, name, producing }, idx) => {
             // Seu ganho com este sub = spread (taxa própria − taxa do sub) sobre a produção dele.
             const spread = calcAffiliatePayout(r, ownConfig) - calcAffiliatePayout(r, configs[id]);
             const stats = [
@@ -163,6 +249,22 @@ export default function SpecialSubAffiliates() {
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{name}</p>
                     <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400 dark:text-neutral-500 mt-0.5 truncate">Sub #{id}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                      {getBrandName(r) && (
+                        <span className="inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-neutral-800 text-[9px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
+                          {getBrandName(r)}
+                        </span>
+                      )}
+                      <span className={cn(
+                        'inline-flex w-fit items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider border',
+                        producing
+                          ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200/60 dark:border-emerald-900/40 text-emerald-700 dark:text-emerald-400'
+                          : 'bg-slate-50 dark:bg-neutral-800/60 border-slate-200/60 dark:border-neutral-700/60 text-slate-400 dark:text-neutral-500'
+                      )}>
+                        <span className={cn('w-1.5 h-1.5 rounded-full', producing ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-neutral-600')} />
+                        {producing ? 'Com produção' : 'Sem produção'}
+                      </span>
+                    </div>
                   </div>
                   <button
                     onClick={() => navigate(`/affiliates/${id}`)}
@@ -222,7 +324,9 @@ export default function SpecialSubAffiliates() {
               </motion.div>
             );
           })}
-        </div>
+          </div>
+          )}
+        </>
       )}
     </div>
   );
