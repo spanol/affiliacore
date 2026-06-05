@@ -11,6 +11,8 @@ import {
   isNoDataError,
   messageLooksLikeError,
   aggregateByCampaign,
+  buildSubToSpecialConfig,
+  calcAgencyNetProfit,
 } from './affiliateService';
 
 describe('extractArray', () => {
@@ -146,5 +148,70 @@ describe('aggregateByCampaign', () => {
     const [row] = aggregateByCampaign(rows);
     expect(row.total_commission).toBe(0);
     expect(row.registrations).toBe(0);
+  });
+});
+
+describe('buildSubToSpecialConfig', () => {
+  const specials = {
+    sp1: { affiliateId: 'sp1', active: true, subAffiliateIds: ['subA', 'subB'] },
+    sp2: { affiliateId: 'sp2', active: false, subAffiliateIds: ['subC'] },
+  } as any;
+  const configs = {
+    sp1: { affiliateId: 'sp1', cpaValue: 200, revPercentage: 10 },
+    sp2: { affiliateId: 'sp2', cpaValue: 150, revPercentage: 5 },
+  } as any;
+
+  it('mapeia cada sub para a config do especial-pai (só ativos por padrão)', () => {
+    const map = buildSubToSpecialConfig(specials, configs);
+    expect(map.subA).toEqual(configs.sp1);
+    expect(map.subB).toEqual(configs.sp1);
+    expect(map.subC).toBeUndefined(); // sp2 inativo
+  });
+
+  it('inclui especiais inativos quando activeOnly=false', () => {
+    const map = buildSubToSpecialConfig(specials, configs, { activeOnly: false });
+    expect(map.subC).toEqual(configs.sp2);
+  });
+
+  it('ignora especial sem config de taxa', () => {
+    const map = buildSubToSpecialConfig(specials, { sp2: configs.sp2 } as any);
+    expect(map.subA).toBeUndefined();
+  });
+});
+
+describe('calcAgencyNetProfit', () => {
+  // Cluster de especial: pai sp1 (R$200/CPA) com 1 sub a R$30/CPA. A agência paga
+  // o sub pela taxa do PAI (R$200), não a R$30 → repasse maior, lucro menor.
+  const results = [
+    { id: 'sp1', total_commission: 1000, qualified_cpa: 2, rvs: 0 },   // pai: repasse 2×200 = 400
+    { id: 'subA', total_commission: 500, qualified_cpa: 3, rvs: 0 },   // sub: 3×200 = 600 (não 3×30=90)
+    { id: 'x', total_commission: 100, qualified_cpa: 1, rvs: 0 },      // avulso: 1×50 = 50
+  ];
+  const configs = {
+    sp1: { affiliateId: 'sp1', cpaValue: 200, revPercentage: 0 },
+    subA: { affiliateId: 'subA', cpaValue: 30, revPercentage: 0 },
+    x: { affiliateId: 'x', cpaValue: 50, revPercentage: 0 },
+  } as any;
+
+  it('cobra o sub pela taxa do especial-pai (corrige a superestimativa do lucro)', () => {
+    const subMap = buildSubToSpecialConfig(
+      { sp1: { affiliateId: 'sp1', active: true, subAffiliateIds: ['subA'] } } as any,
+      configs
+    );
+    const r = calcAgencyNetProfit(results, configs, subMap);
+    expect(r.commission).toBe(1600);          // 1000+500+100
+    expect(r.payout).toBe(400 + 600 + 50);     // sub a R$200, não R$30
+    expect(r.netProfit).toBe(1600 - 1050);     // 550
+  });
+
+  it('sem mapa de sub, cobra cada um pela própria taxa (sub a R$30)', () => {
+    const r = calcAgencyNetProfit(results, configs, {});
+    expect(r.payout).toBe(400 + 90 + 50);      // sub a R$30
+    expect(r.netProfit).toBe(1600 - 540);      // 1060 (superestimado vs 550)
+  });
+
+  it('cada afiliado entra uma vez (sem double-count) e tolera entrada vazia', () => {
+    expect(calcAgencyNetProfit([], configs, {})).toEqual({ commission: 0, payout: 0, netProfit: 0 });
+    expect(calcAgencyNetProfit(null as any, configs, {}).netProfit).toBe(0);
   });
 });

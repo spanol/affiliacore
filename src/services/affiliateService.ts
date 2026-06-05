@@ -503,6 +503,47 @@ export function calcNetProfit(result: any, config?: AffiliateConfig | null): num
   return houseCommission - calcAffiliatePayout(result, config);
 }
 
+// Mapa subId → config do ESPECIAL-pai. Regra de negócio (Carlos, 2026-06-04): a
+// agência paga o especial pela taxa DELE sobre toda a rede; quem repassa os subs
+// é o especial (ele fica com o spread). Logo, no LUCRO DA AGÊNCIA, o repasse de um
+// sub deve usar a taxa do especial-pai, não a taxa baixa que o especial deu ao sub
+// (senão o /admin subestima o repasse e SUPERESTIMA o lucro). [[boost-special-as-scoped-master]]
+export function buildSubToSpecialConfig(
+  specials: Record<string, SpecialAffiliate>,
+  configs: Record<string, AffiliateConfig | undefined>,
+  opts: { activeOnly?: boolean } = {}
+): Record<string, AffiliateConfig> {
+  const activeOnly = opts.activeOnly !== false; // default: só especiais ativos
+  const map: Record<string, AffiliateConfig> = {};
+  for (const s of Object.values(specials || {})) {
+    if (!s) continue;
+    if (activeOnly && !s.active) continue;
+    const parent = configs[String(s.affiliateId)];
+    if (!parent) continue; // sem taxa do especial não há como cobrar a rede
+    for (const sid of s.subAffiliateIds || []) map[String(sid)] = parent;
+  }
+  return map;
+}
+
+// Lucro líquido AGREGADO da agência sobre um conjunto de results (1 linha por
+// afiliado). Repasse usa a config do afiliado, EXCETO quando ele é sub de um
+// especial — aí usa a config do especial-pai (subToSpecialConfig). Cada afiliado
+// entra uma vez (sem double-count).
+export function calcAgencyNetProfit(
+  results: any[],
+  configs: Record<string, AffiliateConfig | undefined>,
+  subToSpecialConfig: Record<string, AffiliateConfig> = {}
+): { commission: number; payout: number; netProfit: number } {
+  let commission = 0;
+  let payout = 0;
+  for (const r of Array.isArray(results) ? results : []) {
+    const id = String(r?.affiliate_id ?? r?.id ?? '');
+    commission += r?.total_commission || 0;
+    payout += calcAffiliatePayout(r, subToSpecialConfig[id] || configs[id]);
+  }
+  return { commission, payout, netProfit: commission - payout };
+}
+
 export async function updateAffiliateStatus(affiliateId: string, status: 'active' | 'inactive'): Promise<any> {
   try {
     const response = await authFetch(`/api/affiliates/${affiliateId}`, {

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, humanizeName } from '../lib/utils';
-import { fetchAffiliates, fetchAllResults, fetchAllResultsByCampaign, fetchAffiliateConfigs, calcAffiliatePayout, fetchSpecialAffiliates, CampaignRow, SpecialAffiliate } from '../services/affiliateService';
+import { fetchAffiliates, fetchAllResults, fetchAllResultsByCampaign, fetchAffiliateConfigs, fetchSpecialAffiliates, buildSubToSpecialConfig, calcAgencyNetProfit, CampaignRow, SpecialAffiliate } from '../services/affiliateService';
 import DateRangePicker from '../components/DateRangePicker';
 import CampaignBreakdown from '../components/CampaignBreakdown';
 import AffiliatePerformanceChart from '../components/AffiliatePerformanceChart';
@@ -150,14 +150,18 @@ export default function AdminDashboard() {
   }), { commission: 0, cpa: 0, rev: 0, registrations: 0, firstDeposits: 0, qualifiedCpa: 0, deposit: 0 }),
   [scopedResults]);
 
-  // B1 · lucro líquido = Σ comissão das casas − Σ repasse aos afiliados (por config).
-  const netProfit = useMemo(() => {
-    const payout = scopedResults.reduce(
-      (sum, r) => sum + calcAffiliatePayout(r, configs[String(r.affiliate_id ?? r.id ?? '')]),
-      0
-    );
-    return totals.commission - payout;
-  }, [scopedResults, configs, totals.commission]);
+  // B1 · lucro líquido = Σ comissão das casas − Σ repasse aos afiliados.
+  // O repasse de um SUB de especial usa a taxa do ESPECIAL-pai (a agência paga o
+  // especial sobre a rede toda; o especial repassa os subs e fica com o spread) —
+  // senão o /admin subestima o repasse e SUPERESTIMA o lucro. [[boost-special-as-scoped-master]]
+  const subToSpecialConfig = useMemo(
+    () => buildSubToSpecialConfig(specials, configs, { activeOnly: true }),
+    [specials, configs]
+  );
+  const netProfit = useMemo(
+    () => calcAgencyNetProfit(scopedResults, configs, subToSpecialConfig).netProfit,
+    [scopedResults, configs, subToSpecialConfig]
+  );
 
   // Contagem de afiliados respeita o filtro de marca.
   const affiliatesCount = useMemo(
