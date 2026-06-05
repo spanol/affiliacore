@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, humanizeName } from '../lib/utils';
-import { fetchAffiliates, fetchAllResults, fetchAllResultsByCampaign, fetchAffiliateConfigs, fetchSpecialAffiliates, buildSubToSpecialConfig, calcAgencyNetProfit, CampaignRow, SpecialAffiliate } from '../services/affiliateService';
+import { fetchAffiliates, fetchAllResults, fetchAllResultsByBrand, fetchAllResultsByCampaign, fetchAffiliateConfigs, fetchSpecialAffiliates, buildSubToSpecialConfig, calcAgencyNetProfit, CampaignRow, SpecialAffiliate } from '../services/affiliateService';
 import DateRangePicker from '../components/DateRangePicker';
 import CampaignBreakdown from '../components/CampaignBreakdown';
 import AffiliatePerformanceChart from '../components/AffiliatePerformanceChart';
@@ -31,6 +31,9 @@ export default function AdminDashboard() {
   const [range, setRange] = useState<DateRange>(() => getDefaultRange());
   // Por Campanha — desempenho agregado da rede por campanha (groupBy=campaign).
   const [campaignRows, setCampaignRows] = useState<CampaignRow[]>([]);
+  // Por casa (groupBy=brand) — comparação entre casas. Hoje só Superbet; a seção
+  // só aparece com ≥2 casas (acende sozinha quando a OTG liberar a 2ª na API).
+  const [brandRows, setBrandRows] = useState<any[]>([]);
   // Filtro multi-marca (só aparece com ≥2 marcas; hoje, só Superbet → oculto).
   const [brandFilter, setBrandFilter] = useState<string>(ALL_BRANDS);
   // Afiliados especiais (p/ os rankings "Top especiais" e "Top subs").
@@ -68,22 +71,25 @@ export default function AdminDashboard() {
     async function getResults() {
       try {
         setLoading(true);
-        const [allResults, cfgs, campaigns, specialData] = await Promise.all([
+        const [allResults, cfgs, campaigns, specialData, byBrand] = await Promise.all([
           fetchAllResults(range),
           fetchAffiliateConfigs(),
           fetchAllResultsByCampaign(range, brandAffiliateIds ?? undefined),
           fetchSpecialAffiliates(),
+          fetchAllResultsByBrand(range),
         ]);
         setResults(Array.isArray(allResults) ? allResults : []);
         setConfigs(cfgs || {});
         setCampaignRows(campaigns);
         setSpecials(specialData || {});
+        setBrandRows(Array.isArray(byBrand) ? byBrand : []);
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
         setResults([]);
         setConfigs({});
         setCampaignRows([]);
         setSpecials({});
+        setBrandRows([]);
       } finally {
         setLoading(false);
       }
@@ -161,6 +167,22 @@ export default function AdminDashboard() {
   const netProfit = useMemo(
     () => calcAgencyNetProfit(scopedResults, configs, subToSpecialConfig).netProfit,
     [scopedResults, configs, subToSpecialConfig]
+  );
+
+  // Por casa (agência) — comissão da casa + funil por marca (groupBy=brand).
+  // Ordenado por comissão. A seção só renderiza com ≥2 casas (ver abaixo).
+  const houseBreakdown = useMemo(
+    () => (Array.isArray(brandRows) ? brandRows : [])
+      .map((r: any) => ({
+        name: humanizeName(String(r.label || r.name || r.id || 'Casa')),
+        commission: Number(r.total_commission) || 0,
+        registrations: Number(r.registrations) || 0,
+        firstDeposits: Number(r.first_deposits) || 0,
+        qualifiedCpa: Number(r.qualified_cpa) || 0,
+        deposit: Number(r.deposit) || 0,
+      }))
+      .sort((a, b) => b.commission - a.commission),
+    [brandRows]
   );
 
   // Contagem de afiliados respeita o filtro de marca.
@@ -340,6 +362,39 @@ export default function AdminDashboard() {
           </>
         )}
       </motion.div>
+
+      {/* Desempenho por casa — comparação entre casas (groupBy=brand). Só aparece
+          com ≥2 casas: hoje (só Superbet) fica oculto e ACENDE sozinho quando a OTG
+          liberar a 2ª casa na nossa API. */}
+      {!loading && houseBreakdown.length >= 2 && (
+        <section>
+          <h3 className="text-[10px] uppercase font-bold tracking-widest text-slate-400 dark:text-neutral-500 mb-3 px-1">
+            Desempenho por casa
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {houseBreakdown.map((h) => (
+              <motion.div
+                key={h.name}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-6 rounded-2xl border bg-white dark:bg-neutral-900/60 border-slate-200/70 dark:border-neutral-800 shadow-sm"
+              >
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-7 h-7 rounded-lg bg-brand/10 text-brand flex items-center justify-center font-black text-xs">{h.name.charAt(0).toUpperCase()}</span>
+                  <span className="text-sm font-bold text-slate-900 dark:text-white truncate">{h.name}</span>
+                </div>
+                <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 dark:text-neutral-500">Comissão (casa)</p>
+                <h4 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight mb-3">R$ {h.commission.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
+                <div className="grid grid-cols-3 gap-2 text-center pt-3 border-t border-slate-100 dark:border-neutral-800">
+                  <div><p className="text-sm font-bold text-slate-800 dark:text-white tabular-nums">{h.registrations.toLocaleString('pt-BR')}</p><p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Cadastros</p></div>
+                  <div><p className="text-sm font-bold text-slate-800 dark:text-white tabular-nums">{h.firstDeposits.toLocaleString('pt-BR')}</p><p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">FTD</p></div>
+                  <div><p className="text-sm font-bold text-slate-800 dark:text-white tabular-nums">{h.qualifiedCpa.toLocaleString('pt-BR')}</p><p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">CPA</p></div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Desempenho por Afiliado — componente compartilhado com o /network do
           especial (lá escopado à rede, à taxa própria). Aqui: toda a rede do master. */}
