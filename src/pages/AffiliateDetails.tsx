@@ -127,6 +127,10 @@ export default function AffiliateDetails() {
   const [loadingNetwork, setLoadingNetwork] = useState(false);
   // Quando o afiliado é um especial com rede, os cards agregam own + subs.
   const [isNetworkView, setIsNetworkView] = useState(false);
+  // Linhas POR afiliado (own + subs) e configs completos — base do card de
+  // lucro líquido do afiliado (ganho dele: direto + spread da rede).
+  const [perAffiliateRows, setPerAffiliateRows] = useState<any[]>([]);
+  const [allConfigs, setAllConfigs] = useState<Record<string, AffiliateConfig>>({});
 
   const openSpecial = async () => {
     if (!affiliate) return;
@@ -205,6 +209,8 @@ export default function AffiliateDetails() {
       // (a página renderiza um conjunto de cards por linha de `results`).
       const resultsArr = Array.isArray(resultsData) ? resultsData : (resultsData ? [resultsData] : []);
       setResults(isNetwork ? [sumResultRows(resultsArr)] : resultsArr);
+      setPerAffiliateRows(resultsArr); // linhas cruas por afiliado (own + subs) p/ o lucro líquido
+      setAllConfigs(allConfigs || {});
       setBrandResults(Array.isArray(brandData) ? brandData : []);
       setCampaignResults(Array.isArray(campaignData) ? campaignData : []);
       setDailyResults(Array.isArray(dailyData) ? dailyData : []);
@@ -372,6 +378,23 @@ export default function AffiliateDetails() {
   })();
   const networkTotalCpa = networkCadastros.reduce((s, x) => s + x.qualifiedCpa, 0);
 
+  // Card de lucro líquido do AFILIADO — visível só a superiores (admin, ou especial
+  // vendo um sub da rede dele). É o GANHO do próprio afiliado, NÃO a margem da
+  // agência (essa segue só no /admin · [[boost-net-profit-rule]]):
+  //   direto = produção própria × taxa dele;
+  //   rede   = spread sobre os subs (taxa do especial − taxa do sub), p/ especiais.
+  const isSuperiorView = isAdmin || (!!profile?.isSpecial && String(id) !== String(profile?.affiliateId));
+  const lucro = (() => {
+    const rowFor = (tid: string) => perAffiliateRows.find((r) => String(r?.id ?? r?.affiliate_id ?? '') === String(tid));
+    const subIds = (specials[String(id)]?.subAffiliateIds || []).map(String);
+    const direto = calcAffiliatePayout(rowFor(String(id)), config);
+    const rede = subIds.reduce((sum, sid) => {
+      const r = rowFor(sid);
+      return r ? sum + (calcAffiliatePayout(r, config) - calcAffiliatePayout(r, allConfigs[sid])) : sum;
+    }, 0);
+    return { direto, rede, total: direto + rede, hasRede: subIds.length > 0 };
+  })();
+
   return (
     <div className="space-y-8 pb-20">
       {/* Header */}
@@ -485,6 +508,36 @@ export default function AffiliateDetails() {
 
       <div className="grid grid-cols-1 gap-8">
         <div className="space-y-8">
+          {/* Lucro líquido do afiliado — só p/ superiores (admin/especial). Ganho do
+              próprio afiliado: total à esquerda + composição (direto + rede) à direita.
+              NÃO é a margem da agência. */}
+          {isSuperiorView && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="relative overflow-hidden p-6 md:p-7 rounded-3xl border border-emerald-200/70 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+            >
+              <div className="absolute top-0 right-0 w-56 h-56 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+              <div className="relative">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 mb-3 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-widest">
+                  Lucro líquido do afiliado <InfoTooltip text="Ganho do próprio afiliado no período (não a margem da agência): produção própria à taxa dele + spread sobre a rede de sub-afiliados." size={12} align="left" />
+                </div>
+                <h3 className="text-3xl md:text-4xl font-bold tracking-tighter text-emerald-700 dark:text-emerald-400">
+                  R$ {lucro.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </h3>
+              </div>
+              {lucro.hasRede && (
+                <div className="relative shrink-0 text-sm md:text-base text-slate-600 dark:text-neutral-300 font-medium tabular-nums">
+                  <span className="text-slate-400 dark:text-neutral-500">(</span>
+                  <span className="font-bold text-slate-700 dark:text-neutral-200">direto</span> R$ {lucro.direto.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <span className="mx-1 text-slate-400 dark:text-neutral-500">+</span>
+                  <span className="font-bold text-slate-700 dark:text-neutral-200">rede</span> R$ {lucro.rede.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <span className="text-slate-400 dark:text-neutral-500">)</span>
+                </div>
+              )}
+            </motion.div>
+          )}
+
           {/* Sem dados: renderiza os cards zerados (em vez de um aviso de vazio). */}
           {(results.length > 0
             ? results
@@ -548,9 +601,10 @@ export default function AffiliateDetails() {
                     </div>
                   </div>
 
-                  {/* Lucro líquido NÃO aparece na view de afiliado (decisão do Carlos, 2026-05-29):
-                      a margem da agência fica só no dashboard do master (/admin · AdminDashboard).
-                      O afiliado vê apenas o próprio ganho ("Comissão total"). */}
+                  {/* A MARGEM DA AGÊNCIA continua só no /admin (decisão do Carlos, 2026-05-29).
+                      O card "Lucro líquido do afiliado" acima é o GANHO DO PRÓPRIO afiliado
+                      (direto + rede), exibido só a superiores (admin/especial) — não a margem
+                      da agência. O afiliado, vendo a si mesmo, não vê esse card. */}
 
                   {/* Aviso: afiliado especial → os números abaixo contabilizam a REDE
                       (produção própria + sub-afiliados vinculados), não só o link dele. */}
