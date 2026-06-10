@@ -541,7 +541,7 @@ export default function Home() {
                   src={asset(partner.logo)}
                   alt={partner.name}
                   loading="lazy"
-                  className="h-20 sm:h-24 w-auto object-contain"
+                  className="h-16 sm:h-20 w-auto object-contain"
                 />
               </motion.div>
             ))}
