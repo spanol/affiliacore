@@ -140,16 +140,17 @@ export default function AffiliatePerformanceChart({
                 tickFormatter={(value) => `R$ ${value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value}`}
               />
               <Tooltip
-                cursor={{ fill: theme === 'dark' ? 'rgba(148, 163, 184, 0.12)' : '#F1F5F9', radius: 10 }}
+                cursor={{ fill: theme === 'dark' ? 'rgba(163, 163, 163, 0.12)' : '#F1F5F9', radius: 10 }}
                 contentStyle={{
                   borderRadius: '16px',
-                  border: theme === 'dark' ? '1px solid #1E293B' : 'none',
-                  backgroundColor: theme === 'dark' ? '#0F172A' : '#FFFFFF',
+                  // Carvão dos cards (neutral-900/800), não mais o slate azulado anterior.
+                  border: theme === 'dark' ? '1px solid #262626' : 'none',
+                  backgroundColor: theme === 'dark' ? '#171717' : '#FFFFFF',
                   boxShadow: theme === 'dark' ? '0 10px 25px -5px rgb(0 0 0 / 0.6)' : '0 10px 15px -3px rgb(0 0 0 / 0.1)',
                   padding: '12px',
                 }}
-                itemStyle={{ fontSize: '12px', fontWeight: 700, color: theme === 'dark' ? '#E2E8F0' : '#334155' }}
-                labelStyle={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: theme === 'dark' ? '#94A3B8' : '#64748B', marginBottom: '8px' }}
+                itemStyle={{ fontSize: '12px', fontWeight: 700, color: theme === 'dark' ? '#E5E5E5' : '#334155' }}
+                labelStyle={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: theme === 'dark' ? '#A3A3A3' : '#64748B', marginBottom: '8px' }}
                 formatter={(value: any, name: any) => [
                   `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
                   name,

@@ -59,16 +59,17 @@ export default function DailyPerformanceChart({ data }: DailyPerformanceChartPro
           <YAxis yAxisId="left" tick={{ fontSize: 10, fill: tickColor }} axisLine={false} tickLine={false} allowDecimals={false} />
           <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: tickColor }} axisLine={false} tickLine={false} />
           <Tooltip
-            cursor={{ fill: isDark ? 'rgba(148, 163, 184, 0.12)' : '#F1F5F9' }}
+            cursor={{ fill: isDark ? 'rgba(163, 163, 163, 0.12)' : '#F1F5F9' }}
             contentStyle={{
               fontSize: 12,
               borderRadius: 12,
-              border: isDark ? '1px solid #1E293B' : '1px solid #e2e8f0',
-              backgroundColor: isDark ? '#0F172A' : '#FFFFFF',
+              // Carvão dos cards (neutral-900/800), não mais o slate azulado anterior.
+              border: isDark ? '1px solid #262626' : '1px solid #e2e8f0',
+              backgroundColor: isDark ? '#171717' : '#FFFFFF',
               padding: '8px 12px',
             }}
-            itemStyle={{ color: isDark ? '#E2E8F0' : '#334155' }}
-            labelStyle={{ color: isDark ? '#94A3B8' : '#64748B' }}
+            itemStyle={{ color: isDark ? '#E5E5E5' : '#334155' }}
+            labelStyle={{ color: isDark ? '#A3A3A3' : '#64748B' }}
             formatter={(value: any, name: any) =>
               name === 'comissao'
                 ? [`R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 'Comissão']
