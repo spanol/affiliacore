@@ -535,13 +535,13 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="flex items-center justify-center h-24 sm:h-28 px-6 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 hover:bg-white/[0.07] transition-colors"
+                className="flex items-center justify-center px-6 py-6"
               >
                 <img
                   src={asset(partner.logo)}
                   alt={partner.name}
                   loading="lazy"
-                  className="max-h-10 sm:max-h-12 w-auto object-contain"
+                  className="max-h-20 sm:max-h-24 w-auto object-contain"
                 />
               </motion.div>
             ))}
