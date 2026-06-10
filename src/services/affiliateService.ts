@@ -263,6 +263,26 @@ export async function setUserSpecialFlag(uid: string, isSpecial: boolean): Promi
   }
 }
 
+// Admin · vincula um login EXISTENTE (por e-mail) a um afiliado, gravando
+// `affiliateId` no doc users/{uid} e espelhando `isSpecial` (via servidor —
+// affiliateId/isSpecial são server-only nas rules). Corrige o login órfão que
+// prende o afiliado no /profile (clientHome sem affiliateId nem isSpecial).
+export async function linkAffiliateUser(
+  email: string,
+  affiliateId: string
+): Promise<{ uid: string; affiliateId: string; isSpecial: boolean }> {
+  const response = await authFetch('/api/link-affiliate-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ email, affiliateId }),
+  });
+  if (!response.ok) {
+    const e = await response.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro ao vincular login: ${response.status}`);
+  }
+  return response.json();
+}
+
 export async function fetchAffiliateStatuses(): Promise<Record<string, AffiliateStatusConfig>> {
   try {
     const response = await authFetch('/api/affiliate-statuses', {

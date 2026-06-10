@@ -42,6 +42,7 @@ import {
   CampaignRow,
   createUser,
   createAccessInvite,
+  linkAffiliateUser,
   isUserRegistered,
   fetchAffiliates,
   fetchSpecialAffiliates,
@@ -170,6 +171,37 @@ export default function AffiliateDetails() {
   const [affiliateLink, setAffiliateLink] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+
+  // Vincular login existente (corrige login órfão sem affiliateId).
+  const [isLinkUserModalOpen, setIsLinkUserModalOpen] = useState(false);
+  const [linkEmail, setLinkEmail] = useState('');
+  const [isLinking, setIsLinking] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [linkSuccess, setLinkSuccess] = useState(false);
+
+  const closeLinkUserModal = () => {
+    setIsLinkUserModalOpen(false);
+    setLinkEmail('');
+    setLinkError(null);
+    setLinkSuccess(false);
+  };
+
+  const handleLinkUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!affiliate || isLinking) return;
+    setIsLinking(true);
+    setLinkError(null);
+    try {
+      await linkAffiliateUser(linkEmail.trim(), String(affiliate.id));
+      setLinkSuccess(true);
+      // Reflete que agora há conta vinculada (atualiza o badge da página).
+      setHasAccount(true);
+    } catch (err: any) {
+      setLinkError(err?.message || 'Erro ao vincular login.');
+    } finally {
+      setIsLinking(false);
+    }
+  };
 
   useEffect(() => {
     if (id) {
@@ -462,6 +494,12 @@ export default function AffiliateDetails() {
                 className="flex items-center gap-2 px-4 py-2.5 bg-brand text-white rounded-xl hover:bg-brand-dark transition-all font-bold text-xs uppercase tracking-wider shadow-sm shadow-brand/20"
               >
                 <UserPlus size={16} /> Cadastrar Usuário
+              </button>
+              <button
+                onClick={() => setIsLinkUserModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 text-slate-700 dark:text-neutral-300 rounded-xl hover:border-brand/40 transition-all font-bold text-xs uppercase tracking-wider shadow-sm"
+              >
+                <Link size={16} /> Vincular Login
               </button>
               <button
                 onClick={handleGenerateLink}
@@ -956,6 +994,89 @@ export default function AffiliateDetails() {
               </div>
             )}
           </motion.div>
+          </div>
+        </div>
+      )}
+
+      {/* Vincular Login Existente — corrige login órfão (users/{uid} sem affiliateId
+          que prende o afiliado no /profile). Liga o login (por e-mail) a ESTE afiliado. */}
+      {isLinkUserModalOpen && (
+        <div onClick={closeLinkUserModal} className="fixed inset-0 z-50 overflow-y-auto p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="flex min-h-full items-center justify-center">
+            <motion.div
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white dark:bg-neutral-900 w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 dark:border-neutral-800 overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-50 dark:border-neutral-800 flex justify-between items-center">
+                <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">Vincular Login Existente</h3>
+                <button onClick={closeLinkUserModal} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+
+              {!linkSuccess ? (
+                <form onSubmit={handleLinkUser} className="p-8 space-y-6">
+                  <div className="p-4 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Vincular a</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">{humanizeName(affiliate.name || affiliate.label)}</p>
+                    <p className="text-[10px] text-slate-400 font-mono mt-1">ID: #{affiliate.id}</p>
+                  </div>
+
+                  <p className="text-xs text-slate-500 dark:text-neutral-400">
+                    Use quando o afiliado <span className="font-bold">já tem login</span> mas não consegue sair do perfil
+                    (conta sem vínculo). Informe o e-mail do login dele.
+                  </p>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">E-mail do login</label>
+                    <div className="relative">
+                      <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 dark:text-neutral-300" />
+                      <input
+                        type="email"
+                        required
+                        placeholder="afiliado@exemplo.com"
+                        value={linkEmail}
+                        onChange={(e) => setLinkEmail(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800 border border-slate-100 dark:border-neutral-700 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  {linkError && (
+                    <div className="rounded-2xl bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-200">
+                      {linkError}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isLinking || !linkEmail.trim()}
+                    className="w-full py-4 bg-slate-900 text-white font-black text-xs uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-slate-900/10 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 dark:bg-white dark:text-neutral-950"
+                  >
+                    {isLinking ? <Loader2 size={18} className="animate-spin" /> : <Link size={18} />}
+                    Vincular
+                  </button>
+                </form>
+              ) : (
+                <div className="p-10 text-center space-y-6">
+                  <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 text-green-500 rounded-full flex items-center justify-center mx-auto">
+                    <CheckCircle size={40} />
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="text-xl font-black text-slate-900 dark:text-white">Login vinculado!</h4>
+                    <p className="text-sm text-slate-500">O afiliado já pode acessar o painel. Peça pra ele sair e entrar novamente.</p>
+                  </div>
+                  <button
+                    onClick={closeLinkUserModal}
+                    className="w-full py-4 bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300 font-bold text-xs uppercase tracking-widest rounded-2xl border border-slate-200 dark:border-neutral-700"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              )}
+            </motion.div>
           </div>
         </div>
       )}

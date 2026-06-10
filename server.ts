@@ -275,6 +275,50 @@ async function startServer() {
     }
   });
 
+  // Vincula um login JÁ EXISTENTE (por e-mail) a um afiliado. Corrige o caso de
+  // users/{uid} sem `affiliateId` — que prende o afiliado no /profile, porque o
+  // roteamento (clientHome) cai no fallback. Espelha `isSpecial` a partir de
+  // special_affiliates. Admin-only (affiliateId/isSpecial só são gravados pelo
+  // servidor — as rules proíbem o cliente de setá-los).
+  app.post('/api/link-affiliate-user', requireAdmin, async (req, res) => {
+    if (!adminApp || !adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+    try {
+      const { email, affiliateId } = req.body;
+      if (!email || !affiliateId) {
+        return res.status(400).json({ error: 'Informe o e-mail do login e o afiliado.' });
+      }
+      const normalizedEmail = String(email).trim().toLowerCase();
+      const affId = String(affiliateId).trim();
+
+      let userRecord: admin.auth.UserRecord;
+      try {
+        userRecord = await adminApp.auth().getUserByEmail(normalizedEmail);
+      } catch (e: any) {
+        if (e.code === 'auth/user-not-found') {
+          return res.status(404).json({ error: 'Nenhum login encontrado com este e-mail.' });
+        }
+        throw e;
+      }
+
+      // isSpecial espelha special_affiliates (existe e ativo).
+      const specialSnap = await adminDb.collection('special_affiliates').doc(affId).get();
+      const isSpecial = specialSnap.exists && specialSnap.data()?.active !== false;
+
+      await adminDb.collection('users').doc(userRecord.uid).set({
+        affiliateId: affId,
+        isSpecial,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      return res.json({ uid: userRecord.uid, affiliateId: affId, isSpecial });
+    } catch (error: any) {
+      console.error('Error linking affiliate user:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno ao vincular login.' });
+    }
+  });
+
   app.get('/api/affiliate-statuses', requireAdmin, async (_req, res) => {
     if (!adminDb) {
       return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });

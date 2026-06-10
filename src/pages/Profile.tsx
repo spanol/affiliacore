@@ -155,6 +155,16 @@ export default function Profile() {
         </div>
       )}
 
+      {/* Login órfão: client sem affiliateId e não-especial fica sem painel (o
+          roteamento cai no /profile). Antes era um beco sem saída silencioso —
+          agora avisa pra o admin vincular o login ao afiliado. */}
+      {profile?.role === 'client' && !profile?.affiliateId && !profile?.isSpecial && (
+        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/40 text-amber-900 dark:text-amber-100">
+          <p className="text-sm font-bold">Sua conta ainda não está vinculada a um afiliado.</p>
+          <p className="text-xs mt-1 text-amber-800/80 dark:text-amber-200/70">Por isso o painel não abre. Peça ao administrador para vincular seu login ao seu cadastro de afiliado.</p>
+        </div>
+      )}
+
       {message && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
