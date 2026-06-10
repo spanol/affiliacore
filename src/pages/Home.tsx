@@ -26,10 +26,10 @@ const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\/+
 // `size` é a altura por logo (Tailwind) — BetMGM e Lottu têm mais margem dentro
 // do arquivo, então precisam de mais altura pra ter o mesmo peso visual.
 const partners = [
-  { name: 'Superbet', logo: 'boost-home/partners/superbet.webp', size: 'h-16 sm:h-12' },
-  { name: 'Betano', logo: 'boost-home/partners/betano.webp', size: 'h-16 sm:h-12' },
-  { name: 'BetMGM', logo: 'boost-home/partners/betmgm.webp', size: 'h-24 sm:h-20' },
-  { name: 'Lottu', logo: 'boost-home/partners/lottu.webp', size: 'h-24 sm:h-20' },
+  { name: 'Superbet', logo: 'boost-home/partners/superbet.webp', size: 'h-14 sm:h-12' },
+  { name: 'Betano', logo: 'boost-home/partners/betano.webp', size: 'h-12 sm:h-12' },
+  { name: 'BetMGM', logo: 'boost-home/partners/betmgm.webp', size: 'h-20' },
+  { name: 'Lottu', logo: 'boost-home/partners/lottu.webp', size: 'h-24' },
 ];
 
 const emptyForm: ContactInquiryInput = {
