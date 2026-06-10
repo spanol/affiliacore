@@ -527,7 +527,7 @@ export default function Home() {
               Casas de apostas parceiras
             </h2>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 max-w-4xl mx-auto">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-8 sm:gap-x-6 max-w-6xl mx-auto">
             {partners.map((partner, i) => (
               <motion.div
                 key={partner.name}
@@ -535,13 +535,13 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="flex items-center justify-center px-6 py-6"
+                className="flex items-center justify-center"
               >
                 <img
                   src={asset(partner.logo)}
                   alt={partner.name}
                   loading="lazy"
-                  className="max-h-20 sm:max-h-24 w-auto object-contain"
+                  className="h-28 sm:h-40 md:h-48 w-auto object-contain"
                 />
               </motion.div>
             ))}
