@@ -22,6 +22,14 @@ import { useToast } from '../contexts/ToastContext';
 
 const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`;
 
+// Casas de apostas parceiras (logos em /public/boost-home/partners).
+const partners = [
+  { name: 'Superbet', logo: 'boost-home/partners/superbet.webp' },
+  { name: 'Betano', logo: 'boost-home/partners/betano.webp' },
+  { name: 'BetMGM', logo: 'boost-home/partners/betmgm.webp' },
+  { name: 'Lottu', logo: 'boost-home/partners/lottu.webp' },
+];
+
 const emptyForm: ContactInquiryInput = {
   name: '',
   email: '',
@@ -139,16 +147,6 @@ export default function Home() {
           id="inicio"
           className="max-w-7xl mx-auto px-6 pt-16 md:pt-24 lg:pt-32 flex flex-col items-center text-center"
         >
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-neutral-300 text-xs font-medium mb-8 uppercase tracking-wider"
-          >
-            <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-            Performance Analytics & Growth
-          </motion.div>
-
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -521,6 +519,34 @@ export default function Home() {
             </div>
           </div>
         </section> */}
+
+        {/* Casas de apostas parceiras */}
+        <section className="max-w-7xl mx-auto px-6 py-24 border-t border-neutral-800/50">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-white">
+              Casas de apostas parceiras
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 max-w-4xl mx-auto">
+            {partners.map((partner, i) => (
+              <motion.div
+                key={partner.name}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="flex items-center justify-center h-24 sm:h-28 px-6 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 hover:bg-white/[0.07] transition-colors"
+              >
+                <img
+                  src={asset(partner.logo)}
+                  alt={partner.name}
+                  loading="lazy"
+                  className="max-h-10 sm:max-h-12 w-auto object-contain"
+                />
+              </motion.div>
+            ))}
+          </div>
+        </section>
       </main>
 
       {/* Footer */}
