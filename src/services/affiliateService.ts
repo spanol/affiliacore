@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { authFetch } from '../lib/api';
-import { withMockAffiliates, withMockResults, withMockBrandRows, withMockAffiliateBrandRows } from '../lib/mockMultiHouse';
+import { withKnownHouses } from '../lib/mockMultiHouse';
 import { getDefaultRange } from '../lib/dateRange';
 
 interface Affiliate {
@@ -302,7 +302,7 @@ export async function fetchAffiliates(): Promise<Affiliate[]> {
       throw new Error(apiError.message);
     }
 
-    return withMockAffiliates(extractArray(data));
+    return extractArray(data);
   } catch (error) {
     console.error('Affiliate fetch error:', error);
     throw error;
@@ -375,9 +375,10 @@ export interface DateRangeOpts {
 // Per-house (brand) breakdown for an affiliate.
 export async function fetchAffiliateResultsByBrand(id: string, opts: DateRangeOpts = {}): Promise<any[]> {
   try {
-    // B6/dev · injeta uma 2ª casa (SportingBet) no breakdown quando a mock multi-casa
-    // está ligada, pra a UI por casa acender mesmo sem a casa real na API.
-    return withMockAffiliateBrandRows(await fetchResultsGrouped('brand', { affiliateIds: id, ...opts }), id);
+    // B6/dev · garante que as casas conhecidas (ex.: SportingBet) apareçam no
+    // breakdown — VAZIAS se a API não trouxe dados — quando a preview multi-casa
+    // está ligada. No-op em produção.
+    return withKnownHouses(await fetchResultsGrouped('brand', { affiliateIds: id, ...opts }));
   } catch (error) {
     console.error(`Error fetching brand results for affiliate ${id}:`, error);
     return [];
@@ -406,7 +407,7 @@ export async function fetchAffiliateResults(id: string, opts: DateRangeOpts = {}
 
 export async function fetchAllResults(opts: DateRangeOpts = {}): Promise<any[]> {
   try {
-    return withMockResults(await fetchResultsGrouped('affiliate', opts));
+    return await fetchResultsGrouped('affiliate', opts);
   } catch (error) {
     console.error('Error fetching all results:', error);
     throw error;
@@ -432,7 +433,8 @@ export async function fetchResultsForAffiliates(ids: string[], opts: DateRangeOp
 // Admin → rede inteira; afiliado especial → o proxy escopa à sub-rede (own + subs).
 export async function fetchAllResultsByBrand(opts: DateRangeOpts = {}): Promise<any[]> {
   try {
-    return withMockBrandRows(await fetchResultsGrouped('brand', opts));
+    // B6/dev · casas conhecidas aparecem mesmo vazias (modelo OTG). No-op em prod.
+    return withKnownHouses(await fetchResultsGrouped('brand', opts));
   } catch (error) {
     console.error('Error fetching network brand results:', error);
     return [];

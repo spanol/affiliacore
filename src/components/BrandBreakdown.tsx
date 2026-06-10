@@ -2,6 +2,7 @@ import React from 'react';
 import { Store } from 'lucide-react';
 import { resolveBrandRates, type AffiliateConfig } from '../services/affiliateService';
 import InfoTooltip from './InfoTooltip';
+import BrandLogo from './BrandLogo';
 
 interface BrandBreakdownProps {
   data: any[];
@@ -18,11 +19,12 @@ export default function BrandBreakdown({ data, config }: BrandBreakdownProps) {
   // B6 · cada casa usa a taxa POR CASA do afiliado (override de byBrand, com
   // fallback no default). A linha de marca traz o brandId em `id`.
   const brands = (Array.isArray(data) ? data : []).map((row: any) => {
+    const id = String(row.id ?? '');
     const name = String(row.label || row.name || row.id || 'Casa');
-    const { cpaValue, revPercentage } = resolveBrandRates(config, String(row.id ?? ''));
+    const { cpaValue, revPercentage } = resolveBrandRates(config, id);
     const rev = (Number(row.rvs) || 0) * (revPercentage / 100);
     const cpa = (Number(row.qualified_cpa) || 0) * cpaValue;
-    return { name, rev, cpa };
+    return { id, name, rev, cpa };
   });
 
   const maxRev = Math.max(1, ...brands.map((b) => b.rev));
@@ -49,9 +51,7 @@ export default function BrandBreakdown({ data, config }: BrandBreakdownProps) {
               <div key={idx} className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 rounded bg-brand flex items-center justify-center text-white font-black text-[10px]">
-                      {b.name.charAt(0).toUpperCase()}
-                    </div>
+                    <BrandLogo name={b.name} brandId={b.id} size={24} />
                     <span className="text-xs font-bold text-slate-700 dark:text-neutral-300">{b.name}</span>
                   </div>
                   <span className="text-xs font-bold text-slate-400">{formatBRL(value)}</span>

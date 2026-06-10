@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getBrandName, uniqueBrands, ALL_BRANDS } from './brand';
+import { getBrandName, uniqueBrands, ALL_BRANDS, getBrandMeta, getBrandLogo, KNOWN_BRANDS } from './brand';
 
 describe('getBrandName', () => {
   it('extrai de brand objeto {name} (shape atual da API)', () => {
@@ -44,5 +44,36 @@ describe('uniqueBrands', () => {
 describe('ALL_BRANDS', () => {
   it('é um sentinel estável', () => {
     expect(ALL_BRANDS).toBe('__all__');
+  });
+});
+
+describe('registro de casas (B6 · logo + casa conhecida)', () => {
+  it('resolve metadados por brandId', () => {
+    expect(getBrandMeta('clsuperbet000001')?.name).toBe('Superbet');
+  });
+
+  it('resolve por nome (case-insensitive) e por slug', () => {
+    expect(getBrandMeta('superbet')?.slug).toBe('superbet');
+    expect(getBrandMeta('SPORTINGBET')?.name).toBe('SportingBet');
+    expect(getBrandMeta('sportingbet')?.id).toBe('clsportingbet000001');
+  });
+
+  it('devolve null p/ casa desconhecida ou entrada vazia', () => {
+    expect(getBrandMeta('betano')).toBeNull();
+    expect(getBrandMeta('')).toBeNull();
+    expect(getBrandMeta(null)).toBeNull();
+  });
+
+  it('getBrandLogo devolve o caminho do asset, null se desconhecida', () => {
+    expect(getBrandLogo('clsuperbet000001')).toBe('/brands/superbet.svg');
+    expect(getBrandLogo('Betano')).toBeNull();
+  });
+
+  it('toda casa conhecida tem slug, name e logo', () => {
+    for (const b of KNOWN_BRANDS) {
+      expect(b.slug).toBeTruthy();
+      expect(b.name).toBeTruthy();
+      expect(b.logo).toMatch(/^\/brands\//);
+    }
   });
 });

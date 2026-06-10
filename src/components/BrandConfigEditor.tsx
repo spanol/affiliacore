@@ -8,6 +8,7 @@ import {
 } from '../services/affiliateService';
 import { humanizeName } from '../lib/utils';
 import InfoTooltip from './InfoTooltip';
+import BrandLogo from './BrandLogo';
 
 interface BrandRow {
   id?: string;
@@ -119,9 +120,7 @@ export default function BrandConfigEditor({ affiliateId, brandRows, config, onSa
             className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800"
           >
             <div className="flex items-center gap-3 sm:w-40 shrink-0">
-              <div className="w-7 h-7 rounded bg-brand flex items-center justify-center text-white font-black text-[10px]">
-                {h.name.charAt(0).toUpperCase()}
-              </div>
+              <BrandLogo name={h.name} brandId={h.id} size={28} />
               <span className="text-xs font-bold text-slate-700 dark:text-neutral-300">{h.name}</span>
             </div>
             <div className="flex-1 grid grid-cols-2 gap-3">

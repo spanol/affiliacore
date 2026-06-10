@@ -19,7 +19,9 @@ import DateRangePicker from '../components/DateRangePicker';
 import CampaignBreakdown from '../components/CampaignBreakdown';
 import AffiliatePerformanceChart from '../components/AffiliatePerformanceChart';
 import BrandFilter from '../components/BrandFilter';
+import BrandLogo from '../components/BrandLogo';
 import { getBrandName, uniqueBrands, ALL_BRANDS } from '../lib/brand';
+import { withKnownBrandNames } from '../lib/mockMultiHouse';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
 
 export default function AdminDashboard() {
@@ -53,7 +55,9 @@ export default function AdminDashboard() {
     return map;
   }, [affiliates]);
 
-  const availableBrands = useMemo(() => uniqueBrands(affiliates), [affiliates]);
+  // Casas conhecidas (ex.: SportingBet vazia) entram no filtro mesmo sem afiliados
+  // — espelha o portal OTG. No-op em produção (só Superbet). [[B6]]
+  const availableBrands = useMemo(() => withKnownBrandNames(uniqueBrands(affiliates)), [affiliates]);
 
   // IDs da marca selecionada (CSV) para reescopar a busca de campanhas. null = todas.
   const brandAffiliateIds = useMemo(() => {
@@ -174,6 +178,7 @@ export default function AdminDashboard() {
   const houseBreakdown = useMemo(
     () => (Array.isArray(brandRows) ? brandRows : [])
       .map((r: any) => ({
+        id: String(r.id ?? ''),
         name: humanizeName(String(r.label || r.name || r.id || 'Casa')),
         commission: Number(r.total_commission) || 0,
         registrations: Number(r.registrations) || 0,
@@ -380,7 +385,7 @@ export default function AdminDashboard() {
                 className="p-6 rounded-2xl border bg-white dark:bg-neutral-900/60 border-slate-200/70 dark:border-neutral-800 shadow-sm"
               >
                 <div className="flex items-center gap-2 mb-4">
-                  <span className="w-7 h-7 rounded-lg bg-brand/10 text-brand flex items-center justify-center font-black text-xs">{h.name.charAt(0).toUpperCase()}</span>
+                  <BrandLogo name={h.name} brandId={h.id} size={28} />
                   <span className="text-sm font-bold text-slate-900 dark:text-white truncate">{h.name}</span>
                 </div>
                 <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 dark:text-neutral-500">Comissão (casa)</p>
