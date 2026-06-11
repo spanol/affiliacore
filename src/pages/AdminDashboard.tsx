@@ -20,7 +20,7 @@ import CampaignBreakdown from '../components/CampaignBreakdown';
 import AffiliatePerformanceChart from '../components/AffiliatePerformanceChart';
 import BrandFilter from '../components/BrandFilter';
 import BrandLogo from '../components/BrandLogo';
-import { getBrandName, uniqueBrands, ALL_BRANDS } from '../lib/brand';
+import { getBrandName, uniqueBrands, ALL_BRANDS, getKnownBrandName } from '../lib/brand';
 import { withKnownBrandNames } from '../lib/knownHouses';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
 
@@ -177,15 +177,20 @@ export default function AdminDashboard() {
   // Ordenado por comissão. A seção só renderiza com ≥2 casas (ver abaixo).
   const houseBreakdown = useMemo(
     () => (Array.isArray(brandRows) ? brandRows : [])
-      .map((r: any) => ({
-        id: String(r.id ?? ''),
-        name: humanizeName(String(r.label || r.name || r.id || 'Casa')),
-        commission: Number(r.total_commission) || 0,
-        registrations: Number(r.registrations) || 0,
-        firstDeposits: Number(r.first_deposits) || 0,
-        qualifiedCpa: Number(r.qualified_cpa) || 0,
-        deposit: Number(r.deposit) || 0,
-      }))
+      .map((r: any) => {
+        const id = String(r.id ?? '');
+        const raw = String(r.label || r.name || r.id || 'Casa');
+        return {
+          id,
+          // casa conhecida → nome canônico do registro; senão humaniza o cru.
+          name: getKnownBrandName(id, raw) ?? humanizeName(raw),
+          commission: Number(r.total_commission) || 0,
+          registrations: Number(r.registrations) || 0,
+          firstDeposits: Number(r.first_deposits) || 0,
+          qualifiedCpa: Number(r.qualified_cpa) || 0,
+          deposit: Number(r.deposit) || 0,
+        };
+      })
       .sort((a, b) => b.commission - a.commission),
     [brandRows]
   );

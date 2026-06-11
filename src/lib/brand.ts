@@ -72,3 +72,15 @@ export function getBrandMeta(idOrName?: string | null): BrandMeta | null {
 export function getBrandLogo(idOrName?: string | null): string | null {
   return getBrandMeta(idOrName)?.logo ?? null;
 }
+
+// Nome CANÔNICO de uma casa conhecida (ex.: "SportingBet"), casando por qualquer
+// das chaves passadas (id e/ou nome cru da API). Retorna null se não for casa
+// conhecida — o caller decide o fallback (ex.: humanizeName do nome cru). Evita
+// que o humanizeName quebre "SportingBet" em "Sporting Bet".
+export function getKnownBrandName(...keys: (string | null | undefined)[]): string | null {
+  for (const k of keys) {
+    const meta = getBrandMeta(k);
+    if (meta) return meta.name;
+  }
+  return null;
+}

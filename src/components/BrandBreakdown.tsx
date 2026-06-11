@@ -1,6 +1,7 @@
 import React from 'react';
 import { Store } from 'lucide-react';
 import { resolveBrandRates, type AffiliateConfig } from '../services/affiliateService';
+import { getKnownBrandName } from '../lib/brand';
 import InfoTooltip from './InfoTooltip';
 import BrandLogo from './BrandLogo';
 
@@ -20,7 +21,8 @@ export default function BrandBreakdown({ data, config }: BrandBreakdownProps) {
   // fallback no default). A linha de marca traz o brandId em `id`.
   const brands = (Array.isArray(data) ? data : []).map((row: any) => {
     const id = String(row.id ?? '');
-    const name = String(row.label || row.name || row.id || 'Casa');
+    const raw = String(row.label || row.name || row.id || 'Casa');
+    const name = getKnownBrandName(id, raw) ?? raw;
     const { cpaValue, revPercentage } = resolveBrandRates(config, id);
     const rev = (Number(row.rvs) || 0) * (revPercentage / 100);
     const cpa = (Number(row.qualified_cpa) || 0) * cpaValue;
