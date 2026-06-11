@@ -46,12 +46,15 @@ export interface BrandMeta {
 
 const normBrandKey = (s?: string | null) => String(s ?? '').trim().toLowerCase();
 
+// ids e logos confirmados na dashboard da OTG (partners.grupootg.com, 2026-06-11):
+// o <select> de casas expõe o brandId real e as logos vêm do bucket público
+// `betting-house-logos` (nome do arquivo = brandId). Baixamos as oficiais p/
+// /public/brands. [[boost-external-api-state]]
 export const KNOWN_BRANDS: BrandMeta[] = [
-  { id: 'clsuperbet000001', slug: 'superbet', name: 'Superbet', logo: '/brands/superbet.svg' },
+  { id: 'clsuperbet000001', slug: 'superbet', name: 'Superbet', logo: '/brands/superbet.png' },
   // SportingBet: a OTG já LISTA a casa pra agência, mas ela está vazia (0 afiliados)
-  // e a nossa x-api-key ainda não traz dados nem o id real — usamos o id do preview
-  // (mesmo do mock) até a OTG ampliar o escopo. Trocar pelo id real quando vier.
-  { id: 'clsportingbet000001', slug: 'sportingbet', name: 'SportingBet', logo: '/brands/sportingbet.svg' },
+  // e a nossa x-api-key ainda não traz dados dela — aparece zerada (modelo do portal).
+  { id: 'cmm5dhdqm000e19b58dqc549a', slug: 'sportingbet', name: 'SportingBet', logo: '/brands/sportingbet.png' },
 ];
 
 // Metadados de uma casa por id (preferencial) ou por nome/slug.
