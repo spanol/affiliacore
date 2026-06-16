@@ -139,13 +139,17 @@ export default function AffiliatesList() {
       });
 
       // Pré-cadastros (aprovados na OTG, ainda sem produção no relatório). Só os
-      // 'pending'; deduplica por nameKey contra os já presentes (relatório/login)
-      // para o pendente sumir assim que o afiliado real aparece. O id sintético
-      // (pending_<nameKey>_<casa>) é o affiliateId que o convite/login usam até a
-      // reconciliação trocar pelo id real no servidor.
-      const presentKeys = new Set(uniqueAffiliates.map((a: any) => normalizeNameKey(a.name || a.label)));
+      // 'pending'; deduplica por nameKey+CASA contra os já presentes (relatório/
+      // login) — o afiliado é por casa na OTG, então o pendente SportingBet deve
+      // aparecer mesmo que a pessoa já tenha um registro Superbet. Some quando o
+      // afiliado real DAQUELA casa aparece. O id sintético (pending_<nameKey>_<casa>)
+      // é o affiliateId que o convite/login usam até a reconciliação no servidor.
+      const houseKey = (nameKey: string, brand?: string | null) => `${nameKey}|${normalizeNameKey(brand)}`;
+      const presentKeys = new Set(
+        uniqueAffiliates.map((a: any) => houseKey(normalizeNameKey(a.name || a.label), getBrandName(a)))
+      );
       const pendingItems: Affiliate[] = (pendingData || [])
-        .filter((p) => p.status === 'pending' && !presentKeys.has(p.nameKey))
+        .filter((p) => p.status === 'pending' && !presentKeys.has(houseKey(p.nameKey, p.house)))
         .map((p) => ({
           id: p.id,
           name: p.name,
