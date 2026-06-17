@@ -10,7 +10,7 @@ Base: `https://agencyboost.com.br/api/partner/v1`
 
 | Método | Rota                    | Scope                  | Retorna                                                  |
 | ------- | ----------------------- | ---------------------- | -------------------------------------------------------- |
-| GET     | `/pending-affiliates` | `pending-affiliates` | Aprovados na OTG aguardando produção (dado-chave)      |
+| GET     | `/pending-affiliates` | `pending-affiliates` | Aprovados na aguardando produção (dado-chave)      |
 | GET     | `/affiliates`         | `affiliates`         | Reconciliados/ativos (id, nome, marca, link)             |
 | GET     | `/results`            | `results`            | Produção agregada —**só contagem, nada de R$** |
 
@@ -42,7 +42,7 @@ Todas as rotas retornam:
 
 ### GET /pending-affiliates  · scope `pending-affiliates`
 
-Afiliados **aprovados na OTG aguardando produção** (o dado-chave). Filtros opcionais:
+Afiliados **aprovados na aguardando produção** (o dado-chave). Filtros opcionais:
 `?status=pending|reconciled` · `?house=Superbet`.
 
 Campos por item: `id, name, nameKey, house, status, social, registerUrl, affiliateId (quando reconciliado), createdAt, updatedAt`.
@@ -66,7 +66,7 @@ Produção agregada. **Obrigatório**: `startDate`, `endDate`
 Campos por item:
 
 - **Métricas (contagem):** `registrations` (cadastros), `first_deposits` (depósitos/FTD),
-  `qualified_cpa` (CPA qualificado). *Note:* é a CONTAGEM — `deposit`/`cpa` (valores R$) NÃO vêm.
+  `qualified_cpa` (CPA qualificado).
 - **Dimensões** (conforme `groupBy`): `affiliate_id`/`affiliate_name`/`id`/`label`,
   `brand`/`brand_id`/`brand_name`, `date`, `campaign`/`campaign_id`/`campaign_name`.
 
