@@ -28,6 +28,7 @@ import InfoTooltip from '../components/InfoTooltip';
 import TrendBadge from '../components/TrendBadge';
 import { DateRange, getDefaultRange, getPreviousRange, percentChange } from '../lib/dateRange';
 import { ALL_BRANDS, getKnownBrandName } from '../lib/brand';
+import { withKnownBrandNames } from '../lib/knownHouses';
 import { cn } from '../lib/utils';
 
 export default function ClientDashboard() {
@@ -153,11 +154,15 @@ export default function ClientDashboard() {
   const clientRows: Array<{ name: string; firstDeposit: string; createdAt: string }> = [];
   const resultsToRender = results.length > 0 ? results : [emptyResult];
 
-  // Casas disponíveis (nome canônico) a partir das linhas por casa já buscadas —
-  // inclui as casas conhecidas vazias (withKnownHouses). O dropdown some com <2.
+  // Casas disponíveis (nome canônico): casas reais das linhas + casas conhecidas
+  // SEMPRE listadas (modelo do portal OTG), pra que o filtro apareça mesmo quando
+  // a API só trouxe uma casa pro afiliado. Espelha o availableBrands do /admin —
+  // antes o cliente derivava só do brandResults cru e o dropdown sumia com 1 casa.
   const brandNameOf = (r: any) =>
     getKnownBrandName(String(r?.id ?? ''), String(r?.label || r?.name || '')) ?? String(r?.label || r?.name || 'Casa');
-  const availableBrands = Array.from(new Set(brandResults.map(brandNameOf))).filter(Boolean);
+  const availableBrands = withKnownBrandNames(
+    Array.from(new Set(brandResults.map(brandNameOf))).filter(Boolean)
+  );
   const isAllBrands = selectedBrand === ALL_BRANDS;
   const selectedBrandRow = isAllBrands ? null : brandResults.find((r) => brandNameOf(r) === selectedBrand);
 
