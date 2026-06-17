@@ -53,6 +53,18 @@ Produção agregada (proxy do relatório da OTG). **Obrigatório**: `startDate`,
 (`YYYY-MM-DD`). Opcional: `groupBy=affiliate|brand|date|campaign` (default `affiliate`),
 `affiliateIds=a,b`.
 
+**Somente CONTAGEM — nenhum valor (R$).** Por decisão do Carlos (2026-06-17), o
+parceiro recebe apenas as métricas de **cadastro, depósitos e CPA** em contagem, mais
+as dimensões de identidade. Os campos monetários da OTG (`total_commission`, `cpa` em
+R$, `rvs`, `deposit` em R$, etc.) são **removidos no servidor** por uma whitelist
+(`src/lib/partnerResults.ts`) — nem campo monetário novo/desconhecido passa.
+
+Campos por item:
+- **Métricas (contagem):** `registrations` (cadastros), `first_deposits` (depósitos/FTD),
+  `qualified_cpa` (CPA qualificado). *Note:* é a CONTAGEM — `deposit`/`cpa` (valores R$) NÃO vêm.
+- **Dimensões** (conforme `groupBy`): `affiliate_id`/`affiliate_name`/`id`/`label`,
+  `brand`/`brand_id`/`brand_name`, `date`, `campaign`/`campaign_id`/`campaign_name`.
+
 ```bash
 curl -H "x-boost-api-key: $KEY" \
   "https://<host>/api/partner/v1/results?startDate=2026-06-01&endDate=2026-06-30&groupBy=affiliate"

@@ -9,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { renderErrorPage } from './errorPage';
 import { isBotUserAgent, appendSubid, clickStatDay } from './src/lib/tracking';
+import { projectPartnerResults } from './src/lib/partnerResults';
 import { pullApprovedRoster, isOtgLinksConfigured } from './otgLinksPull';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1190,7 +1191,10 @@ async function startServer() {
         return res.status(502).json({ error: 'Falha ao consultar o relatório.', code: body?.code, requestId });
       }
       const list = body?.data?.data ?? body?.data ?? body ?? [];
-      return res.json(partnerEnvelope(Array.isArray(list) ? list : []));
+      // Carlos (2026-06-17): pro parceiro só CADASTRO, DEPÓSITOS e CPA (contagem) —
+      // NADA de valores (R$). Whitelist derruba total_commission/cpa/rvs/deposit e
+      // qualquer campo monetário. Ver src/lib/partnerResults.ts.
+      return res.json(partnerEnvelope(projectPartnerResults(list)));
     } catch (error: any) {
       console.error('[partner-api] results:', error);
       return res.status(500).json({ error: 'Erro ao consultar resultados.' });
