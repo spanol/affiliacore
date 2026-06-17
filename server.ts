@@ -1110,7 +1110,13 @@ async function startServer() {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível.' });
     try {
       const snap = await adminDb.collection('pending_affiliates').get();
-      let rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+      // Carlos (2026-06-17): esconder PII de contato (email/phone) do parceiro por ora.
+      // Removidos no servidor; o resto (nome, casa, status, registerUrl…) segue.
+      let rows = snap.docs.map((d) => {
+        const { email, phone, ...rest } = d.data() as any;
+        void email; void phone;
+        return { id: d.id, ...rest };
+      });
       const status = req.query.status ? String(req.query.status) : null;
       const house = req.query.house ? String(req.query.house).toLowerCase() : null;
       if (status) rows = rows.filter((r) => String(r.status || 'pending') === status);
@@ -1172,31 +1178,55 @@ async function startServer() {
       return res.status(400).json({ error: 'startDate e endDate são obrigatórios (YYYY-MM-DD).' });
     }
     try {
-      const params = new URLSearchParams();
-      params.set('startDate', startDate);
-      params.set('endDate', endDate);
-      params.set('groupBy', req.query.groupBy ? String(req.query.groupBy) : 'affiliate');
+      // Params base da consulta (a página é setada por iteração abaixo).
+      const baseParams = new URLSearchParams();
+      baseParams.set('startDate', startDate);
+      baseParams.set('endDate', endDate);
+      baseParams.set('groupBy', req.query.groupBy ? String(req.query.groupBy) : 'affiliate');
       // a OTG não aceita affiliateIds CSV — expande p/ parâmetro repetido.
       if (req.query.affiliateIds) {
         String(req.query.affiliateIds).split(',').map((s) => s.trim()).filter(Boolean)
-          .forEach((affId) => params.append('affiliateIds', affId));
+          .forEach((affId) => baseParams.append('affiliateIds', affId));
       }
-      const resp = await fetch(`${BASE_URL}/api/v2/external/results?${params.toString()}`, {
-        headers: { 'x-api-key': apiKey, Accept: 'application/json', 'User-Agent': 'AgenciaBoost-App/1.0' },
-      });
-      const text = await resp.text();
-      let body: any = null;
-      try { body = text ? JSON.parse(text) : null; } catch { body = null; }
-      if (!resp.ok) {
-        const requestId = crypto.randomBytes(8).toString('hex');
-        console.error(`[partner-api] ${requestId} results upstream ${resp.status}:`, text);
-        return res.status(502).json({ error: 'Falha ao consultar o relatório.', code: body?.code, requestId });
+
+      // PAGINAÇÃO: a OTG entrega só pageSize=50 por página (page=N até totalPages;
+      // pageSize/limit maiores dão erro). Sem isto, o parceiro via só os 50 primeiros
+      // afiliados. Varremos todas as páginas e concatenamos. Trava de segurança em
+      // MAX_PAGES (2500 linhas) — se estourar, logamos o truncamento (não silencioso).
+      const MAX_PAGES = 50;
+      const all: any[] = [];
+      let page = 1;
+      let totalPages = 1;
+      do {
+        const params = new URLSearchParams(baseParams);
+        params.set('page', String(page));
+        const resp = await fetch(`${BASE_URL}/api/v2/external/results?${params.toString()}`, {
+          headers: { 'x-api-key': apiKey, Accept: 'application/json', 'User-Agent': 'AgenciaBoost-App/1.0' },
+        });
+        const text = await resp.text();
+        let body: any = null;
+        try { body = text ? JSON.parse(text) : null; } catch { body = null; }
+        if (!resp.ok) {
+          const requestId = crypto.randomBytes(8).toString('hex');
+          console.error(`[partner-api] ${requestId} results upstream ${resp.status} (page ${page}):`, text);
+          return res.status(502).json({ error: 'Falha ao consultar o relatório.', code: body?.code, requestId });
+        }
+        const d = body?.data;
+        const rows = Array.isArray(d?.data) ? d.data : (Array.isArray(d) ? d : (Array.isArray(body) ? body : []));
+        all.push(...rows);
+        const tp = Number(d?.meta?.totalPages);
+        totalPages = Number.isFinite(tp) && tp > 0 ? tp : 1;
+        page++;
+      } while (page <= totalPages && page <= MAX_PAGES);
+
+      if (totalPages > MAX_PAGES) {
+        console.warn(`[partner-api] results truncado: ${totalPages} páginas > limite ${MAX_PAGES}. Retornando ${all.length} linhas.`);
       }
-      const list = body?.data?.data ?? body?.data ?? body ?? [];
+
       // Carlos (2026-06-17): pro parceiro só CADASTRO, DEPÓSITOS e CPA (contagem) —
       // NADA de valores (R$). Whitelist derruba total_commission/cpa/rvs/deposit e
       // qualquer campo monetário. Ver src/lib/partnerResults.ts.
-      return res.json(partnerEnvelope(projectPartnerResults(list)));
+      return res.json(partnerEnvelope(projectPartnerResults(all)));
     } catch (error: any) {
       console.error('[partner-api] results:', error);
       return res.status(500).json({ error: 'Erro ao consultar resultados.' });

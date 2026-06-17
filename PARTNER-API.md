@@ -58,8 +58,11 @@ Todas as rotas retornam:
 Afiliados **aprovados na OTG aguardando produção** (o dado-chave). Filtros opcionais:
 `?status=pending|reconciled` · `?house=Superbet`.
 
-Campos por item: `id, name, nameKey, house, status, email, phone, social, registerUrl,
+Campos por item: `id, name, nameKey, house, status, registerUrl,
 affiliateId (quando reconciliado), createdAt, updatedAt`.
+
+> **PII de contato oculta (2026-06-17):** `email` e `phone` foram **removidos** da
+> resposta por ora (decisão do Carlos). Para reexpor, ver o handler em `server.ts`.
 
 ```bash
 curl -H "x-boost-api-key: $KEY" \
@@ -74,6 +77,9 @@ Campos: `id, name, siteId, brand, registerUrl` (link de cadastro quando disponí
 Produção agregada (proxy do relatório da OTG). **Obrigatório**: `startDate`, `endDate`
 (`YYYY-MM-DD`). Opcional: `groupBy=affiliate|brand|date|campaign` (default `affiliate`),
 `affiliateIds=a,b`.
+
+**Todas as páginas.** A OTG pagina em 50 linhas/página; o servidor varre todas as
+páginas e devolve o conjunto completo (o `total` do envelope = total real, não 50).
 
 **Somente CONTAGEM — nenhum valor (R$).** Por decisão do Carlos (2026-06-17), o
 parceiro recebe apenas as métricas de **cadastro, depósitos e CPA** em contagem, mais
@@ -102,6 +108,6 @@ fresco. Ver `otgLinksPull.ts`, `scripts/otg-approved/README.md` e a memória
 
 ## ⚠️ LGPD
 
-`pending-affiliates` e `affiliates` carregam **PII de terceiros** (email, telefone,
-social). Garanta base legal/contrato para o compartilhamento com o parceiro antes de
-liberar a key.
+`email`/`phone` em `pending-affiliates` estão **ocultos por ora** (2026-06-17). Mesmo
+assim, `name`, `registerUrl` e o vínculo de afiliado ainda identificam pessoas —
+garanta base legal/contrato para o compartilhamento com o parceiro antes de liberar a key.
