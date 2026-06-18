@@ -17,7 +17,7 @@ import {
   Wallet,
   Plug
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, humanizeName } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -135,7 +135,7 @@ export default function DashboardLayout() {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{profile?.name}</p>
+            <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{humanizeName(profile?.name)}</p>
             <p className="text-[10px] text-slate-500 dark:text-neutral-400 font-medium truncate">
               {profile?.role === 'admin' ? 'Administrador' : 'Cliente'}
             </p>
