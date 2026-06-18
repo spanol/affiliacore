@@ -60,7 +60,7 @@ export default function CampaignBreakdown({
             )}
           </div>
         </div>
-        <div className="px-3 py-1 bg-slate-100 dark:bg-neutral-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+        <div className="px-3 py-1 bg-slate-100 dark:bg-neutral-800 rounded-lg text-[10px] font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-widest">
           {formatInt(data.length)} {data.length === 1 ? 'campanha' : 'campanhas'}
         </div>
       </div>
@@ -75,7 +75,7 @@ export default function CampaignBreakdown({
           {/* sm+ : tabela */}
           <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left">
-              <thead className="bg-slate-50 dark:bg-neutral-800/50 text-[10px] text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-neutral-800">
+              <thead className="bg-slate-50 dark:bg-neutral-800/50 text-[10px] text-slate-400 dark:text-neutral-400 uppercase tracking-widest border-b border-slate-100 dark:border-neutral-800">
                 <tr>
                   <th className="px-6 py-4 font-black">Campanha</th>
                   <th className="px-6 py-4 font-black text-right">Cadastros</th>

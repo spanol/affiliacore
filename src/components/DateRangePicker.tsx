@@ -68,7 +68,7 @@ export default function DateRangePicker({ value, onChange, className }: DateRang
       >
         <Calendar size={16} className="text-slate-500 dark:text-neutral-400" />
         <span className="normal-case tracking-normal font-semibold">{formatRangeLabel(value)}</span>
-        <ChevronDown size={14} className={cn('text-slate-400 transition-transform', open && 'rotate-180')} />
+        <ChevronDown size={14} className={cn('text-slate-400 dark:text-neutral-500 transition-transform', open && 'rotate-180')} />
       </button>
 
       {open && (

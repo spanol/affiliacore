@@ -67,7 +67,7 @@ export default function BrandFilter({ brands, value, onChange }: BrandFilterProp
         <span className="flex-1 text-left truncate">{isAll ? ALL_LABEL : value}</span>
         <ChevronDown
           size={16}
-          className={cn('text-slate-400 shrink-0 transition-transform', open && 'rotate-180')}
+          className={cn('text-slate-400 dark:text-neutral-500 shrink-0 transition-transform', open && 'rotate-180')}
         />
       </button>
 

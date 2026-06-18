@@ -369,7 +369,7 @@ export default function AffiliateDetails() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <Loader2 className="w-10 h-10 text-brand dark:text-white animate-spin" />
-        <p className="text-slate-500 font-medium">Carregando informações realistas...</p>
+        <p className="text-slate-500 dark:text-neutral-400 font-medium">Carregando informações realistas...</p>
       </div>
     );
   }
@@ -382,7 +382,7 @@ export default function AffiliateDetails() {
         </div>
         <div className="space-y-2">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">Ops! Algo deu errado</h2>
-          <p className="text-slate-500 max-w-md">{error || 'Afiliado não encontrado'}</p>
+          <p className="text-slate-500 dark:text-neutral-400 max-w-md">{error || 'Afiliado não encontrado'}</p>
         </div>
         <button 
           onClick={() => navigate('/affiliates')}
@@ -454,7 +454,7 @@ export default function AffiliateDetails() {
           {isAdmin ? (
             <button
               onClick={() => navigate('/affiliates')}
-              className="shrink-0 p-3 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl text-slate-500 hover:text-brand transition-all shadow-sm"
+              className="shrink-0 p-3 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl text-slate-500 hover:text-brand dark:hover:text-white transition-all shadow-sm"
             >
               <ArrowLeft size={20} />
             </button>
@@ -485,7 +485,7 @@ export default function AffiliateDetails() {
                   <button
                     type="button"
                     aria-label="O que significa esta etiqueta?"
-                    className="text-slate-400 hover:text-brand focus:text-brand outline-none transition-colors"
+                    className="text-slate-400 hover:text-brand focus:text-brand dark:hover:text-white dark:focus:text-white outline-none transition-colors"
                   >
                     <HelpCircle size={14} />
                   </button>
@@ -499,7 +499,7 @@ export default function AffiliateDetails() {
                 </span>
               </div>
             </div>
-            <p className="text-slate-500 font-mono text-xs uppercase tracking-widest mt-1 break-all">ID Externo: #{affiliate.id}</p>
+            <p className="text-slate-500 dark:text-neutral-400 font-mono text-xs uppercase tracking-widest mt-1 break-all">ID Externo: #{affiliate.id}</p>
           </div>
         </div>
 
@@ -516,14 +516,14 @@ export default function AffiliateDetails() {
               </button>
               <button
                 onClick={() => setIsLinkUserModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 text-slate-700 dark:text-neutral-300 rounded-xl hover:border-brand/40 transition-all font-bold text-xs uppercase tracking-wider shadow-sm"
+                className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 text-slate-700 dark:text-neutral-300 rounded-xl hover:border-brand/40 dark:hover:border-white/15 transition-all font-bold text-xs uppercase tracking-wider shadow-sm"
               >
                 <Link size={16} /> Vincular Login
               </button>
               <button
                 onClick={handleGenerateLink}
                 disabled={isGeneratingLink}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 text-slate-700 dark:text-neutral-300 rounded-xl hover:border-brand/40 transition-all font-bold text-xs uppercase tracking-wider shadow-sm"
+                className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 text-slate-700 dark:text-neutral-300 rounded-xl hover:border-brand/40 dark:hover:border-white/15 transition-all font-bold text-xs uppercase tracking-wider shadow-sm"
               >
                 {isGeneratingLink ? <Loader2 size={16} className="animate-spin" /> : <Link size={16} />}
                 Gerar Convite
@@ -618,7 +618,7 @@ export default function AffiliateDetails() {
                   {/* Commissions Overview */}
                   <div className="bg-white dark:bg-neutral-900 p-8 rounded-3xl border border-slate-100 dark:border-neutral-800 shadow-sm space-y-6">
                     <div>
-                      <div className="flex items-center gap-1 text-xs font-bold text-slate-500 mb-2">
+                      <div className="flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-neutral-400 mb-2">
                         Comissão total <InfoTooltip text="Seu ganho no período: CPA Calculado + REV Share, conforme a configuração do seu contrato." align="left" />
                       </div>
                       <div className="flex items-baseline gap-4">
@@ -632,7 +632,7 @@ export default function AffiliateDetails() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-6 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800 flex items-center justify-between group hover:border-brand/20 transition-all">
+                      <div className="p-6 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800 flex items-center justify-between group hover:border-brand/20 dark:hover:border-white/10 transition-all">
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 rounded-xl bg-white dark:bg-neutral-800 flex items-center justify-center text-slate-400 group-hover:text-brand dark:group-hover:text-white transition-colors shadow-sm text-xs font-black">
                             R$
@@ -648,7 +648,7 @@ export default function AffiliateDetails() {
                         </div>
                       </div>
 
-                      <div className="p-6 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800 flex items-center justify-between group hover:border-brand/20 transition-all">
+                      <div className="p-6 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800 flex items-center justify-between group hover:border-brand/20 dark:hover:border-white/10 transition-all">
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 rounded-xl bg-white dark:bg-neutral-800 flex items-center justify-center text-slate-400 group-hover:text-brand dark:group-hover:text-white transition-colors shadow-sm">
                             <TrendingUp size={20} />
@@ -688,7 +688,7 @@ export default function AffiliateDetails() {
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       whileInView={{ opacity: 1, y: 0 }}
-                      className="bg-white dark:bg-neutral-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-neutral-800 shadow-sm group hover:border-brand/20 transition-all duration-500"
+                      className="bg-white dark:bg-neutral-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-neutral-800 shadow-sm group hover:border-brand/20 dark:hover:border-white/10 transition-all duration-500"
                     >
                       <div className="flex items-center justify-between mb-4">
                         <div className="p-3 bg-slate-50 dark:bg-neutral-800 rounded-2xl text-slate-400 group-hover:text-brand dark:group-hover:text-white transition-colors">
@@ -697,9 +697,9 @@ export default function AffiliateDetails() {
                         <TrendBadge change={isAllBrands ? percentChange(row.registrations || 0, prevRegistrations ?? 0) : 0} />
                       </div>
                       <div className="space-y-1">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cadastros</p>
+                        <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-[0.2em]">Cadastros</p>
                         <h4 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{row.registrations || 0}</h4>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">{isNetworkView ? 'Clientes cadastrados na rede' : 'Clientes cadastrados'}</p>
+                        <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-widest mt-2">{isNetworkView ? 'Clientes cadastrados na rede' : 'Clientes cadastrados'}</p>
                       </div>
                     </motion.div>
 
@@ -708,7 +708,7 @@ export default function AffiliateDetails() {
                       initial={{ opacity: 0, y: 20 }}
                       whileInView={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.1 }}
-                      className="bg-white dark:bg-neutral-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-neutral-800 shadow-sm group hover:border-brand/20 transition-all duration-500"
+                      className="bg-white dark:bg-neutral-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-neutral-800 shadow-sm group hover:border-brand/20 dark:hover:border-white/10 transition-all duration-500"
                     >
                       <div className="flex items-center justify-between mb-4">
                         <div className="p-3 bg-slate-50 dark:bg-neutral-800 rounded-2xl text-slate-400 group-hover:text-brand dark:group-hover:text-white transition-colors">
@@ -716,14 +716,14 @@ export default function AffiliateDetails() {
                         </div>
                         <div className="flex items-center gap-2">
                            <div className="bg-slate-100 dark:bg-neutral-800 px-2 py-1 rounded-lg">
-                             <span className="text-[10px] font-black text-slate-500">
+                             <span className="text-[10px] font-black text-slate-500 dark:text-neutral-400">
                                {row.registrations > 0 ? ((row.first_deposits / row.registrations) * 100).toFixed(1) : 0}% conv.
                              </span>
                            </div>
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Primeiros Depósitos</p>
+                        <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-[0.2em]">Primeiros Depósitos</p>
                         <h4 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{row.first_deposits || 0}</h4>
                         <div className="flex items-center gap-1.5 mt-2">
                           <div className="w-1.5 h-1.5 rounded-full bg-brand dark:bg-white animate-pulse"></div>
@@ -737,22 +737,22 @@ export default function AffiliateDetails() {
                       initial={{ opacity: 0, y: 20 }}
                       whileInView={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2 }}
-                      className="bg-white dark:bg-neutral-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-neutral-800 shadow-sm group hover:border-brand/20 transition-all duration-500"
+                      className="bg-white dark:bg-neutral-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-neutral-800 shadow-sm group hover:border-brand/20 dark:hover:border-white/10 transition-all duration-500"
                     >
                       <div className="flex items-center justify-between mb-4">
                         <div className="p-3 bg-slate-50 dark:bg-neutral-800 rounded-2xl text-slate-400 group-hover:text-brand dark:group-hover:text-white transition-colors">
                           <Shield size={20} />
                         </div>
                         <div className="bg-slate-100 dark:bg-neutral-800 px-2 py-1 rounded-lg">
-                           <span className="text-[10px] font-black text-slate-500">
+                           <span className="text-[10px] font-black text-slate-500 dark:text-neutral-400">
                              {row.first_deposits > 0 ? ((row.qualified_cpa / row.first_deposits) * 100).toFixed(1) : 0}% conv.
                            </span>
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">CPA Qualificado</p>
+                        <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-[0.2em]">CPA Qualificado</p>
                         <h4 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{row.qualified_cpa || 0}</h4>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2 opacity-60">Meta Alcançada</p>
+                        <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-widest mt-2 opacity-60">Meta Alcançada</p>
                       </div>
                     </motion.div>
                   </div>
@@ -790,19 +790,19 @@ export default function AffiliateDetails() {
                       {paymentProfile?.pixKey ? (
                         <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
                           <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">PIX · {(paymentProfile.pixKeyType || '—').toUpperCase()}</p>
+                            <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-[0.2em] mb-1">PIX · {(paymentProfile.pixKeyType || '—').toUpperCase()}</p>
                             <p className="text-sm font-bold text-slate-800 dark:text-white break-words">{revealPayment ? paymentProfile.pixKey : maskSensitive(paymentProfile.pixKey)}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{(paymentProfile.documentType || 'cpf').toUpperCase()}</p>
+                            <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-[0.2em] mb-1">{(paymentProfile.documentType || 'cpf').toUpperCase()}</p>
                             <p className="text-sm font-bold text-slate-800 dark:text-white break-words">{paymentProfile.document ? (revealPayment ? paymentProfile.document : maskSensitive(paymentProfile.document)) : '—'}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Razão social / Nome</p>
+                            <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-[0.2em] mb-1">Razão social / Nome</p>
                             <p className="text-sm font-bold text-slate-800 dark:text-white break-words">{paymentProfile.legalName || '—'}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Endereço</p>
+                            <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-[0.2em] mb-1">Endereço</p>
                             <p className="text-sm font-bold text-slate-800 dark:text-white break-words">{paymentProfile.address || '—'}</p>
                           </div>
                         </div>
@@ -838,7 +838,7 @@ export default function AffiliateDetails() {
                   <div className="bg-white dark:bg-neutral-900 border border-slate-100 dark:border-neutral-800 rounded-3xl flex flex-col shadow-sm overflow-hidden mb-20">
                     <div className="p-6 border-b border-slate-50 dark:border-neutral-800 flex justify-between items-center bg-slate-50/50 dark:bg-neutral-800/30">
                       <h3 className="font-black text-xs text-slate-800 dark:text-white uppercase tracking-widest">Evolução Diária</h3>
-                      <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-neutral-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-neutral-800 rounded-lg text-[10px] font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-widest">
                         Cadastros · Comissão
                       </div>
                     </div>
@@ -850,13 +850,13 @@ export default function AffiliateDetails() {
                   <div className="bg-white dark:bg-neutral-900 border border-slate-100 dark:border-neutral-800 rounded-3xl flex flex-col shadow-sm overflow-hidden mb-20">
                     <div className="p-6 border-b border-slate-50 dark:border-neutral-800 flex justify-between items-center bg-slate-50/50 dark:bg-neutral-800/30">
                       <h3 className="font-black text-xs text-slate-800 dark:text-white uppercase tracking-widest">Lista de Clientes</h3>
-                      <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-neutral-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-neutral-800 rounded-lg text-[10px] font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-widest">
                         Filtrar por Casa
                       </div>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-left">
-                        <thead className="bg-slate-50 dark:bg-neutral-800/50 text-[10px] text-slate-400 uppercase tracking-widest sticky top-0 backdrop-blur-sm z-10 border-b border-slate-100 dark:border-neutral-800">
+                        <thead className="bg-slate-50 dark:bg-neutral-800/50 text-[10px] text-slate-400 dark:text-neutral-400 uppercase tracking-widest sticky top-0 backdrop-blur-sm z-10 border-b border-slate-100 dark:border-neutral-800">
                           <tr>
                             <th className="px-8 py-5 font-black">Nome</th>
                             <th className="px-8 py-5 font-black">Valor do primeiro depósito</th>
@@ -916,7 +916,7 @@ export default function AffiliateDetails() {
               <form onSubmit={handleCreateUser} className="p-8 space-y-6">
                 <div className="space-y-4">
                   <div className="p-4 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nome do Afiliado</p>
+                    <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-widest mb-1">Nome do Afiliado</p>
                     <p className="text-sm font-bold text-slate-900 dark:text-white">{humanizeName(affiliate.name || affiliate.label)}</p>
                     <p className="text-[10px] text-slate-400 font-mono mt-1">ID: #{affiliate.id}</p>
                   </div>
@@ -931,7 +931,7 @@ export default function AffiliateDetails() {
                         placeholder="afiliado@exemplo.com"
                         value={userEmail}
                         onChange={(e) => setUserEmail(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800 border border-slate-100 dark:border-neutral-700 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all dark:text-white"
+                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800 border border-slate-100 dark:border-neutral-700 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand dark:focus:border-white/30 transition-all dark:text-white"
                       />
                     </div>
                   </div>
@@ -989,18 +989,18 @@ export default function AffiliateDetails() {
                 <div className="p-6 bg-slate-50 dark:bg-neutral-800 rounded-2xl border border-dashed border-slate-200 dark:border-neutral-700 space-y-4">
                   <div className="flex justify-between items-center text-left">
                     <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">E-mail</p>
+                      <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-widest">E-mail</p>
                       <p className="text-sm font-bold text-slate-900 dark:text-white">{userEmail}</p>
                     </div>
                   </div>
                   <div className="flex justify-between items-center text-left">
                     <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Senha Inicial</p>
+                      <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-widest">Senha Inicial</p>
                       <p className="text-lg font-mono font-black text-brand dark:text-white tracking-widest">{userPassword}</p>
                     </div>
                     <button 
                       onClick={() => navigator.clipboard.writeText(userPassword)}
-                      className="p-2 text-slate-400 hover:text-brand transition-colors"
+                      className="p-2 text-slate-400 hover:text-brand dark:hover:text-white transition-colors"
                     >
                       <Copy size={16} />
                     </button>
@@ -1045,7 +1045,7 @@ export default function AffiliateDetails() {
               {!linkSuccess ? (
                 <form onSubmit={handleLinkUser} className="p-8 space-y-6">
                   <div className="p-4 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Vincular a</p>
+                    <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-widest mb-1">Vincular a</p>
                     <p className="text-sm font-bold text-slate-900 dark:text-white">{humanizeName(affiliate.name || affiliate.label)}</p>
                     <p className="text-[10px] text-slate-400 font-mono mt-1">ID: #{affiliate.id}</p>
                   </div>
@@ -1065,7 +1065,7 @@ export default function AffiliateDetails() {
                         placeholder="afiliado@exemplo.com"
                         value={linkEmail}
                         onChange={(e) => setLinkEmail(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800 border border-slate-100 dark:border-neutral-700 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all dark:text-white"
+                        className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800 border border-slate-100 dark:border-neutral-700 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand dark:focus:border-white/30 transition-all dark:text-white"
                       />
                     </div>
                   </div>
@@ -1138,7 +1138,7 @@ export default function AffiliateDetails() {
 
               <div className="space-y-4">
                 <div className="p-6 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800 relative group">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Link de Convite</p>
+                  <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-widest mb-3">Link de Convite</p>
                   <div className="flex items-center gap-4">
                     <div className="flex-1 font-mono text-xs text-slate-600 dark:text-neutral-400 break-all leading-relaxed bg-white dark:bg-neutral-900 p-3 rounded-xl border border-slate-100 dark:border-neutral-800">
                       {affiliateLink}
@@ -1163,14 +1163,14 @@ export default function AffiliateDetails() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</p>
+                    <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-widest mb-1">Status</p>
                     <div className="flex items-center gap-1.5">
                       <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
                       <span className="text-xs font-bold text-slate-700 dark:text-neutral-300">Pendente</span>
                     </div>
                   </div>
                   <div className="p-4 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Validade</p>
+                    <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-widest mb-1">Validade</p>
                     <span className="text-xs font-bold text-slate-700 dark:text-neutral-300">Uso único · 7 dias</span>
                   </div>
                 </div>
@@ -1218,7 +1218,7 @@ export default function AffiliateDetails() {
             ) : (
               <>
                 <div className="shrink-0 px-6 py-4 bg-slate-50/60 dark:bg-neutral-800/30 border-b border-slate-50 dark:border-neutral-800 flex items-center justify-between">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total de CPA na rede</span>
+                  <span className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-widest">Total de CPA na rede</span>
                   <span className="text-lg font-black text-slate-900 dark:text-white tabular-nums">{networkTotalCpa.toLocaleString('pt-BR')}</span>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-50 dark:divide-neutral-800">
@@ -1242,12 +1242,12 @@ export default function AffiliateDetails() {
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-xl font-black text-slate-900 dark:text-white tabular-nums">{n.qualifiedCpa.toLocaleString('pt-BR')}</p>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">CPA</p>
+                        <p className="text-[9px] font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-widest">CPA</p>
                       </div>
                     </div>
                   ))}
                   {networkCadastros.length === 0 && (
-                    <div className="px-6 py-16 text-center text-xs font-bold text-slate-400 uppercase tracking-widest opacity-60">Nenhum afiliado vinculado</div>
+                    <div className="px-6 py-16 text-center text-xs font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-widest opacity-60">Nenhum afiliado vinculado</div>
                   )}
                 </div>
               </>

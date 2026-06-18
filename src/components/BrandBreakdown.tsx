@@ -43,7 +43,7 @@ export default function BrandBreakdown({ data, config }: BrandBreakdownProps) {
         </div>
       </div>
       {brands.length === 0 ? (
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest py-6 text-center opacity-50">Sem dados por casa</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-widest py-6 text-center opacity-50">Sem dados por casa</p>
       ) : (
         <div className="space-y-6">
           {brands.map((b, idx) => {
@@ -56,7 +56,7 @@ export default function BrandBreakdown({ data, config }: BrandBreakdownProps) {
                     <BrandLogo name={b.name} brandId={b.id} size={24} />
                     <span className="text-xs font-bold text-slate-700 dark:text-neutral-300">{b.name}</span>
                   </div>
-                  <span className="text-xs font-bold text-slate-400">{formatBRL(value)}</span>
+                  <span className="text-xs font-bold text-slate-400 dark:text-neutral-400">{formatBRL(value)}</span>
                 </div>
                 <div className="h-6 bg-slate-100 dark:bg-neutral-800 rounded-full overflow-hidden">
                   <div
