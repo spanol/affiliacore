@@ -39,3 +39,23 @@ env:
     secret: affiliate-api-key
     availability:
       - RUNTIME
+
+  # Credenciais do Supabase de provisionamento da OTG (pull automático do roster
+  # de aprovados — links.otgpartners). Server-only; nunca expor ao browser.
+  # Criar com:  firebase apphosting:secrets:set otg-links-*
+  - variable: OTG_LINKS_SUPABASE_URL
+    secret: otg-links-supabase-url
+    availability:
+      - RUNTIME
+  - variable: OTG_LINKS_SUPABASE_ANON_KEY
+    secret: otg-links-supabase-anon-key
+    availability:
+      - RUNTIME
+  - variable: OTG_LINKS_EMAIL
+    secret: otg-links-email
+    availability:
+      - RUNTIME
+  - variable: OTG_LINKS_PASSWORD
+    secret: otg-links-password
+    availability:
+      - RUNTIME
