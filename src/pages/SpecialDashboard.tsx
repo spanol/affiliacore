@@ -316,7 +316,7 @@ export default function SpecialDashboard() {
         </div>
         <div className="divide-y divide-slate-50 dark:divide-neutral-800">
           {topAffiliates.length === 0 || topAffiliates.every((a) => a.commission === 0 && a.registrations === 0) ? (
-            <p className="px-6 py-10 text-center text-xs font-bold text-slate-400 uppercase tracking-widest opacity-60">Nenhuma produção na rede no período</p>
+            <p className="px-6 py-10 text-center text-xs font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-widest opacity-60">Nenhuma produção na rede no período</p>
           ) : topAffiliates.map((a, i) => (
             <div key={a.id || i} className="px-6 py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-neutral-800/30 transition-colors">
               <div className="flex items-center gap-3 min-w-0">
@@ -382,7 +382,7 @@ export default function SpecialDashboard() {
         <div className="bg-white dark:bg-neutral-900 border border-slate-100 dark:border-neutral-800 rounded-3xl flex flex-col shadow-sm overflow-hidden">
           <div className="p-6 border-b border-slate-50 dark:border-neutral-800 flex justify-between items-center bg-slate-50/50 dark:bg-neutral-800/30">
             <h3 className="font-black text-xs text-slate-800 dark:text-white uppercase tracking-widest">Evolução Diária (sua rede)</h3>
-            <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-neutral-800 rounded-lg text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-neutral-800 rounded-lg text-[10px] font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-widest">
               Cadastros · Comissão
             </div>
           </div>

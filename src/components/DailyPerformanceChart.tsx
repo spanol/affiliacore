@@ -23,10 +23,11 @@ export default function DailyPerformanceChart({ data }: DailyPerformanceChartPro
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
-  // Tokens alinhados ao tema (antes eram cores claras fixas que sumiam no dark).
-  const gridColor = isDark ? '#334155' : '#e2e8f0';
-  const tickColor = isDark ? '#94a3b8' : '#94a3b8';
-  const barColor = isDark ? '#475569' : '#141C2A'; // slate-600 no dark, brand no light
+  // Tokens alinhados ao tema. No dark usamos o palette NEUTRAL (cinza puro) do v2 —
+  // antes eram tons de slate (azulados), que destoavam do resto do dark theme.
+  const gridColor = isDark ? '#404040' : '#e2e8f0';        // neutral-700 no dark
+  const tickColor = isDark ? '#a3a3a3' : '#94a3b8';        // neutral-400 no dark (eixos)
+  const barColor = isDark ? '#525252' : '#141C2A';         // neutral-600 no dark, brand no light
   const lineColor = '#0ea5e9';
 
   const rows = (Array.isArray(data) ? data : [])

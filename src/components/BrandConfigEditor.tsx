@@ -108,7 +108,7 @@ export default function BrandConfigEditor({ affiliateId, brandRows, config, onSa
           />
         </div>
       </div>
-      <p className="text-[11px] text-slate-400 mb-6">
+      <p className="text-[11px] text-slate-400 dark:text-neutral-400 mb-6">
         Padrão do contrato: <span className="font-bold">R$ {def.cpaValue}/CPA</span> ·{' '}
         <span className="font-bold">{def.revPercentage}% REV</span>. Em branco = usa o padrão.
       </p>
@@ -125,7 +125,7 @@ export default function BrandConfigEditor({ affiliateId, brandRows, config, onSa
             </div>
             <div className="flex-1 grid grid-cols-2 gap-3">
               <label className="block">
-                <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">CPA (R$)</span>
+                <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-neutral-400">CPA (R$)</span>
                 <input
                   type="number"
                   min={0}
@@ -133,11 +133,11 @@ export default function BrandConfigEditor({ affiliateId, brandRows, config, onSa
                   value={rates[h.id]?.cpa ?? ''}
                   onChange={(e) => setField(h.id, 'cpa', e.target.value)}
                   placeholder={String(def.cpaValue)}
-                  className="mt-1 w-full px-3 py-2 bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all dark:text-white"
+                  className="mt-1 w-full px-3 py-2 bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand dark:focus:border-white/30 transition-all dark:text-white"
                 />
               </label>
               <label className="block">
-                <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">REV (%)</span>
+                <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-neutral-400">REV (%)</span>
                 <input
                   type="number"
                   min={0}
@@ -146,7 +146,7 @@ export default function BrandConfigEditor({ affiliateId, brandRows, config, onSa
                   value={rates[h.id]?.rev ?? ''}
                   onChange={(e) => setField(h.id, 'rev', e.target.value)}
                   placeholder={String(def.revPercentage)}
-                  className="mt-1 w-full px-3 py-2 bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all dark:text-white"
+                  className="mt-1 w-full px-3 py-2 bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand dark:focus:border-white/30 transition-all dark:text-white"
                 />
               </label>
             </div>

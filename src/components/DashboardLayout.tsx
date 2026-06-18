@@ -191,7 +191,7 @@ export default function DashboardLayout() {
             >
               {theme === 'light' ? (
                 <>
-                  <Moon size={14} className="text-slate-600" />
+                  <Moon size={14} className="text-slate-600 dark:text-neutral-400" />
                   <span className="text-[10px] font-bold uppercase tracking-wider">Tema Escuro</span>
                 </>
               ) : (

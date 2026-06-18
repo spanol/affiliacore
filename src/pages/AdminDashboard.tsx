@@ -433,9 +433,9 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-center pt-3 border-t border-slate-100 dark:border-neutral-800">
-                  <div><p className="text-sm font-bold text-slate-800 dark:text-white tabular-nums">{h.registrations.toLocaleString('pt-BR')}</p><p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Cadastros</p></div>
-                  <div><p className="text-sm font-bold text-slate-800 dark:text-white tabular-nums">{h.firstDeposits.toLocaleString('pt-BR')}</p><p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">FTD</p></div>
-                  <div><p className="text-sm font-bold text-slate-800 dark:text-white tabular-nums">{h.qualifiedCpa.toLocaleString('pt-BR')}</p><p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">CPA</p></div>
+                  <div><p className="text-sm font-bold text-slate-800 dark:text-white tabular-nums">{h.registrations.toLocaleString('pt-BR')}</p><p className="text-[9px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-wider">Cadastros</p></div>
+                  <div><p className="text-sm font-bold text-slate-800 dark:text-white tabular-nums">{h.firstDeposits.toLocaleString('pt-BR')}</p><p className="text-[9px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-wider">FTD</p></div>
+                  <div><p className="text-sm font-bold text-slate-800 dark:text-white tabular-nums">{h.qualifiedCpa.toLocaleString('pt-BR')}</p><p className="text-[9px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-wider">CPA</p></div>
                 </div>
               </motion.div>
             ))}
@@ -462,7 +462,7 @@ export default function AdminDashboard() {
             {loading ? (
               <div className="flex items-center justify-center py-10"><Loader2 className="animate-spin text-brand dark:text-white" /></div>
             ) : topSpecials.length === 0 ? (
-              <p className="px-6 py-10 text-center text-xs font-bold text-slate-400 uppercase tracking-widest opacity-60">Nenhum afiliado especial ativo</p>
+              <p className="px-6 py-10 text-center text-xs font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest opacity-60">Nenhum afiliado especial ativo</p>
             ) : topSpecials.map((s, i) => (
               <div key={s.id} className="px-6 py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-neutral-800/30 transition-colors">
                 <div className="flex items-center gap-3 min-w-0">
@@ -491,7 +491,7 @@ export default function AdminDashboard() {
             {loading ? (
               <div className="flex items-center justify-center py-10"><Loader2 className="animate-spin text-brand dark:text-white" /></div>
             ) : topSubs.length === 0 ? (
-              <p className="px-6 py-10 text-center text-xs font-bold text-slate-400 uppercase tracking-widest opacity-60">Nenhum sub-afiliado vinculado</p>
+              <p className="px-6 py-10 text-center text-xs font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest opacity-60">Nenhum sub-afiliado vinculado</p>
             ) : topSubs.map((s, i) => (
               <div key={s.id} className="px-6 py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-neutral-800/30 transition-colors">
                 <div className="flex items-center gap-3 min-w-0">
