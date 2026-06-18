@@ -6,21 +6,23 @@ fotos do portal `partners.grupootg.com` são assets do front-end deles — ficam
 bucket público do Supabase (`betting-house-logos`, arquivo = `<brandId>-<ts>.png`).
 Baixamos as oficiais e hospedamos aqui (`superbet.png`, `sportingbet.png`).
 
-## Como adicionar / trocar uma logo
+## Backoffice de casas (atual) — `/casas`
 
-1. Coloque o arquivo nesta pasta com o nome do **slug** da casa (ver
-   `src/lib/brand.ts` → `KNOWN_BRANDS`). Hoje:
-   - `superbet.svg`
-   - `sportingbet.svg`
-2. Formato: **SVG** (preferido) ou PNG quadrado (≥120×120, fundo transparente).
-   Se usar PNG, ajuste o caminho `logo` em `KNOWN_BRANDS`.
-3. Sem alteração de código: o `BrandLogo` resolve o caminho pelo registro.
+O registro de casas **deixou de ser hardcoded**. A fonte de verdade agora é a
+coleção Firestore `houses`, gerida pelo admin na tela **/casas** (sidebar →
+"Casas"): criar/editar nome, slug, `brandId`, **upload da logo** (vai pro
+Storage, `house-logos/<slug>-<ts>`) e a URL de cadastro. Adicionar uma casa nova
+**não exige mais deploy nem mexer em código** — basta a tela.
 
-> Os arquivos atuais são as **logos oficiais** (baixadas do bucket da OTG). Se um
-> arquivo faltar/404, a UI cai no avatar de inicial automaticamente (`BrandLogo`
-> tem fallback).
+O array `DEFAULT_BRANDS` em `src/lib/brand.ts` é só a **semente** (Superbet +
+SportingBet, com as logos oficiais abaixo): usado como fallback quando o backend
+ainda não carregou e como auto-seed na 1ª vez que a coleção está vazia. Em
+runtime, `setKnownBrands` (no boot do `DashboardLayout`) substitui o registro
+vivo pelas casas do backend.
 
-## Adicionar uma casa nova
+## Logos das sementes hospedadas aqui
 
-Inclua uma entrada em `KNOWN_BRANDS` (`src/lib/brand.ts`) com `id` (brandId real
-da OTG quando conhecido), `slug`, `name` e `logo`, e solte o arquivo aqui.
+Os arquivos desta pasta (`superbet.png`, `sportingbet.png`) são as **logos
+oficiais** das casas-semente. Casas criadas pelo backoffice guardam a logo no
+**Storage** (URL no doc da casa), não aqui. Se uma logo faltar/404, a UI cai no
+avatar de inicial automaticamente (`BrandLogo` / `HouseLogo` têm fallback).

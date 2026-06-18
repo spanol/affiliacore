@@ -4,7 +4,11 @@
 // ainda só traz Superbet com produção (ver [[boost-external-api-state]]).
 // Importante: aqui só ZERAMOS casas faltantes; nunca inventamos produção falsa —
 // as casas reais da API entram com seus números, as demais entram zeradas.
-import { KNOWN_BRANDS } from './brand';
+import { getKnownBrands } from './brand';
+
+// Só casas ATIVAS aparecem "acesas e vazias" (uma casa desativada no backoffice
+// some das visões por casa, mas getBrandMeta ainda a resolve p/ dados históricos).
+const activeKnownBrands = () => getKnownBrands().filter((b) => b.active !== false);
 
 // Linha de marca ZERADA (casa vazia) no shape do groupBy=brand da API.
 const emptyBrandRow = (b: { id?: string; name: string }) => ({
@@ -26,7 +30,7 @@ export function withKnownHouses<T>(real: T[]): T[] {
   const rows = Array.isArray(real) ? [...real] : [];
   const presentIds = new Set(rows.map((r: any) => String(r?.id ?? '').toLowerCase()));
   const presentNames = new Set(rows.map((r: any) => String(r?.label ?? r?.name ?? '').toLowerCase()));
-  for (const b of KNOWN_BRANDS) {
+  for (const b of activeKnownBrands()) {
     const idKey = String(b.id ?? '').toLowerCase();
     if ((idKey && presentIds.has(idKey)) || presentNames.has(b.name.toLowerCase())) continue;
     rows.push(emptyBrandRow(b) as unknown as T);
@@ -38,6 +42,6 @@ export function withKnownHouses<T>(real: T[]): T[] {
 // casa — espelha o portal, que lista a casa vazia.
 export function withKnownBrandNames(realNames: string[]): string[] {
   const set = new Set(realNames);
-  for (const b of KNOWN_BRANDS) set.add(b.name);
+  for (const b of activeKnownBrands()) set.add(b.name);
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 }

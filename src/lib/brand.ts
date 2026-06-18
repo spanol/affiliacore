@@ -41,29 +41,62 @@ export interface BrandMeta {
   id?: string;   // brandId da OTG quando conhecido (Superbet)
   slug: string;
   name: string;
-  logo?: string; // caminho em /public/brands (fallback = avatar de inicial)
+  logo?: string; // URL da logo (Storage) ou caminho em /public/brands; fallback = avatar
+  registerUrlTemplate?: string | null; // URL base de cadastro com {ref} (gera links)
+  active?: boolean; // casa "acesa": listada nas visões por casa (default true)
+  order?: number;   // ordem de exibição
 }
 
 const normBrandKey = (s?: string | null) => String(s ?? '').trim().toLowerCase();
 
+// Casas-semente embarcadas no bundle: usadas como FALLBACK quando o backoffice
+// (coleção Firestore `houses`) ainda não carregou ou está vazio — e como dado de
+// auto-seed do servidor. Em runtime o registro real vem do backend via
+// `setKnownBrands` (DashboardLayout), tornando as casas gerenciáveis sem deploy.
 // ids e logos confirmados na dashboard da OTG (partners.grupootg.com, 2026-06-11):
 // o <select> de casas expõe o brandId real e as logos vêm do bucket público
-// `betting-house-logos` (nome do arquivo = brandId). Baixamos as oficiais p/
-// /public/brands. [[boost-external-api-state]]
-export const KNOWN_BRANDS: BrandMeta[] = [
-  { id: 'clsuperbet000001', slug: 'superbet', name: 'Superbet', logo: '/brands/superbet.png' },
+// `betting-house-logos`. Baixamos as oficiais p/ /public/brands.
+// [[boost-external-api-state]]
+export const DEFAULT_BRANDS: BrandMeta[] = [
+  { id: 'clsuperbet000001', slug: 'superbet', name: 'Superbet', logo: '/brands/superbet.png', active: true },
   // SportingBet: a OTG já LISTA a casa pra agência, mas ela está vazia (0 afiliados)
   // e a nossa x-api-key ainda não traz dados dela — aparece zerada (modelo do portal).
-  { id: 'cmm5dhdqm000e19b58dqc549a', slug: 'sportingbet', name: 'SportingBet', logo: '/brands/sportingbet.png' },
+  { id: 'cmm5dhdqm000e19b58dqc549a', slug: 'sportingbet', name: 'SportingBet', logo: '/brands/sportingbet.png', active: true },
 ];
 
-// Metadados de uma casa por id (preferencial) ou por nome/slug.
+// Compat: alguns lugares ainda importam KNOWN_BRANDS como as casas-semente.
+// O registro VIVO (que muda em runtime) é lido por getKnownBrands().
+export const KNOWN_BRANDS = DEFAULT_BRANDS;
+
+// Registro VIVO das casas. Começa nas sementes e é substituído quando o backend
+// responde (setKnownBrands). Os helpers abaixo leem este cache em tempo de
+// chamada, então toda a UI reflete o backoffice sem rewrite dos call-sites.
+let _knownBrands: BrandMeta[] = [...DEFAULT_BRANDS];
+
+// Lista viva das casas conhecidas (todas, ativas ou não).
+export function getKnownBrands(): BrandMeta[] {
+  return _knownBrands;
+}
+
+// Substitui o registro vivo (chamado no boot com as casas do backend). Ignora
+// entradas sem nome; nunca deixa o registro vazio (cai nas sementes) p/ a UI não
+// ficar sem casas se o backend falhar.
+export function setKnownBrands(list: BrandMeta[] | null | undefined): void {
+  const clean = (Array.isArray(list) ? list : [])
+    .filter((b) => b && String(b.name ?? '').trim())
+    .map((b) => ({ ...b, slug: b.slug || normBrandKey(b.name) }));
+  _knownBrands = clean.length ? clean : [...DEFAULT_BRANDS];
+}
+
+// Metadados de uma casa por id (preferencial) ou por nome/slug. Lê o registro vivo
+// e resolve mesmo casas inativas (badges/logos de dados históricos seguem certos).
 export function getBrandMeta(idOrName?: string | null): BrandMeta | null {
   const key = normBrandKey(idOrName);
   if (!key) return null;
+  const brands = getKnownBrands();
   return (
-    KNOWN_BRANDS.find((b) => normBrandKey(b.id) === key) ||
-    KNOWN_BRANDS.find((b) => normBrandKey(b.name) === key || b.slug === key) ||
+    brands.find((b) => normBrandKey(b.id) === key) ||
+    brands.find((b) => normBrandKey(b.name) === key || b.slug === key) ||
     null
   );
 }
