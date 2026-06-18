@@ -173,8 +173,6 @@ export default function DashboardLayout() {
               ? 'Painel Administrativo'
               : location.pathname === '/special-affiliates'
                 ? 'Afiliados Especiais'
-                : location.pathname === '/parceiros-api'
-                ? 'API Parceiros'
                 : location.pathname === '/roster-otg'
                 ? 'Roster OTG'
                 : location.pathname === '/financeiro'
