@@ -20,6 +20,7 @@ import SpecialAffiliatesList from './pages/SpecialAffiliatesList';
 import Financeiro from './pages/Financeiro';
 import PartnerApiExplorer from './pages/PartnerApiExplorer';
 import OtgRoster from './pages/OtgRoster';
+import Houses from './pages/Houses';
 import NotFound from './pages/NotFound';
 import DashboardLayout from './components/DashboardLayout';
 
@@ -125,6 +126,11 @@ export default function App() {
             <Route path="/roster-otg" element={
               <ProtectedRoute role="admin">
                 <OtgRoster />
+              </ProtectedRoute>
+            } />
+            <Route path="/casas" element={
+              <ProtectedRoute role="admin">
+                <Houses />
               </ProtectedRoute>
             } />
             <Route path="/affiliates/:id" element={<AffiliateDetails />} />

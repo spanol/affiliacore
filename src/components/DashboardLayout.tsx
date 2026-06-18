@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { fetchHouses, syncKnownBrandsFrom } from '../services/houseService';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import { 
@@ -16,7 +17,8 @@ import {
   Crown,
   Wallet,
   Plug,
-  Database
+  Database,
+  Building2
 } from 'lucide-react';
 import { cn, humanizeName } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -30,6 +32,15 @@ export default function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Carrega o registro de casas (backoffice) uma vez no boot da área autenticada e
+  // popula o cache vivo de marcas — toda a UI (logos/filtros/breakdown por casa)
+  // passa a refletir o /casas sem hardcode. Falha silenciosa: cai nas sementes.
+  useEffect(() => {
+    fetchHouses()
+      .then((houses) => { if (houses.length) syncKnownBrandsFrom(houses); })
+      .catch(() => {});
+  }, []);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -65,6 +76,7 @@ export default function DashboardLayout() {
           : []),
         ...(profile?.role === 'admin' ? [
           { label: 'Afiliados Especiais', path: '/special-affiliates', icon: Crown },
+          { label: 'Casas', path: '/casas', icon: Building2 },
           { label: 'Roster OTG', path: '/roster-otg', icon: Database },
           { label: 'API Parceiros', path: '/parceiros-api', icon: Plug },
           { label: 'Configurações', path: '/settings', icon: Settings }
@@ -173,6 +185,8 @@ export default function DashboardLayout() {
               ? 'Painel Administrativo'
               : location.pathname === '/special-affiliates'
                 ? 'Afiliados Especiais'
+                : location.pathname === '/casas'
+                ? 'Casas'
                 : location.pathname === '/roster-otg'
                 ? 'Roster OTG'
                 : location.pathname === '/financeiro'
