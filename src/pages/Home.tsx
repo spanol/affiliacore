@@ -523,7 +523,7 @@ export default function Home() {
         </section> */}
 
         {/* Casas de apostas parceiras */}
-        <section className="max-w-7xl mx-auto px-6 py-24 border-t border-neutral-800/50">
+        {/* <section className="max-w-7xl mx-auto px-6 py-24 border-t border-neutral-800/50">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-white">
               Casas de apostas parceiras
@@ -548,7 +548,7 @@ export default function Home() {
               </motion.div>
             ))}
           </div>
-        </section>
+        </section> */}
       </main>
 
       {/* Footer */}
