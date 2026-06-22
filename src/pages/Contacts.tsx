@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Mail, Phone, Instagram, Clock4 } from 'lucide-react';
+import { Mail, Phone, Share2, Clock4 } from 'lucide-react';
 import { subscribeToContactInquiries, ContactInquiry } from '../services/contactService';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
@@ -80,8 +80,8 @@ export default function Contacts() {
                     <span className="text-sm text-slate-700 dark:text-neutral-200">{contact.phone}</span>
                   </div>
                   <div className="flex items-center gap-2 rounded-xl bg-white dark:bg-neutral-800/40 border border-slate-200 dark:border-neutral-800 p-3">
-                    <Instagram size={16} className="text-slate-400 dark:text-neutral-400" />
-                    <span className="text-sm text-slate-700 dark:text-neutral-200 break-all">{contact.instagram}</span>
+                    <Share2 size={16} className="text-slate-400 dark:text-neutral-400" />
+                    <span className="text-sm text-slate-700 dark:text-neutral-200 break-all">{contact.socialMedia || contact.instagram}</span>
                   </div>
                   <div className="rounded-xl bg-slate-100 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 p-3 text-[11px] uppercase tracking-widest font-bold text-slate-500 dark:text-neutral-400">
                     {contact.createdAt ? new Date(contact.createdAt.toDate()).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Sem data'}

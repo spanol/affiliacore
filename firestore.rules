@@ -72,11 +72,11 @@ service cloud.firestore {
     // painel admin. (Rate limit/captcha do formulário fica como follow-up — App Check.)
     match /contacts/{contactId} {
       allow create: if request.resource.data.keys().hasOnly(
-                         ['name','email','phone','instagram','affiliateExperience','presentation','createdAt'])
+                         ['name','email','phone','socialMedia','affiliateExperience','presentation','createdAt'])
                     && request.resource.data.name is string && request.resource.data.name.size() <= 120
                     && request.resource.data.email is string && request.resource.data.email.size() <= 200
                     && request.resource.data.phone is string && request.resource.data.phone.size() <= 40
-                    && request.resource.data.instagram is string && request.resource.data.instagram.size() <= 120
+                    && request.resource.data.socialMedia is string && request.resource.data.socialMedia.size() <= 120
                     && request.resource.data.affiliateExperience in ['sim', 'nao']
                     && request.resource.data.presentation is string && request.resource.data.presentation.size() <= 2000;
       allow read, update, delete: if isAdmin();

@@ -36,7 +36,7 @@ const emptyForm: ContactInquiryInput = {
   name: '',
   email: '',
   phone: '',
-  instagram: '',
+  socialMedia: '',
   affiliateExperience: 'sim',
   presentation: '',
 };
@@ -62,7 +62,7 @@ export default function Home() {
         name: form.name.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
-        instagram: form.instagram.trim(),
+        socialMedia: form.socialMedia.trim(),
         presentation: form.presentation.trim(),
       });
       setStatus('success');
@@ -461,11 +461,11 @@ export default function Home() {
                         className={inputClass}
                       />
                     </Field>
-                    <Field label="Instagram">
+                    <Field label="Rede Social">
                       <input
                         type="text"
-                        value={form.instagram}
-                        onChange={(e) => updateField('instagram', e.target.value)}
+                        value={form.socialMedia}
+                        onChange={(e) => updateField('socialMedia', e.target.value)}
                         placeholder="@seuperfil"
                         className={inputClass}
                       />

@@ -13,7 +13,7 @@ export interface ContactInquiryInput {
   name: string;
   email: string;
   phone: string;
-  instagram: string;
+  socialMedia: string;
   affiliateExperience: 'sim' | 'nao';
   presentation: string;
 }
@@ -21,6 +21,8 @@ export interface ContactInquiryInput {
 export interface ContactInquiry extends ContactInquiryInput {
   id: string;
   createdAt: Timestamp | null;
+  /** @deprecated registros antigos gravavam `instagram`; usar `socialMedia`. */
+  instagram?: string;
 }
 
 const contactsCollection = collection(db, 'contacts');
