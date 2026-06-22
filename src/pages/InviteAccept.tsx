@@ -4,9 +4,10 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { fetchInvite, acceptInvite } from '../services/affiliateService';
-import { UserPlus, Mail, Lock, AlertCircle, CheckCircle, Loader2, Instagram, Phone } from 'lucide-react';
+import { UserPlus, Mail, Lock, AlertCircle, CheckCircle, Loader2, Share2, Phone, IdCard } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
+import { maskCPF, maskPhone, isValidCPF, isValidPhone } from '../lib/validators';
 
 const boostLogo = `${import.meta.env.BASE_URL}boost-home/logo.svg`;
 
@@ -20,8 +21,9 @@ export default function InviteAccept() {
   const [affiliateName, setAffiliateName] = useState<string | null>(null);
 
   const [email, setEmail] = useState('');
-  const [instagram, setInstagram] = useState('');
+  const [socialMedia, setSocialMedia] = useState('');
   const [phone, setPhone] = useState('');
+  const [cpf, setCpf] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
@@ -58,14 +60,22 @@ export default function InviteAccept() {
       setError('Informe um número de telefone para contato.');
       return;
     }
+    if (!isValidPhone(trimmedPhone)) {
+      setError('Telefone inválido. Use o formato (00) 00000-0000.');
+      return;
+    }
+    if (!isValidCPF(cpf)) {
+      setError('CPF inválido. Verifique os números digitados.');
+      return;
+    }
 
     setSubmitting(true);
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      const normalizedInstagram = instagram.trim().replace(/^@+/, '');
       await acceptInvite(token, normalizedEmail, password, {
         phone: trimmedPhone,
-        instagram: normalizedInstagram ? `@${normalizedInstagram}` : '',
+        socialMedia: socialMedia.trim(),
+        cpf: cpf.trim(),
       });
       setSuccess(true);
       // Sign the affiliate in so AuthContext loads the profile and redirects.
@@ -172,8 +182,9 @@ export default function InviteAccept() {
             <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500" size={16} />
             <input
               type="tel"
+              inputMode="numeric"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => setPhone(maskPhone(e.target.value))}
               required
               className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all outline-none"
               placeholder="(11) 99999-9999"
@@ -182,15 +193,31 @@ export default function InviteAccept() {
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest ml-1">Instagram <span className="text-slate-300 dark:text-neutral-600 normal-case font-medium">(opcional)</span></label>
+          <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest ml-1">Rede Social <span className="text-slate-300 dark:text-neutral-600 normal-case font-medium">(opcional)</span></label>
           <div className="relative">
-            <Instagram className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500" size={16} />
+            <Share2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500" size={16} />
             <input
               type="text"
-              value={instagram}
-              onChange={(e) => setInstagram(e.target.value)}
+              value={socialMedia}
+              onChange={(e) => setSocialMedia(e.target.value)}
               className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all outline-none"
               placeholder="@seuperfil"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest ml-1">CPF</label>
+          <div className="relative">
+            <IdCard className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500" size={16} />
+            <input
+              type="text"
+              inputMode="numeric"
+              value={cpf}
+              onChange={(e) => setCpf(maskCPF(e.target.value))}
+              required
+              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all outline-none"
+              placeholder="000.000.000-00"
             />
           </div>
         </div>
