@@ -609,6 +609,18 @@ export default function AffiliateDetails() {
               const rates = isAllBrands
                 ? { cpaValue: config?.cpaValue || 0, revPercentage: config?.revPercentage || 0 }
                 : resolveBrandRates(config, String(selectedBrandRow?.id ?? ''));
+              // "Configurado como 0" ≠ "ainda não configurado": detecta a AUSÊNCIA do
+              // valor de CPA (config sem `cpaValue` de topo e sem override por casa) p/
+              // não exibir R$0 como se fosse uma taxa real. Caso clássico: afiliado com
+              // só `byBrand` (override por casa) e sem default de topo → a visão "Todas
+              // as casas" cai no topo ausente. A configuração é do admin master.
+              const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+              const brandCpaRaw = isAllBrands
+                ? undefined
+                : config?.byBrand?.[String(selectedBrandRow?.id ?? '')]?.cpaValue;
+              const cpaConfigured = isAllBrands
+                ? isNum(config?.cpaValue)
+                : (isNum(brandCpaRaw) || isNum(config?.cpaValue));
               const calculatedCpa = (row.qualified_cpa || 0) * rates.cpaValue;
               const calculatedRev = (row.rvs || 0) * (rates.revPercentage / 100);
               const totalCommission = calculatedCpa + calculatedRev;
@@ -625,9 +637,15 @@ export default function AffiliateDetails() {
                         <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white break-words">
                           R$ {totalCommission.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </h2>
-                        <div className="flex items-center gap-1 text-brand dark:text-white font-bold text-sm bg-brand/5 dark:bg-white/10 px-2 py-0.5 rounded-lg">
-                          <TrendingUp size={16} /> Configurado
-                        </div>
+                        {cpaConfigured ? (
+                          <div className="flex items-center gap-1 text-brand dark:text-white font-bold text-sm bg-brand/5 dark:bg-white/10 px-2 py-0.5 rounded-lg">
+                            <TrendingUp size={16} /> Configurado
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 text-amber-700 dark:text-amber-400 font-bold text-sm bg-amber-500/10 px-2 py-0.5 rounded-lg" title="O valor de CPA deste afiliado ainda não foi configurado nas taxas do contrato.">
+                            <AlertCircle size={16} /> CPA não configurado
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -639,11 +657,17 @@ export default function AffiliateDetails() {
                           </div>
                           <div>
                             <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-neutral-300 uppercase tracking-widest mb-1">
-                              CPA Calculado (R$ {rates.cpaValue}/CPA) <InfoTooltip text="CPA Qualificado × valor de CPA do seu contrato. Quantos cadastros qualificaram, multiplicado pelo valor por aquisição." size={10} align="left" />
+                              CPA Calculado{cpaConfigured ? ` (R$ ${rates.cpaValue}/CPA)` : ''} <InfoTooltip text="CPA Qualificado × valor de CPA do seu contrato. Quantos cadastros qualificaram, multiplicado pelo valor por aquisição." size={10} align="left" />
                             </div>
-                            <p className="text-xl font-black text-slate-800 dark:text-white">
-                              R$ {calculatedCpa.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
+                            {cpaConfigured ? (
+                              <p className="text-xl font-black text-slate-800 dark:text-white">
+                                R$ {calculatedCpa.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            ) : (
+                              <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
+                                Não configurado{isAdmin ? ' — defina o valor de CPA nas taxas do afiliado' : ''}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
