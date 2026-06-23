@@ -12,6 +12,12 @@ import { db } from '../lib/firebase';
 import { authFetch } from '../lib/api';
 import { withKnownHouses } from '../lib/knownHouses';
 import { getDefaultRange } from '../lib/dateRange';
+import { getKnownBrands } from '../lib/brand';
+import { fetchHouseResults } from './houseService';
+import {
+  StoredManualRow, Metrics, METRIC_KEYS,
+  aggregateByHouse, aggregateByDate, aggregateByAffiliate,
+} from '../lib/houseResults';
 
 interface Affiliate {
   id: string;
@@ -387,13 +393,102 @@ export interface DateRangeOpts {
   endDate?: string;
 }
 
+// --- Merge dos resultados MANUAIS (casas 'manual') ---------------------------
+// As casas 'manual' (não vêm da OTG) recebem resultados por upload (house_results).
+// Aqui somamos essas linhas às da OTG, respeitando o groupBy. O merge é ADITIVO e
+// só ocorre nas visões por casa/data e nas escopadas a afiliado — NÃO em
+// fetchAllResults (groupBy=affiliate da rede), que alimenta a atribuição "1 casa
+// por afiliado" do /admin (manual é incorporado lá explicitamente, sem contaminar).
+
+// Busca as linhas manuais do range; nunca lança (dado opcional/aditivo).
+async function fetchManualRowsSafe(opts: DateRangeOpts): Promise<StoredManualRow[]> {
+  try {
+    return await fetchHouseResults({ start: opts.startDate, end: opts.endDate });
+  } catch {
+    return [];
+  }
+}
+
+// Mantém só as linhas ATRIBUÍDAS a um conjunto de afiliados (descarta agregados).
+function manualForAffiliates(rows: StoredManualRow[], ids: (string | number)[]): StoredManualRow[] {
+  const set = new Set(ids.map(String));
+  return rows.filter((r) => r.affiliateId !== null && set.has(String(r.affiliateId)));
+}
+
+// Linha de marca (groupBy=brand) a partir do total de uma casa manual.
+function manualBrandRow(slug: string, m: Metrics): any {
+  const meta = getKnownBrands().find((b) => b.slug === slug);
+  return {
+    id: meta?.id ?? slug,
+    label: meta?.name ?? slug,
+    registrations: m.registrations,
+    first_deposits: m.first_deposits,
+    qualified_cpa: m.qualified_cpa,
+    rvs: m.rvs,
+    deposit: m.deposit,
+    cpa: 0,
+    total_commission: m.total_commission,
+  };
+}
+
+// Anexa as casas manuais (uma linha por casa) às linhas groupBy=brand da OTG.
+// Casas manuais e OTG são disjuntas, então é append puro (sem risco de somar 2×).
+function appendManualBrandRows(otg: any[], byHouse: Record<string, Metrics>): any[] {
+  const rows = Array.isArray(otg) ? [...otg] : [];
+  for (const slug of Object.keys(byHouse)) rows.push(manualBrandRow(slug, byHouse[slug]));
+  return rows;
+}
+
+// Soma o manual por afiliado nas linhas groupBy=affiliate (merge por id; push se novo).
+function mergeManualAffiliateRows(otg: any[], byAff: Record<string, Metrics>): any[] {
+  const rows = Array.isArray(otg) ? otg.map((r) => ({ ...r })) : [];
+  const idx = new Map<string, any>();
+  rows.forEach((r) => { const id = String(r.affiliate_id ?? r.id ?? ''); if (id) idx.set(id, r); });
+  for (const id of Object.keys(byAff)) {
+    const m = byAff[id];
+    const existing = idx.get(id);
+    if (existing) {
+      for (const k of METRIC_KEYS) existing[k] = (Number(existing[k]) || 0) + m[k];
+    } else {
+      rows.push({ id, affiliate_id: id, ...m, cpa: 0 });
+    }
+  }
+  return rows;
+}
+
+// Soma o manual por data nas linhas groupBy=date (a data está em r.id).
+function mergeManualDateRows(otg: any[], byDate: Record<string, Metrics>): any[] {
+  const rows = Array.isArray(otg) ? otg.map((r) => ({ ...r })) : [];
+  const idx = new Map<string, any>();
+  rows.forEach((r) => { const d = String(r.id ?? r.label ?? ''); if (d) idx.set(d, r); });
+  for (const date of Object.keys(byDate)) {
+    const m = byDate[date];
+    const existing = idx.get(date);
+    if (existing) {
+      for (const k of METRIC_KEYS) existing[k] = (Number(existing[k]) || 0) + m[k];
+    } else {
+      rows.push({ id: date, label: date, ...m });
+    }
+  }
+  return rows;
+}
+
+// Busca pública das linhas manuais (o /admin incorpora ao lucro/totais por casa).
+export async function fetchManualResults(opts: DateRangeOpts = {}): Promise<StoredManualRow[]> {
+  return fetchManualRowsSafe(opts);
+}
+
 // Per-house (brand) breakdown for an affiliate.
 export async function fetchAffiliateResultsByBrand(id: string, opts: DateRangeOpts = {}): Promise<any[]> {
   try {
-    // B6/dev · garante que as casas conhecidas (ex.: SportingBet) apareçam no
-    // breakdown — VAZIAS se a API não trouxe dados — quando a preview multi-casa
-    // está ligada. No-op em produção.
-    return withKnownHouses(await fetchResultsGrouped('brand', { affiliateIds: id, ...opts }));
+    // Casas conhecidas aparecem mesmo vazias (modelo OTG); as casas MANUAIS do
+    // afiliado entram com a produção atribuída a ele (house_results).
+    const [otg, manual] = await Promise.all([
+      fetchResultsGrouped('brand', { affiliateIds: id, ...opts }),
+      fetchManualRowsSafe(opts),
+    ]);
+    const mine = manualForAffiliates(manual, [id]);
+    return withKnownHouses(appendManualBrandRows(otg, aggregateByHouse(mine)));
   } catch (error) {
     console.error(`Error fetching brand results for affiliate ${id}:`, error);
     return [];
@@ -404,7 +499,11 @@ export async function fetchAffiliateResultsByBrand(id: string, opts: DateRangeOp
 // when no explicit start/end is supplied.
 export async function fetchAffiliateDailyResults(id: string, startDate?: string, endDate?: string): Promise<any[]> {
   try {
-    return await fetchResultsGrouped('date', { affiliateIds: id, startDate, endDate });
+    const [otg, manual] = await Promise.all([
+      fetchResultsGrouped('date', { affiliateIds: id, startDate, endDate }),
+      fetchManualRowsSafe({ startDate, endDate }),
+    ]);
+    return mergeManualDateRows(otg, aggregateByDate(manualForAffiliates(manual, [id])));
   } catch (error) {
     console.error(`Error fetching daily results for affiliate ${id}:`, error);
     return [];
@@ -413,7 +512,11 @@ export async function fetchAffiliateDailyResults(id: string, startDate?: string,
 
 export async function fetchAffiliateResults(id: string, opts: DateRangeOpts = {}): Promise<any> {
   try {
-    return await fetchResultsGrouped('affiliate', { affiliateIds: id, ...opts });
+    const [otg, manual] = await Promise.all([
+      fetchResultsGrouped('affiliate', { affiliateIds: id, ...opts }),
+      fetchManualRowsSafe(opts),
+    ]);
+    return mergeManualAffiliateRows(otg, aggregateByAffiliate(manualForAffiliates(manual, [id])));
   } catch (error) {
     console.error(`Error fetching results for affiliate ${id}:`, error);
     throw error;
@@ -437,7 +540,11 @@ export async function fetchResultsForAffiliates(ids: string[], opts: DateRangeOp
   const clean = (ids || []).map(String).map((s) => s.trim()).filter(Boolean);
   if (!clean.length) return [];
   try {
-    return await fetchResultsGrouped('affiliate', { affiliateIds: clean.join(','), ...opts });
+    const [otg, manual] = await Promise.all([
+      fetchResultsGrouped('affiliate', { affiliateIds: clean.join(','), ...opts }),
+      fetchManualRowsSafe(opts),
+    ]);
+    return mergeManualAffiliateRows(otg, aggregateByAffiliate(manualForAffiliates(manual, clean)));
   } catch (error) {
     console.error('Error fetching results for affiliate set:', error);
     return [];
@@ -448,8 +555,13 @@ export async function fetchResultsForAffiliates(ids: string[], opts: DateRangeOp
 // Admin → rede inteira; afiliado especial → o proxy escopa à sub-rede (own + subs).
 export async function fetchAllResultsByBrand(opts: DateRangeOpts = {}): Promise<any[]> {
   try {
-    // B6/dev · casas conhecidas aparecem mesmo vazias (modelo OTG). No-op em prod.
-    return withKnownHouses(await fetchResultsGrouped('brand', opts));
+    // Casas conhecidas aparecem mesmo vazias (modelo OTG); casas MANUAIS entram
+    // com o agregado da casa no range (house_results).
+    const [otg, manual] = await Promise.all([
+      fetchResultsGrouped('brand', opts),
+      fetchManualRowsSafe(opts),
+    ]);
+    return withKnownHouses(appendManualBrandRows(otg, aggregateByHouse(manual)));
   } catch (error) {
     console.error('Error fetching network brand results:', error);
     return [];
@@ -460,7 +572,11 @@ export async function fetchAllResultsByBrand(opts: DateRangeOpts = {}): Promise<
 // Admin → rede inteira; afiliado especial → o proxy escopa à sub-rede (own + subs).
 export async function fetchAllDailyResults(opts: DateRangeOpts = {}): Promise<any[]> {
   try {
-    return await fetchResultsGrouped('date', opts);
+    const [otg, manual] = await Promise.all([
+      fetchResultsGrouped('date', opts),
+      fetchManualRowsSafe(opts),
+    ]);
+    return mergeManualDateRows(otg, aggregateByDate(manual));
   } catch (error) {
     console.error('Error fetching network daily results:', error);
     return [];
@@ -649,6 +765,35 @@ export function calcNetProfitByHouse(
     const cfg = subToSpecialConfig[id] || configs[id];
     acc.commission += r?.total_commission || 0;
     acc.payout += calcAffiliatePayout(r, cfg, house.brandId);
+  }
+  for (const k of Object.keys(out)) out[k].netProfit = out[k].commission - out[k].payout;
+  return out;
+}
+
+// Lucro líquido por casa MANUAL (a partir de house_results). Comissão = agregado da
+// casa (inclui o não-atribuído); repasse = Σ dos afiliados ATRIBUÍDOS (taxa default
+// do afiliado, ou byBrand[brandId|slug] se houver override; regra do especial-pai
+// para subs). O não-atribuído fica como margem (sem repasse). Chaveado pelo NOME
+// canônico da casa, igual aos cards do /admin — disjunto das casas OTG.
+export function calcManualHouseNetProfit(
+  rows: StoredManualRow[],
+  configs: Record<string, AffiliateConfig | undefined>,
+  subToSpecialConfig: Record<string, AffiliateConfig> = {}
+): Record<string, HouseNetProfit> {
+  const nameOf = (slug: string) => getKnownBrands().find((b) => b.slug === slug)?.name ?? slug;
+  const brandKeyOf = (slug: string) => getKnownBrands().find((b) => b.slug === slug)?.id ?? slug;
+  const out: Record<string, HouseNetProfit> = {};
+  const ensure = (name: string) => out[name] ?? (out[name] = { commission: 0, payout: 0, netProfit: 0 });
+
+  // Comissão da casa = agregado (não-atribuído incluído).
+  const byHouse = aggregateByHouse(rows);
+  for (const slug of Object.keys(byHouse)) ensure(nameOf(slug)).commission += byHouse[slug].total_commission;
+
+  // Repasse só das linhas atribuídas.
+  for (const r of rows) {
+    if (r.affiliateId === null) continue;
+    const cfg = subToSpecialConfig[r.affiliateId] || configs[r.affiliateId];
+    ensure(nameOf(r.houseSlug)).payout += calcAffiliatePayout(r, cfg, brandKeyOf(r.houseSlug));
   }
   for (const k of Object.keys(out)) out[k].netProfit = out[k].commission - out[k].payout;
   return out;

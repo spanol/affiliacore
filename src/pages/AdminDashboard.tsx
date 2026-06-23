@@ -14,14 +14,15 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, humanizeName } from '../lib/utils';
-import { fetchAffiliates, fetchAllResults, fetchAllResultsByBrand, fetchAllResultsByCampaign, fetchAffiliateConfigs, fetchSpecialAffiliates, buildSubToSpecialConfig, calcAgencyNetProfit, calcNetProfitByHouse, CampaignRow, SpecialAffiliate } from '../services/affiliateService';
+import { fetchAffiliates, fetchAllResults, fetchAllResultsByBrand, fetchAllResultsByCampaign, fetchAffiliateConfigs, fetchSpecialAffiliates, fetchManualResults, buildSubToSpecialConfig, calcAgencyNetProfit, calcNetProfitByHouse, calcManualHouseNetProfit, CampaignRow, SpecialAffiliate } from '../services/affiliateService';
 import DateRangePicker from '../components/DateRangePicker';
 import CampaignBreakdown from '../components/CampaignBreakdown';
 import AffiliatePerformanceChart from '../components/AffiliatePerformanceChart';
 import BrandFilter from '../components/BrandFilter';
 import BrandLogo from '../components/BrandLogo';
-import { getBrandName, uniqueBrands, ALL_BRANDS, getKnownBrandName, getBrandMeta } from '../lib/brand';
+import { getBrandName, uniqueBrands, ALL_BRANDS, getKnownBrandName, getBrandMeta, getKnownBrands } from '../lib/brand';
 import { withKnownBrandNames } from '../lib/knownHouses';
+import { StoredManualRow, aggregateByHouse, emptyMetrics, addMetrics } from '../lib/houseResults';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
 
 export default function AdminDashboard() {
@@ -40,6 +41,9 @@ export default function AdminDashboard() {
   const [brandFilter, setBrandFilter] = useState<string>(ALL_BRANDS);
   // Afiliados especiais (p/ os rankings "Top especiais" e "Top subs").
   const [specials, setSpecials] = useState<Record<string, SpecialAffiliate>>({});
+  // Resultados MANUAIS (casas 'manual', via upload) — incorporados aos totais e ao
+  // lucro por casa sem contaminar a atribuição da OTG.
+  const [manualRows, setManualRows] = useState<StoredManualRow[]>([]);
 
   // Lista de afiliados (com brand) — base do filtro e do mapa id→marca.
   useEffect(() => {
@@ -75,18 +79,20 @@ export default function AdminDashboard() {
     async function getResults() {
       try {
         setLoading(true);
-        const [allResults, cfgs, campaigns, specialData, byBrand] = await Promise.all([
+        const [allResults, cfgs, campaigns, specialData, byBrand, manual] = await Promise.all([
           fetchAllResults(range),
           fetchAffiliateConfigs(),
           fetchAllResultsByCampaign(range, brandAffiliateIds ?? undefined),
           fetchSpecialAffiliates(),
           fetchAllResultsByBrand(range),
+          fetchManualResults(range),
         ]);
         setResults(Array.isArray(allResults) ? allResults : []);
         setConfigs(cfgs || {});
         setCampaignRows(campaigns);
         setSpecials(specialData || {});
         setBrandRows(Array.isArray(byBrand) ? byBrand : []);
+        setManualRows(Array.isArray(manual) ? manual : []);
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
         setResults([]);
@@ -94,6 +100,7 @@ export default function AdminDashboard() {
         setCampaignRows([]);
         setSpecials({});
         setBrandRows([]);
+        setManualRows([]);
       } finally {
         setLoading(false);
       }
@@ -106,6 +113,22 @@ export default function AdminDashboard() {
     if (brandFilter === ALL_BRANDS) return results;
     return results.filter((r) => brandById[String(r.affiliate_id ?? r.id ?? '')] === brandFilter);
   }, [results, brandFilter, brandById]);
+
+  // Linhas manuais no escopo da marca (ALL = todas; senão só as casas manuais cujo
+  // nome canônico bate com o filtro). Casa OTG selecionada → nenhuma manual.
+  const manualScoped = useMemo(() => {
+    if (brandFilter === ALL_BRANDS) return manualRows;
+    const slugs = new Set(getKnownBrands().filter((b) => b.name === brandFilter).map((b) => b.slug));
+    return manualRows.filter((r) => slugs.has(r.houseSlug));
+  }, [manualRows, brandFilter]);
+
+  // Agregado total das casas manuais no escopo (somado nas métricas do topo/funil).
+  const manualAgg = useMemo(() => {
+    const byHouse = aggregateByHouse(manualScoped);
+    const total = emptyMetrics();
+    for (const slug of Object.keys(byHouse)) addMetrics(total, byHouse[slug]);
+    return total;
+  }, [manualScoped]);
 
   // Mapa id → nome (fallback p/ afiliados sem linha em results).
   const nameById = useMemo(() => {
@@ -147,18 +170,30 @@ export default function AdminDashboard() {
     return { topSpecials, topSubs };
   }, [scopedResults, specials, nameById]);
 
-  // Totais (financeiro + funil) derivados dos results no escopo da marca.
-  const totals = useMemo(() => scopedResults.reduce((acc, curr) => ({
-    commission: acc.commission + (curr.total_commission || 0),
-    cpa: acc.cpa + (curr.cpa || 0),
-    rev: acc.rev + (curr.rvs || 0),
-    registrations: acc.registrations + (curr.registrations || 0),
-    firstDeposits: acc.firstDeposits + (curr.first_deposits || 0),
-    qualifiedCpa: acc.qualifiedCpa + (curr.qualified_cpa || 0),
-    // valor depositado (R$). Campo `deposit` do results (ver BACKLOG · Depósitos).
-    deposit: acc.deposit + (curr.deposit || 0)
-  }), { commission: 0, cpa: 0, rev: 0, registrations: 0, firstDeposits: 0, qualifiedCpa: 0, deposit: 0 }),
-  [scopedResults]);
+  // Totais (financeiro + funil) derivados dos results no escopo da marca + o
+  // agregado das casas MANUAIS (que não estão em `results` p/ não contaminar a
+  // atribuição por casa). `cpa` (R$) manual = 0 no v1 (não é coletado no upload).
+  const totals = useMemo(() => {
+    const base = scopedResults.reduce((acc, curr) => ({
+      commission: acc.commission + (curr.total_commission || 0),
+      cpa: acc.cpa + (curr.cpa || 0),
+      rev: acc.rev + (curr.rvs || 0),
+      registrations: acc.registrations + (curr.registrations || 0),
+      firstDeposits: acc.firstDeposits + (curr.first_deposits || 0),
+      qualifiedCpa: acc.qualifiedCpa + (curr.qualified_cpa || 0),
+      // valor depositado (R$). Campo `deposit` do results (ver BACKLOG · Depósitos).
+      deposit: acc.deposit + (curr.deposit || 0)
+    }), { commission: 0, cpa: 0, rev: 0, registrations: 0, firstDeposits: 0, qualifiedCpa: 0, deposit: 0 });
+    return {
+      commission: base.commission + manualAgg.total_commission,
+      cpa: base.cpa,
+      rev: base.rev + manualAgg.rvs,
+      registrations: base.registrations + manualAgg.registrations,
+      firstDeposits: base.firstDeposits + manualAgg.first_deposits,
+      qualifiedCpa: base.qualifiedCpa + manualAgg.qualified_cpa,
+      deposit: base.deposit + manualAgg.deposit,
+    };
+  }, [scopedResults, manualAgg]);
 
   // B1 · lucro líquido = Σ comissão das casas − Σ repasse aos afiliados.
   // O repasse de um SUB de especial usa a taxa do ESPECIAL-pai (a agência paga o
@@ -168,9 +203,14 @@ export default function AdminDashboard() {
     () => buildSubToSpecialConfig(specials, configs, { activeOnly: true }),
     [specials, configs]
   );
+  // Contribuição das casas manuais ao lucro: Σ (comissão da casa − repasse atribuído).
+  const manualNet = useMemo(() => {
+    const np = calcManualHouseNetProfit(manualScoped, configs, subToSpecialConfig);
+    return Object.values(np).reduce((s, h) => s + h.netProfit, 0);
+  }, [manualScoped, configs, subToSpecialConfig]);
   const netProfit = useMemo(
-    () => calcAgencyNetProfit(scopedResults, configs, subToSpecialConfig).netProfit,
-    [scopedResults, configs, subToSpecialConfig]
+    () => calcAgencyNetProfit(scopedResults, configs, subToSpecialConfig).netProfit + manualNet,
+    [scopedResults, configs, subToSpecialConfig, manualNet]
   );
 
   // Por casa (agência) — comissão da casa + funil por marca (groupBy=brand) +
@@ -210,7 +250,13 @@ export default function AdminDashboard() {
       return { key, brandId: brandIdByName[key] };
     };
 
-    const np = calcNetProfitByHouse(results, houseOf, configs, subToSpecialConfig);
+    // OTG: cruza afiliado×casa (results). Manual: lucro direto das house_results
+    // (disjunto das casas OTG, chaveado pelo mesmo nome canônico). Sem o manual, as
+    // casas manuais apareceriam com repasse/lucro 0 mesmo tendo afiliados atribuídos.
+    const np = {
+      ...calcNetProfitByHouse(results, houseOf, configs, subToSpecialConfig),
+      ...calcManualHouseNetProfit(manualRows, configs, subToSpecialConfig),
+    };
 
     return base
       .map((h) => {
@@ -218,7 +264,7 @@ export default function AdminDashboard() {
         return { ...h, payout: profit?.payout ?? 0, netProfit: profit?.netProfit ?? 0 };
       })
       .sort((a, b) => b.commission - a.commission);
-  }, [brandRows, results, brandById, configs, subToSpecialConfig]);
+  }, [brandRows, results, brandById, configs, subToSpecialConfig, manualRows]);
 
   // Contagem de afiliados respeita o filtro de marca.
   const affiliatesCount = useMemo(
