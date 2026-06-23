@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { Navigate } from 'react-router-dom';
 import {
   Building2, Plus, Loader2, Pencil, Trash2, X, Upload, Link2, Check, Power,
-  Table2, AlertTriangle, FileSpreadsheet, Cloud, Calendar,
+  Table2, AlertTriangle, FileSpreadsheet, Cloud, Calendar, Download,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -13,8 +13,10 @@ import {
 } from '../services/houseService';
 import { fetchAffiliates } from '../services/affiliateService';
 import {
-  parseResultsCsv, resolveAffiliates, buildAffiliateLookup, ResolvedRow, METRIC_KEYS, StoredManualRow,
+  parseResultsCsv, parseResultsRows, resolveAffiliates, buildAffiliateLookup,
+  ResolvedRow, ParseResult, METRIC_KEYS, StoredManualRow,
 } from '../lib/houseResults';
+import { parseSpreadsheetFile, downloadResultsTemplate, isExcelFile } from '../lib/xlsx';
 import { humanizeName } from '../lib/utils';
 
 // Backoffice de casas (betting houses) — admin. Cria/edita o registro próprio de
@@ -493,6 +495,9 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
   const [affiliates, setAffiliates] = useState<any[]>([]);
   const [existing, setExisting] = useState<StoredManualRow[]>([]);
   const [text, setText] = useState('');
+  const [fileResult, setFileResult] = useState<ParseResult | null>(null); // planilha Excel parseada
+  const [fileName, setFileName] = useState('');
+  const [reading, setReading] = useState(false);
   const [analysis, setAnalysis] = useState<ReturnType<typeof resolveAffiliates> | null>(null);
   const [parseErrors, setParseErrors] = useState<{ line: number; message: string }[]>([]);
   const [importing, setImporting] = useState(false);
@@ -518,20 +523,45 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
 
   useEffect(() => { loadMeta(); /* eslint-disable-next-line */ }, [house.slug]);
 
-  // Reanalisa sempre que o texto ou o roster mudam.
+  // Reanalisa sempre que a planilha Excel, o texto colado ou o roster mudam. A
+  // planilha tem prioridade sobre o texto colado quando ambos existem.
   useEffect(() => {
-    if (!text.trim()) { setAnalysis(null); setParseErrors([]); return; }
-    const parsed = parseResultsCsv(text);
+    const parsed = fileResult ?? (text.trim() ? parseResultsCsv(text) : null);
+    if (!parsed) { setAnalysis(null); setParseErrors([]); return; }
     setParseErrors(parsed.errors.map((e) => ({ line: e.line, message: e.message })));
     setAnalysis(resolveAffiliates(parsed.rows, lookup));
-  }, [text, lookup]);
+  }, [fileResult, text, lookup]);
 
-  const onPickFile = (file?: File) => {
+  // Excel (.xlsx/.xls) -> matriz -> parser puro; .csv/.txt -> texto na caixa de colar.
+  const onPickFile = async (file?: File) => {
     if (!file) return;
+    if (isExcelFile(file)) {
+      setReading(true);
+      try {
+        const grid = await parseSpreadsheetFile(file);
+        setText('');
+        setFileResult(parseResultsRows(grid));
+        setFileName(file.name);
+      } catch {
+        push({ type: 'error', message: 'Não foi possível ler a planilha Excel.' });
+      } finally {
+        setReading(false);
+      }
+      return;
+    }
+    // CSV/texto: cai na caixa de colar (parser de texto, tolerante a pt-BR).
     const reader = new FileReader();
-    reader.onload = () => setText(typeof reader.result === 'string' ? reader.result : '');
+    reader.onload = () => {
+      setFileResult(null);
+      setFileName('');
+      setText(typeof reader.result === 'string' ? reader.result : '');
+    };
     reader.readAsText(file);
   };
+
+  const clearFile = () => { setFileResult(null); setFileName(''); };
+
+  const onTypeText = (v: string) => { clearFile(); setText(v); };
 
   const canImport = !!analysis && analysis.rows.length > 0 && parseErrors.length === 0 && analysis.unresolved.length === 0;
 
@@ -547,6 +577,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
       const res = await importHouseResults(house.slug, rows);
       push({ type: 'success', message: `Importado: ${res.imported} linhas em ${res.dates.length} dia(s).` });
       setText('');
+      clearFile();
       setAnalysis(null);
       await loadMeta();
     } catch (e: any) {
@@ -591,7 +622,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
               <HouseLogo house={house} size={36} />
               <div className="min-w-0">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white truncate">Resultados · {house.name}</h2>
-                <p className="text-[11px] text-slate-400 dark:text-neutral-500">Importe os resultados diários por planilha (cole do Excel ou suba um .csv).</p>
+                <p className="text-[11px] text-slate-400 dark:text-neutral-500">Baixe o modelo, preencha no Excel e suba a planilha (.xlsx).</p>
               </div>
             </div>
             <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-neutral-800 hover:text-slate-600 dark:hover:text-neutral-200 transition-colors shrink-0">
@@ -600,6 +631,20 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
           </div>
 
           <div className="p-6 space-y-5 overflow-y-auto">
+            {/* Planilha modelo */}
+            <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 p-3 flex items-center justify-between gap-3">
+              <div className="min-w-0 text-[11px] text-amber-700/80 dark:text-amber-300/70">
+                <p className="font-bold text-amber-700 dark:text-amber-300 mb-0.5 flex items-center gap-1.5"><FileSpreadsheet size={13} /> Planilha modelo (.xlsx)</p>
+                <p>Já vem com todas as colunas e uma aba de instruções. Preencha 1 linha por dia.</p>
+              </div>
+              <button
+                onClick={() => downloadResultsTemplate(house.name).catch(() => push({ type: 'error', message: 'Não foi possível gerar o modelo.' }))}
+                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 text-white text-[11px] font-bold hover:bg-amber-600 transition-all"
+              >
+                <Download size={13} /> Baixar modelo
+              </button>
+            </div>
+
             {/* Formato esperado */}
             <div className="rounded-xl bg-slate-50 dark:bg-neutral-800/40 border border-slate-100 dark:border-neutral-800 p-3 text-[11px] text-slate-500 dark:text-neutral-400">
               <p className="font-bold text-slate-600 dark:text-neutral-300 mb-1">Colunas (cabeçalho obrigatório):</p>
@@ -607,23 +652,50 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
               <p className="mt-1.5">• <b>data</b> obrigatória (1 linha por dia). • <b>afiliado</b> = id ou nome de um afiliado existente; <b>vazio = agregado da casa</b>. • datas/números pt-BR aceitos.</p>
             </div>
 
-            {/* Entrada */}
+            {/* Entrada — subir planilha Excel (principal) */}
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Colar planilha / CSV</label>
-                <input ref={fileRef} type="file" accept=".csv,text/csv,text/plain" className="hidden" onChange={(e) => onPickFile(e.target.files?.[0])} />
-                <button onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline">
-                  <Upload size={12} /> Subir arquivo
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Subir planilha</label>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx,.xlsm,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+                className="hidden"
+                onChange={(e) => { onPickFile(e.target.files?.[0]); e.target.value = ''; }}
+              />
+              {fileName ? (
+                <div className="mt-1.5 flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30">
+                  <span className="inline-flex items-center gap-2 min-w-0 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                    <FileSpreadsheet size={14} className="shrink-0" /> <span className="truncate">{fileName}</span>
+                  </span>
+                  <button onClick={clearFile} className="shrink-0 text-emerald-600/70 dark:text-emerald-400/70 hover:text-red-500" title="Remover planilha">
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  disabled={reading}
+                  className="mt-1.5 w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl border-2 border-dashed border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-500 dark:text-neutral-400 hover:border-amber-500/50 hover:text-amber-600 dark:hover:text-amber-400 transition-all disabled:opacity-60"
+                >
+                  {reading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {reading ? 'Lendo planilha…' : 'Selecionar planilha Excel (.xlsx) ou .csv'}
                 </button>
-              </div>
+              )}
+            </div>
+
+            {/* Alternativa: colar do Excel (TAB/CSV) */}
+            <details className="group">
+              <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500 hover:text-slate-600 dark:hover:text-neutral-300 transition-colors select-none">
+                Ou colar do Excel
+              </summary>
               <textarea
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(e) => onTypeText(e.target.value)}
                 rows={5}
                 placeholder={'data\tafiliado\tcadastros\tftd\tcpa\trev\tdeposito\tcomissao\n2026-06-01\tJoão Silva\t40\t18\t12\t80\t2.400,00\t2400'}
-                className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-xs font-mono text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-neutral-600 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all"
+                className="mt-2 w-full px-3 py-2.5 rounded-xl bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-xs font-mono text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-neutral-600 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all"
               />
-            </div>
+            </details>
 
             {/* Preview / validação */}
             {analysis && (
