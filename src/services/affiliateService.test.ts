@@ -14,10 +14,12 @@ import {
   buildSubToSpecialConfig,
   calcAgencyNetProfit,
   calcNetProfitByHouse,
+  calcManualHouseNetProfit,
   resolveBrandRates,
   calcAffiliatePayout,
   calcNetProfit,
 } from './affiliateService';
+import { StoredManualRow, emptyMetrics, addMetrics } from '../lib/houseResults';
 
 describe('extractArray', () => {
   it('retorna [] para null/undefined', () => {
@@ -351,5 +353,46 @@ describe('calcNetProfitByHouse (B1 · lucro por casa, cruzando afiliado×casa)',
     expect(Object.keys(np).sort()).toEqual(['SportingBet', 'Superbet']);
     expect(calcNetProfitByHouse([], houseOf, configs)).toEqual({});
     expect(calcNetProfitByHouse(null as any, houseOf, configs)).toEqual({});
+  });
+});
+
+describe('calcManualHouseNetProfit (Fase 2 · lucro por casa manual)', () => {
+  const row = (houseSlug: string, affiliateId: string | null, m: Partial<ReturnType<typeof emptyMetrics>>): StoredManualRow =>
+    ({ houseSlug, date: '2026-06-01', affiliateId, ...addMetrics(emptyMetrics(), m) });
+  // 'betano' não está nas casas-semente → nameOf/brandKey caem no slug.
+  const configs = {
+    '123': { affiliateId: '123', cpaValue: 100, revPercentage: 10 },
+    '456': { affiliateId: '456', cpaValue: 50, revPercentage: 0 },
+  } as any;
+
+  it('comissão = agregado (inclui não-atribuído); repasse = Σ atribuídos', () => {
+    const rows = [
+      row('betano', null, { total_commission: 1000, registrations: 100 }),     // agregado
+      row('betano', '123', { qualified_cpa: 2, rvs: 1000, total_commission: 400 }),
+      row('betano', '456', { qualified_cpa: 1, rvs: 0, total_commission: 300 }),
+    ];
+    const np = calcManualHouseNetProfit(rows, configs);
+    // comissão = 1000 (agregado, não 1000+400+300)
+    // repasse = (2×100 + 1000×0.10) + (1×50 + 0) = 300 + 50 = 350
+    expect(np.betano).toEqual({ commission: 1000, payout: 350, netProfit: 650 });
+  });
+
+  it('sem linha agregada, comissão = soma das atribuídas', () => {
+    const rows = [row('kto', '123', { qualified_cpa: 1, total_commission: 200 })];
+    const np = calcManualHouseNetProfit(rows, configs);
+    expect(np.kto.commission).toBe(200);
+    expect(np.kto.payout).toBe(1 * 100 + 0); // 100
+    expect(np.kto.netProfit).toBe(100);
+  });
+
+  it('aplica a regra do especial-pai (subToSpecialConfig) no repasse do sub', () => {
+    const rows = [row('betano', '456', { qualified_cpa: 1, total_commission: 300 })];
+    const subMap = { '456': { affiliateId: 'sp', cpaValue: 200, revPercentage: 0 } } as any;
+    const np = calcManualHouseNetProfit(rows, configs, subMap);
+    expect(np.betano.payout).toBe(200); // taxa do pai (200), não a do sub (50)
+  });
+
+  it('tolera entrada vazia', () => {
+    expect(calcManualHouseNetProfit([], configs)).toEqual({});
   });
 });
