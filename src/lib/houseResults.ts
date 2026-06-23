@@ -50,6 +50,39 @@ const COLUMN_ALIASES: Record<'date' | 'affiliate' | MetricKey, string[]> = {
 const stripKey = (s: string) =>
   s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim().replace(/[\s.]+/g, '_');
 
+// --- Planilha modelo ---------------------------------------------------------
+// Descreve a planilha padrão oferecida pra download (.xlsx). O `header` é o nome
+// canônico da coluna — sempre um dos apelidos reconhecidos por COLUMN_ALIASES, pra
+// que a planilha preenchida e devolvida volte a parsear sem ajustes.
+export interface TemplateColumn {
+  key: 'date' | 'affiliate' | MetricKey;
+  header: string;   // nome da coluna na planilha (reconhecido pelo parser)
+  label: string;    // rótulo humano (aba de instruções)
+  required: boolean;
+  help: string;
+}
+
+export const TEMPLATE_COLUMNS: TemplateColumn[] = [
+  { key: 'date', header: 'data', label: 'Data', required: true, help: 'Dia do resultado (AAAA-MM-DD ou DD/MM/AAAA). Uma linha por dia.' },
+  { key: 'affiliate', header: 'afiliado', label: 'Afiliado', required: false, help: 'Nome ou ID de um afiliado existente. Deixe VAZIO para o total/agregado da casa no dia.' },
+  { key: 'registrations', header: 'cadastros', label: 'Cadastros', required: false, help: 'Quantidade de cadastros (registros).' },
+  { key: 'first_deposits', header: 'ftd', label: 'FTD', required: false, help: 'Primeiros depósitos (first-time deposits).' },
+  { key: 'qualified_cpa', header: 'cpa', label: 'CPA', required: false, help: 'CPAs qualificados.' },
+  { key: 'rvs', header: 'rev', label: 'REV', required: false, help: 'Valor de revenue share (R$).' },
+  { key: 'deposit', header: 'deposito', label: 'Depósito', required: false, help: 'Valor depositado (R$).' },
+  { key: 'total_commission', header: 'comissao', label: 'Comissão', required: false, help: 'Comissão total (R$).' },
+];
+
+// Cabeçalho canônico (1ª linha da planilha modelo).
+export const TEMPLATE_HEADERS: string[] = TEMPLATE_COLUMNS.map((c) => c.header);
+
+// Linhas de exemplo (só pra aba de instruções — NÃO entram na aba de preenchimento,
+// pra ninguém importar o exemplo por engano). 1ª = atribuída a afiliado; 2ª = agregado.
+export const TEMPLATE_EXAMPLE_ROWS: (string | number)[][] = [
+  ['2026-06-01', 'João Silva', 40, 18, 12, 80, 2400, 2400],
+  ['2026-06-01', '', 50, 20, 14, 90, 3000, 3000],
+];
+
 // Número tolerante a pt-BR (R$ 2.400,50) e a contagens simples. Regras:
 //  - remove R$, %, espaços; vazio = 0;
 //  - "." e "," juntos -> "." é milhar, "," é decimal (pt-BR);
@@ -118,19 +151,24 @@ export interface ParseResult {
   columns: Partial<Record<'date' | 'affiliate' | MetricKey, number>>;
 }
 
-// Parseia o texto colado. Exige uma linha de cabeçalho reconhecível com ao menos
-// `data` e uma métrica. Linhas com afiliado vazio = agregado da casa naquele dia.
-export function parseResultsCsv(text: string): ParseResult {
+// Núcleo PURO do parsing: recebe uma MATRIZ de células já separadas (linhas × colunas)
+// e exige um cabeçalho reconhecível com ao menos `data` e uma métrica. Serve tanto ao
+// texto colado/CSV quanto à planilha Excel (que vira matriz em `lib/xlsx.ts`). O nº de
+// linha reportado é o índice na matriz + 1 — alinha com a numeração da planilha/do texto
+// (linhas em branco contam). Linhas com afiliado vazio = agregado da casa naquele dia.
+export function parseResultsRows(grid: string[][]): ParseResult {
   const result: ParseResult = { rows: [], errors: [], columns: {} };
-  const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n');
+  const cellAt = (cells: string[] | undefined, idx: number) => String(cells?.[idx] ?? '');
+  const isBlank = (cells?: string[]) => !cells || cells.every((c) => String(c ?? '').trim() === '');
+
   // primeira linha não-vazia = cabeçalho
-  let headerIdx = lines.findIndex((l) => l.trim() !== '');
+  const headerIdx = grid.findIndex((cells) => !isBlank(cells));
   if (headerIdx === -1) {
     result.errors.push({ line: 0, raw: '', message: 'Nada para importar.' });
     return result;
   }
-  const delim = detectDelimiter(lines[headerIdx]);
-  const headerCells = splitLine(lines[headerIdx], delim).map(stripKey);
+  const headerRaw = (grid[headerIdx] ?? []).join(' | ');
+  const headerCells = (grid[headerIdx] ?? []).map((c) => stripKey(String(c ?? '')));
 
   const aliasToKey = new Map<string, 'date' | 'affiliate' | MetricKey>();
   (Object.keys(COLUMN_ALIASES) as ('date' | 'affiliate' | MetricKey)[]).forEach((key) => {
@@ -144,35 +182,37 @@ export function parseResultsCsv(text: string): ParseResult {
   });
 
   if (result.columns.date === undefined) {
-    result.errors.push({ line: headerIdx + 1, raw: lines[headerIdx], message: 'Cabeçalho sem coluna de data (ex.: "data").' });
+    result.errors.push({ line: headerIdx + 1, raw: headerRaw, message: 'Cabeçalho sem coluna de data (ex.: "data").' });
     return result;
   }
   const hasMetric = METRIC_KEYS.some((k) => result.columns[k] !== undefined);
   if (!hasMetric) {
-    result.errors.push({ line: headerIdx + 1, raw: lines[headerIdx], message: 'Cabeçalho sem nenhuma coluna de métrica (cadastros, ftd, cpa, rev, depósito, comissão).' });
+    result.errors.push({ line: headerIdx + 1, raw: headerRaw, message: 'Cabeçalho sem nenhuma coluna de métrica (cadastros, ftd, cpa, rev, depósito, comissão).' });
     return result;
   }
 
-  for (let i = headerIdx + 1; i < lines.length; i++) {
-    const raw = lines[i];
-    if (raw.trim() === '') continue;
-    const cells = splitLine(raw, delim);
+  for (let i = headerIdx + 1; i < grid.length; i++) {
+    const cells = grid[i];
+    if (isBlank(cells)) continue;
     const lineNo = i + 1;
+    const raw = (cells ?? []).join(' | ');
 
-    const iso = parseDateToISO(cells[result.columns.date!] ?? '');
+    const dateCell = cellAt(cells, result.columns.date!);
+    const iso = parseDateToISO(dateCell);
     if (!iso) {
-      result.errors.push({ line: lineNo, raw, message: `Data inválida: "${cells[result.columns.date!] ?? ''}".` });
+      result.errors.push({ line: lineNo, raw, message: `Data inválida: "${dateCell}".` });
       continue;
     }
-    const affiliate = result.columns.affiliate !== undefined ? (cells[result.columns.affiliate] ?? '').trim() : '';
+    const affiliate = result.columns.affiliate !== undefined ? cellAt(cells, result.columns.affiliate).trim() : '';
 
     const row: ParsedRow = { line: lineNo, date: iso, affiliate, ...emptyMetrics() };
     let bad = '';
     for (const k of METRIC_KEYS) {
       const col = result.columns[k];
       if (col === undefined) continue;
-      const n = parsePtNumber(cells[col] ?? '');
-      if (n === null) { bad = `${k}="${cells[col] ?? ''}"`; break; }
+      const cell = cellAt(cells, col);
+      const n = parsePtNumber(cell);
+      if (n === null) { bad = `${k}="${cell}"`; break; }
       row[k] = n;
     }
     if (bad) {
@@ -182,6 +222,19 @@ export function parseResultsCsv(text: string): ParseResult {
     result.rows.push(row);
   }
   return result;
+}
+
+// Texto colado / CSV -> matriz -> parseResultsRows. Detecta o delimitador (TAB/;/,) na
+// 1ª linha não-vazia e preserva a numeração de linha do texto (linhas em branco contam).
+export function parseResultsCsv(text: string): ParseResult {
+  const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n');
+  const headerIdx = lines.findIndex((l) => l.trim() !== '');
+  if (headerIdx === -1) {
+    return { rows: [], errors: [{ line: 0, raw: '', message: 'Nada para importar.' }], columns: {} };
+  }
+  const delim = detectDelimiter(lines[headerIdx]);
+  const grid = lines.map((l) => (l.trim() === '' ? [] : splitLine(l, delim)));
+  return parseResultsRows(grid);
 }
 
 // --- Resolução de afiliados --------------------------------------------------

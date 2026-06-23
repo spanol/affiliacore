@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
-  parsePtNumber, parseDateToISO, parseResultsCsv, buildAffiliateLookup, resolveAffiliates,
+  parsePtNumber, parseDateToISO, parseResultsCsv, parseResultsRows, buildAffiliateLookup, resolveAffiliates,
   aggregateByHouse, aggregateByDate, aggregateByAffiliate, aggregateByAffiliateHouse,
   unattributedByHouse, emptyMetrics, addMetrics, StoredManualRow,
+  TEMPLATE_HEADERS, TEMPLATE_COLUMNS,
 } from './houseResults';
 
 describe('parsePtNumber', () => {
@@ -80,6 +81,75 @@ describe('parseResultsCsv', () => {
     expect(r.errors).toHaveLength(2);
     expect(r.errors[0].message).toMatch(/Data inválida/);
     expect(r.errors[1].message).toMatch(/inválido/);
+  });
+});
+
+describe('parseResultsRows (matriz — caminho Excel)', () => {
+  it('parseia uma matriz de células com aliases pt-BR e linha agregada (afiliado vazio)', () => {
+    const grid = [
+      ['data', 'afiliado', 'cadastros', 'ftd', 'cpa', 'rev', 'deposito', 'comissao'],
+      ['2026-06-01', 'João Silva', '40', '18', '12', '80', '2400', '2400'],
+      ['2026-06-01', '', '50', '20', '14', '90', '3000', '3000'],
+    ];
+    const r = parseResultsRows(grid);
+    expect(r.errors).toEqual([]);
+    expect(r.rows).toHaveLength(2);
+    expect(r.rows[0]).toMatchObject({ date: '2026-06-01', affiliate: 'João Silva', registrations: 40, deposit: 2400 });
+    expect(r.rows[1].affiliate).toBe(''); // agregado
+  });
+
+  it('aceita células numéricas nativas (number) e números pt-BR em texto', () => {
+    const grid = [
+      ['data', 'cadastros', 'deposito'],
+      ['2026-06-01', 40 as unknown as string, 2400.5 as unknown as string],
+      ['2026-06-02', '88.000', 'R$ 2.400,50'],
+    ];
+    const r = parseResultsRows(grid);
+    expect(r.errors).toEqual([]);
+    expect(r.rows[0]).toMatchObject({ registrations: 40, deposit: 2400.5 });
+    expect(r.rows[1]).toMatchObject({ registrations: 88000, deposit: 2400.5 });
+  });
+
+  it('pula linhas em branco mas mantém o nº de linha alinhado à planilha', () => {
+    const grid = [
+      ['data', 'cadastros'],
+      [],                              // linha 2 em branco
+      ['2026-06-01', '10'],            // linha 3
+      ['99/99/9999', '5'],             // linha 4 (data inválida)
+    ];
+    const r = parseResultsRows(grid);
+    expect(r.rows).toHaveLength(1);
+    expect(r.rows[0].line).toBe(3);
+    expect(r.errors).toEqual([{ line: 4, raw: '99/99/9999 | 5', message: 'Data inválida: "99/99/9999".' }]);
+  });
+
+  it('erro de cabeçalho sem data / sem métrica e matriz vazia', () => {
+    expect(parseResultsRows([['afiliado', 'cadastros'], ['x', '1']]).errors[0].message).toMatch(/coluna de data/i);
+    expect(parseResultsRows([['data', 'afiliado'], ['2026-06-01', 'x']]).errors[0].message).toMatch(/métrica/i);
+    expect(parseResultsRows([]).errors[0].message).toMatch(/Nada para importar/i);
+  });
+
+  it('parseResultsCsv e parseResultsRows concordam no mesmo conteúdo', () => {
+    const viaText = parseResultsCsv('data,cadastros\n2026-06-01,10').rows;
+    const viaGrid = parseResultsRows([['data', 'cadastros'], ['2026-06-01', '10']]).rows;
+    expect(viaGrid[0]).toMatchObject({ date: viaText[0].date, registrations: viaText[0].registrations });
+  });
+});
+
+describe('planilha modelo (constantes)', () => {
+  it('o cabeçalho do modelo é reconhecido pelo parser (round-trip)', () => {
+    const grid = [TEMPLATE_HEADERS, ['2026-06-01', 'João Silva', '40', '18', '12', '80', '2400', '2400']];
+    const r = parseResultsRows(grid);
+    expect(r.errors).toEqual([]);
+    // todas as colunas do modelo foram mapeadas
+    expect(Object.keys(r.columns).sort()).toEqual(TEMPLATE_COLUMNS.map((c) => c.key).sort());
+    expect(r.rows[0]).toMatchObject({ date: '2026-06-01', affiliate: 'João Silva', registrations: 40, total_commission: 2400 });
+  });
+
+  it('o modelo tem data obrigatória e as 6 métricas canônicas', () => {
+    expect(TEMPLATE_COLUMNS.find((c) => c.key === 'date')?.required).toBe(true);
+    const metricCount = TEMPLATE_COLUMNS.filter((c) => c.key !== 'date' && c.key !== 'affiliate').length;
+    expect(metricCount).toBe(6);
   });
 });
 
