@@ -432,7 +432,7 @@ export default function AffiliatesList() {
         <div className="flex items-center gap-2">
           {/* Sincronizar é admin-only (o endpoint /api/affiliates/sync exige admin);
               o afiliado especial não tem acesso, então o botão nem aparece pra ele. */}
-          {isAdmin && (
+          {/* {isAdmin && (
             <button
               onClick={() => setImportModal(true)}
               disabled={loading}
@@ -442,7 +442,7 @@ export default function AffiliatesList() {
               <UploadCloud size={14} />
               Importar aprovados
             </button>
-          )}
+          )} */}
           {isAdmin && (
             <button
               onClick={handleSync}
