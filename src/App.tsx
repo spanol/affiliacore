@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './contexts/ToastContext';
@@ -137,7 +137,7 @@ export default function App() {
                 <Houses />
               </ProtectedRoute>
             } />
-            <Route path="/affiliates/:id" element={<AffiliateDetails />} />
+            <Route path="/affiliates/:id" element={<AffiliateDetailsRoute />} />
           </Route>
 
           {/* Catch-all: rotas desconhecidas do SPA caem numa 404 branded. */}
@@ -148,6 +148,20 @@ export default function App() {
     </ThemeProvider>
   </Router>
   );
+}
+
+// R17 · /affiliates/:id é a home do afiliado COMUM (próprio id), além de ser a tela
+// que o admin usa p/ qualquer afiliado e o especial p/ os subs. Sem guard, um cliente
+// trocava o :id na URL e via nome/marca/dados de QUALQUER afiliado. Guard de papel:
+//   • admin     → qualquer id;
+//   • especial  → passa (o proxy /api/external escopa os DADOS à sub-rede dele);
+//   • comum     → só o PRÓPRIO affiliateId; senão volta pra própria visão.
+function AffiliateDetailsRoute() {
+  const { profile } = useAuth();
+  const { id } = useParams();
+  if (profile?.role === 'admin' || profile?.isSpecial) return <AffiliateDetails />;
+  if (profile?.affiliateId && String(id) === String(profile.affiliateId)) return <AffiliateDetails />;
+  return <Navigate to={clientHome(profile)} replace />;
 }
 
 function DashboardRedirect() {

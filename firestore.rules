@@ -30,13 +30,16 @@ service cloud.firestore {
                     && request.resource.data.uid == userId
                     && !('affiliateId' in request.resource.data.keys())
                     && !('isSpecial' in request.resource.data.keys());
-      // O próprio usuário atualiza o doc, mas NÃO pode mudar role nem o vínculo
-      // (affiliateId) — senão poderia se reapontar pra outro afiliado (IDOR) ou
-      // se promover. Admin faz qualquer coisa.
+      // O próprio usuário atualiza o doc, mas NÃO pode mudar role, o vínculo
+      // (affiliateId) NEM a flag isSpecial — senão poderia se reapontar pra outro
+      // afiliado (IDOR), se promover a admin, ou se auto-marcar especial e ganhar
+      // acesso à /network e à sub-rede (R6). Esses três campos são server-only
+      // (Admin SDK). Admin faz qualquer coisa.
       allow update: if isAdmin()
         || (request.auth.uid == userId
             && request.resource.data.role == resource.data.role
-            && request.resource.data.affiliateId == resource.data.affiliateId);
+            && request.resource.data.affiliateId == resource.data.affiliateId
+            && request.resource.data.isSpecial == resource.data.isSpecial);
       allow delete: if isAdmin();
     }
 
