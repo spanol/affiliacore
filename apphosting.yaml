@@ -49,6 +49,14 @@ env:
     availability:
       - RUNTIME
 
+  # E-mail do admin MASTER que recebe o lembrete diário do ranking (popup). Secret
+  # p/ não commitar PII no repo; vazio/ausente = lembrete vai a todos os admins.
+  # Criar com:  firebase apphosting:secrets:set master-admin-email
+  - variable: MASTER_ADMIN_EMAIL
+    secret: master-admin-email
+    availability:
+      - RUNTIME
+
   # Credenciais do Supabase de provisionamento da OTG (pull automático do roster
   # de aprovados — links.otgpartners). Server-only; nunca expor ao browser.
   # Criar com:  firebase apphosting:secrets:set otg-links-*

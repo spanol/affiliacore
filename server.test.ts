@@ -380,6 +380,7 @@ describe('cron interno daily-ranking', () => {
   afterAll(() => {
     delete process.env.AFFILIATE_API_KEY;
     delete process.env.RANKING_CRON_SECRET;
+    delete process.env.MASTER_ADMIN_EMAIL;
   });
 
   it('sem RANKING_CRON_SECRET no ambiente → 503 (feature off)', async () => {
@@ -398,6 +399,7 @@ describe('cron interno daily-ranking', () => {
 
   it('secret correto → 200, grava daily_rankings e manda lembrete a CADA admin (não a clients)', async () => {
     process.env.RANKING_CRON_SECRET = 'right-secret';
+    delete process.env.MASTER_ADMIN_EMAIL; // sem master definido → fallback a todos os admins
     const fs = makeFirestore(seed);
     const { fetchImpl } = captureFetch(); // upstream devolve { data: [] } → 0 linhas
     const app = createApp({ adminApp: makeAdminApp(), adminDb: fs, fetchImpl });
@@ -426,5 +428,27 @@ describe('cron interno daily-ranking', () => {
     // id determinístico por (date,uid) → só 1 doc de lembrete para o admin
     const dmIds = [...fs.__store.get('direct_messages').keys()];
     expect(dmIds.filter((id) => id.includes('admin-uid'))).toHaveLength(1);
+  });
+
+  it('MASTER_ADMIN_EMAIL setado → lembrete SÓ ao master, não aos demais admins', async () => {
+    process.env.RANKING_CRON_SECRET = 'right-secret';
+    process.env.MASTER_ADMIN_EMAIL = 'boss@boost.com';
+    const seed2 = {
+      users: {
+        'master-uid': { role: 'admin', name: 'Boss', email: 'Boss@Boost.com' }, // casa case-insensitive
+        'other-admin': { role: 'admin', name: 'Outro', email: 'outro@boost.com' },
+      },
+    };
+    const fs = makeFirestore(seed2);
+    const { fetchImpl } = captureFetch();
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs, fetchImpl });
+    const res = await request(app)
+      .post('/api/internal/daily-ranking')
+      .set('x-cron-secret', 'right-secret')
+      .expect(200);
+    const date = res.body.date as string;
+    expect(res.body.reminders).toBe(1);
+    expect(fs.__store.get('direct_messages').get(`ranking-reminder__${date}__master-uid`)).toBeTruthy();
+    expect(fs.__store.get('direct_messages').get(`ranking-reminder__${date}__other-admin`)).toBeUndefined();
   });
 });

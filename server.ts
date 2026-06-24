@@ -858,6 +858,18 @@ export function createApp(deps: ServerDeps) {
   ): Promise<number> {
     if (!adminDb) return 0;
     const adminsSnap = await adminDb.collection('users').where('role', '==', 'admin').get();
+    // Por padrão só o admin MASTER recebe o lembrete (MASTER_ADMIN_EMAIL, case-insensitive).
+    // Sem a env — ou se o e-mail não casar com nenhum admin — cai p/ TODOS os admins
+    // (fallback seguro: alguém sempre é avisado; o warn sinaliza a má-config).
+    const masterEmail = (process.env.MASTER_ADMIN_EMAIL || '').trim().toLowerCase();
+    let recipients = adminsSnap.docs;
+    if (masterEmail) {
+      const matched = adminsSnap.docs.filter(
+        (u) => String((u.data() as any)?.email || '').trim().toLowerCase() === masterEmail,
+      );
+      if (matched.length) recipients = matched;
+      else console.warn(`[cron] MASTER_ADMIN_EMAIL "${masterEmail}" sem admin correspondente — lembrete vai a todos os admins.`);
+    }
     let title: string;
     let body: string;
     if (outcome.ok && outcome.count > 0) {
@@ -871,7 +883,7 @@ export function createApp(deps: ServerDeps) {
       body = `A geração automática falhou${outcome.error ? ` (${outcome.error})` : ''}. Gere manualmente em /ranking.`;
     }
     let sent = 0;
-    for (const u of adminsSnap.docs) {
+    for (const u of recipients) {
       await adminDb.collection('direct_messages').doc(`ranking-reminder__${date}__${u.id}`).set({
         recipientUid: u.id,
         affiliateId: 'system',
