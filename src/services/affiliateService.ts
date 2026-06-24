@@ -69,6 +69,24 @@ export function resolveBrandRates(config?: AffiliateConfig | null, brandId?: str
   };
 }
 
+// Distingue "configurado como 0" de "ainda não configurado": um 0 cru é uma taxa
+// real; a AUSÊNCIA (sem cpaValue de topo e sem override por casa) NÃO deve virar
+// "R$0/CPA" enganoso no display. `brandId` informado → considera o override da casa
+// OU o topo; sem `brandId` (visão "Todas as casas") → só o topo. Fonte ÚNICA da
+// regra a0dc467, consumida por AffiliateDetails e ClientDashboard (antes a heurística
+// vivia inline só na AffiliateDetails e nunca chegou na view do próprio afiliado).
+export function rateStatus(
+  config?: AffiliateConfig | null,
+  brandId?: string
+): { cpaConfigured: boolean; revConfigured: boolean } {
+  const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  const override = brandId && config?.byBrand ? config.byBrand[brandId] : undefined;
+  return {
+    cpaConfigured: isNum(override?.cpaValue) || isNum(config?.cpaValue),
+    revConfigured: isNum(override?.revPercentage) || isNum(config?.revPercentage),
+  };
+}
+
 export interface AffiliateStatusConfig {
   status: 'active' | 'inactive';
   updatedAt?: string | null;
@@ -109,7 +127,9 @@ export async function fetchAffiliateConfigs(): Promise<Record<string, AffiliateC
   }
 }
 
-export async function saveAffiliateConfig(config: AffiliateConfig): Promise<void> {
+// Aceita payload PARCIAL: omitir cpaValue/revPercentage (em vez de mandar 0)
+// preserva a AUSÊNCIA da taxa no merge — é o que impede o "0 fantasma" de topo.
+export async function saveAffiliateConfig(config: Partial<AffiliateConfig> & { affiliateId: string }): Promise<void> {
   try {
     const docRef = doc(db, 'affiliate_configs', config.affiliateId);
     // merge:true → preserva `byBrand` (overrides por casa) quando o editor de taxa
@@ -122,6 +142,24 @@ export async function saveAffiliateConfig(config: AffiliateConfig): Promise<void
     console.error('Error saving affiliate config:', error);
     throw error;
   }
+}
+
+// Monta o payload de TOPO do editor de comissão preservando a ausência: grava um
+// campo só quando foi digitado AGORA (string não-vazia) OU já existia como número.
+// Retorna null quando não há nada a gravar no topo — evita que editar só o REV (ou
+// só um override por casa) crie um `cpaValue: 0` fantasma num afiliado que nunca teve
+// taxa de contrato, o que faria rateStatus ver "0 real" em vez de "não configurado".
+export function buildBrandConfigTopPayload(
+  base: { cpa: string; rev: string },
+  config?: AffiliateConfig | null
+): Partial<Pick<AffiliateConfig, 'cpaValue' | 'revPercentage'>> | null {
+  const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  const top: Partial<Pick<AffiliateConfig, 'cpaValue' | 'revPercentage'>> = {};
+  if (base.cpa.trim() !== '') top.cpaValue = Number(base.cpa) || 0;
+  else if (isNum(config?.cpaValue)) top.cpaValue = config!.cpaValue;
+  if (base.rev.trim() !== '') top.revPercentage = Number(base.rev) || 0;
+  else if (isNum(config?.revPercentage)) top.revPercentage = config!.revPercentage;
+  return Object.keys(top).length > 0 ? top : null;
 }
 
 // B6 · salva apenas os overrides por casa de um afiliado (admin — affiliate_configs
@@ -683,14 +721,17 @@ export async function fetchAllResultsByCampaign(opts: DateRangeOpts = {}, affili
 // caminho retrocompat de todo call-site que não conhece casa (groupBy=affiliate).
 export function calcAffiliatePayout(result: any, config?: AffiliateConfig | null, brandId?: string): number {
   const { cpaValue, revPercentage } = resolveBrandRates(config, brandId);
-  const cpa = (result?.qualified_cpa || 0) * cpaValue;
-  const rev = (result?.rvs || 0) * (revPercentage / 100);
+  // num() coage métrica não-finita (string não-numérica da API externa, null) p/ 0
+  // ANTES de multiplicar — `|| 0` deixava passar strings tipo '2,5' e propagava NaN
+  // pra todo total agregado de dinheiro.
+  const cpa = num(result?.qualified_cpa) * cpaValue;
+  const rev = num(result?.rvs) * (revPercentage / 100);
   return cpa + rev;
 }
 
 // Lucro líquido da agência para um result: comissão da casa − repasse ao afiliado.
 export function calcNetProfit(result: any, config?: AffiliateConfig | null, brandId?: string): number {
-  const houseCommission = result?.total_commission || 0;
+  const houseCommission = num(result?.total_commission);
   return houseCommission - calcAffiliatePayout(result, config, brandId);
 }
 
@@ -736,7 +777,7 @@ export function calcAgencyNetProfit(
   let payout = 0;
   for (const r of Array.isArray(results) ? results : []) {
     const id = String(r?.affiliate_id ?? r?.id ?? '');
-    commission += r?.total_commission || 0;
+    commission += num(r?.total_commission);
     payout += calcAffiliatePayout(r, subToSpecialConfig[id] || configs[id], houseOf?.(id)?.brandId);
   }
   return { commission, payout, netProfit: commission - payout };
@@ -772,7 +813,7 @@ export function calcNetProfitByHouse(
     if (!house || !house.key) continue; // afiliado sem casa conhecida fica de fora
     const acc = out[house.key] ?? (out[house.key] = { commission: 0, payout: 0, netProfit: 0 });
     const cfg = subToSpecialConfig[id] || configs[id];
-    acc.commission += r?.total_commission || 0;
+    acc.commission += num(r?.total_commission);
     acc.payout += calcAffiliatePayout(r, cfg, house.brandId);
   }
   for (const k of Object.keys(out)) out[k].netProfit = out[k].commission - out[k].payout;

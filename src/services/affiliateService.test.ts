@@ -16,6 +16,8 @@ import {
   calcNetProfitByHouse,
   calcManualHouseNetProfit,
   resolveBrandRates,
+  rateStatus,
+  buildBrandConfigTopPayload,
   calcAffiliatePayout,
   calcNetProfit,
 } from './affiliateService';
@@ -427,5 +429,109 @@ describe('calcManualHouseNetProfit (Fase 2 · lucro por casa manual)', () => {
 
   it('tolera entrada vazia', () => {
     expect(calcManualHouseNetProfit([], configs)).toEqual({});
+  });
+});
+
+describe('calcAffiliatePayout · coerção de métrica (não propaga NaN)', () => {
+  const config = { affiliateId: 'a1', cpaValue: 100, revPercentage: 10 } as any;
+
+  it('métrica numérica em string simples é coagida (regressão: "2" → 2)', () => {
+    expect(calcAffiliatePayout({ qualified_cpa: '2', rvs: '1000' }, config)).toBe(2 * 100 + 1000 * 0.1);
+  });
+
+  it('métrica com vírgula decimal pt-BR NÃO vira NaN (Number("2,5")=NaN → 0)', () => {
+    // '2,5' não é parseável por Number → vira 0 em vez de contaminar o total com NaN.
+    const payout = calcAffiliatePayout({ qualified_cpa: '2,5', rvs: '1.000,50' }, config);
+    expect(Number.isNaN(payout)).toBe(false);
+    expect(payout).toBe(0);
+  });
+
+  it('string lixo / null / undefined → 0, nunca NaN', () => {
+    for (const bad of ['abc', 'R$ 100', null, undefined, {}, []]) {
+      const p = calcAffiliatePayout({ qualified_cpa: bad, rvs: bad }, config);
+      expect(Number.isNaN(p)).toBe(false);
+      expect(p).toBe(0);
+    }
+  });
+
+  it('uma linha inválida não contamina o total agregado das demais', () => {
+    const results = [
+      { id: 'good', total_commission: 500, qualified_cpa: 2, rvs: 0 },
+      { id: 'bad', total_commission: 'oops', qualified_cpa: 'x', rvs: 'y' },
+    ];
+    const configs = { good: config, bad: config } as any;
+    const agg = calcAgencyNetProfit(results, configs);
+    expect(Number.isNaN(agg.commission)).toBe(false);
+    expect(Number.isNaN(agg.payout)).toBe(false);
+    expect(agg.commission).toBe(500); // 'oops' → 0
+    expect(agg.payout).toBe(2 * 100); // bad → 0
+  });
+});
+
+describe('rateStatus · ausência de config ≠ R$0 (a0dc467 como fonte única)', () => {
+  it('config null/undefined → nada configurado', () => {
+    expect(rateStatus(null)).toEqual({ cpaConfigured: false, revConfigured: false });
+    expect(rateStatus(undefined, 'sb')).toEqual({ cpaConfigured: false, revConfigured: false });
+  });
+
+  it('0 explícito É config real (0 ≠ ausência)', () => {
+    expect(rateStatus({ affiliateId: 'a', cpaValue: 0, revPercentage: 0 } as any)).toEqual({
+      cpaConfigured: true,
+      revConfigured: true,
+    });
+  });
+
+  it('só topo, sem brandId (visão "Todas as casas")', () => {
+    expect(rateStatus({ affiliateId: 'a', cpaValue: 150 } as any)).toEqual({
+      cpaConfigured: true,
+      revConfigured: false, // revPercentage ausente → não configurado (lado REV do bug)
+    });
+  });
+
+  it('só byBrand sem topo: configurado NAQUELA casa, ausente em "Todas as casas"', () => {
+    const cfg = { affiliateId: 'a', byBrand: { sb: { cpaValue: 200, revPercentage: 25 } } } as any;
+    // Caso clássico do bug: sem brandId cai no topo ausente.
+    expect(rateStatus(cfg)).toEqual({ cpaConfigured: false, revConfigured: false });
+    // Com o brandId da casa com override → configurado.
+    expect(rateStatus(cfg, 'sb')).toEqual({ cpaConfigured: true, revConfigured: true });
+    // Casa SEM override e sem topo → ausente.
+    expect(rateStatus(cfg, 'outra')).toEqual({ cpaConfigured: false, revConfigured: false });
+  });
+
+  it('override por casa herda do topo quando o campo da casa falta', () => {
+    const cfg = { affiliateId: 'a', cpaValue: 100, byBrand: { sb: { revPercentage: 30 } } } as any;
+    // casa sb: cpa vem do topo (configurado), rev tem override (configurado).
+    expect(rateStatus(cfg, 'sb')).toEqual({ cpaConfigured: true, revConfigured: true });
+  });
+});
+
+describe('buildBrandConfigTopPayload · preserva ausência (sem 0 fantasma)', () => {
+  it('editar só o REV num afiliado SEM topo de CPA não grava cpaValue:0', () => {
+    // Bug: hadTopLevel(rev existia) disparava saveAffiliateConfig com cpaValue:0.
+    const payload = buildBrandConfigTopPayload({ cpa: '', rev: '12' }, { affiliateId: 'a', revPercentage: 10 } as any);
+    expect(payload).toEqual({ revPercentage: 12 });
+    expect(payload && 'cpaValue' in payload).toBe(false);
+  });
+
+  it('nada digitado e nenhum topo salvo → null (não grava topo nenhum)', () => {
+    expect(buildBrandConfigTopPayload({ cpa: '', rev: '' }, null)).toBeNull();
+    // só override por casa, afiliado sem contrato de topo: não inventa topo 0/0.
+    expect(buildBrandConfigTopPayload({ cpa: '', rev: '' }, { affiliateId: 'a', byBrand: {} } as any)).toBeNull();
+  });
+
+  it('preserva topo salvo quando o campo não foi digitado', () => {
+    const payload = buildBrandConfigTopPayload({ cpa: '', rev: '20' }, { affiliateId: 'a', cpaValue: 300, revPercentage: 10 } as any);
+    expect(payload).toEqual({ cpaValue: 300, revPercentage: 20 });
+  });
+
+  it('0 digitado É um valor (grava 0 explícito)', () => {
+    expect(buildBrandConfigTopPayload({ cpa: '0', rev: '' }, null)).toEqual({ cpaValue: 0 });
+  });
+
+  it('campos digitados sobrepõem o salvo', () => {
+    expect(buildBrandConfigTopPayload({ cpa: '250', rev: '15' }, { affiliateId: 'a', cpaValue: 100, revPercentage: 5 } as any)).toEqual({
+      cpaValue: 250,
+      revPercentage: 15,
+    });
   });
 });
