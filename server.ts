@@ -19,28 +19,45 @@ import { pullApprovedRoster, isOtgLinksConfigured } from './otgLinksPull';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let adminApp: admin.app.App | null = null;
-let adminDb: admin.firestore.Firestore | null = null;
-
 // Bucket do Storage (logos das casas). Default = bucket do projeto; override por env.
 const STORAGE_BUCKET = process.env.FIREBASE_STORAGE_BUCKET || 'agencia-boost-app.firebasestorage.app';
 
-try {
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-    adminApp = admin.initializeApp({ credential: admin.credential.cert(serviceAccount), storageBucket: STORAGE_BUCKET });
-  } else {
-    adminApp = admin.initializeApp({ storageBucket: STORAGE_BUCKET });
+// Inicializa o Firebase Admin (idempotente). Fica DENTRO de uma função — antes era um
+// side-effect no topo do módulo — p/ que importar este arquivo nos testes (só para
+// pegar `createApp`) não tente ADC/credenciais nem polua o console. Chamado por startServer().
+function initAdmin(): { adminApp: admin.app.App | null; adminDb: admin.firestore.Firestore | null } {
+  try {
+    let adminApp: admin.app.App;
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+      adminApp = admin.initializeApp({ credential: admin.credential.cert(serviceAccount), storageBucket: STORAGE_BUCKET });
+    } else {
+      adminApp = admin.initializeApp({ storageBucket: STORAGE_BUCKET });
+    }
+    console.log('Firebase Admin initialized');
+    return { adminApp, adminDb: adminApp.firestore() };
+  } catch (error) {
+    console.error('Firebase Admin initialization failed:', error);
+    return { adminApp: null, adminDb: null };
   }
-  adminDb = adminApp.firestore();
-  console.log('Firebase Admin initialized');
-} catch (error) {
-  console.error('Firebase Admin initialization failed:', error);
 }
 
-async function startServer() {
+// Dependências injetáveis. Produção passa o Admin SDK real + o fetch global; os testes
+// (supertest) passam mocks de Firestore/verifyIdToken (via adminApp.auth())/fetch p/
+// exercitar o ESCOPO e a AUTORIZAÇÃO das rotas sem rede nem Firebase real (R4/R13/R16/R20/R25).
+export interface ServerDeps {
+  adminApp: admin.app.App | null;
+  adminDb: admin.firestore.Firestore | null;
+  fetchImpl?: typeof fetch;
+}
+
+// Monta o app Express (middlewares + rotas) SEM ouvir porta nem montar Vite/estático —
+// isso fica no startServer(), específico de ambiente. Tudo o que as rotas usam
+// (adminApp/adminDb/fetch) vem de `deps`, deixando o app testável de fora via supertest.
+export function createApp(deps: ServerDeps) {
+  const { adminApp, adminDb } = deps;
+  const fetchImpl = deps.fetchImpl ?? fetch;
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
 
   // SECURITY (LOW): cabeçalhos de segurança. CSP fica desligada aqui porque exige
   // uma allowlist própria (Tailwind/Vite, Firebase, recharts, avatares dicebear) e
@@ -347,6 +364,12 @@ async function startServer() {
       const normalizedEmail = String(email).trim().toLowerCase();
       const normalizedName = String(name).trim();
       const normalizedRole = String(role);
+      // SECURITY (R25): `role` é gravado verbatim e decide o roteamento/escopo. Um
+      // valor fora de {admin,client} cairia no fallback /profile silencioso (e poderia
+      // confundir checagens futuras). Valida o enum ANTES de criar o usuário no Auth.
+      if (normalizedRole !== 'admin' && normalizedRole !== 'client') {
+        return res.status(400).json({ error: 'Papel inválido. Use "admin" ou "client".' });
+      }
       let userRecord: admin.auth.UserRecord;
 
       try {
@@ -760,7 +783,7 @@ async function startServer() {
       do {
         const params = new URLSearchParams(baseParams);
         params.set('page', String(page));
-        const resp = await fetch(`${BASE_URL}/api/v2/external/results?${params.toString()}`, {
+        const resp = await fetchImpl(`${BASE_URL}/api/v2/external/results?${params.toString()}`, {
           headers: { 'x-api-key': apiKey, Accept: 'application/json', 'User-Agent': 'AgenciaBoost-App/1.0' },
         });
         const text = await resp.text();
@@ -833,7 +856,7 @@ async function startServer() {
     const apiKey = process.env.AFFILIATE_API_KEY;
     if (!apiKey) throw new Error('Chave de API externa não configurada.');
 
-    const response = await fetch(`${BASE_URL}/api/v2/external/affiliates`, {
+    const response = await fetchImpl(`${BASE_URL}/api/v2/external/affiliates`, {
       headers: { 'x-api-key': apiKey, 'Accept': 'application/json', 'User-Agent': 'AgenciaBoost-App/1.0' },
     });
     if (!response.ok) {
@@ -1240,7 +1263,7 @@ async function startServer() {
         
       console.log(`Proxying request to: ${targetUrl}`);
       
-      const response = await fetch(targetUrl, {
+      const response = await fetchImpl(targetUrl, {
         method: 'GET',
         headers: {
           'x-api-key': apiKey,
@@ -1815,7 +1838,7 @@ async function startServer() {
       do {
         const params = new URLSearchParams(baseParams);
         params.set('page', String(page));
-        const resp = await fetch(`${BASE_URL}/api/v2/external/results?${params.toString()}`, {
+        const resp = await fetchImpl(`${BASE_URL}/api/v2/external/results?${params.toString()}`, {
           headers: { 'x-api-key': apiKey, Accept: 'application/json', 'User-Agent': 'AgenciaBoost-App/1.0' },
         });
         const text = await resp.text();
@@ -1870,6 +1893,18 @@ async function startServer() {
     next();
   });
 
+  return app;
+}
+
+// Sobe o servidor de verdade: inicializa o Admin SDK, monta o app via createApp e
+// adiciona a camada específica de ambiente (Vite em dev / estático + fallback SPA em
+// prod). Essa camada NÃO entra no createApp p/ manter o app testável e sem dependência
+// de build/Vite.
+async function startServer() {
+  const PORT = Number(process.env.PORT) || 3000;
+  const { adminApp, adminDb } = initAdmin();
+  const app = createApp({ adminApp, adminDb });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -1918,4 +1953,10 @@ async function startServer() {
   });
 }
 
-startServer();
+// Auto-start só quando o processo é o servidor (tsx server.ts). Vitest seta
+// VITEST=true e NODE_ENV='test'; o guard impede que importar este arquivo p/ pegar
+// `createApp` num teste (supertest) suba o Vite e ouça a porta. Dev (NODE_ENV
+// undefined) e prod (production) rodam normalmente.
+if (process.env.VITEST !== 'true' && process.env.NODE_ENV !== 'test') {
+  startServer();
+}
