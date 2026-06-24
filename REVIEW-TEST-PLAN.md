@@ -11,9 +11,20 @@
 
 **Adiado conscientemente** (NÃO mexido — exige mudança de camada de dados + verificação no app rodando; arriscado às cegas):
 
-- **R9 (AffiliateDetails "lucro do afiliado") e R10 (SpecialDashboard/SpecialSubAffiliates ownConfig dropa byBrand):** ambos calculam sobre **uma linha agregada por afiliado** (`perAffiliateRows`/`results` groupBy=affiliate). Aplicar `byBrand` corretamente exige dados **por afiliado×casa** (novo fetch no service/proxy) + somatório por casa — preservar byBrand no config sozinho não resolve (as chamadas são sem `brandId`). Fazer cego pode introduzir erro de dinheiro pior. **Próximo passo:** Fase 1.1 — fetch afiliado×casa + `calcSpecialEarnings`/`computeSubSpread` puras, validadas com o app rodando.
+- **R9 (AffiliateDetails "lucro do afiliado"), R10 (SpecialDashboard/SpecialSubAffiliates ownConfig dropa byBrand) e R2 (ranking server-side ignora byBrand):** os TRÊS compartilham a MESMA raiz — calculam sobre **uma linha agregada por afiliado** (`perAffiliateRows`/`results`/rows do ranking, groupBy=affiliate). Aplicar `byBrand` corretamente exige dados **por afiliado×casa** (novo fetch no service/proxy) + somatório por casa — preservar byBrand no config sozinho não resolve (as chamadas são sem `brandId`). Fazer cego pode introduzir erro de dinheiro pior. **Tarefa única (Fase 1.1):** fetch afiliado×casa + `calcSpecialEarnings`/`computeSubSpread`/`computeRankingEntries` puras, validadas com o app rodando.
 
-Demais fases (2 segurança/escopo, 3 services, 4 páginas, 5 tooling) seguem como abaixo.
+## 0.1 Status — Fase 2 (segurança/escopo) · em andamento
+
+**Entregue** (commit `48167d5`; 209 testes verdes):
+- **`src/lib/scope.ts` (puro) + 19 testes** — primeiro teste no núcleo do `server.ts` (superfície que estava 100% sem cobertura).
+  - `resolveScopedAffiliateIds` trava o **R4** (IDOR do proxy `/api/external`): comum só lê o próprio id, especial lê a sub-rede, id fora do escopo é descartado.
+  - `resolveIsSpecial` unifica a definição (`active === true`) — fecha **R7** (o site de Vincular Login usava `active !== false` e divergia).
+  - `resolveServerToday` (fuso America/Sao_Paulo) — fecha **R12** (ranking gravado/lido com data UTC errada à noite BR).
+- `server.ts` wireado às 3 (precisa reiniciar o processo p/ valer; o dev roda old code até lá).
+
+**Pendente na Fase 2:** R5 (`affiliate_configs` legível por qualquer signed-in — exige fetch escopado no client + tightening das rules, coordenado), R6 (rules de `users` não travam `isSpecial`), R17 (guard de papel em `/affiliates/:id`), testes de `firestore.rules` (emulator) e de rotas Express (supertest + `createApp(deps)`).
+
+Demais fases (3 services, 4 páginas, 5 tooling) seguem como abaixo.
 
 ---
 
