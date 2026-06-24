@@ -40,6 +40,15 @@ env:
     availability:
       - RUNTIME
 
+  # Secret do cron interno (POST /api/internal/daily-ranking). Um Cloud Scheduler bate
+  # nesse endpoint 1×/dia (~14h30 BR) com o header x-cron-secret p/ gerar o ranking do
+  # dia + avisar os admins. Sem o secret a rota responde 503.
+  # Criar com:  firebase apphosting:secrets:set ranking-cron-secret
+  - variable: RANKING_CRON_SECRET
+    secret: ranking-cron-secret
+    availability:
+      - RUNTIME
+
   # Credenciais do Supabase de provisionamento da OTG (pull automático do roster
   # de aprovados — links.otgpartners). Server-only; nunca expor ao browser.
   # Criar com:  firebase apphosting:secrets:set otg-links-*

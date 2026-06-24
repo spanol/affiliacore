@@ -76,7 +76,7 @@ function makeFirestore(seed: Record<string, Record<string, any>> = {}): any {
           return true;
         });
       }
-      return { docs, empty: docs.length === 0, size: docs.length };
+      return { docs, empty: docs.length === 0, size: docs.length, forEach: (cb: any) => docs.forEach(cb) };
     },
   });
   return {
@@ -365,5 +365,66 @@ describe('create-user enum de role (R25)', () => {
       .send({ name: 'X', email: 'x@y.com', password: 'secret123', role: 'client' })
       .expect(200);
     expect(res.body.uid).toBe('new-c');
+  });
+});
+
+// =============================================================================
+// Cron interno: /api/internal/daily-ranking (auto-gera o ranking + lembra o admin)
+// =============================================================================
+describe('cron interno daily-ranking', () => {
+  const seed = { users: { 'admin-uid': { role: 'admin', name: 'Boss' }, 'cli-uid': { role: 'client' } } };
+
+  beforeAll(() => {
+    process.env.AFFILIATE_API_KEY = 'cron-key';
+  });
+  afterAll(() => {
+    delete process.env.AFFILIATE_API_KEY;
+    delete process.env.RANKING_CRON_SECRET;
+  });
+
+  it('sem RANKING_CRON_SECRET no ambiente → 503 (feature off)', async () => {
+    delete process.env.RANKING_CRON_SECRET;
+    await request(buildApp({ seed })).post('/api/internal/daily-ranking').expect(503);
+  });
+
+  it('secret ausente/errado → 401', async () => {
+    process.env.RANKING_CRON_SECRET = 'right-secret';
+    await request(buildApp({ seed })).post('/api/internal/daily-ranking').expect(401);
+    await request(buildApp({ seed }))
+      .post('/api/internal/daily-ranking')
+      .set('x-cron-secret', 'wrong')
+      .expect(401);
+  });
+
+  it('secret correto → 200, grava daily_rankings e manda lembrete a CADA admin (não a clients)', async () => {
+    process.env.RANKING_CRON_SECRET = 'right-secret';
+    const fs = makeFirestore(seed);
+    const { fetchImpl } = captureFetch(); // upstream devolve { data: [] } → 0 linhas
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs, fetchImpl });
+    const res = await request(app)
+      .post('/api/internal/daily-ranking')
+      .set('x-cron-secret', 'right-secret')
+      .expect(200);
+    expect(res.body.ok).toBe(true);
+    const date = res.body.date as string;
+    expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // ranking do dia gravado (mesmo vazio)
+    expect(fs.__store.get('daily_rankings').get(date)).toBeTruthy();
+    // lembrete determinístico ao admin; cliente NÃO recebe
+    expect(res.body.reminders).toBe(1);
+    expect(fs.__store.get('direct_messages').get(`ranking-reminder__${date}__admin-uid`)).toBeTruthy();
+    expect(fs.__store.get('direct_messages').get(`ranking-reminder__${date}__cli-uid`)).toBeUndefined();
+  });
+
+  it('re-rodar no mesmo dia é idempotente (não acumula lembrete)', async () => {
+    process.env.RANKING_CRON_SECRET = 'right-secret';
+    const fs = makeFirestore(seed);
+    const { fetchImpl } = captureFetch();
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs, fetchImpl });
+    await request(app).post('/api/internal/daily-ranking').set('x-cron-secret', 'right-secret').expect(200);
+    await request(app).post('/api/internal/daily-ranking').set('x-cron-secret', 'right-secret').expect(200);
+    // id determinístico por (date,uid) → só 1 doc de lembrete para o admin
+    const dmIds = [...fs.__store.get('direct_messages').keys()];
+    expect(dmIds.filter((id) => id.includes('admin-uid'))).toHaveLength(1);
   });
 });

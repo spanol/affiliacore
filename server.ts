@@ -761,92 +761,187 @@ export function createApp(deps: ServerDeps) {
   // afiliado (qualified_cpa·CPA + rvs·REV%, taxa default do afiliado) e gravamos
   // daily_rankings/{data} — que todo afiliado lê (leaderboard público com nomes).
   const isoDateRe = /^\d{4}-\d{2}-\d{2}$/;
-  app.post('/api/rankings/compute', requireAdmin, async (req, res) => {
-    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+
+  // Núcleo REUSÁVEL da geração do ranking (fonte única — CLAUDE.md): pagina os results
+  // do dia, calcula o repasse de cada afiliado (mesma fórmula byBrand dos dashboards) e
+  // grava daily_rankings/{date}. Reusado pela rota admin (botão) E pela rota de cron.
+  // Lança em falha dura (Error.status p/ o chamador mapear); code "040" (sem dados) não
+  // é erro → grava ranking vazio. NUNCA reimplemente este cálculo inline (R2).
+  async function computeAndStoreRanking(
+    date: string,
+    generatedByName: string,
+  ): Promise<{ date: string; count: number; entries: any[] }> {
+    if (!adminDb) throw Object.assign(new Error('Firebase Admin não está inicializado.'), { status: 500 });
     const BASE_URL = process.env.VITE_AFFILIATE_API_BASE_URL || 'https://affiliate-api-prd.partnersotg.com';
     const apiKey = process.env.AFFILIATE_API_KEY;
-    if (!apiKey) return res.status(500).json({ error: 'Chave de API externa não configurada.' });
+    if (!apiKey) throw Object.assign(new Error('Chave de API externa não configurada.'), { status: 500 });
 
+    // Resultados do dia, todas as páginas (a OTG entrega pageSize=50).
+    const baseParams = new URLSearchParams();
+    baseParams.set('startDate', date);
+    baseParams.set('endDate', date);
+    baseParams.set('groupBy', 'affiliate');
+    const MAX_PAGES = 50;
+    const rows: any[] = [];
+    let page = 1;
+    let totalPages = 1;
+    do {
+      const params = new URLSearchParams(baseParams);
+      params.set('page', String(page));
+      const resp = await fetchImpl(`${BASE_URL}/api/v2/external/results?${params.toString()}`, {
+        headers: { 'x-api-key': apiKey, Accept: 'application/json', 'User-Agent': 'AgenciaBoost-App/1.0' },
+      });
+      const text = await resp.text();
+      let body: any = null;
+      try { body = text ? JSON.parse(text) : null; } catch { body = null; }
+      if (!resp.ok) {
+        const requestId = crypto.randomBytes(8).toString('hex');
+        console.error(`[rankings] ${requestId} results upstream ${resp.status} (page ${page}):`, text);
+        // code "040" (sem dados) não é erro: grava ranking vazio.
+        if (body?.code === '040') break;
+        throw Object.assign(new Error('Falha ao consultar o relatório do dia.'), { status: 502, code: body?.code, requestId });
+      }
+      const d = body?.data;
+      const pageRows = Array.isArray(d?.data) ? d.data : (Array.isArray(d) ? d : (Array.isArray(body) ? body : []));
+      rows.push(...pageRows);
+      const tp = Number(d?.meta?.totalPages);
+      totalPages = Number.isFinite(tp) && tp > 0 ? tp : 1;
+      page++;
+    } while (page <= totalPages && page <= MAX_PAGES);
+
+    // Configs (taxa por afiliado, COM byBrand) e nome+marca do mirror.
+    const [cfgSnap, affSnap] = await Promise.all([
+      adminDb.collection('affiliate_configs').get(),
+      adminDb.collection('affiliates').get(),
+    ]);
+    // Config COMPLETA (inclui byBrand) — antes guardava só cpaValue/revPercentage e
+    // o ranking nunca via o override por casa (R2).
+    const configs: Record<string, AffiliateConfig | undefined> = {};
+    cfgSnap.forEach((d) => { configs[d.id] = d.data() as AffiliateConfig; });
+    const names: Record<string, string> = {};
+    const brandIdByAffiliate: Record<string, string> = {};
+    affSnap.forEach((d) => {
+      const v = d.data() as any;
+      if (v?.name) names[d.id] = String(v.name);
+      // marca do afiliado (mirror: brand = {id,name}) → aplica a taxa byBrand da casa
+      // dele, MESMA atribuição afiliado→casa que o /admin usa (calcNetProfitByHouse).
+      const bid = v?.brand?.id ?? v?.brand_id;
+      if (bid) brandIdByAffiliate[d.id] = String(bid);
+    });
+
+    // Mesma fórmula/repasse dos dashboards (calcAffiliatePayout), com a taxa por casa.
+    const entries = computeRankingEntries(rows, configs, {
+      brandIdOf: (id) => brandIdByAffiliate[id],
+      nameById: names,
+    });
+
+    await adminDb.collection('daily_rankings').doc(date).set({
+      date,
+      entries,
+      count: entries.length,
+      metric: 'commission',
+      generatedByName,
+      generatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { date, count: entries.length, entries };
+  }
+
+  // Lembrete diário aos admins (popup de mensagem direta), CIENTE do resultado da
+  // geração automática: gerou com dados / sem dados (OTG ainda não atualizou) / falhou.
+  // Garante que o admin master seja avisado todo dia (rede de segurança caso o cron
+  // não rode/falhe). Id determinístico por (date,uid) → no máx. 1 lembrete por admin
+  // por dia (re-run no mesmo dia ATUALIZA o doc, não acumula).
+  async function sendRankingReminderToAdmins(
+    date: string,
+    outcome: { ok: boolean; count: number; error?: string },
+  ): Promise<number> {
+    if (!adminDb) return 0;
+    const adminsSnap = await adminDb.collection('users').where('role', '==', 'admin').get();
+    let title: string;
+    let body: string;
+    if (outcome.ok && outcome.count > 0) {
+      title = `Ranking de ${date} gerado`;
+      body = `O ranking diário foi gerado automaticamente com ${outcome.count} afiliado(s). Confira em /ranking.`;
+    } else if (outcome.ok) {
+      title = `Ranking de ${date} ainda sem dados`;
+      body = `A geração automática rodou, mas a OTG ainda não tem resultados de ${date}. Gere novamente em /ranking depois das 14h.`;
+    } else {
+      title = `Falha ao gerar o ranking de ${date}`;
+      body = `A geração automática falhou${outcome.error ? ` (${outcome.error})` : ''}. Gere manualmente em /ranking.`;
+    }
+    let sent = 0;
+    for (const u of adminsSnap.docs) {
+      await adminDb.collection('direct_messages').doc(`ranking-reminder__${date}__${u.id}`).set({
+        recipientUid: u.id,
+        affiliateId: 'system',
+        affiliateName: 'Sistema',
+        title,
+        body,
+        createdByName: 'Sistema Boost',
+        readAt: null,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      sent++;
+    }
+    return sent;
+  }
+
+  // Gate de cron interno: secret de alto-entropia no header `x-cron-secret`, comparado
+  // em tempo constante. Sem RANKING_CRON_SECRET no ambiente → 503 (feature off). Permite
+  // que um scheduler externo (Cloud Scheduler) dispare rotinas SEM um token de admin
+  // Firebase — que ele não tem como obter. NÃO use em rotas de dado sensível por papel.
+  const requireCronSecret: express.RequestHandler = (req, res, next) => {
+    const secret = process.env.RANKING_CRON_SECRET || '';
+    if (!secret) return res.status(503).json({ error: 'Cron não configurado (defina RANKING_CRON_SECRET).' });
+    const provided = String(req.headers['x-cron-secret'] || '');
+    const a = Buffer.from(provided);
+    const b = Buffer.from(secret);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      return res.status(401).json({ error: 'Secret de cron inválido.' });
+    }
+    next();
+  };
+
+  app.post('/api/rankings/compute', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     // Data: a do corpo (browser, fuso BR) ou hoje no servidor como fallback.
     const date = isoDateRe.test(String(req.body?.date)) ? String(req.body.date) : resolveServerToday();
-
     try {
-      // Resultados do dia, todas as páginas (a OTG entrega pageSize=50).
-      const baseParams = new URLSearchParams();
-      baseParams.set('startDate', date);
-      baseParams.set('endDate', date);
-      baseParams.set('groupBy', 'affiliate');
-      const MAX_PAGES = 50;
-      const rows: any[] = [];
-      let page = 1;
-      let totalPages = 1;
-      do {
-        const params = new URLSearchParams(baseParams);
-        params.set('page', String(page));
-        const resp = await fetchImpl(`${BASE_URL}/api/v2/external/results?${params.toString()}`, {
-          headers: { 'x-api-key': apiKey, Accept: 'application/json', 'User-Agent': 'AgenciaBoost-App/1.0' },
-        });
-        const text = await resp.text();
-        let body: any = null;
-        try { body = text ? JSON.parse(text) : null; } catch { body = null; }
-        if (!resp.ok) {
-          const requestId = crypto.randomBytes(8).toString('hex');
-          console.error(`[rankings] ${requestId} results upstream ${resp.status} (page ${page}):`, text);
-          // code "040" (sem dados) não é erro: grava ranking vazio.
-          if (body?.code === '040') break;
-          return res.status(502).json({ error: 'Falha ao consultar o relatório do dia.', code: body?.code, requestId });
-        }
-        const d = body?.data;
-        const pageRows = Array.isArray(d?.data) ? d.data : (Array.isArray(d) ? d : (Array.isArray(body) ? body : []));
-        rows.push(...pageRows);
-        const tp = Number(d?.meta?.totalPages);
-        totalPages = Number.isFinite(tp) && tp > 0 ? tp : 1;
-        page++;
-      } while (page <= totalPages && page <= MAX_PAGES);
-
-      // Configs (taxa por afiliado, COM byBrand) e nome+marca do mirror.
-      const [cfgSnap, affSnap] = await Promise.all([
-        adminDb.collection('affiliate_configs').get(),
-        adminDb.collection('affiliates').get(),
-      ]);
-      // Config COMPLETA (inclui byBrand) — antes guardava só cpaValue/revPercentage e
-      // o ranking nunca via o override por casa (R2).
-      const configs: Record<string, AffiliateConfig | undefined> = {};
-      cfgSnap.forEach((d) => { configs[d.id] = d.data() as AffiliateConfig; });
-      const names: Record<string, string> = {};
-      const brandIdByAffiliate: Record<string, string> = {};
-      affSnap.forEach((d) => {
-        const v = d.data() as any;
-        if (v?.name) names[d.id] = String(v.name);
-        // marca do afiliado (mirror: brand = {id,name}) → aplica a taxa byBrand da casa
-        // dele, MESMA atribuição afiliado→casa que o /admin usa (calcNetProfitByHouse).
-        const bid = v?.brand?.id ?? v?.brand_id;
-        if (bid) brandIdByAffiliate[d.id] = String(bid);
-      });
-
-      // Mesma fórmula/repasse dos dashboards (calcAffiliatePayout), com a taxa por casa.
-      const entries = computeRankingEntries(rows, configs, {
-        brandIdOf: (id) => brandIdByAffiliate[id],
-        nameById: names,
-      });
-
       const adminSnap = await adminDb.collection('users').doc((req as any).user.uid).get();
       const generatedByName = (adminSnap.exists ? (adminSnap.data() as any)?.name : null) || 'Gerência Boost';
-
-      await adminDb.collection('daily_rankings').doc(date).set({
-        date,
-        entries,
-        count: entries.length,
-        metric: 'commission',
-        generatedByName,
-        generatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      return res.json({ date, count: entries.length, entries, generatedAt: new Date().toISOString() });
+      const result = await computeAndStoreRanking(date, generatedByName);
+      return res.json({ ...result, generatedAt: new Date().toISOString() });
     } catch (error: any) {
       console.error('[rankings] compute:', error);
-      return res.status(500).json({ error: error.message || 'Erro interno calculando ranking.' });
+      return res.status(error.status || 500).json({ error: error.message || 'Erro interno calculando ranking.', code: error.code });
     }
+  });
+
+  // Gatilho DIÁRIO (Cloud Scheduler ~14h30 BR, depois da OTG atualizar 13h-14h). Gera o
+  // ranking de HOJE no fuso BR (resolveServerToday — R12) e manda um lembrete/relatório
+  // aos admins. Secret-gated (fora do requireAdmin — um cron não tem token Firebase).
+  // Idempotente: re-rodar no mesmo dia sobrescreve o ranking e o lembrete. Responde 200
+  // mesmo "sem dados" (o lembrete cobre; o scheduler não deve re-tentar por isso); 502
+  // só na falha real de upstream (aí um retry do scheduler faz sentido).
+  app.post('/api/internal/daily-ranking', requireCronSecret, async (_req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    const date = resolveServerToday();
+    let outcome: { ok: boolean; count: number; error?: string };
+    try {
+      const result = await computeAndStoreRanking(date, 'Geração automática');
+      outcome = { ok: true, count: result.count };
+    } catch (error: any) {
+      console.error('[cron] daily-ranking geração falhou:', error);
+      outcome = { ok: false, count: 0, error: error?.message };
+    }
+    let reminders = 0;
+    try {
+      reminders = await sendRankingReminderToAdmins(date, outcome);
+    } catch (e) {
+      console.error('[cron] daily-ranking lembrete falhou:', e);
+    }
+    return res.status(outcome.ok ? 200 : 502).json({ date, ok: outcome.ok, count: outcome.count, reminders, error: outcome.error });
   });
 
   const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
