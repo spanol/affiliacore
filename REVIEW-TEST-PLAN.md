@@ -1,5 +1,22 @@
 # Plano de Revisão Total + Testes — Plataforma Agência Boost
 
+## 0. Status de execução — Fase 1 (money-math) · 2026-06-24
+
+**Entregue** (commits `f7d05d7`, `4e58ec5`, `13c1c21`; 190 testes verdes, lint limpo):
+
+- **NaN no dinheiro (P0.1):** `calcAffiliatePayout`/`calcNetProfit`/`calcAgencyNetProfit`/`calcNetProfitByHouse` agora coagem `qualified_cpa`/`rvs`/`total_commission` com `num()` antes de multiplicar — string não-numérica da API (`'2,5'`) não vira mais NaN. ✓ testado.
+- **Ausência ≠ R$0 (P0.2/P0.9):** extraída `rateStatus(config, brandId)` como **fonte única** da regra a0dc467; aplicada na **ClientDashboard** (bug R1 crítico — a view do próprio afiliado mostrava "Configurado"/`R$0` fixo) e na AffiliateDetails (troca a heurística inline). ✓ testado.
+- **0 fantasma (finding #8):** `buildBrandConfigTopPayload` faz o BrandConfigEditor gravar só taxas configuradas; editar só o REV não cria mais `cpaValue:0`. `saveAffiliateConfig` aceita payload parcial. ✓ testado.
+- **Invariante agregado==Σcards sob filtro (R8):** `composeAdminProfit` unifica headline + cards por casa da MESMA base escopada; o `base` dos cards passou a respeitar o `brandFilter`. Preserva comportamento em "Todas as casas"; corrige o caminho com filtro. ✓ testado COM byBrand, filtro, órfão e casas manuais.
+
+**Adiado conscientemente** (NÃO mexido — exige mudança de camada de dados + verificação no app rodando; arriscado às cegas):
+
+- **R9 (AffiliateDetails "lucro do afiliado") e R10 (SpecialDashboard/SpecialSubAffiliates ownConfig dropa byBrand):** ambos calculam sobre **uma linha agregada por afiliado** (`perAffiliateRows`/`results` groupBy=affiliate). Aplicar `byBrand` corretamente exige dados **por afiliado×casa** (novo fetch no service/proxy) + somatório por casa — preservar byBrand no config sozinho não resolve (as chamadas são sem `brandId`). Fazer cego pode introduzir erro de dinheiro pior. **Próximo passo:** Fase 1.1 — fetch afiliado×casa + `calcSpecialEarnings`/`computeSubSpread` puras, validadas com o app rodando.
+
+Demais fases (2 segurança/escopo, 3 services, 4 páginas, 5 tooling) seguem como abaixo.
+
+---
+
 ## 1. Resumo executivo
 
 A confiabilidade da plataforma está estruturalmente comprometida por um descasamento entre **onde o risco mora** e **onde os testes medem**. As funções puras de dinheiro em `src/lib` e `src/services/affiliateService.ts` estão bem cobertas (lib 87%), mas a *cola* que escolhe taxa (byBrand vs topo), distingue ausência-de-config de R$0, e garante o invariante "agregado == Σ dos cards" vive embutida em **páginas (`src/pages/**`, ~5000 linhas, 0 testes)** e em **`server.ts` (1880 linhas, 0 testes de rota)** — exatamente os dois arquivos que `vitest.config.ts` **exclui da métrica de cobertura** (`coverage.include` lista só `src/lib`, `src/services`, `src/components`). Os dois bugs já corrigidos (a0dc467 ausência≠zero; 7c1c830 byBrand-vs-topo) nasceram aí, e a caça adversarial confirma que **a mesma classe ainda está aberta** em pelo menos 5 superfícies (ClientDashboard, BrandConfigEditor, AffiliateDetails "lucro", SpecialDashboard, e o ranking server-side). Tese central: **a cobertura mede o lugar errado; a classe de bug que escapa é money-math + resolução de taxa + escopo-por-papel vivendo em páginas/server não cobertos.** Enquanto a detecção de ausência e a seleção de taxa não forem extraídas para funções puras testadas e reusadas por todos os call-sites, cada tela nova reintroduz o bug.
