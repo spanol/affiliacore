@@ -450,6 +450,50 @@ async function startServer() {
     }
   });
 
+  // SECURITY (R5): taxas (CPA/REV/byBrand) são dado comercial sensível. Antes a rule
+  // de affiliate_configs era `read: isSignedIn()` e o cliente lia a COLEÇÃO INTEIRA —
+  // todo afiliado via a taxa de todos. Agora a leitura é mediada aqui (Admin SDK) e
+  // escopada por papel: admin recebe todas; afiliado recebe só a própria + (se especial
+  // ativo) as da sub-rede. A rule passa a ser admin-only (cliente direto bloqueado),
+  // espelhando payment_profiles/houses. [[REVIEW-TEST-PLAN R5]]
+  app.get('/api/affiliate-configs', requireAuth, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const user = (req as any).user;
+      if (user?.role === 'admin') {
+        const snap = await adminDb.collection('affiliate_configs').get();
+        const configs: Record<string, any> = {};
+        snap.forEach((d) => { configs[d.id] = d.data(); });
+        return res.json({ configs });
+      }
+
+      const ownId = user?.affiliateId ? String(user.affiliateId) : '';
+      if (!ownId) return res.json({ configs: {} });
+
+      // Própria config + (se especial ativo) as da sub-rede — mesmo escopo do proxy.
+      const ids = new Set<string>([ownId]);
+      try {
+        const specialSnap = await adminDb.collection('special_affiliates').doc(ownId).get();
+        const special = specialSnap.exists ? (specialSnap.data() as any) : null;
+        if (resolveIsSpecial(special) && Array.isArray(special.subAffiliateIds)) {
+          special.subAffiliateIds.forEach((s: any) => ids.add(String(s)));
+        }
+      } catch (e) {
+        console.error('Erro ao carregar sub-rede p/ configs:', e);
+      }
+
+      const configs: Record<string, any> = {};
+      await Promise.all([...ids].map(async (id) => {
+        const d = await adminDb!.collection('affiliate_configs').doc(id).get();
+        if (d.exists) configs[id] = d.data();
+      }));
+      return res.json({ configs });
+    } catch (error: any) {
+      console.error('[affiliate-configs] get:', error);
+      return res.status(500).json({ error: error.message || 'Erro ao carregar configs.' });
+    }
+  });
+
   app.patch('/api/affiliates/:affiliateId', requireAdmin, async (req, res) => {
     if (!adminDb) {
       return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });

@@ -113,14 +113,22 @@ async function fetchAffiliateApi(endpoint: string, query?: URLSearchParams): Pro
   });
 }
 
+// SECURITY (R5): as taxas (CPA/REV/byBrand) são dado comercial sensível — não são
+// mais lidas direto do Firestore pelo cliente (a rule de affiliate_configs passou a
+// ser admin-only). A leitura é mediada pelo servidor, que ESCOPA por papel: admin
+// recebe todas; afiliado recebe só a própria + (se especial ativo) as da sub-rede.
+// Mesma assinatura/retorno de antes — as páginas não mudam (já usavam só o próprio/subs).
 export async function fetchAffiliateConfigs(): Promise<Record<string, AffiliateConfig>> {
   try {
-    const querySnapshot = await getDocs(collection(db, 'affiliate_configs'));
-    const configs: Record<string, AffiliateConfig> = {};
-    querySnapshot.forEach((doc) => {
-      configs[doc.id] = doc.data() as AffiliateConfig;
-    });
-    return configs;
+    const resp = await authFetch('/api/affiliate-configs', { method: 'GET', headers: { Accept: 'application/json' } });
+    if (!resp.ok) {
+      console.error('Error fetching affiliate configs:', resp.status);
+      return {};
+    }
+    const body = await resp.json().catch(() => null);
+    return (body && typeof body === 'object' && body.configs && typeof body.configs === 'object')
+      ? (body.configs as Record<string, AffiliateConfig>)
+      : {};
   } catch (error) {
     console.error('Error fetching affiliate configs:', error);
     return {};

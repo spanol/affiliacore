@@ -22,8 +22,9 @@ const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigi
 
 // Passo 3 · Lista de sub-afiliados do afiliado especial — espelha o "Afiliados" do
 // master, capado à própria rede. Cada sub abre a AffiliateDetails escopada
-// (/affiliates/:id) — o proxy libera o especial a ler os subs, e as rules liberam
-// nome (affiliates) e config (affiliate_configs) a signed-in.
+// (/affiliates/:id) — o proxy libera o especial a ler os subs; o nome vem de
+// `affiliates` (signed-in) e a config (CPA/REV) vem ESCOPADA do servidor
+// (GET /api/affiliate-configs devolve own + sub-rede; a rule é admin-only · R5).
 export default function SpecialSubAffiliates() {
   const { profile } = useAuth();
   const { push } = useToast();

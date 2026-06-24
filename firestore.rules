@@ -46,10 +46,13 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // CPA / REV configuration per affiliate.
+    // CPA / REV configuration per affiliate (taxas — dado comercial sensível).
+    // SECURITY (R5): leitura mediada pelo servidor (Admin SDK, GET /api/affiliate-configs),
+    // que escopa por papel (admin = todas; afiliado = própria + sub-rede do especial).
+    // Cliente direto é BLOQUEADO — antes era `read: isSignedIn()` e qualquer afiliado
+    // logado lia a coleção inteira (CPA/REV/byBrand de todos). Espelha payment_profiles.
     match /affiliate_configs/{affiliateId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
 
     // B3 · Afiliado especial: marca o especial + sub-rede + taxa da sub-rede.
