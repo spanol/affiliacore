@@ -21,9 +21,12 @@
   - `resolveIsSpecial` unifica a definição (`active === true`) — fecha **R7** (o site de Vincular Login usava `active !== false` e divergia).
   - `resolveServerToday` (fuso America/Sao_Paulo) — fecha **R12** (ranking gravado/lido com data UTC errada à noite BR).
 - `server.ts` wireado às 3. **Validado em tela** após reiniciar o processo: /admin idêntico (R$ 46.423,38), /ranking renderiza com data BR e estado vazio certo.
-- **R5 fechado** (commit `203b127`): `affiliate_configs` não é mais legível por qualquer signed-in. Novo `GET /api/affiliate-configs` (requireAuth, Admin SDK) escopa por papel (admin=todas; afiliado=própria+sub-rede via `resolveIsSpecial`); `fetchAffiliateConfigs()` passou a usá-lo (assinatura igual, páginas inalteradas); rule virou admin-only. Validado no app (admin: repasse/lucro corretos via endpoint; 401 sem token). **PENDE `firebase deploy --only firestore:rules`** p/ valer em prod.
+- **R5 fechado** (commit `203b127`): `affiliate_configs` não é mais legível por qualquer signed-in. Novo `GET /api/affiliate-configs` (requireAuth, Admin SDK) escopa por papel (admin=todas; afiliado=própria+sub-rede via `resolveIsSpecial`); `fetchAffiliateConfigs()` passou a usá-lo (assinatura igual, páginas inalteradas); rule virou admin-only. Validado no app (admin: repasse/lucro corretos via endpoint; 401 sem token).
+- **R6 fechado** (commit `d5bccbc`): a rule de update de `users/{uid}` agora trava `isSpecial` (além de role/affiliateId) — cliente não se auto-marca especial.
+- **R17 fechado** (commit `d5bccbc`): `AffiliateDetailsRoute` em `App.tsx` — admin vê qualquer afiliado, especial passa (proxy escopa os dados), comum só o próprio id. Validado no app (admin sem regressão).
+- ⚠️ **PENDE `firebase deploy --only firestore:rules`** p/ R5+R6 valerem em produção (ação do operador; não rodo deploy de prod).
 
-**Pendente na Fase 2:** R6 (rules de `users` não travam `isSpecial`), R17 (guard de papel em `/affiliates/:id`), testes de `firestore.rules` (emulator) e de rotas Express (supertest + `createApp(deps)`).
+**Pendente na Fase 2:** testes de `firestore.rules` (emulator) e de rotas Express (supertest + `createApp(deps)`).
 
 Demais fases (3 services, 4 páginas, 5 tooling) seguem como abaixo.
 
