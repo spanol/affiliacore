@@ -36,7 +36,20 @@
 
 **Pronto quando (Fase 2)** ✅: (a) proxy IDOR e house-results scope com teste de integração verde; (b) rules com regressão verde para privesc (create/update role+isSpecial) e leitura cruzada de `affiliate_configs`/PII/`direct_messages`; (c) ranking server usa byBrand e fuso BR (Fase 1.1) com teste; (d) `isSpecial` por função única. **Falta operacional:** `vitest.config.ts coverage.include` ainda exclui `server.ts`/`pages` (a métrica ignora estas rotas testadas — dívida da Fase 5, P0.12); CI rodando `test:rules` (Fase 5).
 
-Demais fases (3 services, 4 páginas, 5 tooling) seguem como abaixo.
+## 0.2 Status — Fase 3 (services + tempo real) · COMPLETA · 2026-06-24
+
+**Entregue** (commits `794d160`, `de85634`; 312 testes verdes, lint limpo) — os 5 services saíram de 0% e o swap do AuthContext ganhou teste + fix:
+- **`noticeService` (13):** `isNoticeForUser` por audiência/papel (R21 — all/clients/specials, inativo→false, profile null); `subscribeToNotices` mapper (active default true, createdAt null) + erro; CRUD via `authFetch`.
+- **`rankingService` (8):** `subscribeToDailyRanking` — doc inexistente→`null` VS `entries:[]`→`{entries:[],count:0}` **não-null** (R22), count fallback=length, entries não-array→`[]`, erro; `computeDailyRanking` POST + erro; `todayISO` formato.
+- **`directMessageService` (10):** `where('recipientUid','==',uid)`; ordena createdAt desc com null no fim; readAt null; send/markRead via `authFetch` (encode).
+- **`contactService` (6):** `createContactInquiry` addDoc+serverTimestamp; mapper createdAt null + campo legado `instagram` preservado; erro.
+- **`houseService` (28):** `houseToBrandMeta` (brandId/logo null→undefined, registerUrlTemplate null PRESERVADO); `syncKnownBrandsFrom` ordena order→nome pt-BR; fetch/create/update/delete/import/clear via `authFetch` (querystrings + parseError error→message→status).
+- **`AuthContext` (7) + FIX R14:** na troca A→B o `loading` volta a `true` e o profile obsoleto é limpo antes de assinar o snapshot do novo (antes mantinha user=B/profile=A/loading=false → ProtectedRoute roteava com papel errado). Teste cobre login/logout/doc inexistente/erro/swap (desinscreve A antes de B)/unmount.
+- **Processo:** padrão de mock (`firebase/firestore`+`lib/firebase`+`lib/api`) estabelecido em `noticeService.test.ts` como template; os 4 services restantes escritos via **workflow** (1 agente/service, auto-verificados com vitest) e auditados manualmente. Tests de `directMessageService`/`contactService` etc. (P1.8) e null-vs-vazio do ranking (P0.11/R22) + `isNoticeForUser` (P0.10/R21) cobertos.
+
+**Pendente Fase 3 (menor):** P2.4 (cenários extremos de `houseResults.ts` — já tem 28 testes-base); component tests mais amplos ficam na Fase 4.
+
+Demais fases (4 páginas/fluxos, 5 tooling) seguem como abaixo.
 
 ---
 
