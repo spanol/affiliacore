@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchHouses, syncKnownBrandsFrom } from '../services/houseService';
+import { fetchSpecialAffiliates, type SpecialAffiliate } from '../services/affiliateService';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import { 
@@ -36,6 +37,7 @@ export default function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [specials, setSpecials] = useState<Record<string, SpecialAffiliate>>({});
 
   // Carrega o registro de casas (backoffice) uma vez no boot da área autenticada e
   // popula o cache vivo de marcas — toda a UI (logos/filtros/breakdown por casa)
@@ -45,6 +47,30 @@ export default function DashboardLayout() {
       .then((houses) => { if (houses.length) syncKnownBrandsFrom(houses); })
       .catch(() => {});
   }, []);
+
+  // Só o master tem os itens "Afiliados"/"Afiliados Especiais" na sidebar e navega
+  // para /affiliates/:id; carrega o registro de especiais uma vez para saber a qual
+  // item de lista a tela de detalhe pertence (destaque do menu). Falha silenciosa.
+  useEffect(() => {
+    if (profile?.role !== 'admin') return;
+    fetchSpecialAffiliates().then(setSpecials).catch(() => {});
+  }, [profile?.role]);
+
+  // Na visão de detalhe (/affiliates/:id) o pathname não bate exato com nenhum item;
+  // destacamos o item de lista correspondente — "Afiliados Especiais" se o afiliado
+  // em tela for especial, senão "Afiliados".
+  const affiliateDetailMatch = location.pathname.match(/^\/affiliates\/([^/]+)/);
+  const viewedAffiliateId = affiliateDetailMatch ? affiliateDetailMatch[1] : null;
+  const viewedAffiliateIsSpecial = !!(viewedAffiliateId && specials[viewedAffiliateId]?.active);
+
+  const isActive = (path: string) => {
+    if (location.pathname === path) return true;
+    if (viewedAffiliateId) {
+      if (path === '/special-affiliates') return viewedAffiliateIsSpecial;
+      if (path === '/affiliates') return !viewedAffiliateIsSpecial;
+    }
+    return false;
+  };
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -125,13 +151,13 @@ export default function DashboardLayout() {
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-medium border border-transparent",
-                    location.pathname === item.path
+                    isActive(item.path)
                       ? "bg-amber-500/15 text-amber-500 font-bold border-amber-500/30 shadow-sm"
                       : "text-slate-600 dark:text-neutral-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white hover:border-slate-200 dark:hover:border-neutral-800 hover:shadow-sm"
                   )}
                 >
                   <item.icon size={18} className={cn(
-                    location.pathname === item.path ? "text-amber-500" : "text-slate-600 dark:text-neutral-300"
+                    isActive(item.path) ? "text-amber-500" : "text-slate-600 dark:text-neutral-300"
                   )} />
                   {item.label}
                 </Link>

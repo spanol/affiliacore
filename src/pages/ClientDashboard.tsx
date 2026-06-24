@@ -317,8 +317,8 @@ export default function ClientDashboard() {
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Primeiros Depósitos</p>
                       <h4 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{row.first_deposits || 0}</h4>
                       <div className="flex items-center gap-1.5 mt-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-brand dark:bg-white animate-pulse"></div>
-                        <p className="text-[10px] font-bold text-brand dark:text-white uppercase tracking-widest leading-none">Contas Ativas</p>
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest leading-none">Contas Ativas</p>
                       </div>
                     </div>
                   </motion.div>
