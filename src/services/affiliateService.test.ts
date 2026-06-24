@@ -18,6 +18,7 @@ import {
   resolveBrandRates,
   rateStatus,
   buildBrandConfigTopPayload,
+  composeAdminProfit,
   calcAffiliatePayout,
   calcNetProfit,
 } from './affiliateService';
@@ -429,6 +430,65 @@ describe('calcManualHouseNetProfit (Fase 2 · lucro por casa manual)', () => {
 
   it('tolera entrada vazia', () => {
     expect(calcManualHouseNetProfit([], configs)).toEqual({});
+  });
+});
+
+describe('composeAdminProfit · headline == Σ cards (invariante 7c1c830 + eixo do filtro)', () => {
+  // 3 afiliados em 2 casas, com override byBrand (a1 SportingBet R$200 vs topo R$100).
+  const results = [
+    { id: 'a1', total_commission: 1000, qualified_cpa: 5, rvs: 0 }, // SportingBet
+    { id: 'a2', total_commission: 600, qualified_cpa: 3, rvs: 0 },  // Superbet
+    { id: 'b1', total_commission: 400, qualified_cpa: 2, rvs: 0 },  // Superbet
+  ];
+  const configs = {
+    a1: { affiliateId: 'a1', cpaValue: 100, revPercentage: 0, byBrand: { sp: { cpaValue: 200, revPercentage: 0 } } },
+    a2: { affiliateId: 'a2', cpaValue: 50, revPercentage: 0 },
+    b1: { affiliateId: 'b1', cpaValue: 80, revPercentage: 0 },
+  } as any;
+  const houseOf = (id: string) =>
+    ({ a1: { key: 'SportingBet', brandId: 'sp' }, a2: { key: 'Superbet', brandId: 'sb' }, b1: { key: 'Superbet', brandId: 'sb' } } as any)[id] ?? null;
+
+  it('com todo afiliado em casa conhecida, netProfit == byHouseTotal (aplica byBrand)', () => {
+    const p = composeAdminProfit(results, [], configs, {}, houseOf);
+    // a1 usa byBrand R$200 (5×200=1000), não o topo R$100.
+    expect(p.byHouse.SportingBet).toEqual({ commission: 1000, payout: 1000, netProfit: 0 });
+    expect(p.byHouse.Superbet.payout).toBe(3 * 50 + 2 * 80); // 310
+    expect(p.netProfit).toBe(p.byHouseTotal);
+  });
+
+  it('filtrar uma marca: headline e cards saem da MESMA base escopada e batem', () => {
+    // Simula o filtro do /admin: só as linhas da SportingBet entram.
+    const scoped = results.filter((r) => houseOf(r.id)?.key === 'SportingBet');
+    const p = composeAdminProfit(scoped, [], configs, {}, houseOf);
+    expect(Object.keys(p.byHouse)).toEqual(['SportingBet']);
+    expect(p.netProfit).toBe(p.byHouseTotal); // não soma Superbet por fora
+    expect(p.netProfit).toBe(0); // 1000 − 5×200
+  });
+
+  it('afiliado de casa desconhecida entra no netProfit (taxa topo) mas NÃO vira card → delta explícito', () => {
+    const withOrphan = [...results, { id: 'ghost', total_commission: 300, qualified_cpa: 1, rvs: 0 }];
+    const cfgs = { ...configs, ghost: { affiliateId: 'ghost', cpaValue: 50, revPercentage: 0 } } as any;
+    const p = composeAdminProfit(withOrphan, [], cfgs, {}, houseOf);
+    expect(Object.keys(p.byHouse).sort()).toEqual(['SportingBet', 'Superbet']); // ghost sem card
+    // ghost: comissão 300 − 1×50 = 250 de lucro entra só no headline.
+    expect(p.netProfit).toBe(p.byHouseTotal + 250);
+  });
+
+  it('soma o lucro das casas MANUAIS ao headline e aos cards', () => {
+    const manual = [
+      { houseSlug: 'kto', date: '2026-06-01', affiliateId: null, ...addMetrics(emptyMetrics(), { total_commission: 500 }) },
+    ] as any;
+    const otg = composeAdminProfit(results, [], configs, {}, houseOf);
+    const withManual = composeAdminProfit(results, manual, configs, {}, houseOf);
+    // casa manual sem atribuição → lucro = comissão (500) entra no headline e no total dos cards.
+    expect(withManual.netProfit).toBe(otg.netProfit + 500);
+    expect(withManual.byHouseTotal).toBe(otg.byHouseTotal + 500);
+    expect(withManual.netProfit).toBe(withManual.byHouseTotal);
+  });
+
+  it('tolera entradas vazias', () => {
+    const p = composeAdminProfit([], [], configs, {}, houseOf);
+    expect(p).toEqual({ netProfit: 0, byHouse: {}, byHouseTotal: 0 });
   });
 });
 

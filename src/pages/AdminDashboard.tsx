@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, humanizeName } from '../lib/utils';
-import { fetchAffiliates, fetchAllResults, fetchAllResultsByBrand, fetchAllResultsByCampaign, fetchAffiliateConfigs, fetchSpecialAffiliates, fetchManualResults, buildSubToSpecialConfig, calcAgencyNetProfit, calcNetProfitByHouse, calcManualHouseNetProfit, CampaignRow, SpecialAffiliate } from '../services/affiliateService';
+import { fetchAffiliates, fetchAllResults, fetchAllResultsByBrand, fetchAllResultsByCampaign, fetchAffiliateConfigs, fetchSpecialAffiliates, fetchManualResults, buildSubToSpecialConfig, composeAdminProfit, CampaignRow, SpecialAffiliate } from '../services/affiliateService';
 import DateRangePicker from '../components/DateRangePicker';
 import CampaignBreakdown from '../components/CampaignBreakdown';
 import AffiliatePerformanceChart from '../components/AffiliatePerformanceChart';
@@ -225,15 +225,15 @@ export default function AdminDashboard() {
     };
   }, [brandRows, brandById]);
 
-  // Contribuição das casas manuais ao lucro: Σ (comissão da casa − repasse atribuído).
-  const manualNet = useMemo(() => {
-    const np = calcManualHouseNetProfit(manualScoped, configs, subToSpecialConfig);
-    return Object.values(np).reduce((s, h) => s + h.netProfit, 0);
-  }, [manualScoped, configs, subToSpecialConfig]);
-  const netProfit = useMemo(
-    () => calcAgencyNetProfit(scopedResults, configs, subToSpecialConfig, houseOf).netProfit + manualNet,
-    [scopedResults, configs, subToSpecialConfig, manualNet, houseOf]
+  // Lucro da agência (headline) + detalhamento por casa saindo da MESMA base
+  // ESCOPADA pelo filtro de marca — antes o headline escopava (scopedResults) mas os
+  // cards por casa somavam TODAS as casas (results cru), e ao filtrar uma marca os dois
+  // divergiam (mesma classe do 7c1c830, no eixo do filtro). [[boost-net-profit-per-house]]
+  const profit = useMemo(
+    () => composeAdminProfit(scopedResults, manualScoped, configs, subToSpecialConfig, houseOf),
+    [scopedResults, manualScoped, configs, subToSpecialConfig, houseOf]
   );
+  const netProfit = profit.netProfit;
 
   // Por casa (agência) — comissão da casa + funil por marca (groupBy=brand) +
   // LUCRO LÍQUIDO daquela casa. O funil/comissão vêm do groupBy=brand; o lucro NÃO
@@ -243,37 +243,34 @@ export default function AdminDashboard() {
   // a taxa por casa (byBrand via brandId real da OTG) e a regra do especial-pai.
   // [[boost-net-profit-per-house]] [[boost-net-profit-rule]]
   const houseBreakdown = useMemo(() => {
-    const base = (Array.isArray(brandRows) ? brandRows : []).map((r: any) => {
-      const id = String(r.id ?? '');
-      const raw = String(r.label || r.name || r.id || 'Casa');
-      return {
-        id,
-        // casa conhecida → nome canônico do registro; senão humaniza o cru.
-        name: getKnownBrandName(id, raw) ?? humanizeName(raw),
-        commission: Number(r.total_commission) || 0,
-        registrations: Number(r.registrations) || 0,
-        firstDeposits: Number(r.first_deposits) || 0,
-        qualifiedCpa: Number(r.qualified_cpa) || 0,
-        deposit: Number(r.deposit) || 0,
-      };
-    });
+    // Cards das casas escopados pelo MESMO filtro de marca do headline — senão, ao
+    // filtrar uma marca, o card de cima encolhe mas os cards somam todas as casas.
+    const base = (Array.isArray(brandRows) ? brandRows : [])
+      .map((r: any) => {
+        const id = String(r.id ?? '');
+        const raw = String(r.label || r.name || r.id || 'Casa');
+        return {
+          id,
+          // casa conhecida → nome canônico do registro; senão humaniza o cru.
+          name: getKnownBrandName(id, raw) ?? humanizeName(raw),
+          commission: Number(r.total_commission) || 0,
+          registrations: Number(r.registrations) || 0,
+          firstDeposits: Number(r.first_deposits) || 0,
+          qualifiedCpa: Number(r.qualified_cpa) || 0,
+          deposit: Number(r.deposit) || 0,
+        };
+      })
+      .filter((h) => brandFilter === ALL_BRANDS || h.name === brandFilter);
 
-    // OTG: cruza afiliado×casa (results) com o MESMO `houseOf` do lucro agregado,
-    // p/ os dois aplicarem a taxa por casa (byBrand) e baterem. Manual: lucro
-    // direto das house_results (disjunto das casas OTG, chaveado pelo nome canônico).
-    // Sem o manual, casas manuais apareceriam com repasse/lucro 0 mesmo com afiliados.
-    const np = {
-      ...calcNetProfitByHouse(results, houseOf, configs, subToSpecialConfig),
-      ...calcManualHouseNetProfit(manualRows, configs, subToSpecialConfig),
-    };
-
+    // `profit.byHouse` (OTG afiliado×casa + manual) vem da MESMA base escopada do
+    // headline → o card de cima bate com a Σ dos cards visíveis. [[boost-net-profit-per-house]]
     return base
       .map((h) => {
-        const profit = np[h.name];
-        return { ...h, payout: profit?.payout ?? 0, netProfit: profit?.netProfit ?? 0 };
+        const p = profit.byHouse[h.name];
+        return { ...h, payout: p?.payout ?? 0, netProfit: p?.netProfit ?? 0 };
       })
       .sort((a, b) => b.commission - a.commission);
-  }, [brandRows, results, houseOf, configs, subToSpecialConfig, manualRows]);
+  }, [brandRows, brandFilter, profit]);
 
   // Contagem de afiliados respeita o filtro de marca.
   const affiliatesCount = useMemo(

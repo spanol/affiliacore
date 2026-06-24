@@ -849,6 +849,36 @@ export function calcManualHouseNetProfit(
   return out;
 }
 
+// Compõe o lucro da agência do /admin: headline + detalhamento por casa SAINDO DA
+// MESMA base. Recebe os results e linhas manuais JÁ ESCOPADOS pelo filtro de marca
+// (quando há filtro), p/ que o card de cima e os cards por casa nunca divirjam — antes
+// o headline escopava mas o breakdown somava TODAS as casas (mesma classe do 7c1c830,
+// reaberta no eixo do filtro). [[boost-net-profit-per-house]]
+//   • `byHouse`  = comissão/repasse/lucro por casa (OTG cruzando afiliado×casa +
+//                  manual), chaveado pelo nome canônico — alimenta os cards.
+//   • `netProfit`= total REAL da agência: agregado OTG (inclui afiliado de casa
+//                  DESCONHECIDA, à taxa de topo, que `byHouse` deixa de fora) + manual.
+//   • `byHouseTotal` = Σ dos cards. Invariante: quando todo afiliado tem casa conhecida,
+//                  `netProfit === byHouseTotal`; a diferença é o lucro dos afiliados sem
+//                  casa mapeada (que não viram card).
+export function composeAdminProfit(
+  results: any[],
+  manualRows: StoredManualRow[],
+  configs: Record<string, AffiliateConfig | undefined>,
+  subToSpecialConfig: Record<string, AffiliateConfig>,
+  houseOf: (affiliateId: string) => { key: string; brandId?: string } | null
+): { netProfit: number; byHouse: Record<string, HouseNetProfit>; byHouseTotal: number } {
+  const manualByHouse = calcManualHouseNetProfit(manualRows, configs, subToSpecialConfig);
+  const byHouse: Record<string, HouseNetProfit> = {
+    ...calcNetProfitByHouse(results, houseOf, configs, subToSpecialConfig),
+    ...manualByHouse,
+  };
+  const byHouseTotal = Object.values(byHouse).reduce((s, h) => s + h.netProfit, 0);
+  const manualTotal = Object.values(manualByHouse).reduce((s, h) => s + h.netProfit, 0);
+  const netProfit = calcAgencyNetProfit(results, configs, subToSpecialConfig, houseOf).netProfit + manualTotal;
+  return { netProfit, byHouse, byHouseTotal };
+}
+
 // --- Link de divulgação da agência (/go/:code) -------------------------------
 // O afiliado compartilha boost.../go/:code; o servidor registra o clique e
 // redireciona pro registerUrl real da casa (passando o clickId como subid —
