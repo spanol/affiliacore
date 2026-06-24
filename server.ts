@@ -9,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { renderErrorPage } from './errorPage';
 import { isBotUserAgent, appendSubid, clickStatDay } from './src/lib/tracking';
+import { resolveIsSpecial, resolveServerToday, resolveScopedAffiliateIds } from './src/lib/scope';
 import { DEFAULT_BRANDS } from './src/lib/brand';
 import { projectPartnerResults } from './src/lib/partnerResults';
 import { pullApprovedRoster, isOtgLinksConfigured } from './otgLinksPull';
@@ -203,7 +204,7 @@ async function startServer() {
 
       const specialSnap = await adminDb.collection('special_affiliates').doc(callerAffiliateId).get();
       const special = specialSnap.exists ? (specialSnap.data() as any) : null;
-      if (!special?.active) return res.status(403).json({ error: 'Você não é um afiliado especial ativo.' });
+      if (!resolveIsSpecial(special)) return res.status(403).json({ error: 'Você não é um afiliado especial ativo.' });
       const subs = Array.isArray(special.subAffiliateIds) ? special.subAffiliateIds.map((s: any) => String(s)) : [];
       if (!subs.includes(subId)) return res.status(403).json({ error: 'Este afiliado não pertence à sua sub-rede.' });
 
@@ -407,9 +408,11 @@ async function startServer() {
         throw e;
       }
 
-      // isSpecial espelha special_affiliates (existe e ativo).
+      // isSpecial espelha special_affiliates (existe e ativo). resolveIsSpecial unifica
+      // a regra (active === true) — antes este site usava `active !== false` e divergia
+      // dos demais quando o doc não tinha o campo `active`. [[R7]]
       const specialSnap = await adminDb.collection('special_affiliates').doc(affId).get();
-      const isSpecial = specialSnap.exists && specialSnap.data()?.active !== false;
+      const isSpecial = resolveIsSpecial(specialSnap.exists ? (specialSnap.data() as any) : null);
 
       await adminDb.collection('users').doc(userRecord.uid).set({
         affiliateId: affId,
@@ -696,7 +699,7 @@ async function startServer() {
     if (!apiKey) return res.status(500).json({ error: 'Chave de API externa não configurada.' });
 
     // Data: a do corpo (browser, fuso BR) ou hoje no servidor como fallback.
-    const date = isoDateRe.test(String(req.body?.date)) ? String(req.body.date) : new Date().toISOString().slice(0, 10);
+    const date = isoDateRe.test(String(req.body?.date)) ? String(req.body.date) : resolveServerToday();
 
     try {
       // Resultados do dia, todas as páginas (a OTG entrega pageSize=50).
@@ -1079,7 +1082,7 @@ async function startServer() {
       // espelha isSpecial no doc novo — senão ele se cadastra sem acesso à /network
       // (bug recorrente do especial sem flag). Resolvido pelo affiliateId do convite.
       const specialSnap = await adminDb.collection('special_affiliates').doc(affId).get();
-      const isSpecial = specialSnap.exists && specialSnap.data()?.active === true;
+      const isSpecial = resolveIsSpecial(specialSnap.exists ? (specialSnap.data() as any) : null);
 
       let userRecord: admin.auth.UserRecord;
       try {
@@ -1142,36 +1145,27 @@ async function startServer() {
       // affiliateIds pedidos pelo cliente são validados contra ele.
       const user = (req as any).user;
       if (user?.role !== 'admin') {
-        if (endpoint !== 'results' || id) {
-          return res.status(403).json({ error: 'Acesso restrito ao seu próprio desempenho.' });
-        }
-        if (!user?.affiliateId) {
-          return res.status(403).json({ error: 'Sua conta não está vinculada a um afiliado.' });
-        }
-        const ownId = String(user.affiliateId);
-
-        let allowedIds = [ownId];
-        if (adminDb) {
+        // Carrega a sub-rede do especial só no caminho válido (results, sem :id, com
+        // affiliateId); resolveScopedAffiliateIds cuida de todos os 403. [[R4]]
+        let special: any = null;
+        if (adminDb && endpoint === 'results' && !id && user?.affiliateId) {
           try {
-            const specialSnap = await adminDb.collection('special_affiliates').doc(ownId).get();
-            const special = specialSnap.exists ? (specialSnap.data() as any) : null;
-            if (special?.active && Array.isArray(special.subAffiliateIds)) {
-              allowedIds = [ownId, ...special.subAffiliateIds.map((s: any) => String(s))];
-            }
+            const specialSnap = await adminDb.collection('special_affiliates').doc(String(user.affiliateId)).get();
+            special = specialSnap.exists ? (specialSnap.data() as any) : null;
           } catch (e) {
             console.error('Erro ao carregar sub-rede do afiliado especial:', e);
           }
         }
-
-        const requested = String(req.query.affiliateIds || '')
-          .split(',').map((s) => s.trim()).filter(Boolean);
-        const scoped = requested.length
-          ? requested.filter((idr) => allowedIds.includes(idr))
-          : allowedIds;
-        if (scoped.length === 0) {
-          return res.status(403).json({ error: 'Acesso restrito à sua sub-rede.' });
-        }
-        req.query.affiliateIds = scoped.join(',');
+        const decision = resolveScopedAffiliateIds({
+          role: user?.role,
+          endpoint,
+          id,
+          ownAffiliateId: user?.affiliateId,
+          special,
+          requestedAffiliateIds: req.query.affiliateIds as any,
+        });
+        if (decision.denied) return res.status(decision.denied.status).json({ error: decision.denied.error });
+        if (decision.scoped) req.query.affiliateIds = decision.scoped.join(',');
       }
 
       // A API externa NÃO aceita affiliateIds separados por vírgula (devolve vazio);
