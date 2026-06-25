@@ -17,6 +17,7 @@ import type { AffiliateConfig } from './src/lib/commission';
 import { DEFAULT_BRANDS } from './src/lib/brand';
 import { projectPartnerResults } from './src/lib/partnerResults';
 import { pullApprovedRoster, isOtgLinksConfigured } from './otgLinksPull';
+import { pullAnalytics, isOtgAnalyticsConfigured } from './otgAnalyticsPull';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1161,6 +1162,35 @@ export function createApp(deps: ServerDeps) {
     } catch (error: any) {
       console.error('Error refreshing pending affiliates from OTG:', error);
       return res.status(502).json({ error: error.message || 'Erro ao puxar o roster da OTG.' });
+    }
+  });
+
+  // v1 ANALÍTICA da OTG: traz cliques + funil inicial + NGR por afiliado×casa —
+  // inclusive os só-funil (clique/cadastro sem comissão) que a v2 externa esconde
+  // (caso "Lucas Guimarães"). Auth via OTG_DASH_ACCESS_TOKEN (dashboard tem 2FA →
+  // sem password-grant; ver SPIKE-OTG-V1-ANALYTICS.md). Range default = mês corrente
+  // no fuso BR. Por ora pull+retorna (persistência/UI = próxima fatia).
+  app.post('/api/analytics/refresh', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    if (!isOtgAnalyticsConfigured()) {
+      return res.status(503).json({ error: 'v1 analítica não configurada (defina OTG_DASH_API_BASE + OTG_DASH_ACCESS_TOKEN no Secret Manager).' });
+    }
+    const today = resolveServerToday();
+    const isoRe = /^\d{4}-\d{2}-\d{2}$/;
+    const initialDate = isoRe.test(String(req.body?.initialDate)) ? String(req.body.initialDate) : `${today.slice(0, 7)}-01`;
+    const finalDate = isoRe.test(String(req.body?.finalDate)) ? String(req.body.finalDate) : today;
+    try {
+      const result = await pullAnalytics({ initialDate, finalDate });
+      return res.json({
+        source: 'otg-v1-analytics',
+        range: { initialDate, finalDate },
+        houses: result.houses.map((h) => ({ house: h.house, summary: h.summary, count: h.rows.length })),
+        rows: result.rows,
+        fetchedAt: result.fetchedAt,
+      });
+    } catch (error: any) {
+      console.error('Error pulling OTG v1 analytics:', error);
+      return res.status(502).json({ error: error.message || 'Erro ao puxar a v1 analítica da OTG.' });
     }
   });
 
