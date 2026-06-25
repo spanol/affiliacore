@@ -11,6 +11,8 @@ import { renderErrorPage } from './errorPage';
 import { isBotUserAgent, appendSubid, clickStatDay } from './src/lib/tracking';
 import { resolveIsSpecial, resolveServerToday, resolveScopedAffiliateIds } from './src/lib/scope';
 import { computeRankingEntries } from './src/lib/ranking';
+import { expandAffiliateIdsParam } from './src/lib/affiliateIdsParam';
+import { hrDocId, sanitizeMetrics } from './src/lib/houseResultsDoc';
 import type { AffiliateConfig } from './src/lib/commission';
 import { DEFAULT_BRANDS } from './src/lib/brand';
 import { projectPartnerResults } from './src/lib/partnerResults';
@@ -1353,12 +1355,7 @@ export function createApp(deps: ServerDeps) {
       for (const [key, value] of Object.entries(req.query as Record<string, any>)) {
         if (value == null) continue;
         if (key === 'affiliateIds') {
-          const raw = Array.isArray(value) ? value : [value];
-          raw
-            .flatMap((v) => String(v).split(','))
-            .map((s) => s.trim())
-            .filter(Boolean)
-            .forEach((affId) => outParams.append('affiliateIds', affId));
+          expandAffiliateIdsParam(value).forEach((affId) => outParams.append('affiliateIds', affId));
         } else {
           outParams.append(key, String(value));
         }
@@ -1727,15 +1724,8 @@ export function createApp(deps: ServerDeps) {
   // Casas 'manual' recebem resultados via planilha. Cada doc = uma linha
   // (casa, data, afiliado|null=agregado) com as métricas no shape de `results`.
   // O merge com a OTG é feito no cliente (affiliateService) — aqui só persistimos.
-  // doc id determinístico (casa__data__aff) p/ reimportar ser idempotente.
-  const HR_METRICS = ['registrations', 'first_deposits', 'qualified_cpa', 'rvs', 'deposit', 'total_commission'];
-  const hrDocId = (slug: string, date: string, affiliateId: string | null) =>
-    `${slug}__${date}__${affiliateId ?? 'agg'}`.replace(/\//g, '_');
-  const sanitizeMetrics = (src: any) => {
-    const out: any = {};
-    for (const k of HR_METRICS) out[k] = Number(src?.[k]) || 0;
-    return out;
-  };
+  // `hrDocId` (id determinístico = reimport idempotente) e `sanitizeMetrics`
+  // (coage as 6 métricas) vivem em src/lib/houseResultsDoc.ts (testados isolados).
   // Commit em lotes (< 500 ops por batch do Firestore).
   const commitChunked = async (ops: ((b: admin.firestore.WriteBatch) => void)[]) => {
     for (let i = 0; i < ops.length; i += 450) {
@@ -1929,10 +1919,7 @@ export function createApp(deps: ServerDeps) {
       baseParams.set('endDate', endDate);
       baseParams.set('groupBy', req.query.groupBy ? String(req.query.groupBy) : 'affiliate');
       // a OTG não aceita affiliateIds CSV — expande p/ parâmetro repetido.
-      if (req.query.affiliateIds) {
-        String(req.query.affiliateIds).split(',').map((s) => s.trim()).filter(Boolean)
-          .forEach((affId) => baseParams.append('affiliateIds', affId));
-      }
+      expandAffiliateIdsParam(req.query.affiliateIds).forEach((affId) => baseParams.append('affiliateIds', affId));
 
       // PAGINAÇÃO: a OTG entrega só pageSize=50 por página (page=N até totalPages;
       // pageSize/limit maiores dão erro). Sem isto, o parceiro via só os 50 primeiros
