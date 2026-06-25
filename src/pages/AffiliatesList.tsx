@@ -26,6 +26,7 @@ import { cn, humanizeName } from '../lib/utils';
 import BrandFilter from '../components/BrandFilter';
 import { getBrandName, uniqueBrands, ALL_BRANDS, getKnownBrandName } from '../lib/brand';
 import { normalizeNameKey } from '../lib/affiliateName';
+import { selectVisiblePending } from '../lib/pendingAffiliates';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Navigate, Link } from 'react-router-dom';
 
@@ -153,12 +154,16 @@ export default function AffiliatesList() {
       // aparecer mesmo que a pessoa já tenha um registro Superbet. Some quando o
       // afiliado real DAQUELA casa aparece. O id sintético (pending_<nameKey>_<casa>)
       // é o affiliateId que o convite/login usam até a reconciliação no servidor.
-      const houseKey = (nameKey: string, brand?: string | null) => `${nameKey}|${normalizeNameKey(brand)}`;
+      const houseKey = (nameKey?: string, brand?: string | null) => `${normalizeNameKey(nameKey)}|${normalizeNameKey(brand)}`;
+      // Suprime o pré-cadastro que JÁ tem representação: por ID (aceitou o convite →
+      // o login carrega o id sintético, mas sem brand, então a dedup por nameKey+casa
+      // falhava e o afiliado aparecia 2× — 1 com login + 1 "sem login") OU por
+      // nameKey+casa (reconciliado pelo relatório). [[selectVisiblePending]]
+      const presentIds = new Set(uniqueAffiliates.map((a: any) => String(a.id ?? a._id ?? '')));
       const presentKeys = new Set(
-        uniqueAffiliates.map((a: any) => houseKey(normalizeNameKey(a.name || a.label), getBrandName(a)))
+        uniqueAffiliates.map((a: any) => houseKey(a.name || a.label, getBrandName(a)))
       );
-      const pendingItems: Affiliate[] = (pendingData || [])
-        .filter((p) => p.status === 'pending' && !presentKeys.has(houseKey(p.nameKey, p.house)))
+      const pendingItems: Affiliate[] = selectVisiblePending(pendingData, presentIds, presentKeys, houseKey)
         .map((p) => ({
           id: p.id,
           name: p.name,
