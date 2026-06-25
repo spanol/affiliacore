@@ -5,6 +5,7 @@
 // postback (subid→jogador), a atribuição por jogador acende sem retrabalho.
 // Probe 2026-06-17: o subid sobrevive até a URL final de cadastro da casa
 // (Short.io → Entain), convivendo com o `wm` (ref do afiliado).
+import { resolveServerToday } from './scope';
 
 // Bots de preview/crawler batem no link (unfurl de redes sociais, buscadores,
 // scripts). NÃO podem contar como clique humano — senão o "andamento" mente.
@@ -34,7 +35,10 @@ export function appendSubid(registerUrl: string, subid: string): string {
   }
 }
 
-// Dia UTC (YYYY-MM-DD) para a chave do contador diário de cliques.
+// Dia (YYYY-MM-DD) no fuso BR (America/Sao_Paulo) para a chave do contador diário
+// de cliques. ANTES usava UTC (`toISOString`): o Cloud Run roda em UTC, então entre
+// 21h e 23:59 BR o clique caía no bucket de AMANHÃ, desalinhando a série diária
+// (mesma classe do R12 do ranking). Fonte ÚNICA do "dia BR" = resolveServerToday.
 export function clickStatDay(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  return resolveServerToday(date);
 }

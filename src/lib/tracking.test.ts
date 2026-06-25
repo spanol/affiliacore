@@ -56,9 +56,19 @@ describe('appendSubid', () => {
   });
 });
 
-describe('clickStatDay', () => {
-  it('formata o dia UTC como YYYY-MM-DD', () => {
-    expect(clickStatDay(new Date('2026-06-17T02:54:43Z'))).toBe('2026-06-17');
-    expect(clickStatDay(new Date('2026-12-31T23:59:59Z'))).toBe('2026-12-31');
+describe('clickStatDay · dia no fuso BR (não UTC)', () => {
+  it('usa America/Sao_Paulo, não UTC — clique de madrugada UTC fica no dia BR anterior', () => {
+    // 02:54 UTC = 23:54 BR do dia ANTERIOR → bucket 2026-06-16 (em UTC seria 06-17).
+    expect(clickStatDay(new Date('2026-06-17T02:54:43Z'))).toBe('2026-06-16');
+  });
+
+  it('janela 21h–23:59 BR (00h–02h59 UTC) NÃO vaza para o dia seguinte (classe R12)', () => {
+    // 01:30 UTC do dia 18 = 22:30 BR do dia 17 → continua 2026-06-17.
+    expect(clickStatDay(new Date('2026-06-18T01:30:00Z'))).toBe('2026-06-17');
+  });
+
+  it('horário comercial BR fica no mesmo dia', () => {
+    // 15:00 UTC = 12:00 BR → 2026-06-17.
+    expect(clickStatDay(new Date('2026-06-17T15:00:00Z'))).toBe('2026-06-17');
   });
 });
