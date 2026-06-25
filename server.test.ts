@@ -17,7 +17,7 @@
  * house-results — agregado não vaza), R20 (convite público TTL/single-use + rate
  * limit), R25 (create-user valida o enum de role).
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from './server';
 
@@ -450,5 +450,74 @@ describe('cron interno daily-ranking', () => {
     expect(res.body.reminders).toBe(1);
     expect(fs.__store.get('direct_messages').get(`ranking-reminder__${date}__master-uid`)).toBeTruthy();
     expect(fs.__store.get('direct_messages').get(`ranking-reminder__${date}__other-admin`)).toBeUndefined();
+  });
+});
+
+// =============================================================================
+// v1 ANALÍTICA da OTG — POST /api/analytics/refresh
+// Trava o WIRING da rota: admin-only, 503 sem creds, param fix repassado ao pull,
+// resiliência (superbet-404 → 200 parcial) e auth expirada (401 em todas → 502).
+// =============================================================================
+describe('POST /api/analytics/refresh (v1 analítica)', () => {
+  const seed = { users: { 'admin-uid': { role: 'admin' }, 'cli-uid': { role: 'client' } } };
+  const aresp = (status: number, data: any) => ({
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => data,
+    text: async () => (typeof data === 'string' ? data : JSON.stringify(data)),
+  });
+  const sbBody = (rows: any[]) => ({
+    statusCode: 200,
+    message: 'Success',
+    data: { summary: { clicks: 5462 }, rows, meta: { currentPage: 1, totalPages: 1, totalRows: rows.length, pageSize: 500 } },
+  });
+  const LUCAS = { affiliate: 'LucasGuimaraes', clicks: 20, registrations: 4, ftd: 0, cpa_qual: 0, deposits: 0, bet_amount: 0, ngr: 0 };
+
+  beforeEach(() => {
+    process.env.OTG_DASH_API_BASE = 'https://api.test';
+    process.env.OTG_DASH_ACCESS_TOKEN = 'tok-123';
+    process.env.OTG_DASH_HOUSES = 'sportingbet,superbet';
+  });
+  afterEach(() => {
+    delete process.env.OTG_DASH_API_BASE;
+    delete process.env.OTG_DASH_ACCESS_TOKEN;
+    delete process.env.OTG_DASH_HOUSES;
+  });
+
+  it('não-admin → 403', async () => {
+    await request(buildApp({ seed })).post('/api/analytics/refresh').set('Authorization', 'Bearer cli-uid').expect(403);
+  });
+
+  it('sem credenciais OTG → 503', async () => {
+    delete process.env.OTG_DASH_API_BASE;
+    delete process.env.OTG_DASH_ACCESS_TOKEN;
+    await request(buildApp({ seed })).post('/api/analytics/refresh').set('Authorization', 'Bearer admin-uid').expect(503);
+  });
+
+  it('sportingbet 200 + superbet 404 → 200 parcial; Lucas nas rows, superbet indisponível', async () => {
+    const fetchImpl: any = async (url: string) =>
+      String(url).includes('superbet') ? aresp(404, {}) : aresp(200, sbBody([LUCAS]));
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(seed), fetchImpl });
+    const res = await request(app)
+      .post('/api/analytics/refresh')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ initialDate: '2026-06-01', finalDate: '2026-06-25' })
+      .expect(200);
+    expect(res.body.source).toBe('otg-v1-analytics');
+    expect(res.body.range).toEqual({ initialDate: '2026-06-01', finalDate: '2026-06-25' });
+    expect(res.body.rows.some((r: any) => r.nameKey === 'lucasguimaraes')).toBe(true);
+    const sup = res.body.houses.find((h: any) => h.house === 'superbet');
+    expect(sup.available).toBe(false);
+    expect(res.body.houses.find((h: any) => h.house === 'sportingbet').available).toBe(true);
+  });
+
+  it('401 em todas (token OTG expirado) → 502 surfacia o erro', async () => {
+    const fetchImpl: any = async () => aresp(401, { message: 'Unauthorized' });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(seed), fetchImpl });
+    const res = await request(app)
+      .post('/api/analytics/refresh')
+      .set('Authorization', 'Bearer admin-uid')
+      .expect(502);
+    expect(res.body.error).toMatch(/HTTP 401/);
   });
 });

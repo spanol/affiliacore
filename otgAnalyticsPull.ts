@@ -27,6 +27,8 @@ export interface HouseAnalytics {
   house: string;
   summary: Record<string, number> | null;
   rows: FunnelRow[];
+  available: boolean; // false se a casa não tem endpoint analítico (404) ou se o pull dela falhou
+  error?: string; // mensagem quando o pull DESTA casa falhou (não-404; ex.: 401 token expirado)
 }
 
 export interface AnalyticsPullResult {
@@ -84,11 +86,11 @@ export const fetchHouseAnalytics = async (
     const qs = new URLSearchParams({
       initialDate: range.initialDate,
       finalDate: range.finalDate,
-      // valores de scope/sortBy ainda a CONFIRMAR (foram mascarados na captura);
-      // estes são o palpite seguro p/ o groupBy por afiliado. Ver SPIKE §5.
-      scope: 'affiliate',
-      sortBy: 'clicks',
-      sortDirection: 'desc',
+      // groupBy por afiliado. CONFIRMADO 2026-06-25 (probe direto): scope ∈
+      // {AFFILIATES, CAMPAIGNS} — 'affiliate' minúsculo dava HTTP 400. sortBy/
+      // sortDirection são opcionais e os valores não foram confirmados → omitidos
+      // (o default da API já ordena de forma utilizável). Ver SPIKE §2.
+      scope: 'AFFILIATES',
       page: String(page),
       pageSize: String(PAGE_SIZE),
     });
@@ -96,6 +98,12 @@ export const fetchHouseAnalytics = async (
     const resp = await fetchImpl(url, {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
     });
+    // 404 = a casa não tem endpoint analítico exposto (ex.: `superbet-analytics` em
+    // 2026-06; só `sportingbet-analytics` existe, embora ambas constem em
+    // /api/v1/betting-houses). Degrada como "indisponível" — NÃO derruba as outras.
+    if (resp.status === 404) {
+      return { house, summary: null, rows: [], available: false };
+    }
     if (!resp.ok) {
       const text = await resp.text().catch(() => '');
       throw new Error(`OTG analytics (${house}): HTTP ${resp.status}. ${text.slice(0, 200)}`);
@@ -105,14 +113,15 @@ export const fetchHouseAnalytics = async (
     if (!summary && d?.summary && typeof d.summary === 'object') summary = d.summary;
     const rows = Array.isArray(d?.rows) ? d.rows : [];
     raw.push(...rows);
-    // shape de paginação ainda não 100% confirmado — tenta meta.totalPages, senão
-    // para quando a página vier incompleta (< PAGE_SIZE).
+    // shape de paginação CONFIRMADO: data.meta = {currentPage,totalPages,totalRows,
+    // pageSize}. Com pageSize=500 vem tudo em 1 página; o fallback (< PAGE_SIZE → para)
+    // cobre o caso de a meta sumir.
     const tp = Number(d?.meta?.totalPages ?? d?.pagination?.totalPages);
     totalPages = Number.isFinite(tp) && tp > 0 ? tp : rows.length < PAGE_SIZE ? page : page + 1;
     page++;
   } while (page <= totalPages && page <= MAX_PAGES);
 
-  return { house, summary, rows: mapAnalyticsRows(raw, house) };
+  return { house, summary, rows: mapAnalyticsRows(raw, house), available: true };
 };
 
 // Puxa todas as casas configuradas e devolve achatado + por casa.
@@ -127,7 +136,15 @@ export const pullAnalytics = async (
   const { houses } = cfg();
   const out: HouseAnalytics[] = [];
   for (const house of houses) {
-    out.push(await fetchHouseAnalytics(house, range, token, fetchImpl));
+    // Resiliência por casa: o erro de UMA casa (404 já é tratado como soft dentro de
+    // fetchHouseAnalytics; um 5xx pontual cai aqui) não pode derrubar o pull das
+    // outras. Token expirado (401) cai aqui p/ TODAS — a rota decide o status final
+    // (502 quando NENHUMA casa respondeu). Ver server.ts POST /api/analytics/refresh.
+    try {
+      out.push(await fetchHouseAnalytics(house, range, token, fetchImpl));
+    } catch (e: any) {
+      out.push({ house, summary: null, rows: [], available: false, error: e?.message || String(e) });
+    }
   }
   return { houses: out, rows: out.flatMap((h) => h.rows), fetchedAt: new Date().toISOString() };
 };

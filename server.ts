@@ -1180,11 +1180,27 @@ export function createApp(deps: ServerDeps) {
     const initialDate = isoRe.test(String(req.body?.initialDate)) ? String(req.body.initialDate) : `${today.slice(0, 7)}-01`;
     const finalDate = isoRe.test(String(req.body?.finalDate)) ? String(req.body.finalDate) : today;
     try {
-      const result = await pullAnalytics({ initialDate, finalDate });
+      const result = await pullAnalytics({ initialDate, finalDate }, fetchImpl);
+      const houses = result.houses.map((h) => ({
+        house: h.house,
+        available: h.available,
+        summary: h.summary,
+        count: h.rows.length,
+        error: h.error,
+      }));
+      // Se NENHUMA casa respondeu (todas indisponíveis/erro) E houve erro real — ex.:
+      // token OTG expirado (TTL ~15 min) → 401 em todas — surfacia 502 em vez de um
+      // 200-vazio enganoso. (Só superbet-404, sem erro real, segue 200 com rows da
+      // sportingbet.) Ver SPIKE-OTG-V1-ANALYTICS.md.
+      const anyOk = result.houses.some((h) => h.available);
+      const firstErr = result.houses.find((h) => h.error)?.error;
+      if (!anyOk && firstErr) {
+        return res.status(502).json({ error: firstErr, range: { initialDate, finalDate }, houses });
+      }
       return res.json({
         source: 'otg-v1-analytics',
         range: { initialDate, finalDate },
-        houses: result.houses.map((h) => ({ house: h.house, summary: h.summary, count: h.rows.length })),
+        houses,
         rows: result.rows,
         fetchedAt: result.fetchedAt,
       });
