@@ -272,6 +272,9 @@ describe('coleções admin-only (servidor via Admin SDK; client direto negado)',
     'houses',
     'house_results',
     'api_partners',
+    // settings/external_api tem FORMA de credencial → leitura admin-only (audit
+    // 2026-06-24, espelha R5). Antes era signed-in-read; o doc é credential-shaped.
+    'settings',
   ];
 
   for (const col of ADMIN_ONLY) {
@@ -293,7 +296,6 @@ describe('coleções legíveis por signed-in (escrita só admin)', () => {
   const SIGNED_IN_READ = [
     'affiliates',
     'special_affiliates',
-    'settings',
     'notices',
     'daily_rankings',
   ];

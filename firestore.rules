@@ -66,10 +66,13 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Global application settings.
+    // Global application settings (inclui settings/external_api, doc com FORMA de
+    // credencial). SECURITY: leitura admin-only — antes era `read: isSignedIn()` e
+    // qualquer afiliado logado lia o doc credential-shaped. Espelha o fix R5 de
+    // affiliate_configs. O único leitor vivo é a tela Settings (admin); fetchSetting
+    // do client é código morto. Escrita já era admin-only.
     match /settings/{settingId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
 
     // Public contact form submissions: anyone may create; only admins may read/manage.
