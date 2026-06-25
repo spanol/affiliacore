@@ -23,6 +23,7 @@ import {
   calcNetProfit,
 } from './affiliateService';
 import { StoredManualRow, emptyMetrics, addMetrics } from '../lib/houseResults';
+import fc from 'fast-check';
 
 describe('extractArray', () => {
   it('retorna [] para null/undefined', () => {
@@ -108,6 +109,51 @@ describe('extractApiError', () => {
   it('detecta erro por mensagem mesmo sem flag de sucesso', () => {
     const err = extractApiError({ message: 'unauthorized' });
     expect(err).not.toBeNull();
+  });
+});
+
+describe('extractArray · precedência de caminho e arrays vazios (P2.1)', () => {
+  it('caminho prioritário data.data VAZIO vence results com conteúdo (precedência por caminho, não "1º não-vazio")', () => {
+    // data.data é o 1º path testado; Array.isArray([]) é true → retorna [] mesmo
+    // havendo results preenchido. Documenta o contrato real (precedência por caminho).
+    expect(extractArray({ data: { data: [] }, results: [{ id: 1 }] })).toEqual([]);
+  });
+
+  it('prefere a chave prioritária (affiliates) e ignora errors não-listado', () => {
+    expect(extractArray({ errors: [], affiliates: [{ id: 1 }] })).toEqual([{ id: 1 }]);
+  });
+
+  it('prefere data (path prioritário) sobre chave não-listada (warnings)', () => {
+    expect(extractArray({ warnings: [1], data: [{ id: 1 }] })).toEqual([{ id: 1 }]);
+  });
+
+  it('data.data como objeto vazio não quebra → []', () => {
+    expect(extractArray({ data: { data: {} } })).toEqual([]);
+  });
+});
+
+describe('extractApiError · códigos não-canônicos (P2.2)', () => {
+  it('200/201 não são erro (whitelist de sucesso)', () => {
+    expect(extractApiError({ code: '200' })).toBeNull();
+    expect(extractApiError({ code: '201' })).toBeNull();
+  });
+
+  it('código zero ("0"/"00") cai como erro genérico — só 200/201 são sucesso (limite documentado)', () => {
+    // O parser só trata 200/201 como sucesso; um código "0"/"00" sem success:true
+    // nem mensagem é classificado como erro real (noData=false). Comportamento
+    // conservador — se a OTG passar a usar 0=sucesso, revisar extractApiError.
+    expect(extractApiError({ code: '0' })?.noData).toBe(false);
+    expect(extractApiError({ code: '00' })?.noData).toBe(false);
+  });
+
+  it('detecta erro aninhado em payload.meta (success:false)', () => {
+    const err = extractApiError({ meta: { success: false, message: 'falha no meta' } });
+    expect(err).not.toBeNull();
+    expect(err?.message).toBe('falha no meta');
+  });
+
+  it('mensagem neutra sem flag de falha → null', () => {
+    expect(extractApiError({ message: 'processado com sucesso' })).toBeNull();
   });
 });
 
@@ -593,5 +639,57 @@ describe('buildBrandConfigTopPayload · preserva ausência (sem 0 fantasma)', ()
       cpaValue: 250,
       revPercentage: 15,
     });
+  });
+});
+
+// Property-based (fast-check) do invariante central 7c1c830: o lucro líquido
+// AGREGADO da agência == Σ do lucro por casa, com configs byBrand ALEATÓRIAS — desde
+// que todo afiliado tenha casa conhecida (sem órfão; o órfão é contabilizado só no
+// agregado, comportamento já fixado por exemplo). Centenas de combinações/execução.
+describe('invariante agregado == Σ cards · property-based (byBrand aleatório)', () => {
+  const HOUSES = [
+    { key: 'Superbet', brandId: 'sb' },
+    { key: 'SportingBet', brandId: 'sp' },
+    { key: 'Betano', brandId: 'bt' },
+  ];
+  const affArb = fc.record({
+    houseIdx: fc.nat({ max: 2 }),
+    total_commission: fc.nat({ max: 100000 }),
+    qualified_cpa: fc.nat({ max: 500 }),
+    rvs: fc.nat({ max: 100000 }),
+    topCpa: fc.nat({ max: 500 }),
+    topRev: fc.nat({ max: 100 }),
+    hasOverride: fc.boolean(),
+    ovCpa: fc.nat({ max: 500 }),
+    ovRev: fc.nat({ max: 100 }),
+  });
+
+  it('calcAgencyNetProfit(...,houseOf).netProfit ≈ Σ calcNetProfitByHouse', () => {
+    fc.assert(
+      fc.property(fc.array(affArb, { minLength: 1, maxLength: 8 }), (affs) => {
+        const results = affs.map((a, i) => ({
+          id: `aff${i}`,
+          total_commission: a.total_commission,
+          qualified_cpa: a.qualified_cpa,
+          rvs: a.rvs,
+        }));
+        const configs: Record<string, any> = {};
+        const houseMap: Record<string, { key: string; brandId: string }> = {};
+        affs.forEach((a, i) => {
+          const h = HOUSES[a.houseIdx];
+          houseMap[`aff${i}`] = h;
+          const cfg: any = { affiliateId: `aff${i}`, cpaValue: a.topCpa, revPercentage: a.topRev };
+          if (a.hasOverride) cfg.byBrand = { [h.brandId]: { cpaValue: a.ovCpa, revPercentage: a.ovRev } };
+          configs[`aff${i}`] = cfg;
+        });
+        const houseOf = (id: string) => houseMap[id] ?? null;
+
+        const agg = calcAgencyNetProfit(results, configs, {}, houseOf);
+        const byHouse = calcNetProfitByHouse(results, houseOf, configs);
+        const sumNet = Object.values(byHouse).reduce((s: number, h: any) => s + h.netProfit, 0);
+        expect(agg.netProfit).toBeCloseTo(sumNet, 4);
+      }),
+      { numRuns: 500 },
+    );
   });
 });

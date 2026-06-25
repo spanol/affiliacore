@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
   toISODate,
   getPresetRange,
@@ -116,6 +116,46 @@ describe('getPreviousRange', () => {
     // 01–03/05 (3 dias) → 28–30/04.
     expect(getPreviousRange({ startDate: '2026-05-01', endDate: '2026-05-03' }))
       .toEqual({ startDate: '2026-04-28', endDate: '2026-04-30' });
+  });
+});
+
+// P2.6 / R26 — em fuso COM horário de verão (America/New_York), um intervalo que
+// CRUZA a virada do DST não pode encolher/inflar a contagem de dias. A função usa
+// Date local + setDate (calendário), então deve ser robusta. Setamos TZ best-effort
+// (o Node relê process.env.TZ); a asserção do invariante (mesma qtd de dias + fim no
+// dia anterior ao início) é TZ-agnóstica via UTC, então vale mesmo se o TZ não trocar.
+describe('getPreviousRange · robusto a DST (P2.6 / R26)', () => {
+  const realTZ = process.env.TZ;
+  beforeAll(() => { process.env.TZ = 'America/New_York'; });
+  afterAll(() => { process.env.TZ = realTZ; });
+
+  // contagem inclusiva de dias via UTC (não depende do fuso da máquina/teste).
+  const inclusiveDays = (r: { startDate: string; endDate: string }) => {
+    const [ys, ms, ds] = r.startDate.split('-').map(Number);
+    const [ye, me, de] = r.endDate.split('-').map(Number);
+    const a = Date.UTC(ys, ms - 1, ds);
+    const b = Date.UTC(ye, me - 1, de);
+    return Math.round((b - a) / 86_400_000) + 1;
+  };
+  const dayBefore = (iso: string) => {
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d - 1));
+    return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`;
+  };
+
+  it('intervalo de 30 dias cruzando o spring-forward (mar/2026) mantém 30 dias', () => {
+    const range = { startDate: '2026-02-20', endDate: '2026-03-21' }; // cruza 08/03 (NY)
+    expect(inclusiveDays(range)).toBe(30); // sanidade do fixture
+    const prev = getPreviousRange(range);
+    expect(inclusiveDays(prev)).toBe(30);
+    expect(prev.endDate).toBe(dayBefore(range.startDate));
+  });
+
+  it('intervalo cruzando o fall-back (nov/2026) mantém a duração e encadeia sem buraco', () => {
+    const range = { startDate: '2026-10-20', endDate: '2026-11-18' }; // cruza 01/11 (NY)
+    const prev = getPreviousRange(range);
+    expect(inclusiveDays(prev)).toBe(inclusiveDays(range));
+    expect(prev.endDate).toBe(dayBefore(range.startDate));
   });
 });
 

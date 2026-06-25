@@ -26,8 +26,16 @@ export interface AffiliateConfig {
 }
 
 // Coage valor não-finito (string não-numérica da API externa, null) p/ 0 — ANTES de
-// multiplicar, p/ nunca propagar NaN aos totais de dinheiro.
-export const num = (v: any): number => (Number.isFinite(Number(v)) ? Number(v) : 0);
+// multiplicar, p/ nunca propagar NaN aos totais de dinheiro. Um objeto NÃO-array
+// (métrica malformada da API) vira 0 sem chamar Number(): `Number({toString:false})`
+// — JSON válido — LANÇA "Cannot convert object to primitive value" (achado property
+// 2026-06-24); blindar aqui evita o crash do cálculo de dinheiro. Arrays seguem a
+// coerção nativa (Number([5])===5), e primitivos/strings ficam inalterados.
+export const num = (v: any): number => {
+  if (v !== null && typeof v === 'object' && !Array.isArray(v)) return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
 // Resolve as taxas efetivas de um afiliado para uma casa: usa o override de
 // `byBrand[brandId]` quando existe, senão cai no CPA/REV de topo (o default).
