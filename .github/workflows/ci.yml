@@ -1,0 +1,58 @@
+name: CI
+
+# Roda em cada push na main e em todo PR. Dois jobs:
+#  - lint-test: tsc (type-check) + vitest com cobertura E thresholds por pasta
+#    (vitest.config.ts). Falha o build se a cobertura cair abaixo dos pisos.
+#  - rules: testa firestore.rules contra o emulador (precisa Java + firebase CLI).
+#    O firebase-tools é instalado AQUI (não vai pro devDeps — convenção do repo: o
+#    CLI é global; o JAR do emulador é baixado/cacheado fora do npm).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancela execuções antigas do mesmo ref quando chega um push novo.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-test:
+    name: Lint + Test + Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Type-check (tsc --noEmit)
+        run: npm run lint
+      - name: Tests + coverage thresholds
+        run: npm run coverage
+
+  rules:
+    name: Firestore rules (emulator)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - name: Cache Firestore emulator JAR
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@^15
+      - name: Firestore rules tests
+        run: npm run test:rules
