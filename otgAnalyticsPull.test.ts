@@ -9,6 +9,7 @@ import {
   fetchHouseAnalytics,
   pullAnalytics,
   isOtgAnalyticsConfigured,
+  __resetOtgAuthCacheForTests,
 } from './otgAnalyticsPull';
 
 // Response-like mínima (só o que o módulo usa: status/ok/json/text).
@@ -37,6 +38,7 @@ const RANGE = { initialDate: '2026-06-01', finalDate: '2026-06-25' };
 
 const ORIG = { ...process.env };
 beforeEach(() => {
+  __resetOtgAuthCacheForTests();
   process.env.OTG_DASH_API_BASE = 'https://api.test';
   process.env.OTG_DASH_ACCESS_TOKEN = 'tok-123';
   process.env.OTG_DASH_HOUSES = 'sportingbet,superbet';
@@ -146,5 +148,66 @@ describe('pullAnalytics · resiliência por casa', () => {
       expect(h.error).toMatch(/HTTP 401/);
     }
     expect(out.rows).toHaveLength(0);
+  });
+});
+
+describe('auth durável via login (sem token manual)', () => {
+  // contrato real: POST /api/v1/auth/login {email,password,deviceToken} → {data:{access_token,...}}
+  const loginOk = (accessToken: string) =>
+    resp(200, { data: { user: { id: 'u' }, access_token: accessToken, deviceToken: 'dev-rotacionado' } });
+
+  beforeEach(() => {
+    __resetOtgAuthCacheForTests();
+    delete process.env.OTG_DASH_ACCESS_TOKEN; // sem override manual → caminho de login
+    process.env.OTG_DASH_EMAIL = 'carlos@x.org';
+    process.env.OTG_DASH_PASSWORD = 'pw';
+    process.env.OTG_DASH_DEVICE_TOKEN = 'dev-2fa';
+  });
+
+  it('configurado só com email+senha+deviceToken; falta o deviceToken → não configurado', () => {
+    expect(isOtgAnalyticsConfigured()).toBe(true);
+    delete process.env.OTG_DASH_DEVICE_TOKEN;
+    expect(isOtgAnalyticsConfigured()).toBe(false);
+  });
+
+  it('loga (POST body {email,password,deviceToken}) e usa o access_token como Bearer', async () => {
+    const calls: any[] = [];
+    const fetchImpl: any = async (url: string, init: any) => {
+      calls.push({ url, init });
+      if (url.includes('/auth/login')) return loginOk('ACCESS-XYZ');
+      if (url.includes('superbet')) return resp(404, {});
+      return resp(200, sportingbetPage([LUCAS]));
+    };
+    const out = await pullAnalytics(RANGE, fetchImpl);
+
+    const login = calls.find((c) => c.url.includes('/api/v1/auth/login'));
+    expect(login.init.method).toBe('POST');
+    expect(JSON.parse(login.init.body)).toEqual({ email: 'carlos@x.org', password: 'pw', deviceToken: 'dev-2fa' });
+    const sb = calls.find((c) => c.url.includes('sportingbet-analytics'));
+    expect(sb.init.headers.Authorization).toBe('Bearer ACCESS-XYZ');
+    expect(out.rows.some((r) => r.nameKey === 'lucasguimaraes')).toBe(true);
+  });
+
+  it('login 401 → pullAnalytics rejeita (vira 502 na rota)', async () => {
+    const fetchImpl: any = async (url: string) =>
+      url.includes('/auth/login') ? resp(401, { message: 'Email ou senha incorretos' }) : resp(200, sportingbetPage([]));
+    await expect(pullAnalytics(RANGE, fetchImpl)).rejects.toThrow(/HTTP 401/);
+  });
+
+  it('login não-401 (deviceToken expirado) → erro com dica de recapturar', async () => {
+    const fetchImpl: any = async () => resp(400, { message: 'invalid device' });
+    await expect(pullAnalytics(RANGE, fetchImpl)).rejects.toThrow(/deviceToken/);
+  });
+
+  it('cacheia o access_token: 2 pulls = 1 login só', async () => {
+    let logins = 0;
+    const fetchImpl: any = async (url: string) => {
+      if (url.includes('/auth/login')) { logins++; return loginOk('ACCESS-CACHED'); }
+      if (url.includes('superbet')) return resp(404, {});
+      return resp(200, sportingbetPage([LUCAS]));
+    };
+    await pullAnalytics(RANGE, fetchImpl);
+    await pullAnalytics(RANGE, fetchImpl);
+    expect(logins).toBe(1);
   });
 });

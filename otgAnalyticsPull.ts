@@ -8,12 +8,19 @@
 //      e TODOS os afiliados, inclusive os só-funil que a v2 esconde (caso "Lucas").
 // Este módulo lê o (3) server-side: `GET {BASE}/api/v1/agency/{casa}-analytics`.
 //
-// AUTENTICAÇÃO (atenção): o dashboard `partners.grupootg.com` EXIGE 2FA (achado
-// 2026-06-25: localStorage tem `2fa:login`). Por isso NÃO há password-grant
-// server-side como no (2)/Supabase — email+senha do Carlos não passam sozinhos.
-// O token de acesso (Bearer, ~curto) precisa ser obtido PÓS-2FA e fornecido via
-// Secret Manager (`OTG_DASH_ACCESS_TOKEN`). Quando soubermos o endpoint de refresh
-// (capturar 1 login no DevTools), trocamos por refresh-token durável aqui.
+// AUTENTICAÇÃO (contrato capturado 2026-06-25 via interceptor no dashboard):
+//   POST {BASE}/api/v1/auth/login  body { email, password, deviceToken }
+//     → 200 { data: { user, access_token, deviceToken } }
+//   - `access_token`: Bearer p/ /api/v1/agency/*, TTL ~15 min.
+//   - `deviceToken`: prova "verified-2fa" (localStorage `2fa:login.token`), TTL ~8h.
+//     É o que PULA o OTP no re-login — sem ele o login exigiria 2FA interativo.
+//   - NÃO há refresh-token: o próprio login é o "refresh". /api/v1/auth/refresh existe
+//     mas não aceitou os tokens testados. Sem access_token o dashboard cai no /login.
+// Logo a auth DURÁVEL server-side = guardar email+senha+deviceToken (Secret Manager) e
+// logar sob demanda, cacheando o access_token de 15 min em memória. O Carlos só re-troca
+// o deviceToken a cada ~8h (capturar `2fa:login` no localStorage pós-2FA) — 32× menos
+// que o access_token manual. `OTG_DASH_ACCESS_TOKEN` segue como override manual rápido.
+// Ver SPIKE-OTG-V1-ANALYTICS.md.
 // ============================================================================
 
 import { mapAnalyticsRows, FunnelRow } from './src/lib/otgAnalytics';
@@ -41,7 +48,10 @@ type FetchImpl = typeof fetch;
 
 const cfg = () => ({
   base: (process.env.OTG_DASH_API_BASE || '').replace(/\/+$/, ''),
-  token: process.env.OTG_DASH_ACCESS_TOKEN || '',
+  token: process.env.OTG_DASH_ACCESS_TOKEN || '', // override manual (pós-2FA, ~15 min)
+  email: process.env.OTG_DASH_EMAIL || '',
+  password: process.env.OTG_DASH_PASSWORD || '',
+  deviceToken: process.env.OTG_DASH_DEVICE_TOKEN || '', // = 2fa:login.token (~8h)
   houses: (process.env.OTG_DASH_HOUSES || 'sportingbet,superbet')
     .split(',')
     .map((s) => s.trim())
@@ -49,22 +59,70 @@ const cfg = () => ({
 });
 
 export const isOtgAnalyticsConfigured = (): boolean => {
-  const { base, token, houses } = cfg();
-  return Boolean(base && token && houses.length);
+  const { base, token, email, password, deviceToken, houses } = cfg();
+  // configurada se houver base + casas + (token manual OU trio de login durável).
+  return Boolean(base && houses.length && (token || (email && password && deviceToken)));
 };
 
-// O dashboard usa Bearer JWT custom (NÃO Supabase). Com 2FA, o token vem pronto do
-// Secret Manager (capturado pós-2FA). Sem token → erro explícito.
-const getAccessToken = (): string => {
-  const { token } = cfg();
-  if (!token) {
-    throw new Error(
-      'OTG_DASH_ACCESS_TOKEN ausente. O partners.grupootg.com exige 2FA, então não há ' +
-        'password-grant server-side: forneça um access token (pós-2FA) no Secret Manager. ' +
-        'Ver SPIKE-OTG-V1-ANALYTICS.md §3/§5.'
-    );
+// Cache em memória do access_token (TTL ~15 min) p/ não logar a cada request. Por
+// processo; some no restart (tsx server.ts) — ok, o próximo pull re-loga.
+let cachedAccess: { token: string; expMs: number } | null = null;
+
+// Exposto só p/ testes isolarem o cache entre casos.
+export const __resetOtgAuthCacheForTests = (): void => {
+  cachedAccess = null;
+};
+
+const decodeExpMs = (jwt: string): number | null => {
+  try {
+    const payload = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64').toString('utf8'));
+    return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
+  } catch {
+    return null;
   }
-  return token;
+};
+
+// Login durável: POST /api/v1/auth/login { email, password, deviceToken } → access_token.
+const loginForAccessToken = async (fetchImpl: FetchImpl): Promise<string> => {
+  const { base, email, password, deviceToken } = cfg();
+  const resp = await fetchImpl(`${base}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ email, password, deviceToken }),
+  });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => '');
+    const hint =
+      resp.status === 401
+        ? 'Email/senha incorretos.'
+        : 'O deviceToken pode ter expirado (~8h) — recapture o 2fa:login pós-2FA e atualize OTG_DASH_DEVICE_TOKEN.';
+    throw new Error(`OTG login: HTTP ${resp.status}. ${hint} ${text.slice(0, 160)}`);
+  }
+  const body = await resp.json().catch(() => null);
+  const data = body?.data ?? {};
+  const accessToken = data.access_token || data.accessToken || data.token;
+  if (!accessToken) {
+    throw new Error('OTG login: resposta 200 sem access_token (shape mudou?). data keys: ' + Object.keys(data).join(','));
+  }
+  return accessToken;
+};
+
+// Resolve um access_token válido: 1) override manual; 2) login durável (cacheado).
+const getAccessToken = async (fetchImpl: FetchImpl = fetch): Promise<string> => {
+  const { token, email, password, deviceToken } = cfg();
+  if (token) return token; // override manual rápido / fallback
+  if (email && password && deviceToken) {
+    const now = Date.now();
+    if (cachedAccess && now < cachedAccess.expMs - 60_000) return cachedAccess.token;
+    const accessToken = await loginForAccessToken(fetchImpl);
+    cachedAccess = { token: accessToken, expMs: decodeExpMs(accessToken) ?? now + 10 * 60_000 };
+    return accessToken;
+  }
+  throw new Error(
+    'v1 analítica sem credencial: defina OTG_DASH_EMAIL + OTG_DASH_PASSWORD + OTG_DASH_DEVICE_TOKEN ' +
+      '(login durável; deviceToken = 2fa:login pós-2FA, ~8h) OU OTG_DASH_ACCESS_TOKEN (manual, ~15 min). ' +
+      'Ver SPIKE-OTG-V1-ANALYTICS.md.'
+  );
 };
 
 const MAX_PAGES = 50;
@@ -130,9 +188,9 @@ export const pullAnalytics = async (
   fetchImpl: FetchImpl = fetch
 ): Promise<AnalyticsPullResult> => {
   if (!isOtgAnalyticsConfigured()) {
-    throw new Error('Credenciais da v1 analítica ausentes (OTG_DASH_API_BASE + OTG_DASH_ACCESS_TOKEN).');
+    throw new Error('Credenciais da v1 analítica ausentes (OTG_DASH_API_BASE + login OTG_DASH_EMAIL/PASSWORD/DEVICE_TOKEN ou OTG_DASH_ACCESS_TOKEN).');
   }
-  const token = getAccessToken();
+  const token = await getAccessToken(fetchImpl);
   const { houses } = cfg();
   const out: HouseAnalytics[] = [];
   for (const house of houses) {
