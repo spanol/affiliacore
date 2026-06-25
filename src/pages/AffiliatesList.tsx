@@ -19,7 +19,7 @@ import {
   Clock,
   X
 } from 'lucide-react';
-import { fetchAffiliates, fetchAffiliateConfigs, fetchAffiliateStatuses, saveAffiliateConfig, updateAffiliateStatus, createAuditLog, fetchRegisteredUsers, updateUserRole, syncAffiliates, AffiliateConfig, fetchSpecialAffiliates, SpecialAffiliate, fetchPendingAffiliates, importPendingAffiliates, createAccessInvite } from '../services/affiliateService';
+import { fetchAffiliates, fetchAffiliateConfigs, fetchAffiliateStatuses, saveAffiliateConfig, buildBrandConfigTopPayload, updateAffiliateStatus, createAuditLog, fetchRegisteredUsers, updateUserRole, syncAffiliates, AffiliateConfig, fetchSpecialAffiliates, SpecialAffiliate, fetchPendingAffiliates, importPendingAffiliates, createAccessInvite } from '../services/affiliateService';
 import SpecialAffiliateModal from '../components/SpecialAffiliateModal';
 import { useToast } from '../contexts/ToastContext';
 import { cn, humanizeName } from '../lib/utils';
@@ -250,7 +250,10 @@ export default function AffiliatesList() {
     setConfigs(prev => ({
       ...prev,
       [affiliateId]: {
-        ...(prev[affiliateId] || { affiliateId, cpaValue: 0, revPercentage: 0 }),
+        // default VAZIO (não 0): editar só um campo não pode plantar um 0 fantasma
+        // no irmão — senão "Salvar" persistia {cpaValue:0,revPercentage:0} e o
+        // rateStatus lia "configurado" (ausência ≠ R$0). [[buildBrandConfigTopPayload]]
+        ...(prev[affiliateId] || ({ affiliateId, cpaValue: '', revPercentage: '' } as any)),
         [field]: next as any
       }
     }));
@@ -258,15 +261,19 @@ export default function AffiliatesList() {
 
   const handleSaveConfig = async (affiliateId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const raw = configs[affiliateId];
+    const toStr = (v: unknown) => (v === '' || v == null ? '' : String(v));
+    // Fonte ÚNICA da regra ausência-vs-zero: só grava um campo digitado AGORA ou já
+    // existente como número. null = nada a gravar → NÃO cria doc fantasma (antes
+    // gravava 0/0, que rateStatus via como "configurado"). Mesma pura do BrandConfigEditor.
+    const top = buildBrandConfigTopPayload(
+      { cpa: toStr(raw?.cpaValue), rev: toStr(raw?.revPercentage) },
+      raw,
+    );
+    if (!top) return;
     setSavingId(affiliateId);
     try {
-      const raw = configs[affiliateId] || { affiliateId, cpaValue: 0, revPercentage: 0 };
-      const config = {
-        affiliateId,
-        cpaValue: Number(raw.cpaValue) || 0,
-        revPercentage: Number(raw.revPercentage) || 0,
-      };
-      await saveAffiliateConfig(config);
+      await saveAffiliateConfig({ affiliateId, ...top });
       setSavedConfigIds((prev) => new Set(prev).add(affiliateId));
       setSavedId(affiliateId);
       setTimeout(() => setSavedId(null), 2000);
@@ -581,7 +588,7 @@ export default function AffiliatesList() {
               <tbody className="divide-y divide-slate-100 dark:divide-neutral-800 text-xs">
                 {visibleAffiliates.map((item: any) => {
                   const affiliateId = item.id || item._id;
-                  const config = configs[affiliateId] || { affiliateId, cpaValue: 0, revPercentage: 0 };
+                  const config = configs[affiliateId] || ({ affiliateId, cpaValue: '', revPercentage: '' } as any);
                   const pendingCfg = needsConfig(item);
 
                   return (
@@ -765,7 +772,7 @@ export default function AffiliatesList() {
           <div className="md:hidden divide-y divide-slate-100 dark:divide-neutral-800">
             {visibleAffiliates.map((item: any) => {
               const affiliateId = item.id || item._id;
-              const config = configs[affiliateId] || { affiliateId, cpaValue: 0, revPercentage: 0 };
+              const config = configs[affiliateId] || ({ affiliateId, cpaValue: '', revPercentage: '' } as any);
               const pendingCfg = needsConfig(item);
               return (
                 <div key={affiliateId || Math.random()} className={cn("p-4 space-y-4", item.isPending && "bg-amber-50/40 dark:bg-amber-900/[0.06]")}>

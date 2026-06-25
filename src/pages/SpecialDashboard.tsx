@@ -172,12 +172,19 @@ export default function SpecialDashboard() {
   // nunca a comissão bruta da casa — Comissão/CPA/REV são o que o especial recebe.
   const affiliateChartData = useMemo(
     () => [...results]
-      .map((r) => ({
-        name: humanizeName(String(r.affiliate_name || r.name || r.label || r.affiliate_id || r.id || '---')),
-        Comissão: calcAffiliatePayout(r, ownConfig),
-        CPA: (r.qualified_cpa || 0) * (ownConfig.cpaValue || 0),
-        REV: (r.rvs || 0) * ((ownConfig.revPercentage || 0) / 100),
-      }))
+      .map((r) => {
+        // taxa POR CASA do afiliado (não só o topo) — espelha os cards/CPA/REV acima
+        // (:146-152). Sem isso o chart divergia da Comissão real quando havia override
+        // byBrand. [[boost-net-profit-per-house]]
+        const brandId = brandIdOf(rowAff(r));
+        const rates = resolveBrandRates(ownConfig, brandId);
+        return {
+          name: humanizeName(String(r.affiliate_name || r.name || r.label || r.affiliate_id || r.id || '---')),
+          Comissão: calcAffiliatePayout(r, ownConfig, brandId),
+          CPA: (r.qualified_cpa || 0) * rates.cpaValue,
+          REV: (r.rvs || 0) * (rates.revPercentage / 100),
+        };
+      })
       .sort((a, b) => b.Comissão - a.Comissão),
     [results, ownConfig]
   );
