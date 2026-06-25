@@ -10,7 +10,7 @@
 | Fonte | Acesso | O que oferece |
 |-------|--------|---------------|
 | **API v2 externa** (`/api/v2/external`, `x-api-key` via proxy) | ✅ temos | `affiliates`, `results` (groupBy `affiliate`/`brand`/`date`/`campaign`), `campaigns` |
-| **API v1 interna** (`/api/v1`, JWT de sessão da agência) | ❌ **não temos** (401 com nossa chave) | cliques, valores em aposta, canais, ciclo de pagamento |
+| **API v1 interna** (`/api/v1/agency/{casa}-analytics`, JWT custom da agência) | 🟡 **alcançável pelo login do Carlos** (x-api-key dá 401; mas o dashboard usa Bearer JWT do login) — ver `SPIKE-OTG-V1-ANALYTICS.md` | **cliques**, valores em aposta (handle), **NGR**, canais, ciclo de pagamento — e **TODOS os afiliados** (inclui só-funil que a v2 esconde) |
 | **Firebase** (Auth + Firestore) | ✅ nosso | usuários/roles, configs CPA/REV, status, auditoria, convites, espelho de afiliados |
 
 **Conclusão-chave:** o MVP é 100% construível sobre a **v2 + Firebase**. Os dados exclusivos
@@ -45,10 +45,17 @@ do v1 dependem de a OTG liberar acesso (ver Trilha C).
 | **B4 · Dados bancários** (PIX/banco/CNPJ) | decisão + segurança (`firestore.rules` restrito) |
 | **B5 · Acessos/visualizações** (settings do admin master) | depende de definir os eixos (por-admin? por-tela?) |
 
-## Trilha C — BLOQUEADA: requer acesso à API v1 da OTG 🔴
-Dados: **Cliques · Valores em Aposta · Canais · Ciclo de pagamento.**
+## Trilha C — POTENCIALMENTE DESBLOQUEÁVEL via login da agência 🟡 (era 🔴)
+Dados: **Cliques · Valores em Aposta (handle) · NGR · Canais · Ciclo de pagamento.**
 Não existem na v2 e o v1 exige JWT de sessão (nossa `x-api-key` dá 401).
-**Ação necessária:** pedido formal à OTG (rascunho abaixo). Não é tarefa de código.
+**ACHADO 2026-06-25** (ver **`SPIKE-OTG-V1-ANALYTICS.md`**): o dashboard `partners.grupootg.com`
+já consome a v1 (`GET /api/v1/agency/{casa}-analytics`, **com cliques + NGR + TODOS os afiliados**,
+inclusive os só-funil que a v2 esconde — caso "Lucas Guimarães"). A auth é **JWT custom da agência**
+(Bearer, token no localStorage; NÃO Supabase), obtido pelo PRÓPRIO login do Carlos — então
+**não precisamos pedir API key nova à OTG**; dá para automatizar server-side com as creds do Carlos
+(mesmo padrão do `otgLinksPull.ts`, mas login custom, não Supabase). **Pendência de operador:**
+capturar o request de login + 1 de analytics (DevTools › Network) e fornecer as creds via Secret Manager.
+O rascunho de pedido à OTG (abaixo) vira plano B.
 
 ## Trilha D — B3 · Afiliado especial (sub-afiliados) 🟡 em implementação
 - A "feature incompleta" de 28/05 **era este afiliado especial** (não havia sistema legado).
