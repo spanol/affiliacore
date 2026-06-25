@@ -49,7 +49,25 @@
 
 **Pendente Fase 3 (menor):** P2.4 (cenários extremos de `houseResults.ts` — já tem 28 testes-base); component tests mais amplos ficam na Fase 4.
 
-Demais fases (4 páginas/fluxos, 5 tooling) seguem como abaixo.
+## 0.3 Status — Fase 4 (páginas/fluxos + componentes) · COMPLETA · 2026-06-24
+
+**Entregue** (commits `7788282`, `efb7760`; 381 testes verdes, lint limpo). 5 bugs confirmados + 6 extrações puras, cada uma religada na página e testada (scout multi-agente mapeou; fan-out de 9 agentes escreveu os testes, auto-verificados + auditados):
+
+- **R23 Profile** (`src/lib/profileSave.ts`): ordem invertida — gravava `mustChangePassword:false` ANTES de `updatePassword`; se a senha falhasse (ex. `auth/requires-recent-login`), o usuário escapava do gate de 1º acesso. Agora senha PRIMEIRO; perfil (liberando o gate) só depois. Teste prova ordem `[pw,doc]` + doc nunca grava se a senha lança.
+- **R27 NotificationBell** (`countUnreadNotices` em `noticeService`): aviso com `serverTimestamp` pendente (createdAt null) nascia "lido" (`0 > lastSeen`=false). Agora null = não-lido.
+- **Ranking data impossível** (`resolveRankingDate` em `dateRange`): `?date` só checava formato → `2026-13-40`/`2026-02-30` passavam. Agora valida semântica (mês/dia + round-trip UTC).
+- **Register e-mail** (`Register.tsx`): Auth recebia e-mail cru, Firestore gravava normalizado → divergência. Agora normaliza uma vez e usa em ambos; teste de componente prova `'  TEST@X.COM '`→`'test@x.com'`.
+- **R24 import Houses** (`canImport`/`buildImportPayload` em `src/lib/houseImport.ts`): payload inline podia vazar `affiliateLabel`/`line`. Pura copia EXATAMENTE `{date, affiliateId, ...6 METRIC_KEYS}`; teste prova o no-leak. (Corrige tb o `disabled` do botão.)
+- **R19 findAffiliateInList** (`src/lib/affiliateLookup.ts`): scan por id (a.id/a._id) extraído do fallback de `fetchAffiliateById`.
+- **Gate do lucro líquido** (`src/lib/affiliateView.ts canViewAffiliateNetProfit`): unifica o `isSuperiorView`; afiliado vendo a própria página nunca vê o card (e mesmo o card é o GANHO do afiliado, não a margem da agência — essa só no /admin). Verificado limpo: ClientDashboard não importa nenhuma função de lucro/margem.
+- **computeRosterStats** (`src/lib/rosterStats.ts`): stats do OtgRoster extraído do useMemo.
+- **BrandBreakdown**: `Number()||0`→`num()` (coerção-padrão dos dashboards, consistência) + teste de componente (empty, config null, override byBrand, num preserva valor real). NOTA: `num` guarda NaN/Infinity→0 mas NÃO parseia vírgula pt-BR; em prod os totais batem (a OTG manda número parseável), então adequado.
+
+**Pendente Fase 4 (menor):** teste da ordem de validação do InviteAccept (P1.10, sem bug — só cobertura); component tests mais amplos de ClientDashboard/AffiliateDetails (o gate já está coberto pela função pura `canViewAffiliateNetProfit`).
+
+## 0.4 — Falta a Fase 5 (tooling/CI)
+
+Único bloco grande restante do plano: `vitest.config.ts coverage.include` ainda exclui `pages/`/`server.ts`/`contexts/` (a métrica esconde a superfície testada — P0.12/§7); thresholds por pasta; CI rodando `lint`+`test`+`test:rules`; property-based (fast-check) p/ os invariantes; `firebase-tools` no devDeps p/ CI. Ver §6/§7/§8.
 
 ---
 
