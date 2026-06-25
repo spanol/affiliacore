@@ -80,18 +80,28 @@ env:
   # Credenciais da v1 ANALÍTICA da OTG (cliques + funil inicial + NGR; rota
   # POST /api/analytics/refresh → GET {BASE}/api/v1/agency/{casa}-analytics).
   # Server-only; nunca expor ao browser. Ver SPIKE-OTG-V1-ANALYTICS.md.
-  # ATENÇÃO: o dashboard partners.grupootg.com tem 2FA → o ACCESS_TOKEN é um Bearer
-  # obtido PÓS-2FA e EXPIRA (~1h); enquanto não capturarmos o endpoint de refresh,
-  # o token no secret precisa ser renovado manualmente (limitação conhecida).
-  # Criar/atualizar com:
-  #   firebase apphosting:secrets:set otg-dash-api-base
-  #   firebase apphosting:secrets:set otg-dash-access-token
+  # AUTH DURÁVEL (2026-06-25): o servidor loga (POST /api/v1/auth/login
+  # {email,password,deviceToken}) e cacheia o access_token (~15 min) em memória. O
+  # deviceToken (= localStorage 2fa:login, ~8h) PULA o 2FA — renová-lo a cada ~8h é a
+  # única manutenção. Criar/atualizar os secrets com:
+  #   firebase apphosting:secrets:set otg-dash-email
+  #   firebase apphosting:secrets:set otg-dash-password
+  #   firebase apphosting:secrets:set otg-dash-device-token
+  # (OTG_DASH_ACCESS_TOKEN — override manual de 15 min — foi removido daqui; é só p/ dev.)
   - variable: OTG_DASH_API_BASE
-    secret: otg-dash-api-base
+    value: https://affiliate-api-prd.partnersotg.com
     availability:
       - RUNTIME
-  - variable: OTG_DASH_ACCESS_TOKEN
-    secret: otg-dash-access-token
+  - variable: OTG_DASH_EMAIL
+    secret: otg-dash-email
+    availability:
+      - RUNTIME
+  - variable: OTG_DASH_PASSWORD
+    secret: otg-dash-password
+    availability:
+      - RUNTIME
+  - variable: OTG_DASH_DEVICE_TOKEN
+    secret: otg-dash-device-token
     availability:
       - RUNTIME
   # Casas a puxar (slugs, CSV) — não é segredo, inline.

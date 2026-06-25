@@ -18,6 +18,7 @@ import { DEFAULT_BRANDS } from './src/lib/brand';
 import { projectPartnerResults } from './src/lib/partnerResults';
 import { pullApprovedRoster, isOtgLinksConfigured } from './otgLinksPull';
 import { pullAnalytics, isOtgAnalyticsConfigured } from './otgAnalyticsPull';
+import { analyticsDocId, funnelKey, sanitizeFunnel, hasFunnelActivity } from './src/lib/analyticsDoc';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1165,6 +1166,72 @@ export function createApp(deps: ServerDeps) {
     }
   });
 
+  // Persiste o funil da v1 em `affiliate_analytics` (1 doc/afiliado×casa, id
+  // determinístico → idempotente) e RECONCILIA: resolve o affiliateId por nameKey|casa
+  // (afiliado real do mirror tem prioridade; senão o pending) e ENRIQUECE o pending
+  // casado com o resumo do funil — é assim que os afiliados SportingBet "desatualizados"
+  // (só-funil, ex.: Lucas) passam a mostrar cliques/cadastros. Ver src/lib/analyticsDoc.
+  const persistAnalytics = async (
+    rows: Array<{ nameKey: string; affiliate: string; house: string; [k: string]: any }>,
+    range: { initialDate: string; finalDate: string }
+  ): Promise<{ persisted: number; enrichedPending: number }> => {
+    if (!adminDb || !rows.length) return { persisted: 0, enrichedPending: 0 };
+    // mapas de junção por nameKey|casa (mesma chave da reconciliação de pending)
+    const realByKey = new Map<string, string>();
+    const affSnap = await adminDb.collection('affiliates').get();
+    affSnap.forEach((d) => {
+      const a = d.data() as any;
+      const nk = normNameKey(a?.name ?? a?.label);
+      const hs = normNameKey(brandNameOf(a));
+      if (nk) realByKey.set(`${nk}|${hs}`, String(a?.id ?? d.id));
+    });
+    const pendingByKey = new Map<string, { ref: any; affiliateId: string }>();
+    const pendSnap = await adminDb.collection('pending_affiliates').get();
+    pendSnap.forEach((d) => {
+      const p = d.data() as any;
+      const key = `${normNameKey(p?.nameKey)}|${normNameKey(p?.house)}`;
+      pendingByKey.set(key, { ref: d.ref, affiliateId: String(p?.affiliateId ?? d.id) });
+    });
+    let persisted = 0;
+    let enrichedPending = 0;
+    for (const row of rows) {
+      const key = funnelKey(row.nameKey, row.house);
+      const real = realByKey.get(key);
+      const pend = pendingByKey.get(key);
+      const metrics = sanitizeFunnel(row);
+      await adminDb
+        .collection('affiliate_analytics')
+        .doc(analyticsDocId(row.nameKey, row.house))
+        .set(
+          {
+            nameKey: row.nameKey,
+            affiliate: row.affiliate,
+            house: row.house,
+            ...metrics,
+            affiliateId: real ?? pend?.affiliateId ?? null,
+            funnelOnly: !real, // true = não está no relatório v2 (caso "Lucas")
+            range,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      persisted++;
+      // enriquece o pending casado (sem tocar no nome) → mostra atividade no /admin.
+      if (pend) {
+        await pend.ref.set(
+          {
+            funnel: metrics,
+            hasFunnelActivity: hasFunnelActivity(row),
+            funnelUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+        enrichedPending++;
+      }
+    }
+    return { persisted, enrichedPending };
+  };
+
   // v1 ANALÍTICA da OTG: traz cliques + funil inicial + NGR por afiliado×casa —
   // inclusive os só-funil (clique/cadastro sem comissão) que a v2 externa esconde
   // (caso "Lucas Guimarães"). Auth via OTG_DASH_ACCESS_TOKEN (dashboard tem 2FA →
@@ -1197,10 +1264,20 @@ export function createApp(deps: ServerDeps) {
       if (!anyOk && firstErr) {
         return res.status(502).json({ error: firstErr, range: { initialDate, finalDate }, houses });
       }
+      // Persiste + reconcilia (best-effort: o pull já deu certo; falha de gravação não
+      // derruba a resposta — espelha o reconcile do /pending-affiliates/refresh).
+      let persist = { persisted: 0, enrichedPending: 0 };
+      try {
+        persist = await persistAnalytics(result.rows, { initialDate, finalDate });
+      } catch (e: any) {
+        console.warn('Analytics: persistência adiada (falha ao gravar):', e?.message);
+      }
       return res.json({
         source: 'otg-v1-analytics',
         range: { initialDate, finalDate },
         houses,
+        persisted: persist.persisted,
+        enrichedPending: persist.enrichedPending,
         rows: result.rows,
         fetchedAt: result.fetchedAt,
       });

@@ -140,6 +140,15 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Funil da v1 ANALÍTICA da OTG (cliques/cadastros/FTD/NGR por afiliado×casa —
+    // inclui os só-funil que o relatório v2 esconde, ex.: "Lucas"). Escrito pelo
+    // servidor (Admin SDK) no POST /api/analytics/refresh; o afiliado lê só o próprio
+    // funil pelo GET autenticado (/api/affiliate-analytics, escopado por papel).
+    // Cliente direto é bloqueado; admin pode ler/gerir direto. Espelha house_results.
+    match /affiliate_analytics/{rowId} {
+      allow read, write: if isAdmin();
+    }
+
     // API keys de parceiros externos (M2M). Só o servidor (Admin SDK) emite/valida
     // — guarda o HASH da key, nunca a key crua. Cliente direto é bloqueado; admin
     // pode ler p/ gestão (vê só o hash + scopes). Ver server.ts (requirePartner).

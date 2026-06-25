@@ -520,4 +520,34 @@ describe('POST /api/analytics/refresh (v1 analítica)', () => {
       .expect(502);
     expect(res.body.error).toMatch(/HTTP 401/);
   });
+
+  it('persiste o funil em affiliate_analytics + reconcilia (real vs Lucas só-funil) e enriquece o pending', async () => {
+    const HELDER = { affiliate: 'HelderDosSantosCavalheiro', clicks: 164, registrations: 47, ftd: 12, cpa_qual: 10, deposits: 0, bet_amount: 0, ngr: 1467.96 };
+    const fetchImpl: any = async (url: string) =>
+      String(url).includes('superbet') ? aresp(404, {}) : aresp(200, sbBody([HELDER, LUCAS]));
+    const fs = makeFirestore({
+      users: { 'admin-uid': { role: 'admin' } },
+      affiliates: { 'AFF-H': { id: 'AFF-H', name: 'Helder Dos Santos Cavalheiro', brand: 'SportingBet' } },
+      pending_affiliates: {
+        pending_lucasguimaraes_sportingbet: { id: 'pending_lucasguimaraes_sportingbet', nameKey: 'lucasguimaraes', house: 'sportingbet', status: 'pending', name: 'Lucas Guimarães' },
+      },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs, fetchImpl });
+    const res = await request(app)
+      .post('/api/analytics/refresh')
+      .set('Authorization', 'Bearer admin-uid')
+      .expect(200);
+
+    expect(res.body.persisted).toBe(2);
+    expect(res.body.enrichedPending).toBe(1);
+    // affiliate_analytics: id determinístico nameKey__casa; Lucas só-funil vs Helder real
+    const an = fs.__store.get('affiliate_analytics');
+    expect(an.get('lucasguimaraes__sportingbet')).toMatchObject({ clicks: 20, registrations: 4, affiliateId: 'pending_lucasguimaraes_sportingbet', funnelOnly: true });
+    expect(an.get('helderdossantoscavalheiro__sportingbet')).toMatchObject({ clicks: 164, affiliateId: 'AFF-H', funnelOnly: false });
+    // pending do Lucas: enriquecido com o funil SEM perder o nome bonito
+    const pend = fs.__store.get('pending_affiliates').get('pending_lucasguimaraes_sportingbet');
+    expect(pend.name).toBe('Lucas Guimarães');
+    expect(pend.hasFunnelActivity).toBe(true);
+    expect(pend.funnel.clicks).toBe(20);
+  });
 });
