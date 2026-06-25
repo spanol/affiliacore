@@ -65,9 +65,19 @@
 
 **Pendente Fase 4 (menor):** teste da ordem de validação do InviteAccept (P1.10, sem bug — só cobertura); component tests mais amplos de ClientDashboard/AffiliateDetails (o gate já está coberto pela função pura `canViewAffiliateNetProfit`).
 
-## 0.4 — Falta a Fase 5 (tooling/CI)
+## 0.4 Status — Fase 5 (tooling/CI) · COMPLETA · 2026-06-24
 
-Único bloco grande restante do plano: `vitest.config.ts coverage.include` ainda exclui `pages/`/`server.ts`/`contexts/` (a métrica esconde a superfície testada — P0.12/§7); thresholds por pasta; CI rodando `lint`+`test`+`test:rules`; property-based (fast-check) p/ os invariantes; `firebase-tools` no devDeps p/ CI. Ver §6/§7/§8.
+**Entregue** (420 testes verdes + 42 de rules; lint limpo; `npm run coverage` exit 0):
+- **`vitest.config.ts coverage.include` estendido** (P0.12/§7) p/ `src/pages/**`, `src/contexts/**`, `server.ts`, `otgLinksPull.ts`, `errorPage.ts` + `exclude` de testes/types/entry. A métrica DEIXA de esconder a superfície de risco — baseline honesto medido: lib ~93/91/95, services ~44/92/46, components ~18/75/57, contexts ~44/81/50, **pages ~3/41/29**, **server.ts ~30/51/28** (antes "inexistentes").
+- **Thresholds por pasta** travando o piso atual (sobe a cada fase); só valem com `--coverage`.
+- **CI** (`.github/workflows/ci.yml`): job `lint-test` (tsc + `npm run coverage` c/ thresholds) + job `rules` (setup-java + `firebase-tools@^15` global + `npm run test:rules`). `firebase-tools` **NÃO** entra no devDeps (convenção do repo: CLI global; instalado no job).
+- **Property-based (fast-check ^4)**: `commission.property.test.ts` (num finito sobre JSON; payout nunca NaN c/ métrica-lixo; override byBrand finito sempre vence o topo; spread≥0 quando sub≤pai), `scope.property.test.ts` (R4 — scoped sempre ⊆ {own}∪subs, nunca vaza; admin nunca filtrado; endpoint≠results sempre 403), e o invariante **agregado==Σcards com byBrand aleatório** (em `affiliateService.test.ts`).
+- **P2 restantes:** `expandAffiliateIdsParam` (P2.9, `src/lib/affiliateIdsParam.ts` — fonte única do CSV→repetido da OTG, dedupe, religado nos 2 sites do server), `hrDocId`/`sanitizeMetrics` (P2.8, `src/lib/houseResultsDoc.ts` — extraídos das closures do server, idempotência+coerção testadas), `extractArray` precedência-de-caminho/vazios (P2.1), `extractApiError` códigos não-canônicos (P2.2), `getPreviousRange` DST `America/New_York` (P2.6).
+- **Hardening do `num()`** (achado property-based): `Number({"toString":false})` — JSON válido — lançava; agora objeto não-array → 0 (nunca crasha o cálculo de dinheiro).
+
+## 0.5 — Auditoria final de segurança/arquitetura · ENTREGUE · 2026-06-24
+
+Revisão adversarial multi-agente (6 dimensões → verificação adversarial → síntese) fechando a auditoria. Veredito: **plataforma fundamentalmente segura** (0 críticas/0 altas reais); as closures das Fases 1–4 seguram; 12 hipóteses refutadas. **5 issues reais (mesma classe, superfícies sem teste); 4 corrigidas nesta sessão + 1 follow-up de operador (App Check).** Relatório completo: **`SECURITY-AUDIT-2026-06.md`** (raiz). Fixes: `settings` admin-only (rule+teste), `AffiliatesList` sem 0 fantasma, `clickStatDay` fuso BR, `SpecialDashboard` chart byBrand. **Pende `firebase deploy --only firestore:rules` (operador)** p/ a rule de `settings` valer em prod.
 
 ---
 
