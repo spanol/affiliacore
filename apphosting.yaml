@@ -76,3 +76,26 @@ env:
     secret: otg-links-password
     availability:
       - RUNTIME
+
+  # Credenciais da v1 ANALÍTICA da OTG (cliques + funil inicial + NGR; rota
+  # POST /api/analytics/refresh → GET {BASE}/api/v1/agency/{casa}-analytics).
+  # Server-only; nunca expor ao browser. Ver SPIKE-OTG-V1-ANALYTICS.md.
+  # ATENÇÃO: o dashboard partners.grupootg.com tem 2FA → o ACCESS_TOKEN é um Bearer
+  # obtido PÓS-2FA e EXPIRA (~1h); enquanto não capturarmos o endpoint de refresh,
+  # o token no secret precisa ser renovado manualmente (limitação conhecida).
+  # Criar/atualizar com:
+  #   firebase apphosting:secrets:set otg-dash-api-base
+  #   firebase apphosting:secrets:set otg-dash-access-token
+  - variable: OTG_DASH_API_BASE
+    secret: otg-dash-api-base
+    availability:
+      - RUNTIME
+  - variable: OTG_DASH_ACCESS_TOKEN
+    secret: otg-dash-access-token
+    availability:
+      - RUNTIME
+  # Casas a puxar (slugs, CSV) — não é segredo, inline.
+  - variable: OTG_DASH_HOUSES
+    value: sportingbet,superbet
+    availability:
+      - RUNTIME
