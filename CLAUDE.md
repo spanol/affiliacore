@@ -107,6 +107,13 @@ Esta seção destila os bugs reais que escaparam dos testes (auditoria 2026-06) 
 - **`server.ts` roda código ANTIGO até reiniciar o processo** (`tsx server.ts`, sem watch) — mudanças no servidor não aparecem no app rodando até `kill` + `npm run dev`. O frontend tem HMR (Vite middleware), então mudanças de página/lib aparecem na hora.
 - **Verificação no app usa o Firestore de PROD + rules DEPLOYADAS** (o client SDK fala direto com o Firestore). Mudança de `firestore.rules` só vale após `firebase deploy --only firestore:rules` (deploy é ação do operador).
 
+### Boost-first / afiliado nativo & resultados manuais (2026-06-26)
+- **Casa manual cruza resultado pelo E-MAIL DE LOGIN na Boost, não pela identidade OTG.** Só Superbet/SportingBet vêm da OTG; as demais (`/casas`, `dataSource:'manual'`) são geridas na Boost. O roster de cruzamento do import (`Houses.tsx`) = `buildImportRoster(affiliates, users, aliases)` (`src/lib/boostAffiliate.ts`): NOME vem do mirror `affiliates`; E-MAILS vêm de `users` (login) + `affiliate_email_aliases`.
+- **Afiliado NATIVO Boost** (`boost_<uuid>` via `makeBoostAffiliateId`): mirror `affiliates` é **name-only** (`source:'boost'`, legível por logado p/ exibir nome); o **e-mail (PII) vive SÓ em `affiliate_email_aliases/{normEmail}`** (server-only, `read,write: if isAdmin()`). NUNCA gravar e-mail de afiliado no mirror `affiliates` (vazaria a todo signed-in). `fetchAffiliates()` UNE `source:'boost'` (best-effort) p/ o nome resolver em todo o app.
+- Endpoints (requireAdmin): `POST /api/boost-affiliates` (cria nativo, idempotente por e-mail, convite opt-in via `createInviteDoc`), `POST`/`GET /api/affiliate-email-aliases` ("vincular a existente"). Wrappers em `affiliateService`: `createBoostAffiliates`/`createEmailAlias`/`fetchEmailAliases`.
+- **`manualForAffiliates(rows, ids)` ACEITA CSV** (`"a,b"`) além de array/id — a view de REDE do especial (`AffiliateDetails`) passa `idsCsv` cru a `fetchAffiliateResultsByBrand/Daily/Campaign`; sem o split o manual da rede não casava (casa→R$0). Invariante: o merge manual tem que bater entre o **agregado** E o **por-casa** nas visões por-afiliado (igual ao `/admin` `composeAdminProfit`). Banner "em captação/sem comissão" deve ser gated por atividade real (inclui manual).
+- **Browser/file_upload:** o `file_upload` do Chrome MCP NÃO aceita mais caminho do host. P/ subir planilha no teste: copie p/ `public/` → no page-context `fetch('/arquivo')` → `new File([blob])` → `DataTransfer` → `input.files` + `dispatchEvent(new Event('change',{bubbles:true}))`. Limpe o `public/` depois.
+
 ## Configuration & conventions
 
 - **Path alias**: `@/*` → repo root (configured in both `vite.config.ts` and `tsconfig.json`).

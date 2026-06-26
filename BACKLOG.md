@@ -161,3 +161,20 @@ O Carlos decidiu **não remover de vez por enquanto** — apenas escondeu.
 **Pergunta em aberto.** Aposentar só a tela de admin ou todo o fluxo de contato (incluindo o
 formulário público que grava em `contacts`)?
 
+
+---
+
+## ENTREGUE (2026-06-26) — Boost-first: import por Excel + afiliado nativo Boost
+
+Commits na main: **0a10337** (feature) + **fb0330c** (fix). 493 testes verdes; tsc limpo.
+
+- **Import de resultados por Excel (.xlsx)** + botão "Baixar modelo" (todas as colunas + aba de instruções). Núcleo puro `parseResultsRows` (CSV/colado e Excel), `lib/xlsx.ts` (SheetJS via import dinâmico), seleção de aba por casa + fill-down da data.
+- **Cruzamento por e-mail de login Boost** (não OTG). Coluna `email` no parser/modelo.
+- **Afiliado NATIVO Boost** (`boost_<uuid>`): no preview do import, "Cadastrar na Boost" (cria nativo + convite opt-in) e "Vincular a existente" (alias e-mail→afiliado). PII do e-mail em `affiliate_email_aliases` (server-only); mirror `affiliates` name-only; `fetchAffiliates` une `source:boost`.
+- **Fix:** merge manual no por-casa/diário/campanha da REDE do especial (`manualForAffiliates` aceita CSV) + banner "em captação" gated por atividade real.
+
+**Validado ao vivo (PROD):** vincular + import casaram e gravaram o `house_results` atribuído ao afiliado (verificado no Firestore). Dados de teste limpos.
+
+**Pendências de operador:** `firebase deploy --only firestore:rules` (inclui `affiliate_email_aliases`; Admin SDK já funciona sem). **Smoke test dos fixes ainda PENDENTE** (ver memória `boost-native-affiliates` → seção SMOKE TEST RESUME).
+
+**Follow-up (não feito):** afiliado nativo na lista global `/affiliates` com status/config próprios; revisar se o ClientDashboard do especial deve mostrar a rede.
