@@ -2,6 +2,10 @@ node_modules/
 build/
 dist/
 coverage/
+
+# Versão gerada no build (scripts/gen-version.mjs). Não versionar — muda a cada
+# build/deploy; o conteúdo é derivado (carimbo de tempo + commit).
+public/version.json
 .DS_Store
 *.log
 .env*

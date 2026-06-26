@@ -10,3 +10,10 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+// Injetados pelo Vite `define` no build (vite.config.ts), lidos de public/version.json
+// (gerado por scripts/gen-version.mjs). Em ambientes sem o define (vitest/SSR/node) o
+// identificador não existe em runtime — sempre acessar via `typeof` (ver src/lib/version.ts).
+declare const __APP_VERSION__: string;
+declare const __BUILD_TIME__: string;
+declare const __BUILD_COMMIT__: string;

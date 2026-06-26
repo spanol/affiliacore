@@ -4,8 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/gen-version.mjs",
     "dev": "tsx server.ts",
     "start": "tsx server.ts",
+    "prebuild": "node scripts/gen-version.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
