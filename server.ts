@@ -13,6 +13,7 @@ import { resolveIsSpecial, resolveServerToday, resolveScopedAffiliateIds } from 
 import { computeRankingEntries } from './src/lib/ranking';
 import { expandAffiliateIdsParam } from './src/lib/affiliateIdsParam';
 import { hrDocId, sanitizeMetrics } from './src/lib/houseResultsDoc';
+import { makeBoostAffiliateId, normalizeEmailKey } from './src/lib/boostAffiliate';
 import type { AffiliateConfig } from './src/lib/commission';
 import { DEFAULT_BRANDS } from './src/lib/brand';
 import { projectPartnerResults } from './src/lib/partnerResults';
@@ -1366,6 +1367,22 @@ export function createApp(deps: ServerDeps) {
     }
   });
 
+  // Cria um convite (token single-use, 7d) ligado a um affiliateId. Extraído p/ ser
+  // reusado pelo POST /api/invites E pelo cadastro de afiliado nativo Boost.
+  const createInviteDoc = async (affiliateId: string, affiliateName?: string | null) => {
+    const token = crypto.randomBytes(24).toString('hex');
+    const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + INVITE_TTL_MS);
+    await adminDb!.collection('invites').doc(token).set({
+      token,
+      affiliateId: String(affiliateId),
+      affiliateName: affiliateName ? String(affiliateName) : null,
+      status: 'pending',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt,
+    });
+    return { token, expiresAt: expiresAt.toDate().toISOString() };
+  };
+
   // Admin generates an access invite for an affiliate.
   app.post('/api/invites', requireAdmin, async (req, res) => {
     if (!adminDb) {
@@ -1376,23 +1393,134 @@ export function createApp(deps: ServerDeps) {
       if (!affiliateId) {
         return res.status(400).json({ error: 'affiliateId é obrigatório.' });
       }
-
-      const token = crypto.randomBytes(24).toString('hex');
-      const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + INVITE_TTL_MS);
-
-      await adminDb.collection('invites').doc(token).set({
-        token,
-        affiliateId: String(affiliateId),
-        affiliateName: affiliateName ? String(affiliateName) : null,
-        status: 'pending',
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        expiresAt,
-      });
-
-      return res.status(201).json({ token, expiresAt: expiresAt.toDate().toISOString() });
+      const { token, expiresAt } = await createInviteDoc(String(affiliateId), affiliateName);
+      return res.status(201).json({ token, expiresAt });
     } catch (error: any) {
       console.error('Error creating invite:', error);
       return res.status(500).json({ error: error.message || 'Erro interno criando convite.' });
+    }
+  });
+
+  // --- Afiliado nativo Boost (sem OTG) + alias de e-mail ----------------------
+  // SECURITY: nome vai no mirror `affiliates` (legível por logado, p/ exibição);
+  // e-mail (PII) vai SÓ em affiliate_email_aliases (admin-only). Ver firestore.rules.
+
+  // Cria afiliados nativos Boost em lote a partir do import (nome+email+casa).
+  // Idempotente por e-mail: se já existe alias, reusa o affiliateId (não duplica).
+  app.post('/api/boost-affiliates', requireAdmin, async (req, res) => {
+    if (!adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+    try {
+      const list = Array.isArray(req.body?.affiliates) ? req.body.affiliates : null;
+      if (!list || list.length === 0) {
+        return res.status(400).json({ error: 'Envie { affiliates: [{ name, email?, house }] }.' });
+      }
+      const generateInvite = !!req.body?.generateInvite;
+      const createdByUid = (req as any).user?.uid ?? null;
+      const created: any[] = [];
+
+      for (const item of list) {
+        const name = String(item?.name ?? '').trim();
+        const house = String(item?.house ?? '').trim();
+        const emailKey = normalizeEmailKey(item?.email);
+        if (!name) { continue; }
+
+        // Idempotência: e-mail já mapeado -> reusa o afiliado existente.
+        let affiliateId: string | null = null;
+        let reused = false;
+        if (emailKey) {
+          const aliasSnap = await adminDb.collection('affiliate_email_aliases').doc(emailKey).get();
+          if (aliasSnap.exists && aliasSnap.data()?.affiliateId) {
+            affiliateId = String(aliasSnap.data()!.affiliateId);
+            reused = true;
+          }
+        }
+
+        if (!affiliateId) {
+          affiliateId = makeBoostAffiliateId(crypto.randomUUID());
+          // mirror (name-only) — alimenta a resolução de nome em todo o app.
+          await adminDb.collection('affiliates').doc(affiliateId).set({
+            id: affiliateId,
+            name,
+            brand: house ? { name: house } : null,
+            source: 'boost',
+            createdByUid,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true });
+          // ativo por padrão (espelha o status dos afiliados gerenciados)
+          await adminDb.collection('affiliate_statuses').doc(affiliateId).set({
+            status: 'active',
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true });
+          // e-mail (PII) -> alias admin-only
+          if (emailKey) {
+            await adminDb.collection('affiliate_email_aliases').doc(emailKey).set({
+              email: emailKey,
+              affiliateId,
+              name,
+              kind: 'boost',
+              createdByUid,
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, { merge: true });
+          }
+        }
+
+        let invite: { token: string; expiresAt: string } | null = null;
+        if (generateInvite) {
+          try { invite = await createInviteDoc(affiliateId, name); } catch (e) { console.error('invite p/ boost-affiliate falhou:', e); }
+        }
+        created.push({ affiliateId, name, email: emailKey || null, reused, invite });
+      }
+
+      return res.status(201).json({ created });
+    } catch (error: any) {
+      console.error('Error creating boost affiliates:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno criando afiliados Boost.' });
+    }
+  });
+
+  // "Vincular a existente": liga um e-mail (de planilha, sem login) a um afiliado já
+  // existente. Persistente — reuploads futuros com esse e-mail passam a casar.
+  app.post('/api/affiliate-email-aliases', requireAdmin, async (req, res) => {
+    if (!adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+    try {
+      const emailKey = normalizeEmailKey(req.body?.email);
+      const affiliateId = String(req.body?.affiliateId ?? '').trim();
+      if (!emailKey || !affiliateId) {
+        return res.status(400).json({ error: 'Informe email e affiliateId.' });
+      }
+      await adminDb.collection('affiliate_email_aliases').doc(emailKey).set({
+        email: emailKey,
+        affiliateId,
+        kind: 'link',
+        createdByUid: (req as any).user?.uid ?? null,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return res.json({ email: emailKey, affiliateId });
+    } catch (error: any) {
+      console.error('Error creating email alias:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno criando alias.' });
+    }
+  });
+
+  // Lista os aliases de e-mail (p/ o roster do import). Admin-only.
+  app.get('/api/affiliate-email-aliases', requireAdmin, async (_req, res) => {
+    if (!adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+    try {
+      const snap = await adminDb.collection('affiliate_email_aliases').get();
+      const aliases = snap.docs.map((d) => {
+        const x = d.data();
+        return { email: x.email ?? d.id, affiliateId: x.affiliateId, name: x.name ?? null, kind: x.kind ?? null };
+      });
+      return res.json({ aliases });
+    } catch (error: any) {
+      console.error('Error listing email aliases:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno listando aliases.' });
     }
   });
 

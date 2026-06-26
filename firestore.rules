@@ -58,6 +58,14 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Alias de e-mail -> affiliateId (Boost-first). Doc id = e-mail normalizado.
+    // Guarda o e-mail (PII) dos afiliados nativos Boost e os vínculos manuais
+    // (admin liga um e-mail de planilha a um afiliado existente). Mediado pelo
+    // servidor (Admin SDK); cliente NUNCA lê e-mail de terceiro. Espelha affiliate_configs.
+    match /affiliate_email_aliases/{emailKey} {
+      allow read, write: if isAdmin();
+    }
+
     // B3 · Afiliado especial: marca o especial + sub-rede + taxa da sub-rede.
     // Só o master (admin) escreve; leitura liberada a signed-in (o especial
     // precisa ler a própria sub-rede; escopo fino fica no proxy/servidor).

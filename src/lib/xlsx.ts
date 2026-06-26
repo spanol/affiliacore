@@ -31,24 +31,52 @@ function cellToString(v: unknown): string {
   return String(v).trim();
 }
 
-// Lê um arquivo Excel no browser e devolve a 1ª planilha como matriz de strings.
+const normName = (s: string) => String(s ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+// Escolhe a aba a usar. Workbooks podem ter uma aba por casa (ex.: "Resultados
+// Betfair"); quando `prefer` é dado (nome da casa), prefere a aba cujo nome bate /
+// contém o da casa. Ignora a aba "Instruções" do modelo. Cai na 1ª aba de dados.
+function pickSheet(sheetNames: string[], prefer?: string): { name: string; matched: boolean } {
+  const data = sheetNames.filter((n) => !/instru/i.test(normName(n)));
+  const pool = data.length ? data : sheetNames;
+  const want = prefer ? normName(prefer) : '';
+  if (want) {
+    const exact = pool.find((n) => normName(n) === want);
+    if (exact) return { name: exact, matched: true };
+    const contains = pool.find((n) => { const nn = normName(n); return nn.includes(want) || want.includes(nn); });
+    if (contains) return { name: contains, matched: true };
+  }
+  return { name: pool[0], matched: false };
+}
+
+export interface SpreadsheetRead {
+  grid: string[][];
+  sheetName: string;     // aba efetivamente lida
+  sheetNames: string[];  // todas as abas do arquivo
+  matched: boolean;      // true se a aba foi escolhida por bater com a casa
+}
+
+// Lê um arquivo Excel no browser e devolve a aba escolhida como matriz de strings.
 // `raw: true` + `cellDates: true` preserva números/datas nativos (cellToString os
 // normaliza). `blankrows: true` mantém o índice de cada linha alinhado à planilha,
-// pra que os erros do parser apontem o nº de linha real.
-export async function parseSpreadsheetFile(file: File): Promise<string[][]> {
+// pra que os erros do parser apontem o nº de linha real. `prefer` (nome da casa)
+// seleciona a aba certa em workbooks com uma aba por casa.
+export async function parseSpreadsheetFile(file: File, prefer?: string): Promise<SpreadsheetRead> {
   const XLSX = await loadXLSX();
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: 'array', cellDates: true });
-  const sheetName = wb.SheetNames[0];
-  const sheet = sheetName ? wb.Sheets[sheetName] : undefined;
-  if (!sheet) return [];
+  const sheetNames = wb.SheetNames ?? [];
+  if (!sheetNames.length) return { grid: [], sheetName: '', sheetNames, matched: false };
+  const { name, matched } = pickSheet(sheetNames, prefer);
+  const sheet = wb.Sheets[name];
+  if (!sheet) return { grid: [], sheetName: name, sheetNames, matched };
   const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
     header: 1,
     raw: true,
     blankrows: true,
     defval: '',
   });
-  return grid.map((row) => (Array.isArray(row) ? row.map(cellToString) : []));
+  return { grid: grid.map((row) => (Array.isArray(row) ? row.map(cellToString) : [])), sheetName: name, sheetNames, matched };
 }
 
 // Extensões/MIME aceitos como planilha Excel.

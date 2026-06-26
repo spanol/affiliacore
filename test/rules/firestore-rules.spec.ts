@@ -265,6 +265,7 @@ describe('coleções admin-only (servidor via Admin SDK; client direto negado)',
   const ADMIN_ONLY = [
     'payment_profiles',
     'affiliate_statuses',
+    'affiliate_email_aliases',
     'audit_logs',
     'affiliate_links',
     'link_clicks',

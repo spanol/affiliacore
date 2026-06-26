@@ -4,8 +4,18 @@ import { describe, it, expect, vi } from 'vitest';
 // Firebase client (lib/firebase roda um testConnection() no import).
 vi.mock('../lib/firebase', () => ({ db: {} }));
 vi.mock('../lib/api', () => ({ authFetch: vi.fn() }));
+vi.mock('firebase/firestore', () => ({
+  collection: vi.fn(), doc: vi.fn(), getDoc: vi.fn(), setDoc: vi.fn(),
+  getDocs: vi.fn(), query: vi.fn(), where: vi.fn(), serverTimestamp: vi.fn(),
+}));
 
+import { authFetch } from '../lib/api';
+import { getDocs } from 'firebase/firestore';
 import {
+  fetchAffiliates,
+  createBoostAffiliates,
+  createEmailAlias,
+  fetchEmailAliases,
   extractArray,
   extractApiError,
   isNoDataError,
@@ -24,6 +34,51 @@ import {
 } from './affiliateService';
 import { StoredManualRow, emptyMetrics, addMetrics } from '../lib/houseResults';
 import fc from 'fast-check';
+
+describe('fetchAffiliates · une nativos Boost (Boost-first)', () => {
+  const okJson = (body: any) => ({ ok: true, json: async () => body });
+
+  it('une OTG + mirror source:boost (boost name-only, email vazio, dedupe por id)', async () => {
+    vi.mocked(authFetch).mockResolvedValue(okJson([{ id: 'cl1', name: 'OTG One' }]) as any);
+    vi.mocked(getDocs).mockResolvedValue({
+      docs: [{ id: 'boost_x', data: () => ({ name: 'Vanesa', source: 'boost', brand: { name: 'Betfair' } }) }],
+    } as any);
+    const list = await fetchAffiliates();
+    expect(list.map((a: any) => a.id).sort()).toEqual(['boost_x', 'cl1']);
+    const boost = list.find((a: any) => a.id === 'boost_x') as any;
+    expect(boost).toMatchObject({ name: 'Vanesa', email: '', source: 'boost' });
+  });
+
+  it('falha ao ler o mirror não derruba o fetch (best-effort → só OTG)', async () => {
+    vi.mocked(authFetch).mockResolvedValue(okJson([{ id: 'cl1', name: 'OTG One' }]) as any);
+    vi.mocked(getDocs).mockRejectedValue(new Error('firestore down'));
+    const list = await fetchAffiliates();
+    expect(list.map((a: any) => a.id)).toEqual(['cl1']);
+  });
+});
+
+describe('wrappers Boost-native (authFetch)', () => {
+  it('createBoostAffiliates envia o body e devolve created[]', async () => {
+    const created = [{ affiliateId: 'boost_a', name: 'A', email: 'a@x.com', reused: false, invite: null }];
+    vi.mocked(authFetch).mockResolvedValue({ ok: true, json: async () => ({ created }) } as any);
+    const out = await createBoostAffiliates([{ name: 'A', email: 'a@x.com', house: 'Betfair' }], { generateInvite: true });
+    expect(out).toEqual(created);
+    const [, init] = vi.mocked(authFetch).mock.calls.at(-1)!;
+    expect(JSON.parse((init as any).body)).toEqual({ affiliates: [{ name: 'A', email: 'a@x.com', house: 'Betfair' }], generateInvite: true });
+  });
+
+  it('createEmailAlias posta email+affiliateId', async () => {
+    vi.mocked(authFetch).mockResolvedValue({ ok: true, json: async () => ({ email: 'js@x.com', affiliateId: '8a58' }) } as any);
+    expect(await createEmailAlias('js@x.com', '8a58')).toEqual({ email: 'js@x.com', affiliateId: '8a58' });
+  });
+
+  it('fetchEmailAliases devolve [] em erro e a lista em sucesso', async () => {
+    vi.mocked(authFetch).mockResolvedValue({ ok: false, json: async () => ({}) } as any);
+    expect(await fetchEmailAliases()).toEqual([]);
+    vi.mocked(authFetch).mockResolvedValue({ ok: true, json: async () => ({ aliases: [{ email: 'a@x.com', affiliateId: 'b' }] }) } as any);
+    expect(await fetchEmailAliases()).toEqual([{ email: 'a@x.com', affiliateId: 'b' }]);
+  });
+});
 
 describe('extractArray', () => {
   it('retorna [] para null/undefined', () => {

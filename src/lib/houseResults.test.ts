@@ -134,36 +134,63 @@ describe('parseResultsRows (matriz — caminho Excel)', () => {
     const viaGrid = parseResultsRows([['data', 'cadastros'], ['2026-06-01', '10']]).rows;
     expect(viaGrid[0]).toMatchObject({ date: viaText[0].date, registrations: viaText[0].registrations });
   });
+
+  it('fill-down: linha sem data herda a última data válida acima', () => {
+    const grid = [
+      ['data', 'email', 'cadastros'],
+      ['2026-06-01', 'a@x.com', '10'],   // data explícita
+      ['', 'b@x.com', '20'],             // herda 2026-06-01
+      ['2026-06-02', 'c@x.com', '30'],   // nova data
+      ['', 'd@x.com', '40'],             // herda 2026-06-02
+    ];
+    const r = parseResultsRows(grid);
+    expect(r.errors).toEqual([]);
+    expect(r.rows.map((x) => x.date)).toEqual(['2026-06-01', '2026-06-01', '2026-06-02', '2026-06-02']);
+  });
+
+  it('1ª linha de dados sem data (nada pra herdar) é erro', () => {
+    const r = parseResultsRows([['data', 'cadastros'], ['', '10'], ['2026-06-01', '20']]);
+    expect(r.rows).toHaveLength(1);
+    expect(r.errors[0]).toMatchObject({ line: 2, message: expect.stringMatching(/Data ausente/i) });
+  });
+
+  it('lê a coluna email', () => {
+    const r = parseResultsRows([['data', 'afiliado', 'email', 'cadastros'], ['2026-06-01', 'João', 'joao@x.com', '5']]);
+    expect(r.columns.email).toBe(2);
+    expect(r.rows[0]).toMatchObject({ affiliate: 'João', email: 'joao@x.com', registrations: 5 });
+  });
 });
 
 describe('planilha modelo (constantes)', () => {
   it('o cabeçalho do modelo é reconhecido pelo parser (round-trip)', () => {
-    const grid = [TEMPLATE_HEADERS, ['2026-06-01', 'João Silva', '40', '18', '12', '80', '2400', '2400']];
+    const grid = [TEMPLATE_HEADERS, ['2026-06-01', 'João Silva', 'joao@x.com', '40', '18', '12', '80', '2400', '2400']];
     const r = parseResultsRows(grid);
     expect(r.errors).toEqual([]);
     // todas as colunas do modelo foram mapeadas
     expect(Object.keys(r.columns).sort()).toEqual(TEMPLATE_COLUMNS.map((c) => c.key).sort());
-    expect(r.rows[0]).toMatchObject({ date: '2026-06-01', affiliate: 'João Silva', registrations: 40, total_commission: 2400 });
+    expect(r.rows[0]).toMatchObject({ date: '2026-06-01', affiliate: 'João Silva', email: 'joao@x.com', registrations: 40, total_commission: 2400 });
   });
 
   it('o modelo tem data obrigatória e as 6 métricas canônicas', () => {
     expect(TEMPLATE_COLUMNS.find((c) => c.key === 'date')?.required).toBe(true);
-    const metricCount = TEMPLATE_COLUMNS.filter((c) => c.key !== 'date' && c.key !== 'affiliate').length;
+    expect(TEMPLATE_COLUMNS.some((c) => c.key === 'email')).toBe(true);
+    const metricCount = TEMPLATE_COLUMNS.filter((c) => !['date', 'affiliate', 'email'].includes(c.key)).length;
     expect(metricCount).toBe(6);
   });
 });
 
 describe('resolveAffiliates / buildAffiliateLookup', () => {
   const roster = [
-    { id: '123', name: 'João Silva' },
+    { id: '123', name: 'João Silva', email: 'joao@otg.com' },
     { id: '456', label: 'Maria Souza' },
   ];
   const lookup = buildAffiliateLookup(roster);
 
-  it('resolve por id exato e por nome (acento/caixa-insensitive)', () => {
+  it('resolve por id exato, por nome e por e-mail (acento/caixa-insensitive)', () => {
     expect(lookup('123')?.id).toBe('123');
     expect(lookup('joao silva')?.id).toBe('123');
     expect(lookup('MARIA SOUZA')?.id).toBe('456');
+    expect(lookup('JOAO@OTG.COM')?.id).toBe('123'); // e-mail, caixa-insensitive
     expect(lookup('inexistente')).toBeNull();
   });
 
@@ -173,7 +200,42 @@ describe('resolveAffiliates / buildAffiliateLookup', () => {
     expect(res.rows).toHaveLength(2);
     expect(res.rows[0].affiliateId).toBe('123');
     expect(res.rows[1].affiliateId).toBeNull(); // agregado
-    expect(res.unresolved).toEqual([{ line: 4, token: 'Fulano' }]);
+    expect(res.unresolved).toEqual([{ line: 4, token: 'Fulano', email: '', name: 'Fulano' }]);
+  });
+
+  it('cruza por e-mail mesmo com nome divergente (e-mail tem prioridade)', () => {
+    // e-mail de login (users/{uid}.email) aponta pro affiliateId; nome no roster difere do digitado
+    const lk = buildAffiliateLookup([{ id: '789', name: 'Bruno Eduardo Santos', email: 'bruno@gmail.com' }]);
+    const parsed = parseResultsRows([
+      ['data', 'afiliado', 'email', 'cadastros'],
+      ['2026-06-01', 'Bruninho (apelido)', 'bruno@gmail.com', '7'],
+    ]).rows;
+    const res = resolveAffiliates(parsed, lk);
+    expect(res.unresolved).toEqual([]);
+    expect(res.rows[0].affiliateId).toBe('789');
+  });
+
+  it('e-mail tem precedência sobre afiliado; sem e-mail cai no nome; nenhum dos dois = agregado', () => {
+    const lk = buildAffiliateLookup([
+      { id: 'A', name: 'Ana', email: 'ana@x.com' },
+      { id: 'B', name: 'Bia' },
+    ]);
+    const parsed = parseResultsRows([
+      ['data', 'afiliado', 'email', 'cadastros'],
+      ['2026-06-01', 'lixo', 'ana@x.com', '1'], // e-mail vence -> A
+      ['2026-06-01', 'Bia', '', '2'],            // sem e-mail -> nome -> B
+      ['2026-06-01', '', '', '3'],               // nada -> agregado
+      ['2026-06-01', 'NaoExiste', 'nao@x.com', '4'], // ambos falham -> unresolved (token = e-mail)
+    ]).rows;
+    const res = resolveAffiliates(parsed, lk);
+    expect(res.rows.map((r) => r.affiliateId)).toEqual(['A', 'B', null]);
+    expect(res.unresolved).toEqual([{ line: 5, token: 'nao@x.com', email: 'nao@x.com', name: 'NaoExiste' }]);
+  });
+
+  it('buildAffiliateLookup aceita múltiplos e-mails por afiliado (OTG + login)', () => {
+    const lk = buildAffiliateLookup([{ id: 'Z', name: 'Zé', email: 'ze@otg.com', emails: ['ze.login@boost.com'] }]);
+    expect(lk('ze@otg.com')?.id).toBe('Z');
+    expect(lk('ze.login@boost.com')?.id).toBe('Z');
   });
 });
 

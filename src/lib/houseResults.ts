@@ -35,10 +35,15 @@ export interface StoredManualRow extends Metrics {
 
 // --- Parsing do CSV/planilha -------------------------------------------------
 
+// Chaves de coluna reconhecidas (cabeçalho). `email` é coluna própria (matching
+// por e-mail de login, mais confiável que nome/id) — ver resolveAffiliates.
+export type ColumnKey = 'date' | 'affiliate' | 'email' | MetricKey;
+
 // Aliases de coluna (case/acento-insensitive). chave canônica -> apelidos aceitos.
-const COLUMN_ALIASES: Record<'date' | 'affiliate' | MetricKey, string[]> = {
+const COLUMN_ALIASES: Record<ColumnKey, string[]> = {
   date: ['data', 'date', 'dia'],
   affiliate: ['afiliado', 'affiliate', 'affiliate_id', 'afiliado_id', 'id', 'nome', 'name'],
+  email: ['email', 'e-mail', 'mail', 'login', 'email_login', 'email_de_login'],
   registrations: ['cadastros', 'cadastro', 'registrations', 'registros', 'reg'],
   first_deposits: ['ftd', 'first_deposits', 'primeiros_depositos', 'primeiro_deposito', 'pd'],
   qualified_cpa: ['cpa', 'cpa_qualificado', 'qualified_cpa', 'cpaq', 'cpa_qualif'],
@@ -55,7 +60,7 @@ const stripKey = (s: string) =>
 // canônico da coluna — sempre um dos apelidos reconhecidos por COLUMN_ALIASES, pra
 // que a planilha preenchida e devolvida volte a parsear sem ajustes.
 export interface TemplateColumn {
-  key: 'date' | 'affiliate' | MetricKey;
+  key: ColumnKey;
   header: string;   // nome da coluna na planilha (reconhecido pelo parser)
   label: string;    // rótulo humano (aba de instruções)
   required: boolean;
@@ -63,8 +68,9 @@ export interface TemplateColumn {
 }
 
 export const TEMPLATE_COLUMNS: TemplateColumn[] = [
-  { key: 'date', header: 'data', label: 'Data', required: true, help: 'Dia do resultado (AAAA-MM-DD ou DD/MM/AAAA). Uma linha por dia.' },
-  { key: 'affiliate', header: 'afiliado', label: 'Afiliado', required: false, help: 'Nome ou ID de um afiliado existente. Deixe VAZIO para o total/agregado da casa no dia.' },
+  { key: 'date', header: 'data', label: 'Data', required: true, help: 'Dia do resultado (AAAA-MM-DD ou DD/MM/AAAA). Preencha na 1ª linha do dia — as linhas abaixo herdam a mesma data até mudar.' },
+  { key: 'affiliate', header: 'afiliado', label: 'Afiliado', required: false, help: 'Nome do afiliado (opcional, só p/ leitura). O cruzamento usa o e-mail. Deixe afiliado E e-mail vazios para o total/agregado da casa no dia.' },
+  { key: 'email', header: 'email', label: 'E-mail', required: false, help: 'E-mail de login do afiliado na plataforma (ou o e-mail OTG). É por ele que o resultado é cruzado com o afiliado.' },
   { key: 'registrations', header: 'cadastros', label: 'Cadastros', required: false, help: 'Quantidade de cadastros (registros).' },
   { key: 'first_deposits', header: 'ftd', label: 'FTD', required: false, help: 'Primeiros depósitos (first-time deposits).' },
   { key: 'qualified_cpa', header: 'cpa', label: 'CPA', required: false, help: 'CPAs qualificados.' },
@@ -79,8 +85,8 @@ export const TEMPLATE_HEADERS: string[] = TEMPLATE_COLUMNS.map((c) => c.header);
 // Linhas de exemplo (só pra aba de instruções — NÃO entram na aba de preenchimento,
 // pra ninguém importar o exemplo por engano). 1ª = atribuída a afiliado; 2ª = agregado.
 export const TEMPLATE_EXAMPLE_ROWS: (string | number)[][] = [
-  ['2026-06-01', 'João Silva', 40, 18, 12, 80, 2400, 2400],
-  ['2026-06-01', '', 50, 20, 14, 90, 3000, 3000],
+  ['2026-06-01', 'João Silva', 'joao@email.com', 40, 18, 12, 80, 2400, 2400],
+  ['2026-06-01', '', '', 50, 20, 14, 90, 3000, 3000],
 ];
 
 // Número tolerante a pt-BR (R$ 2.400,50) e a contagens simples. Regras:
@@ -136,6 +142,7 @@ export interface ParsedRow extends Metrics {
   line: number;        // nº da linha no texto colado (1-based, conta o header)
   date: string;        // ISO
   affiliate: string;   // token cru (id ou nome); '' = agregado da casa
+  email: string;       // e-mail (token de cruzamento preferencial); '' = ausente
 }
 
 export interface ParseError {
@@ -147,8 +154,8 @@ export interface ParseError {
 export interface ParseResult {
   rows: ParsedRow[];
   errors: ParseError[];
-  // índice de coluna de cada campo reconhecido (date/affiliate obrigam date; métricas opcionais)
-  columns: Partial<Record<'date' | 'affiliate' | MetricKey, number>>;
+  // índice de coluna de cada campo reconhecido (date obrigatória; demais opcionais)
+  columns: Partial<Record<ColumnKey, number>>;
 }
 
 // Núcleo PURO do parsing: recebe uma MATRIZ de células já separadas (linhas × colunas)
@@ -170,8 +177,8 @@ export function parseResultsRows(grid: string[][]): ParseResult {
   const headerRaw = (grid[headerIdx] ?? []).join(' | ');
   const headerCells = (grid[headerIdx] ?? []).map((c) => stripKey(String(c ?? '')));
 
-  const aliasToKey = new Map<string, 'date' | 'affiliate' | MetricKey>();
-  (Object.keys(COLUMN_ALIASES) as ('date' | 'affiliate' | MetricKey)[]).forEach((key) => {
+  const aliasToKey = new Map<string, ColumnKey>();
+  (Object.keys(COLUMN_ALIASES) as ColumnKey[]).forEach((key) => {
     COLUMN_ALIASES[key].forEach((a) => aliasToKey.set(stripKey(a), key));
   });
 
@@ -191,21 +198,37 @@ export function parseResultsRows(grid: string[][]): ParseResult {
     return result;
   }
 
+  // Data com "fill-down": uma linha sem data herda a última data válida acima (a
+  // planilha costuma preencher a data só na 1ª linha do dia). A 1ª linha de dados
+  // PRECISA ter data — sem data anterior pra herdar é erro.
+  let lastISO = '';
   for (let i = headerIdx + 1; i < grid.length; i++) {
     const cells = grid[i];
     if (isBlank(cells)) continue;
     const lineNo = i + 1;
     const raw = (cells ?? []).join(' | ');
 
-    const dateCell = cellAt(cells, result.columns.date!);
-    const iso = parseDateToISO(dateCell);
-    if (!iso) {
-      result.errors.push({ line: lineNo, raw, message: `Data inválida: "${dateCell}".` });
-      continue;
+    const dateCell = cellAt(cells, result.columns.date!).trim();
+    let iso: string;
+    if (dateCell === '') {
+      if (!lastISO) {
+        result.errors.push({ line: lineNo, raw, message: 'Data ausente (e nenhuma data anterior para herdar).' });
+        continue;
+      }
+      iso = lastISO;
+    } else {
+      const parsed = parseDateToISO(dateCell);
+      if (!parsed) {
+        result.errors.push({ line: lineNo, raw, message: `Data inválida: "${dateCell}".` });
+        continue;
+      }
+      iso = parsed;
+      lastISO = parsed;
     }
     const affiliate = result.columns.affiliate !== undefined ? cellAt(cells, result.columns.affiliate).trim() : '';
+    const email = result.columns.email !== undefined ? cellAt(cells, result.columns.email).trim() : '';
 
-    const row: ParsedRow = { line: lineNo, date: iso, affiliate, ...emptyMetrics() };
+    const row: ParsedRow = { line: lineNo, date: iso, affiliate, email, ...emptyMetrics() };
     let bad = '';
     for (const k of METRIC_KEYS) {
       const col = result.columns[k];
@@ -238,9 +261,11 @@ export function parseResultsCsv(text: string): ParseResult {
 }
 
 // --- Resolução de afiliados --------------------------------------------------
-// Mapeia o token do CSV (id OU nome) para um affiliateId do roster. Token vazio =
-// agregado (affiliateId null). Tokens não-resolvidos são reportados (a UI bloqueia
-// a importação até resolver, p/ não gravar atribuição fantasma).
+// Mapeia a linha para um affiliateId do roster. Cruzamento PREFERENCIAL por e-mail
+// (login da plataforma ou e-mail OTG) — não depende de nome igual nem de id na OTG;
+// cai pro token de afiliado (id/nome) só se o e-mail faltar/não casar. Linha sem
+// e-mail E sem afiliado = agregado (affiliateId null). Não-resolvidos são reportados
+// (a UI bloqueia a importação até resolver, p/ não gravar atribuição fantasma).
 export interface ResolvedRow extends Metrics {
   line: number;
   date: string;
@@ -249,7 +274,9 @@ export interface ResolvedRow extends Metrics {
 }
 export interface ResolveResult {
   rows: ResolvedRow[];
-  unresolved: { line: number; token: string }[];
+  // token = e-mail OU afiliado cru (o que existir, e-mail tem prioridade). email/name
+  // vêm da linha p/ a UI montar o "Cadastrar na Boost" sem re-juntar com o parse.
+  unresolved: { line: number; token: string; email?: string; name?: string }[];
 }
 
 export type AffiliateLookup = (token: string) => { id: string; label?: string } | null;
@@ -258,13 +285,16 @@ export function resolveAffiliates(parsed: ParsedRow[], lookup: AffiliateLookup):
   const out: ResolveResult = { rows: [], unresolved: [] };
   for (const p of parsed) {
     const base = { line: p.line, date: p.date, ...metricsOf(p) };
-    if (!p.affiliate) {
-      out.rows.push({ ...base, affiliateId: null });
+    const email = (p.email ?? '').trim();
+    const affiliate = (p.affiliate ?? '').trim();
+    if (!email && !affiliate) {
+      out.rows.push({ ...base, affiliateId: null }); // agregado da casa
       continue;
     }
-    const hit = lookup(p.affiliate);
+    // e-mail primeiro (mais confiável), depois id/nome.
+    const hit = (email && lookup(email)) || (affiliate && lookup(affiliate)) || null;
     if (!hit) {
-      out.unresolved.push({ line: p.line, token: p.affiliate });
+      out.unresolved.push({ line: p.line, token: email || affiliate, email, name: affiliate });
       continue;
     }
     out.rows.push({ ...base, affiliateId: hit.id, affiliateLabel: hit.label });
@@ -272,12 +302,17 @@ export function resolveAffiliates(parsed: ParsedRow[], lookup: AffiliateLookup):
   return out;
 }
 
-// Lookup por id exato OU nome normalizado, a partir da lista de afiliados.
+const normEmail = (s: string) => String(s ?? '').trim().toLowerCase();
+
+// Lookup por id exato, e-mail OU nome normalizado, a partir da lista de afiliados.
+// Cada entrada pode trazer e-mail(s) — junte aqui o e-mail OTG E o de login da
+// plataforma (users/{uid}.email) apontando pro mesmo affiliateId.
 export function buildAffiliateLookup(
-  affiliates: { id?: string; _id?: string; name?: string; label?: string }[]
+  affiliates: { id?: string; _id?: string; name?: string; label?: string; email?: string | null; emails?: (string | null | undefined)[] }[]
 ): AffiliateLookup {
   const byId = new Map<string, { id: string; label?: string }>();
   const byName = new Map<string, { id: string; label?: string }>();
+  const byEmail = new Map<string, { id: string; label?: string }>();
   for (const a of Array.isArray(affiliates) ? affiliates : []) {
     const id = String(a.id ?? a._id ?? '').trim();
     if (!id) continue;
@@ -287,11 +322,15 @@ export function buildAffiliateLookup(
       const key = nm ? stripKey(String(nm)) : '';
       if (key && !byName.has(key)) byName.set(key, { id, label });
     }
+    for (const em of [a.email, ...(a.emails ?? [])]) {
+      const key = em ? normEmail(em) : '';
+      if (key && !byEmail.has(key)) byEmail.set(key, { id, label });
+    }
   }
   return (token: string) => {
     const t = String(token ?? '').trim();
     if (!t) return null;
-    return byId.get(t.toLowerCase()) || byName.get(stripKey(t)) || null;
+    return byId.get(t.toLowerCase()) || byEmail.get(normEmail(t)) || byName.get(stripKey(t)) || null;
   };
 }
 

@@ -369,6 +369,84 @@ describe('create-user enum de role (R25)', () => {
 });
 
 // =============================================================================
+// Afiliado nativo Boost + alias de e-mail (Boost-first)
+// =============================================================================
+describe('boost-affiliates + email aliases', () => {
+  const seed = () => ({ users: { 'admin-uid': { role: 'admin' }, 'client-uid': { role: 'client' } } });
+
+  it('cria afiliado nativo: mirror name-only + alias (PII) + status ativo', async () => {
+    const fs = makeFirestore(seed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs });
+    const res = await request(app)
+      .post('/api/boost-affiliates')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliates: [{ name: 'Vanesa Cristina', email: 'Vanesa@X.com', house: 'Betfair' }] })
+      .expect(201);
+
+    expect(res.body.created).toHaveLength(1);
+    const c = res.body.created[0];
+    expect(c.affiliateId).toMatch(/^boost_/);
+    expect(c.reused).toBe(false);
+    expect(c.email).toBe('vanesa@x.com');
+    expect(c.invite).toBeNull();
+
+    // mirror: nome SIM, e-mail NÃO (PII fica só no alias)
+    const aff = fs.__store.get('affiliates').get(c.affiliateId);
+    expect(aff).toMatchObject({ name: 'Vanesa Cristina', source: 'boost', brand: { name: 'Betfair' } });
+    expect(aff.email).toBeUndefined();
+    // alias por e-mail normalizado
+    const alias = fs.__store.get('affiliate_email_aliases').get('vanesa@x.com');
+    expect(alias).toMatchObject({ affiliateId: c.affiliateId, kind: 'boost' });
+    // status ativo
+    expect(fs.__store.get('affiliate_statuses').get(c.affiliateId).status).toBe('active');
+  });
+
+  it('idempotente por e-mail: 2º cadastro reusa o affiliateId (não duplica mirror)', async () => {
+    const fs = makeFirestore(seed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs });
+    const first = await request(app).post('/api/boost-affiliates').set('Authorization', 'Bearer admin-uid')
+      .send({ affiliates: [{ name: 'A', email: 'a@x.com', house: 'Betfair' }] }).expect(201);
+    const id = first.body.created[0].affiliateId;
+    const second = await request(app).post('/api/boost-affiliates').set('Authorization', 'Bearer admin-uid')
+      .send({ affiliates: [{ name: 'A again', email: 'A@x.com', house: 'Betfair' }] }).expect(201);
+    expect(second.body.created[0].reused).toBe(true);
+    expect(second.body.created[0].affiliateId).toBe(id);
+    expect(fs.__store.get('affiliates').size).toBe(1);
+  });
+
+  it('generateInvite → cria convite e devolve token', async () => {
+    const fs = makeFirestore(seed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs });
+    const res = await request(app).post('/api/boost-affiliates').set('Authorization', 'Bearer admin-uid')
+      .send({ affiliates: [{ name: 'B', email: 'b@x.com', house: 'Betfair' }], generateInvite: true }).expect(201);
+    expect(res.body.created[0].invite?.token).toBeTruthy();
+    expect(fs.__store.get('invites').size).toBe(1);
+  });
+
+  it('client → 403; body vazio → 400', async () => {
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(seed()) });
+    await request(app).post('/api/boost-affiliates').set('Authorization', 'Bearer client-uid')
+      .send({ affiliates: [{ name: 'X' }] }).expect(403);
+    await request(app).post('/api/boost-affiliates').set('Authorization', 'Bearer admin-uid')
+      .send({ affiliates: [] }).expect(400);
+  });
+
+  it('alias "vincular a existente" grava kind:link; GET lista; client 403', async () => {
+    const fs = makeFirestore(seed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs });
+    await request(app).post('/api/affiliate-email-aliases').set('Authorization', 'Bearer admin-uid')
+      .send({ email: 'JS@Gmail.com', affiliateId: '8a58' }).expect(200);
+    expect(fs.__store.get('affiliate_email_aliases').get('js@gmail.com')).toMatchObject({ affiliateId: '8a58', kind: 'link' });
+
+    const list = await request(app).get('/api/affiliate-email-aliases').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(list.body.aliases).toEqual([{ email: 'js@gmail.com', affiliateId: '8a58', name: null, kind: 'link' }]);
+
+    await request(app).get('/api/affiliate-email-aliases').set('Authorization', 'Bearer client-uid').expect(403);
+    await request(app).post('/api/affiliate-email-aliases').set('Authorization', 'Bearer admin-uid').send({ email: 'x' }).expect(400);
+  });
+});
+
+// =============================================================================
 // Cron interno: /api/internal/daily-ranking (auto-gera o ranking + lembra o admin)
 // =============================================================================
 describe('cron interno daily-ranking', () => {

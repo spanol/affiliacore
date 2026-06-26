@@ -323,6 +323,54 @@ export async function linkAffiliateUser(
   return response.json();
 }
 
+// --- Afiliado nativo Boost + alias de e-mail (Boost-first) ------------------
+
+export interface BoostAffiliateInput { name: string; email?: string; house?: string }
+export interface BoostAffiliateCreated { affiliateId: string; name: string; email: string | null; reused: boolean; invite?: { token: string; expiresAt: string } | null }
+
+// Cria afiliados nativos Boost em lote (a partir das linhas não-encontradas do import).
+// `generateInvite` dispara o convite de login. Idempotente por e-mail no servidor.
+export async function createBoostAffiliates(
+  affiliates: BoostAffiliateInput[],
+  opts: { generateInvite?: boolean } = {}
+): Promise<BoostAffiliateCreated[]> {
+  const response = await authFetch('/api/boost-affiliates', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ affiliates, generateInvite: !!opts.generateInvite }),
+  });
+  if (!response.ok) {
+    const e = await response.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro ao cadastrar afiliados: ${response.status}`);
+  }
+  const data = await response.json();
+  return Array.isArray(data?.created) ? data.created : [];
+}
+
+// "Vincular a existente": liga um e-mail a um afiliado já existente (alias persistente).
+export async function createEmailAlias(email: string, affiliateId: string): Promise<{ email: string; affiliateId: string }> {
+  const response = await authFetch('/api/affiliate-email-aliases', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ email, affiliateId }),
+  });
+  if (!response.ok) {
+    const e = await response.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro ao vincular e-mail: ${response.status}`);
+  }
+  return response.json();
+}
+
+export interface EmailAlias { email: string; affiliateId: string; name?: string | null; kind?: string | null }
+
+// Lista os aliases de e-mail (p/ o roster do import). Admin-only no servidor.
+export async function fetchEmailAliases(): Promise<EmailAlias[]> {
+  const response = await authFetch('/api/affiliate-email-aliases', { headers: { Accept: 'application/json' } });
+  if (!response.ok) return [];
+  const data = await response.json().catch(() => ({}));
+  return Array.isArray((data as any)?.aliases) ? (data as any).aliases : [];
+}
+
 export async function fetchAffiliateStatuses(): Promise<Record<string, AffiliateStatusConfig>> {
   try {
     const response = await authFetch('/api/affiliate-statuses', {
@@ -343,6 +391,23 @@ export async function fetchAffiliateStatuses(): Promise<Record<string, Affiliate
   }
 }
 
+// Afiliados NATIVOS Boost (sem OTG) — docs do mirror `affiliates` com source:'boost'.
+// Name-only (e-mail é PII e vive em affiliate_email_aliases). Best-effort: nunca
+// derruba o fetchAffiliates (retorna [] em qualquer falha). Espelha o nome em todo o
+// app (nameById/listas) sem o `#boost_<uuid>`.
+async function fetchBoostMirror(): Promise<any[]> {
+  try {
+    const snap = await getDocs(query(collection(db, 'affiliates'), where('source', '==', 'boost')));
+    return snap.docs.map((d) => {
+      const x = d.data() as any;
+      return { id: d.id, name: x.name ?? '', email: '', brand: x.brand ?? null, source: 'boost' };
+    });
+  } catch (error) {
+    console.error('Boost mirror fetch error:', error);
+    return [];
+  }
+}
+
 export async function fetchAffiliates(): Promise<Affiliate[]> {
   try {
     const response = await fetchAffiliateApi('affiliates');
@@ -354,15 +419,22 @@ export async function fetchAffiliates(): Promise<Affiliate[]> {
 
     const data = await response.json();
     const apiError = extractApiError(data);
+    let otg: any[];
     if (apiError) {
       if (apiError.noData) {
         console.warn(`Affiliate API returned no data (${apiError.code || 'no-code'}): ${apiError.message}`);
-        return [];
+        otg = [];
+      } else {
+        throw new Error(apiError.message);
       }
-      throw new Error(apiError.message);
+    } else {
+      otg = extractArray(data);
     }
 
-    return extractArray(data);
+    // Boost-first: une os nativos Boost (dedupe por id; boost_* nunca colide com OTG).
+    const boost = await fetchBoostMirror();
+    const seen = new Set(otg.map((a: any) => String(a?.id ?? a?._id ?? '')));
+    return [...otg, ...boost.filter((b) => !seen.has(b.id))] as Affiliate[];
   } catch (error) {
     console.error('Affiliate fetch error:', error);
     throw error;

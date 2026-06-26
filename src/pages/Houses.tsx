@@ -11,11 +11,14 @@ import {
   House, HouseInput, fetchHouses, createHouse, updateHouse, deleteHouse, syncKnownBrandsFrom,
   fetchHouseResults, importHouseResults, clearHouseResults,
 } from '../services/houseService';
-import { fetchAffiliates } from '../services/affiliateService';
+import {
+  fetchAffiliates, fetchRegisteredUsers, fetchEmailAliases, createBoostAffiliates, createEmailAlias,
+} from '../services/affiliateService';
 import {
   parseResultsCsv, parseResultsRows, resolveAffiliates, buildAffiliateLookup,
   ParseResult, StoredManualRow,
 } from '../lib/houseResults';
+import { buildImportRoster } from '../lib/boostAffiliate';
 import { canImport, buildImportPayload } from '../lib/houseImport';
 import { parseSpreadsheetFile, downloadResultsTemplate, isExcelFile } from '../lib/xlsx';
 import { humanizeName } from '../lib/utils';
@@ -493,32 +496,87 @@ function ConfirmDeleteModal({ house, loading, onClose, onConfirm }: { house: Hou
 function HouseResultsModal({ house, onClose }: { house: House; onClose: () => void }) {
   const { push } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [affiliates, setAffiliates] = useState<any[]>([]);
+  const [roster, setRoster] = useState<Parameters<typeof buildAffiliateLookup>[0]>([]);
   const [existing, setExisting] = useState<StoredManualRow[]>([]);
   const [text, setText] = useState('');
   const [fileResult, setFileResult] = useState<ParseResult | null>(null); // planilha Excel parseada
   const [fileName, setFileName] = useState('');
+  const [sheetInfo, setSheetInfo] = useState<{ sheetName: string; sheetNames: string[]; matched: boolean } | null>(null);
   const [reading, setReading] = useState(false);
   const [analysis, setAnalysis] = useState<ReturnType<typeof resolveAffiliates> | null>(null);
   const [parseErrors, setParseErrors] = useState<{ line: number; message: string }[]>([]);
   const [importing, setImporting] = useState(false);
   const [loadingMeta, setLoadingMeta] = useState(true);
+  const [creating, setCreating] = useState(false);          // "Cadastrar na Boost" em andamento
+  const [generateInvite, setGenerateInvite] = useState(false);
+  const [linkingLine, setLinkingLine] = useState<number | null>(null); // qual não-resolvido está sendo vinculado
+  const [linkQuery, setLinkQuery] = useState('');
 
-  const lookup = useMemo(() => buildAffiliateLookup(affiliates), [affiliates]);
+  const lookup = useMemo(() => buildAffiliateLookup(roster), [roster]);
 
   const loadMeta = async () => {
     setLoadingMeta(true);
     try {
-      const [affs, rows] = await Promise.all([
+      // Roster de cruzamento (Boost-first): nome vem do mirror `affiliates` (OTG +
+      // nativos Boost); e-mails vêm dos logins da plataforma + dos aliases admin.
+      // Assim casa por e-mail mesmo quem não tem id na OTG, bastando ter cadastro Boost.
+      const [affs, users, aliases, rows] = await Promise.all([
         fetchAffiliates(),
+        fetchRegisteredUsers(),
+        fetchEmailAliases(),
         fetchHouseResults({ houseSlug: house.slug }),
       ]);
-      setAffiliates(Array.isArray(affs) ? affs : []);
+      setRoster(buildImportRoster(affs as any, users as any, aliases as any));
       setExisting(Array.isArray(rows) ? rows : []);
     } catch {
       push({ type: 'error', message: 'Não foi possível carregar afiliados/resultados.' });
     } finally {
       setLoadingMeta(false);
+    }
+  };
+
+  // Afiliados existentes p/ o "Vincular a existente" (só com nome, ordenado).
+  const linkOptions = useMemo(() => {
+    const q = linkQuery.trim().toLowerCase();
+    return (roster as any[])
+      .filter((r) => r.name && String(r.name).trim())
+      .map((r) => ({ id: r.id as string, name: humanizeName(String(r.name)) }))
+      .filter((r) => !q || r.name.toLowerCase().includes(q) || r.id.toLowerCase().includes(q))
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+      .slice(0, 30);
+  }, [roster, linkQuery]);
+
+  // Cadastra os não-resolvidos como afiliados nativos Boost (nome+email+casa) e
+  // reanalisa — as linhas passam a casar na hora.
+  const handleCreateBoost = async () => {
+    const unresolved = analysis?.unresolved ?? [];
+    const toCreate = unresolved
+      .map((u) => ({ name: (u.name || u.email || '').trim(), email: (u.email || '').trim(), house: house.name }))
+      .filter((a) => a.name);
+    if (!toCreate.length) return;
+    setCreating(true);
+    try {
+      const created = await createBoostAffiliates(toCreate, { generateInvite });
+      const invites = created.filter((c) => c.invite).length;
+      push({ type: 'success', message: `Cadastrado(s) ${created.length} afiliado(s) na Boost${invites ? ` · ${invites} convite(s) gerado(s)` : ''}.` });
+      await loadMeta();
+    } catch (e: any) {
+      push({ type: 'error', message: e?.message || 'Erro ao cadastrar afiliados.' });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // Vincula um e-mail não-resolvido a um afiliado existente (alias persistente).
+  const handleLink = async (email: string, affiliateId: string) => {
+    if (!email) { push({ type: 'error', message: 'Linha sem e-mail para vincular.' }); return; }
+    try {
+      await createEmailAlias(email, affiliateId);
+      push({ type: 'success', message: 'E-mail vinculado ao afiliado.' });
+      setLinkingLine(null); setLinkQuery('');
+      await loadMeta();
+    } catch (e: any) {
+      push({ type: 'error', message: e?.message || 'Erro ao vincular.' });
     }
   };
 
@@ -534,15 +592,17 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
   }, [fileResult, text, lookup]);
 
   // Excel (.xlsx/.xls) -> matriz -> parser puro; .csv/.txt -> texto na caixa de colar.
+  // Em workbooks com 1 aba por casa, seleciona a aba que bate com esta casa.
   const onPickFile = async (file?: File) => {
     if (!file) return;
     if (isExcelFile(file)) {
       setReading(true);
       try {
-        const grid = await parseSpreadsheetFile(file);
+        const { grid, sheetName, sheetNames, matched } = await parseSpreadsheetFile(file, house.name);
         setText('');
         setFileResult(parseResultsRows(grid));
         setFileName(file.name);
+        setSheetInfo({ sheetName, sheetNames, matched });
       } catch {
         push({ type: 'error', message: 'Não foi possível ler a planilha Excel.' });
       } finally {
@@ -555,12 +615,13 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
     reader.onload = () => {
       setFileResult(null);
       setFileName('');
+      setSheetInfo(null);
       setText(typeof reader.result === 'string' ? reader.result : '');
     };
     reader.readAsText(file);
   };
 
-  const clearFile = () => { setFileResult(null); setFileName(''); };
+  const clearFile = () => { setFileResult(null); setFileName(''); setSheetInfo(null); };
 
   const onTypeText = (v: string) => { clearFile(); setText(v); };
 
@@ -645,8 +706,8 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
             {/* Formato esperado */}
             <div className="rounded-xl bg-slate-50 dark:bg-neutral-800/40 border border-slate-100 dark:border-neutral-800 p-3 text-[11px] text-slate-500 dark:text-neutral-400">
               <p className="font-bold text-slate-600 dark:text-neutral-300 mb-1">Colunas (cabeçalho obrigatório):</p>
-              <code className="block font-mono text-[10px] text-slate-500 dark:text-neutral-400">data; afiliado; cadastros; ftd; cpa; rev; deposito; comissao</code>
-              <p className="mt-1.5">• <b>data</b> obrigatória (1 linha por dia). • <b>afiliado</b> = id ou nome de um afiliado existente; <b>vazio = agregado da casa</b>. • datas/números pt-BR aceitos.</p>
+              <code className="block font-mono text-[10px] text-slate-500 dark:text-neutral-400">data; afiliado; email; cadastros; ftd; cpa; rev; deposito; comissao</code>
+              <p className="mt-1.5">• <b>data</b> obrigatória — preencha só na 1ª linha do dia (as de baixo herdam). • <b>email</b> = cruzamento com o afiliado (login na plataforma ou e-mail OTG); <b>email e afiliado vazios = agregado da casa</b>. • datas/números pt-BR aceitos.</p>
             </div>
 
             {/* Entrada — subir planilha Excel (principal) */}
@@ -660,13 +721,22 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                 onChange={(e) => { onPickFile(e.target.files?.[0]); e.target.value = ''; }}
               />
               {fileName ? (
-                <div className="mt-1.5 flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30">
-                  <span className="inline-flex items-center gap-2 min-w-0 text-xs font-bold text-emerald-700 dark:text-emerald-300">
-                    <FileSpreadsheet size={14} className="shrink-0" /> <span className="truncate">{fileName}</span>
-                  </span>
-                  <button onClick={clearFile} className="shrink-0 text-emerald-600/70 dark:text-emerald-400/70 hover:text-red-500" title="Remover planilha">
-                    <X size={14} />
-                  </button>
+                <div className="mt-1.5 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30">
+                    <span className="inline-flex items-center gap-2 min-w-0 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                      <FileSpreadsheet size={14} className="shrink-0" /> <span className="truncate">{fileName}</span>
+                      {sheetInfo?.sheetName && <span className="font-normal text-emerald-600/70 dark:text-emerald-400/60 truncate">› {sheetInfo.sheetName}</span>}
+                    </span>
+                    <button onClick={clearFile} className="shrink-0 text-emerald-600/70 dark:text-emerald-400/70 hover:text-red-500" title="Remover planilha">
+                      <X size={14} />
+                    </button>
+                  </div>
+                  {sheetInfo && sheetInfo.sheetNames.length > 1 && !sheetInfo.matched && (
+                    <p className="px-1 text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <AlertTriangle size={11} className="shrink-0" />
+                      Várias abas e nenhuma bate com “{house.name}”. Lendo a 1ª (“{sheetInfo.sheetName}”) — confira o preview.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <button
@@ -713,11 +783,76 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                   )}
                 </div>
 
-                {(parseErrors.length > 0 || analysis.unresolved.length > 0) && (
+                {parseErrors.length > 0 && (
                   <div className="rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 p-3 text-[11px] text-red-600 dark:text-red-400 space-y-0.5 max-h-32 overflow-y-auto">
                     {parseErrors.slice(0, 8).map((e, i) => <p key={`e${i}`}>Linha {e.line}: {e.message}</p>)}
-                    {analysis.unresolved.slice(0, 8).map((u, i) => <p key={`u${i}`}>Linha {u.line}: afiliado "{u.token}" não encontrado no roster.</p>)}
-                    <p className="text-red-400/70 dark:text-red-500/60 pt-1">Corrija (ou cadastre o afiliado) para liberar a importação.</p>
+                    <p className="text-red-400/70 dark:text-red-500/60 pt-1">Corrija os erros de formato para liberar a importação.</p>
+                  </div>
+                )}
+
+                {analysis.unresolved.length > 0 && (
+                  <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 p-3 space-y-2">
+                    <div>
+                      <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300">Afiliados não encontrados na Boost</p>
+                      <p className="text-[11px] text-amber-700/70 dark:text-amber-300/60">Cadastre-os como afiliados Boost (passam a cruzar pelo e-mail) ou vincule cada um a um afiliado já existente.</p>
+                    </div>
+                    <div className="space-y-1 max-h-44 overflow-y-auto">
+                      {analysis.unresolved.map((u) => (
+                        <div key={u.line} className="rounded-lg bg-white/60 dark:bg-neutral-900/40 border border-amber-100 dark:border-amber-900/30 px-2 py-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="min-w-0 truncate text-[11px] text-slate-600 dark:text-neutral-300">
+                              <span className="text-slate-400 dark:text-neutral-500">L{u.line}</span> {u.name || '—'}
+                              {u.email && <span className="text-slate-400 dark:text-neutral-500"> · {u.email}</span>}
+                            </span>
+                            <button
+                              onClick={() => { setLinkingLine(linkingLine === u.line ? null : u.line); setLinkQuery(''); }}
+                              className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline"
+                            >
+                              <Link2 size={11} /> {linkingLine === u.line ? 'Cancelar' : 'Vincular'}
+                            </button>
+                          </div>
+                          {linkingLine === u.line && (
+                            <div className="mt-1.5">
+                              <input
+                                value={linkQuery}
+                                onChange={(e) => setLinkQuery(e.target.value)}
+                                placeholder="Buscar afiliado existente…"
+                                className="w-full px-2 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-[11px] text-slate-900 dark:text-white focus:outline-none focus:border-amber-500"
+                              />
+                              <div className="mt-1 max-h-32 overflow-y-auto rounded-lg border border-slate-100 dark:border-neutral-800">
+                                {!u.email ? (
+                                  <p className="px-2 py-1.5 text-[11px] text-red-500">Esta linha não tem e-mail — não dá para vincular.</p>
+                                ) : linkOptions.length === 0 ? (
+                                  <p className="px-2 py-1.5 text-[11px] text-slate-400 dark:text-neutral-500">Nenhum afiliado encontrado.</p>
+                                ) : linkOptions.map((o) => (
+                                  <button
+                                    key={o.id}
+                                    onClick={() => handleLink(u.email || '', o.id)}
+                                    className="block w-full text-left px-2 py-1.5 text-[11px] text-slate-600 dark:text-neutral-300 hover:bg-amber-500/10"
+                                  >
+                                    {o.name}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-amber-100 dark:border-amber-900/30">
+                      <label className="inline-flex items-center gap-1.5 text-[11px] text-amber-700/80 dark:text-amber-300/70 cursor-pointer select-none">
+                        <input type="checkbox" checked={generateInvite} onChange={(e) => setGenerateInvite(e.target.checked)} className="accent-amber-500" />
+                        Gerar convite de acesso
+                      </label>
+                      <button
+                        onClick={handleCreateBoost}
+                        disabled={creating}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-[11px] font-bold hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        {creating ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                        Cadastrar {analysis.unresolved.length} na Boost
+                      </button>
+                    </div>
                   </div>
                 )}
 
