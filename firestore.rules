@@ -192,5 +192,14 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
+
+    // Controle de versão da aplicação. O servidor (Admin SDK) publica app_meta/version
+    // no boot de cada deploy; qualquer afiliado autenticado lê em tempo real p/ saber
+    // se o bundle está desatualizado (banner de atualização + refresh). NÃO é dado
+    // sensível (só o carimbo de versão/commit). Escrita só pelo servidor/admin.
+    match /app_meta/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
   }
 }

@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import crypto from 'crypto';
+import fs from 'fs';
 import express from 'express';
 import helmet from 'helmet';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
@@ -20,6 +21,7 @@ import { projectPartnerResults } from './src/lib/partnerResults';
 import { pullApprovedRoster, isOtgLinksConfigured } from './otgLinksPull';
 import { pullAnalytics, isOtgAnalyticsConfigured } from './otgAnalyticsPull';
 import { analyticsDocId, funnelKey, sanitizeFunnel, hasFunnelActivity } from './src/lib/analyticsDoc';
+import { buildVersionPayload, type AppVersion } from './src/lib/version';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2342,6 +2344,53 @@ export function createApp(deps: ServerDeps) {
   return app;
 }
 
+// Controle de versão: publica a versão DESTE deploy em app_meta/version (Firestore) no
+// boot. Como cada deploy é um processo novo com um version.json novo (gerado no build
+// por scripts/gen-version.mjs), a versão "eleva" sozinha a cada deploy — os clientes com
+// a aba aberta veem o doc mudar (onSnapshot) e ganham o banner de atualização. Fica FORA
+// do createApp (depende de build/FS) p/ não atrapalhar os testes via supertest. Escreve
+// só se a versão mudou — o Cloud Run pode reiniciar a instância sem deploy novo, e isso
+// manteria o updatedAt refletindo deploys reais. Os secrets do Admin SDK só existem em
+// RUNTIME (apphosting.yaml), então a publicação tem que ser no boot, nunca no build.
+function readBuildVersion(): AppVersion | null {
+  // Em prod a versão vem de dist/version.json (Vite copia public/ -> dist/); em dev,
+  // direto de public/version.json (gerado pelo predev). Tenta os dois.
+  const candidates = [
+    path.join(process.cwd(), 'dist', 'version.json'),
+    path.join(process.cwd(), 'public', 'version.json'),
+  ];
+  for (const file of candidates) {
+    try {
+      const info = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (info?.version) return info as AppVersion;
+    } catch {
+      /* arquivo ausente neste ambiente — tenta o próximo */
+    }
+  }
+  return null;
+}
+
+async function publishAppVersion(adminDb: admin.firestore.Firestore | null) {
+  if (!adminDb) return;
+  const info = readBuildVersion();
+  if (!info?.version) {
+    console.warn('App version: version.json não encontrado — pulando publicação.');
+    return;
+  }
+  try {
+    const ref = adminDb.collection('app_meta').doc('version');
+    const snap = await ref.get();
+    if (snap.exists && snap.data()?.version === info.version) return; // sem mudança
+    await ref.set(
+      { ...buildVersionPayload(info), updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+      { merge: true },
+    );
+    console.log(`App version published: ${info.version}`);
+  } catch (err) {
+    console.error('Failed to publish app version:', err);
+  }
+}
+
 // Sobe o servidor de verdade: inicializa o Admin SDK, monta o app via createApp e
 // adiciona a camada específica de ambiente (Vite em dev / estático + fallback SPA em
 // prod). Essa camada NÃO entra no createApp p/ manter o app testável e sem dependência
@@ -2350,6 +2399,9 @@ async function startServer() {
   const PORT = Number(process.env.PORT) || 3000;
   const { adminApp, adminDb } = initAdmin();
   const app = createApp({ adminApp, adminDb });
+
+  // Publica a versão deste deploy (best-effort, não bloqueia o boot).
+  void publishAppVersion(adminDb);
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
