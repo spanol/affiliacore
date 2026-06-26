@@ -16,7 +16,7 @@ import {
 } from '../services/affiliateService';
 import {
   parseResultsCsv, parseResultsRows, resolveAffiliates, buildAffiliateLookup,
-  ParseResult, StoredManualRow,
+  ParseResult, StoredManualRow, TEMPLATE_HEADERS, TEMPLATE_EXAMPLE_ROWS,
 } from '../lib/houseResults';
 import { buildImportRoster } from '../lib/boostAffiliate';
 import { canImport, buildImportPayload } from '../lib/houseImport';
@@ -761,7 +761,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                 value={text}
                 onChange={(e) => onTypeText(e.target.value)}
                 rows={5}
-                placeholder={'data\tafiliado\tcadastros\tftd\tcpa\trev\tdeposito\tcomissao\n2026-06-01\tJoão Silva\t40\t18\t12\t80\t2.400,00\t2400'}
+                placeholder={`${TEMPLATE_HEADERS.join('\t')}\n${TEMPLATE_EXAMPLE_ROWS[0].join('\t')}`}
                 className="mt-2 w-full px-3 py-2.5 rounded-xl bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-xs font-mono text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-neutral-600 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all"
               />
             </details>
