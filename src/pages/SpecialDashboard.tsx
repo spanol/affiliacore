@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   fetchSpecialAffiliates,
   fetchAffiliates,
-  fetchAllResults,
+  fetchResultsForAffiliates,
   fetchAllResultsByBrand,
   fetchAllResultsByCampaign,
   fetchAllDailyResults,
@@ -53,18 +53,25 @@ export default function SpecialDashboard() {
     if (!ownId) return;
     try {
       setLoading(true);
+      // A rede (own + subs) precisa ser conhecida ANTES de buscar os resultados por
+      // afiliado: `fetchResultsForAffiliates(networkIds)` funde o resultado MANUAL
+      // (casas 'manual') escopado à rede, igual ao headline do AffiliateDetails. Sem
+      // isso, `results` (que era `fetchAllResults`, mantido PURO p/ o /admin) NÃO somava
+      // o manual no agregado — só o BrandBreakdown por-casa (fetchAllResultsByBrand)
+      // mostrava, criando a divergência "headline ≠ Σ por-casa" (achado ao vivo 2026-06-26).
+      const specials = await fetchSpecialAffiliates();
+      const mine = specials[ownId] || null;
+      const networkIds = [ownId, ...((mine?.subAffiliateIds || []).map(String))];
       // brand/campaign/daily vão SEM affiliateIds — o proxy escopa à sub-rede do
       // especial (own + subs). Agregados pela API por casa/campanha/dia.
-      const [specials, rows, byBrand, byCampaign, byDay, cfgs, poolData] = await Promise.all([
-        fetchSpecialAffiliates(),
-        fetchAllResults(range),
+      const [rows, byBrand, byCampaign, byDay, cfgs, poolData] = await Promise.all([
+        fetchResultsForAffiliates(networkIds, range),
         fetchAllResultsByBrand(range),
         fetchAllResultsByCampaign(range),
         fetchAllDailyResults(range),
         fetchAffiliateConfigs(),
         fetchAffiliates().catch(() => []),
       ]);
-      const mine = specials[ownId] || null;
       setSpecial(mine);
       setResults(Array.isArray(rows) ? rows : []);
       setBrandResults(Array.isArray(byBrand) ? byBrand : []);
