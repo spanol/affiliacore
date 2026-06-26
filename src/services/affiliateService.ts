@@ -1189,6 +1189,27 @@ export async function refreshPendingAffiliates(): Promise<RefreshRosterResult> {
   return response.json();
 }
 
+export interface RefreshAnalyticsResult {
+  range?: { initialDate: string; finalDate: string };
+  houses?: Array<{ house: string; available: boolean; count: number; error?: string }>;
+  persisted?: number;
+  enrichedPending?: number;
+}
+
+// Admin · puxa o funil da v1 (cliques/cadastros) da OTG e persiste/reconcilia
+// (affiliate_analytics + enriquece os pendentes). Dispara POST /api/analytics/refresh.
+export async function refreshAnalytics(): Promise<RefreshAnalyticsResult> {
+  const response = await authFetch('/api/analytics/refresh', {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) {
+    const e = await response.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro ao atualizar o funil: ${response.status}`);
+  }
+  return response.json();
+}
+
 export interface AccessInvite {
   token: string;
   url: string;

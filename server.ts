@@ -1275,6 +1275,35 @@ export function createApp(deps: ServerDeps) {
     return { persisted, enrichedPending };
   };
 
+  // Núcleo compartilhado do refresh do funil: pull + (se alguma casa respondeu)
+  // persist/reconcilia. Usado pela rota ADMIN (botão no /otg-roster) e pela rota de
+  // CRON (scheduler). Não lança por casa (resiliência em pullAnalytics); só propaga se
+  // o pull inteiro falhar (ex.: login durável caiu → o chamador devolve 502).
+  const runAnalyticsRefresh = async (range: { initialDate: string; finalDate: string }) => {
+    const result = await pullAnalytics(range, fetchImpl);
+    const houses = result.houses.map((h) => ({
+      house: h.house,
+      available: h.available,
+      summary: h.summary,
+      count: h.rows.length,
+      error: h.error,
+    }));
+    const anyOk = result.houses.some((h) => h.available);
+    const firstErr = result.houses.find((h) => h.error)?.error;
+    let persisted = 0;
+    let enrichedPending = 0;
+    if (anyOk) {
+      try {
+        const p = await persistAnalytics(result.rows, range);
+        persisted = p.persisted;
+        enrichedPending = p.enrichedPending;
+      } catch (e: any) {
+        console.warn('Analytics: persistência adiada (falha ao gravar):', e?.message);
+      }
+    }
+    return { result, houses, anyOk, firstErr, persisted, enrichedPending };
+  };
+
   // v1 ANALÍTICA da OTG: traz cliques + funil inicial + NGR por afiliado×casa —
   // inclusive os só-funil (clique/cadastro sem comissão) que a v2 externa esconde
   // (caso "Lucas Guimarães"). Auth via OTG_DASH_ACCESS_TOKEN (dashboard tem 2FA →
@@ -1290,43 +1319,50 @@ export function createApp(deps: ServerDeps) {
     const initialDate = isoRe.test(String(req.body?.initialDate)) ? String(req.body.initialDate) : `${today.slice(0, 7)}-01`;
     const finalDate = isoRe.test(String(req.body?.finalDate)) ? String(req.body.finalDate) : today;
     try {
-      const result = await pullAnalytics({ initialDate, finalDate }, fetchImpl);
-      const houses = result.houses.map((h) => ({
-        house: h.house,
-        available: h.available,
-        summary: h.summary,
-        count: h.rows.length,
-        error: h.error,
-      }));
+      const { result, houses, anyOk, firstErr, persisted, enrichedPending } = await runAnalyticsRefresh({ initialDate, finalDate });
       // Se NENHUMA casa respondeu (todas indisponíveis/erro) E houve erro real — ex.:
-      // token OTG expirado (TTL ~15 min) → 401 em todas — surfacia 502 em vez de um
-      // 200-vazio enganoso. (Só superbet-404, sem erro real, segue 200 com rows da
-      // sportingbet.) Ver SPIKE-OTG-V1-ANALYTICS.md.
-      const anyOk = result.houses.some((h) => h.available);
-      const firstErr = result.houses.find((h) => h.error)?.error;
+      // login OTG falhou → 401/erro em todas — surfacia 502 em vez de um 200-vazio
+      // enganoso. (Só superbet-404, sem erro real, segue 200 com rows da sportingbet.)
       if (!anyOk && firstErr) {
         return res.status(502).json({ error: firstErr, range: { initialDate, finalDate }, houses });
-      }
-      // Persiste + reconcilia (best-effort: o pull já deu certo; falha de gravação não
-      // derruba a resposta — espelha o reconcile do /pending-affiliates/refresh).
-      let persist = { persisted: 0, enrichedPending: 0 };
-      try {
-        persist = await persistAnalytics(result.rows, { initialDate, finalDate });
-      } catch (e: any) {
-        console.warn('Analytics: persistência adiada (falha ao gravar):', e?.message);
       }
       return res.json({
         source: 'otg-v1-analytics',
         range: { initialDate, finalDate },
         houses,
-        persisted: persist.persisted,
-        enrichedPending: persist.enrichedPending,
+        persisted,
+        enrichedPending,
         rows: result.rows,
         fetchedAt: result.fetchedAt,
       });
     } catch (error: any) {
       console.error('Error pulling OTG v1 analytics:', error);
       return res.status(502).json({ error: error.message || 'Erro ao puxar a v1 analítica da OTG.' });
+    }
+  });
+
+  // CRON do funil v1: um scheduler externo (Cloud Scheduler) atualiza o funil
+  // diariamente SEM token admin (que ele não tem) — gated pelo mesmo `requireCronSecret`
+  // do ranking (RANKING_CRON_SECRET, header x-cron-secret). Mesma lógica da rota admin
+  // (pull + persist/reconcilia), range = mês corrente BR. Ver boost-v1-analytics + CLAUDE.md.
+  app.post('/api/internal/analytics-refresh', requireCronSecret, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    if (!isOtgAnalyticsConfigured()) {
+      return res.status(503).json({ error: 'v1 analítica não configurada (defina OTG_DASH_EMAIL/PASSWORD/DEVICE_TOKEN).' });
+    }
+    const today = resolveServerToday();
+    const isoRe = /^\d{4}-\d{2}-\d{2}$/;
+    const initialDate = isoRe.test(String(req.body?.initialDate)) ? String(req.body.initialDate) : `${today.slice(0, 7)}-01`;
+    const finalDate = isoRe.test(String(req.body?.finalDate)) ? String(req.body.finalDate) : today;
+    try {
+      const { anyOk, firstErr, persisted, enrichedPending, houses } = await runAnalyticsRefresh({ initialDate, finalDate });
+      if (!anyOk && firstErr) {
+        return res.status(502).json({ ok: false, error: firstErr, range: { initialDate, finalDate }, houses });
+      }
+      return res.json({ ok: true, range: { initialDate, finalDate }, persisted, enrichedPending, houses });
+    } catch (error: any) {
+      console.error('Error in analytics cron:', error);
+      return res.status(502).json({ ok: false, error: error.message || 'Erro ao atualizar o funil.' });
     }
   });
 

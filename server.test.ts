@@ -550,6 +550,32 @@ describe('POST /api/analytics/refresh (v1 analítica)', () => {
     expect(pend.hasFunnelActivity).toBe(true);
     expect(pend.funnel.clicks).toBe(20);
   });
+
+  describe('CRON /api/internal/analytics-refresh (sem token admin)', () => {
+    afterEach(() => { delete process.env.RANKING_CRON_SECRET; });
+
+    it('sem RANKING_CRON_SECRET no ambiente → 503', async () => {
+      delete process.env.RANKING_CRON_SECRET;
+      await request(buildApp({ seed })).post('/api/internal/analytics-refresh').expect(503);
+    });
+
+    it('secret ausente/errado → 401', async () => {
+      process.env.RANKING_CRON_SECRET = 'right-cron';
+      await request(buildApp({ seed })).post('/api/internal/analytics-refresh').expect(401);
+      await request(buildApp({ seed })).post('/api/internal/analytics-refresh').set('x-cron-secret', 'wrong').expect(401);
+    });
+
+    it('secret certo → 200 ok + persiste o funil (scheduler, sem auth Firebase)', async () => {
+      process.env.RANKING_CRON_SECRET = 'right-cron';
+      const fetchImpl: any = async (url: string) => (String(url).includes('superbet') ? aresp(404, {}) : aresp(200, sbBody([LUCAS])));
+      const fs = makeFirestore({ users: { 'admin-uid': { role: 'admin' } } });
+      const app = createApp({ adminApp: makeAdminApp(), adminDb: fs, fetchImpl });
+      const res = await request(app).post('/api/internal/analytics-refresh').set('x-cron-secret', 'right-cron').expect(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.persisted).toBe(1);
+      expect(fs.__store.get('affiliate_analytics').get('lucasguimaraes__sportingbet')).toMatchObject({ clicks: 20, funnelOnly: true });
+    });
+  });
 });
 
 // =============================================================================

@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Database, RefreshCw, Loader2, Search, ExternalLink, Mail, Phone, AtSign,
-  UserPlus, Copy, Check, X, CheckCircle2, Clock,
+  UserPlus, Copy, Check, X, CheckCircle2, Clock, MousePointerClick,
 } from 'lucide-react';
 import {
-  fetchPendingAffiliates, refreshPendingAffiliates, createAccessInvite, PendingAffiliate,
+  fetchPendingAffiliates, refreshPendingAffiliates, refreshAnalytics, createAccessInvite, PendingAffiliate,
 } from '../services/affiliateService';
 import { useToast } from '../contexts/ToastContext';
 import { cn, humanizeName } from '../lib/utils';
@@ -25,6 +25,7 @@ export default function OtgRoster() {
   const [rows, setRows] = useState<PendingAffiliate[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshingFunnel, setRefreshingFunnel] = useState(false);
 
   const [search, setSearch] = useState('');
   const [house, setHouse] = useState('');
@@ -61,6 +62,22 @@ export default function OtgRoster() {
       push({ type: 'error', message: err instanceof Error ? err.message : 'Falha ao atualizar da OTG.' });
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const handleRefreshFunnel = async () => {
+    setRefreshingFunnel(true);
+    try {
+      const r = await refreshAnalytics();
+      push({
+        type: 'success',
+        message: `Funil v1: ${r.persisted ?? 0} afiliados gravados · ${r.enrichedPending ?? 0} pendentes enriquecidos.`,
+      });
+      await load();
+    } catch (err) {
+      push({ type: 'error', message: err instanceof Error ? err.message : 'Falha ao atualizar o funil.' });
+    } finally {
+      setRefreshingFunnel(false);
     }
   };
 
@@ -113,15 +130,26 @@ export default function OtgRoster() {
             Saem da fila quando aparecem no relatório (<span className="font-semibold">reconciliados</span>).
           </p>
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing || loading}
-          title="Puxar o roster fresco direto da OTG e reconciliar"
-          className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-full bg-slate-900 dark:bg-amber-500 text-white dark:text-neutral-950 text-xs font-bold hover:opacity-90 disabled:opacity-50 transition-opacity shadow-sm"
-        >
-          {refreshing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-          {refreshing ? 'Atualizando...' : 'Atualizar da OTG'}
-        </button>
+        <div className="shrink-0 flex items-center gap-2">
+          <button
+            onClick={handleRefreshFunnel}
+            disabled={refreshingFunnel || loading}
+            title="Puxar o funil da v1 (cliques/cadastros que a v2 esconde) e enriquecer os pendentes"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-slate-300 dark:border-neutral-700 text-slate-700 dark:text-neutral-200 text-xs font-bold hover:bg-slate-50 dark:hover:bg-white/5 disabled:opacity-50 transition-colors"
+          >
+            {refreshingFunnel ? <Loader2 size={14} className="animate-spin" /> : <MousePointerClick size={14} />}
+            {refreshingFunnel ? 'Atualizando...' : 'Atualizar funil (v1)'}
+          </button>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            title="Puxar o roster fresco direto da OTG e reconciliar"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-slate-900 dark:bg-amber-500 text-white dark:text-neutral-950 text-xs font-bold hover:opacity-90 disabled:opacity-50 transition-opacity shadow-sm"
+          >
+            {refreshing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {refreshing ? 'Atualizando...' : 'Atualizar da OTG'}
+          </button>
+        </div>
       </header>
 
       {/* Stats */}
