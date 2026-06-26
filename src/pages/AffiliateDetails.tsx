@@ -72,7 +72,6 @@ import { withKnownBrandNames } from '../lib/knownHouses';
 import { canViewAffiliateNetProfit } from '../lib/affiliateView';
 import { cn, humanizeName } from '../lib/utils';
 import { sumFunnelForAffiliate } from '../lib/analyticsDoc';
-import { normalizeNameKey } from '../lib/affiliateName';
 import { motion } from 'motion/react';
 
 // B4 · mascara dados sensíveis (PIX, documento) — só os últimos dígitos.
@@ -260,7 +259,20 @@ export default function AffiliateDetails() {
         fetchAffiliateAnalytics().catch(() => [] as AffiliateFunnel[])
       ]);
       setFunnelRows(Array.isArray(funnelData) ? funnelData : []);
-      setAffiliate(detailsData);
+      // Afiliado SÓ-FUNIL (fora do relatório v2, ex.: "Lucas"): a v2 não o conhece,
+      // mas a v1 analítica sim. Sintetiza um afiliado a partir do funil (o id de rota =
+      // affiliateId do funil/pending) p/ a página renderizar a dashboard PADRÃO (zerada)
+      // + um informativo de captação, em vez do antigo card degradado. [[boost-v1-analytics-integration]]
+      let resolvedAffiliate = detailsData;
+      if (!resolvedAffiliate) {
+        const fr = (Array.isArray(funnelData) ? funnelData : []).find(
+          (r) => r?.affiliateId != null && String(r.affiliateId) === String(affId)
+        );
+        if (fr) {
+          resolvedAffiliate = { id: affId, name: humanizeName(fr.affiliate || '') || 'Afiliado', label: fr.affiliate || '', funnelOnly: true };
+        }
+      }
+      setAffiliate(resolvedAffiliate);
       // groupBy=affiliate devolve 1 linha por afiliado; p/ a rede somamos numa linha só
       // (a página renderiza um conjunto de cards por linha de `results`).
       const resultsArr = Array.isArray(resultsData) ? resultsData : (resultsData ? [resultsData] : []);
@@ -386,12 +398,6 @@ export default function AffiliateDetails() {
   // (id de rota) OU por nameKey. Computado ANTES dos returns p/ a degradação graciosa do
   // caso só-funil (id sintético fora da v2, ex.: "Lucas"). sumFunnelForAffiliate é puro.
   const funnelTotals = sumFunnelForAffiliate(funnelRows, { affiliateId: id, nameKey: affiliate?.name || affiliate?.label });
-  const funnelDisplayName =
-    humanizeName(
-      funnelRows.find(
-        (r) => (id != null && String(r.affiliateId) === String(id)) || (affiliate != null && normalizeNameKey(r.nameKey || '') === normalizeNameKey(affiliate.name || affiliate.label || ''))
-      )?.affiliate || ''
-    ) || 'Afiliado';
 
   if (loading) {
     return (
@@ -402,45 +408,9 @@ export default function AffiliateDetails() {
     );
   }
 
-  // Afiliado fora do relatório v2 (só-funil, ex.: "Lucas") — em vez de "Algo deu errado",
-  // mostra o funil que a v1 enxerga (cliques/cadastros · sem comissão ainda).
-  if (!affiliate && !error && funnelTotals.matched > 0) {
-    return (
-      <div className="max-w-2xl mx-auto py-8 space-y-6">
-        <button
-          onClick={() => navigate('/affiliates')}
-          className="flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-        >
-          <ArrowLeft size={18} /> Voltar para lista
-        </button>
-        <div className="bg-white dark:bg-neutral-900 p-8 rounded-3xl border border-slate-100 dark:border-neutral-800 shadow-sm space-y-6">
-          <div>
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">{funnelDisplayName}</h1>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[11px] font-bold">
-              <Clock size={12} /> Em captação — sem comissão ainda
-            </div>
-          </div>
-          <p className="text-sm text-slate-500 dark:text-neutral-400 leading-relaxed">
-            Este afiliado já gera <strong>cliques e cadastros</strong>, mas ainda não produziu comissão — por isso não aparece no relatório de resultados. Os números abaixo vêm do funil da OTG.
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {[
-              { label: 'Cliques', value: funnelTotals.clicks },
-              { label: 'Cadastros', value: funnelTotals.registrations },
-              { label: 'FTDs', value: funnelTotals.ftd },
-              { label: 'CPA qual.', value: funnelTotals.cpaQual },
-            ].map((s) => (
-              <div key={s.label} className="p-5 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800">
-                <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-[0.15em]">{s.label}</p>
-                <h4 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter mt-1">{(s.value || 0).toLocaleString('pt-BR')}</h4>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // Afiliado SÓ-FUNIL (fora do relatório v2, ex.: "Lucas") já foi sintetizado no
+  // loadDetails a partir do funil → cai na dashboard PADRÃO (zerada) com o banner de
+  // captação abaixo, em vez do antigo card degradado. Aqui só resta o erro real.
   if (error || !affiliate) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center">
@@ -642,6 +612,20 @@ export default function AffiliateDetails() {
 
       <div className="grid grid-cols-1 gap-8">
         <div className="space-y-8">
+          {/* Informativo de captação: afiliado SÓ-FUNIL (cliques/cadastros, sem comissão
+              ainda na v2). Substitui o antigo card degradado — agora a dashboard padrão
+              aparece zerada e este banner contextualiza o porquê. [[boost-v1-analytics-integration]] */}
+          {funnelTotals.funnelOnly && funnelTotals.matched > 0 && (
+            <div className="bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/40 rounded-3xl p-6 shadow-sm">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 mb-3 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[11px] font-bold">
+                <Clock size={12} /> Em captação — sem comissão ainda
+              </div>
+              <p className="text-sm text-slate-600 dark:text-neutral-300 leading-relaxed">
+                Este afiliado já gera <strong>cliques e cadastros</strong>, mas ainda não produziu comissão — por isso os números de resultado abaixo aparecem zerados. Os dados de captação vêm do funil da OTG (v1).
+              </p>
+            </div>
+          )}
+
           {/* Lucro líquido do afiliado — só p/ superiores (admin/especial). Ganho do
               próprio afiliado: total à esquerda + composição (direto + rede) à direita.
               NÃO é a margem da agência. */}
