@@ -426,7 +426,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
             </Field>
 
             {dataSource === 'manual' && (
-              <Field label="Taxa padrão da casa" hint="comissão que a casa paga à AGÊNCIA — usada p/ derivar a comissão quando a planilha não traz a coluna 'comissao'. Sem isto, o lucro por casa fica negativo.">
+              <Field label="Taxa padrão da casa" hint="RECEITA: o que a casa paga à AGÊNCIA — NÃO é o repasse ao afiliado (esse fica em Afiliados). Usada p/ derivar a comissão quando a planilha não traz a coluna 'comissao'. Sem isto, o lucro por casa fica negativo.">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <span className="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">CPA (R$ por CPA)</span>

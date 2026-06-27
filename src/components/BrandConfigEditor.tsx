@@ -138,13 +138,14 @@ export default function BrandConfigEditor({ affiliateId, brandRows, config, onSa
         <div className="flex items-center gap-1 text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
           Comissão do afiliado
           <InfoTooltip
-            text="O Padrão do contrato é a taxa-base, lida por todas as telas (inclusive o lucro da agência). Os overrides por casa têm prioridade só naquela casa. Em branco = usa o padrão."
+            text="O Padrão do contrato é o MESMO CPA/REV de Gestão de Afiliados — o repasse ao afiliado, lido por todas as telas (inclusive o lucro da agência). Os overrides por casa têm prioridade só naquela casa. Em branco = usa o padrão. Não confunda com a Taxa padrão da casa (a receita da casa, em Casas)."
             align="left"
           />
         </div>
       </div>
       <p className="text-[11px] text-slate-400 dark:text-neutral-400 mb-6">
-        O <span className="font-bold">Padrão do contrato</span> vale para todas as casas. Defina um{' '}
+        O <span className="font-bold">Padrão do contrato</span> é o mesmo CPA/REV da tela{' '}
+        <span className="font-bold">Gestão de Afiliados</span> e vale para todas as casas. Defina um{' '}
         <span className="font-bold">override por casa</span> só quando o acordo daquela casa for diferente.
       </p>
 

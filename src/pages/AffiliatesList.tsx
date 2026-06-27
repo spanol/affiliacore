@@ -24,6 +24,7 @@ import SpecialAffiliateModal from '../components/SpecialAffiliateModal';
 import { useToast } from '../contexts/ToastContext';
 import { cn, humanizeName } from '../lib/utils';
 import BrandFilter from '../components/BrandFilter';
+import InfoTooltip from '../components/InfoTooltip';
 import { getBrandName, uniqueBrands, ALL_BRANDS, getKnownBrandName } from '../lib/brand';
 import { normalizeNameKey } from '../lib/affiliateName';
 import { selectVisiblePending } from '../lib/pendingAffiliates';
@@ -583,8 +584,24 @@ export default function AffiliatesList() {
                     <>
                         <th className="px-6 py-4">Cargo</th>
                       <th className="px-6 py-4">Ativo</th>
-                      <th className="px-6 py-4">Config. CPA (R$)</th>
-                      <th className="px-6 py-4">Config. REV (%)</th>
+                      <th className="px-6 py-4">
+                        <span className="inline-flex items-center gap-1">
+                          Config. CPA (R$)
+                          <InfoTooltip
+                            text="Repasse PADRÃO ao afiliado, válido em TODAS as casas (o que a agência paga a ele). Taxa diferente em uma casa? Abra o afiliado → Override por casa. Não é a taxa de Casas (que é a receita da casa)."
+                            size={12}
+                          />
+                        </span>
+                      </th>
+                      <th className="px-6 py-4">
+                        <span className="inline-flex items-center gap-1">
+                          Config. REV (%)
+                          <InfoTooltip
+                            text="REV Share PADRÃO do afiliado (% sobre o RVS), válido em todas as casas. O override por casa fica na ficha do afiliado."
+                            size={12}
+                          />
+                        </span>
+                      </th>
                       <th className="px-6 py-4 text-right">Ação</th>
                     </>
                   )}
@@ -859,7 +876,13 @@ export default function AffiliatesList() {
                           </select>
                         </label>
                         <label className="block">
-                          <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-1 block">Config. CPA (R$)</span>
+                          <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                            Config. CPA (R$)
+                            <InfoTooltip
+                              text="Repasse PADRÃO ao afiliado, válido em TODAS as casas (o que a agência paga a ele). Taxa diferente em uma casa? Abra o afiliado → Override por casa. Não é a taxa de Casas (que é a receita da casa)."
+                              size={12}
+                            />
+                          </span>
                           <div className="relative">
                             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 dark:text-neutral-500">R$</span>
                             <input
@@ -874,7 +897,13 @@ export default function AffiliatesList() {
                           </div>
                         </label>
                         <label className="block">
-                          <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-1 block">Config. REV (%)</span>
+                          <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                            Config. REV (%)
+                            <InfoTooltip
+                              text="REV Share PADRÃO do afiliado (% sobre o RVS), válido em todas as casas. O override por casa fica na ficha do afiliado."
+                              size={12}
+                            />
+                          </span>
                           <div className="relative">
                             <Percent size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300 dark:text-neutral-500" />
                             <input
@@ -984,6 +1013,14 @@ function ListingHelp() {
             <li className="flex gap-2"><span className="font-bold text-amber-600 dark:text-amber-400">2.</span><span><b>Acesso</b> — um login gerado via convite.</span></li>
             <li className="flex gap-2"><span className="font-bold text-amber-600 dark:text-amber-400">3.</span><span><b>Comissão</b> — CPA/REV configurados. Sem isso, o repasse fica <b>R$&nbsp;0</b>.</span></li>
           </ol>
+          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-neutral-800">
+            <p className="text-[11px] font-bold text-slate-700 dark:text-neutral-200">Onde se configura o CPA/REV</p>
+            <ul className="mt-1.5 space-y-1.5 text-[11px] leading-relaxed font-medium text-slate-500 dark:text-neutral-400">
+              <li className="flex gap-2"><span className="text-amber-600 dark:text-amber-400 font-bold">•</span><span><b>Aqui</b> — o repasse <b>padrão</b> do afiliado, válido em <b>todas as casas</b> (o que a agência paga a ele).</span></li>
+              <li className="flex gap-2"><span className="text-amber-600 dark:text-amber-400 font-bold">•</span><span><b>Na ficha do afiliado</b> — um <b>override por casa</b> (prioridade só naquela casa) sobre o padrão acima.</span></li>
+              <li className="flex gap-2"><span className="text-amber-600 dark:text-amber-400 font-bold">•</span><span>Em <Link to="/casas" className="font-bold text-amber-600 dark:text-amber-400 hover:underline">Casas</Link> — a <b>Taxa padrão da casa</b> é a <b>receita</b> (o que a casa paga à agência), <b>não</b> o repasse ao afiliado.</span></li>
+            </ul>
+          </div>
           <p className="mt-3 pt-3 border-t border-slate-100 dark:border-neutral-800 text-[11px] leading-relaxed font-medium text-slate-500 dark:text-neutral-400">
             Aprovados na OTG <b>sem produção</b> ainda não aparecem aqui — ficam em{' '}
             <Link to="/roster-otg" className="font-bold text-amber-600 dark:text-amber-400 hover:underline">Roster OTG</Link> até reconciliar.
