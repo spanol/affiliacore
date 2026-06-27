@@ -4,6 +4,8 @@
 // recortes (por casa / por afiliado / por data) usados no merge com a OTG. Mantê-lo
 // puro deixa toda a aritmética sensível (sem double-count, "não atribuído") testável.
 
+import { houseCommissionForRow, type HouseRate } from './commission';
+
 // Métricas canônicas — mesmo shape das linhas de `results` da API externa, pra que
 // as linhas manuais somem direto nas visões existentes.
 export const METRIC_KEYS = [
@@ -369,6 +371,20 @@ export function aggregateByHouse(rows: StoredManualRow[]): Record<string, Metric
     addMetrics(out[slug] ?? (out[slug] = emptyMetrics()), m);
   }
   return out;
+}
+
+// Enriquece linhas manuais com a comissão da casa DERIVADA da taxa padrão
+// (defaultCpa/defaultRev) quando a planilha não trouxe `comissao` (total_commission=0).
+// Fonte ÚNICA dessa derivação — consumida pelos cards "por casa" (fetchAllResultsByBrand)
+// E pelo lucro do /admin (composeAdminProfit via manualRowsD). Sem isto, uma casa manual
+// sem coluna `comissao` mostrava Comissão R$ 0 mas Lucro líquido positivo (bases
+// divergentes — bug 2026-06-27). Deriva POR LINHA antes de agregar, p/ casar exatamente
+// com a comissão que o lucro por casa usa. [[houseCommissionForRow]]
+export function deriveManualCommission(
+  rows: StoredManualRow[],
+  rateOf: (slug: string) => HouseRate | null
+): StoredManualRow[] {
+  return rows.map((r) => ({ ...r, total_commission: houseCommissionForRow(r, rateOf(r.houseSlug)) }));
 }
 
 // Total por DATA no range (soma dos agregados das casas). Chave = date ISO.

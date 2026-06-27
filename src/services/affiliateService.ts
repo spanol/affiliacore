@@ -17,7 +17,7 @@ import { getKnownBrands } from '../lib/brand';
 import { fetchHouseResults } from './houseService';
 import {
   StoredManualRow, Metrics, METRIC_KEYS,
-  aggregateByHouse, aggregateByDate, aggregateByAffiliate,
+  aggregateByHouse, aggregateByDate, aggregateByAffiliate, deriveManualCommission,
 } from '../lib/houseResults';
 // Núcleo PURO de comissão (movido p/ lib/commission p/ o server.ts reusar a MESMA
 // fórmula). Re-exportado abaixo p/ os call-sites antigos (`from './affiliateService'`).
@@ -532,6 +532,20 @@ export function manualForAffiliates(rows: StoredManualRow[], ids: (string | numb
   return rows.filter((r) => r.affiliateId !== null && set.has(String(r.affiliateId)));
 }
 
+// Taxa padrão (defaultCpa/defaultRev) de uma casa manual pelo slug, do registro vivo
+// de casas — fonte do `rateOf` que deriva a comissão da casa.
+function houseRateOf(slug: string) {
+  const b = getKnownBrands().find((x) => x.slug === slug);
+  return b ? { defaultCpa: b.defaultCpa, defaultRev: b.defaultRev } : null;
+}
+
+// Enriquece as linhas manuais com a comissão da casa derivada (deriveManualCommission
+// puro + o rateOf do registro de casas). Exportado p/ o AdminDashboard aplicar a MESMA
+// derivação que os cards por casa usam — sem isso, comissão do card e lucro divergiam.
+export function deriveManualRowsCommission(rows: StoredManualRow[]): StoredManualRow[] {
+  return deriveManualCommission(rows, houseRateOf);
+}
+
 // Linha de marca (groupBy=brand) a partir do total de uma casa manual.
 function manualBrandRow(slug: string, m: Metrics): any {
   const meta = getKnownBrands().find((b) => b.slug === slug);
@@ -604,7 +618,7 @@ export async function fetchAffiliateResultsByBrand(id: string, opts: DateRangeOp
       fetchResultsGrouped('brand', { affiliateIds: id, ...opts }),
       fetchManualRowsSafe(opts),
     ]);
-    const mine = manualForAffiliates(manual, [id]);
+    const mine = deriveManualRowsCommission(manualForAffiliates(manual, [id]));
     return withKnownHouses(appendManualBrandRows(otg, aggregateByHouse(mine)));
   } catch (error) {
     console.error(`Error fetching brand results for affiliate ${id}:`, error);
@@ -678,7 +692,7 @@ export async function fetchAllResultsByBrand(opts: DateRangeOpts = {}): Promise<
       fetchResultsGrouped('brand', opts),
       fetchManualRowsSafe(opts),
     ]);
-    return withKnownHouses(appendManualBrandRows(otg, aggregateByHouse(manual)));
+    return withKnownHouses(appendManualBrandRows(otg, aggregateByHouse(deriveManualRowsCommission(manual))));
   } catch (error) {
     console.error('Error fetching network brand results:', error);
     return [];

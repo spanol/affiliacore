@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parsePtNumber, parseDateToISO, parseResultsCsv, parseResultsRows, buildAffiliateLookup, resolveAffiliates,
   aggregateByHouse, aggregateByDate, aggregateByAffiliate, aggregateByAffiliateHouse,
-  unattributedByHouse, emptyMetrics, addMetrics, StoredManualRow,
+  unattributedByHouse, emptyMetrics, addMetrics, deriveManualCommission, StoredManualRow,
   TEMPLATE_HEADERS, TEMPLATE_COLUMNS,
 } from './houseResults';
 
@@ -286,3 +286,39 @@ describe('agregações (merge)', () => {
 function m(p: Partial<ReturnType<typeof emptyMetrics>>) {
   return addMetrics(emptyMetrics(), p);
 }
+
+describe('deriveManualCommission', () => {
+  const row = (p: Partial<StoredManualRow>): StoredManualRow => ({
+    ...emptyMetrics(), houseSlug: 'betfair', date: '2026-06-01', affiliateId: null, ...p,
+  });
+  const rateOf = (slug: string) => (slug === 'betfair' ? { defaultCpa: 150, defaultRev: 25 } : null);
+
+  it('sem coluna comissao (total_commission=0) → deriva de defaultCpa/defaultRev', () => {
+    const [r] = deriveManualCommission([row({ qualified_cpa: 2, rvs: 1000 })], rateOf);
+    expect(r.total_commission).toBe(2 * 150 + 1000 * 0.25); // 300 + 250 = 550
+  });
+
+  it('com comissao importada (>0) → mantém, não deriva', () => {
+    const [r] = deriveManualCommission([row({ qualified_cpa: 2, rvs: 1000, total_commission: 999 })], rateOf);
+    expect(r.total_commission).toBe(999);
+  });
+
+  it('casa sem taxa padrão (rateOf=null) → comissão 0 (não NaN)', () => {
+    const [r] = deriveManualCommission([row({ houseSlug: 'desconhecida', qualified_cpa: 5, rvs: 100 })], rateOf);
+    expect(r.total_commission).toBe(0);
+  });
+
+  it('preserva os demais campos e não muta a entrada', () => {
+    const input = row({ qualified_cpa: 1, rvs: 0, registrations: 7, affiliateId: 'a1' });
+    const [r] = deriveManualCommission([input], rateOf);
+    expect(r.registrations).toBe(7);
+    expect(r.affiliateId).toBe('a1');
+    expect(input.total_commission).toBe(0); // entrada intacta (map imutável)
+  });
+
+  it('derivar por linha e somar bate com a base do lucro por casa', () => {
+    const rows = [row({ qualified_cpa: 1, rvs: 100 }), row({ qualified_cpa: 3, rvs: 0 })];
+    const total = deriveManualCommission(rows, rateOf).reduce((s, r) => s + r.total_commission, 0);
+    expect(total).toBe((1 * 150 + 100 * 0.25) + (3 * 150)); // 175 + 450 = 625
+  });
+});

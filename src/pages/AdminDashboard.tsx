@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, humanizeName } from '../lib/utils';
-import { fetchAffiliates, fetchAllResults, fetchAllResultsByBrand, fetchAllResultsByCampaign, fetchAffiliateConfigs, fetchSpecialAffiliates, fetchManualResults, buildSubToSpecialConfig, composeAdminProfit, houseCommissionForRow, CampaignRow, SpecialAffiliate } from '../services/affiliateService';
+import { fetchAffiliates, fetchAllResults, fetchAllResultsByBrand, fetchAllResultsByCampaign, fetchAffiliateConfigs, fetchSpecialAffiliates, fetchManualResults, buildSubToSpecialConfig, composeAdminProfit, deriveManualRowsCommission, CampaignRow, SpecialAffiliate } from '../services/affiliateService';
 import DateRangePicker from '../components/DateRangePicker';
 import CampaignBreakdown from '../components/CampaignBreakdown';
 import AffiliatePerformanceChart from '../components/AffiliatePerformanceChart';
@@ -119,13 +119,7 @@ export default function AdminDashboard() {
   // de CPA dá comissão 0 e o lucro do master fica NEGATIVO (0 − repasse). Enriquecemos
   // num ÚNICO ponto p/ que headline (manualAgg) e cards por casa (composeAdminProfit)
   // saiam da MESMA base. [[houseCommissionForRow]]
-  const manualRowsD = useMemo(() => {
-    const rateOf = (slug: string) => {
-      const b = getKnownBrands().find((x) => x.slug === slug);
-      return b ? { defaultCpa: b.defaultCpa, defaultRev: b.defaultRev } : null;
-    };
-    return manualRows.map((r) => ({ ...r, total_commission: houseCommissionForRow(r, rateOf(r.houseSlug)) }));
-  }, [manualRows]);
+  const manualRowsD = useMemo(() => deriveManualRowsCommission(manualRows), [manualRows]);
 
   // Linhas manuais no escopo da marca (ALL = todas; senão só as casas manuais cujo
   // nome canônico bate com o filtro). Casa OTG selecionada → nenhuma manual.
