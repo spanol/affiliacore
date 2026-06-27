@@ -71,7 +71,10 @@ export default function NotificationBell() {
       {open && (
         <>
           <button className="fixed inset-0 z-30 cursor-default" onClick={() => setOpen(false)} aria-hidden tabIndex={-1} />
-          <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] z-40 rounded-2xl bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 shadow-2xl overflow-hidden">
+          {/* Mobile: painel fixo abaixo do header, com margens laterais (não corta à
+              esquerda — o sino fica longe da borda direita). Desktop (lg): volta a
+              ancorar pela direita do sino. */}
+          <div className="fixed inset-x-4 top-16 mt-2 z-40 rounded-2xl bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 shadow-2xl overflow-hidden lg:absolute lg:inset-x-auto lg:right-0 lg:top-auto lg:mt-2 lg:w-80 lg:max-w-[calc(100vw-2rem)]">
             <div className="px-4 py-3 border-b border-slate-100 dark:border-neutral-800 flex items-center justify-between">
               <p className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-widest">Avisos</p>
               <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500">{visible.length}</span>
