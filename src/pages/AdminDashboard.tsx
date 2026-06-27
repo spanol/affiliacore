@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, humanizeName } from '../lib/utils';
-import { fetchAffiliates, fetchAllResults, fetchAllResultsByBrand, fetchAllResultsByCampaign, fetchAffiliateConfigs, fetchSpecialAffiliates, fetchManualResults, buildSubToSpecialConfig, composeAdminProfit, CampaignRow, SpecialAffiliate } from '../services/affiliateService';
+import { fetchAffiliates, fetchAllResults, fetchAllResultsByBrand, fetchAllResultsByCampaign, fetchAffiliateConfigs, fetchSpecialAffiliates, fetchManualResults, buildSubToSpecialConfig, composeAdminProfit, houseCommissionForRow, CampaignRow, SpecialAffiliate } from '../services/affiliateService';
 import DateRangePicker from '../components/DateRangePicker';
 import CampaignBreakdown from '../components/CampaignBreakdown';
 import AffiliatePerformanceChart from '../components/AffiliatePerformanceChart';
@@ -114,13 +114,26 @@ export default function AdminDashboard() {
     return results.filter((r) => brandById[String(r.affiliate_id ?? r.id ?? '')] === brandFilter);
   }, [results, brandFilter, brandById]);
 
+  // Comissão da casa DERIVADA da taxa padrão (defaultCpa/defaultRev) quando a planilha
+  // não trouxe `comissao` (total_commission=0). Sem isto, casa manual só com contagem
+  // de CPA dá comissão 0 e o lucro do master fica NEGATIVO (0 − repasse). Enriquecemos
+  // num ÚNICO ponto p/ que headline (manualAgg) e cards por casa (composeAdminProfit)
+  // saiam da MESMA base. [[houseCommissionForRow]]
+  const manualRowsD = useMemo(() => {
+    const rateOf = (slug: string) => {
+      const b = getKnownBrands().find((x) => x.slug === slug);
+      return b ? { defaultCpa: b.defaultCpa, defaultRev: b.defaultRev } : null;
+    };
+    return manualRows.map((r) => ({ ...r, total_commission: houseCommissionForRow(r, rateOf(r.houseSlug)) }));
+  }, [manualRows]);
+
   // Linhas manuais no escopo da marca (ALL = todas; senão só as casas manuais cujo
   // nome canônico bate com o filtro). Casa OTG selecionada → nenhuma manual.
   const manualScoped = useMemo(() => {
-    if (brandFilter === ALL_BRANDS) return manualRows;
+    if (brandFilter === ALL_BRANDS) return manualRowsD;
     const slugs = new Set(getKnownBrands().filter((b) => b.name === brandFilter).map((b) => b.slug));
-    return manualRows.filter((r) => slugs.has(r.houseSlug));
-  }, [manualRows, brandFilter]);
+    return manualRowsD.filter((r) => slugs.has(r.houseSlug));
+  }, [manualRowsD, brandFilter]);
 
   // Agregado total das casas manuais no escopo (somado nas métricas do topo/funil).
   const manualAgg = useMemo(() => {

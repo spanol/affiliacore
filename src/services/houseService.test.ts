@@ -54,7 +54,15 @@ describe('houseToBrandMeta', () => {
       active: true,
       order: 1,
       dataSource: 'otg',
+      defaultCpa: null,
+      defaultRev: null,
     });
+  });
+
+  it('preserva a taxa padrão da casa (defaultCpa/defaultRev) quando definida', () => {
+    const meta = houseToBrandMeta(makeHouse({ defaultCpa: 150, defaultRev: 25 }));
+    expect(meta.defaultCpa).toBe(150);
+    expect(meta.defaultRev).toBe(25);
   });
 
   it('brandId null → id undefined', () => {

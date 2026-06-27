@@ -17,6 +17,10 @@ export interface House {
   order?: number;
   // 'otg' = resultados vêm da API externa; 'manual' = alimentados por upload (CSV).
   dataSource: 'otg' | 'manual';
+  // Taxa PADRÃO (comissão casa→agência) — deriva a comissão de linhas manuais sem
+  // `comissao` importada. CPA em R$, REV em %. Só relevante p/ casas 'manual'.
+  defaultCpa?: number | null;
+  defaultRev?: number | null;
 }
 
 // Campos editáveis no backoffice. `logoBase64` (data URL) sobe a logo nova; se
@@ -29,6 +33,8 @@ export interface HouseInput {
   active?: boolean;
   order?: number;
   dataSource?: 'otg' | 'manual';
+  defaultCpa?: number | null;
+  defaultRev?: number | null;
   logoBase64?: string | null;
 }
 
@@ -43,6 +49,8 @@ export function houseToBrandMeta(h: House): BrandMeta {
     active: h.active,
     order: h.order,
     dataSource: h.dataSource,
+    defaultCpa: h.defaultCpa ?? null,
+    defaultRev: h.defaultRev ?? null,
   };
 }
 

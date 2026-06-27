@@ -87,3 +87,24 @@ export function calcNetProfit(result: any, config?: AffiliateConfig | null, bran
   const houseCommission = num(result?.total_commission);
   return houseCommission - calcAffiliatePayout(result, config, brandId);
 }
+
+// Taxa PADRÃO de uma casa = quanto a CASA paga à AGÊNCIA por CPA/REV (receita).
+// Definida no backoffice /casas (BrandMeta.defaultCpa/defaultRev), só faz sentido p/
+// casas 'manual'. CPA em R$, REV em %.
+export interface HouseRate {
+  defaultCpa?: number | null;
+  defaultRev?: number | null;
+}
+
+// Comissão BRUTA da casa (receita da agência) para UMA linha manual (house_results).
+// Usa o `total_commission` importado quando houver (>0); senão DERIVA da taxa PADRÃO
+// da casa: cpa_qualificado × defaultCpa + rvs × (defaultRev/100). É FALLBACK — não
+// sobrescreve comissão importada. Sem isso, planilha só com contagem de CPA (sem a
+// coluna `comissao`) dá comissão 0 e o lucro do master fica NEGATIVO (0 − repasse).
+// num() guarda contra NaN/ausência. Fonte ÚNICA da derivação (consumida no /admin).
+export function houseCommissionForRow(row: any, houseRate?: HouseRate | null): number {
+  const imported = num(row?.total_commission);
+  if (imported > 0) return imported;
+  return num(row?.qualified_cpa) * num(houseRate?.defaultCpa)
+    + num(row?.rvs) * (num(houseRate?.defaultRev) / 100);
+}

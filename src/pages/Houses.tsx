@@ -259,6 +259,9 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
   const [registerUrlTemplate, setRegisterUrlTemplate] = useState(house?.registerUrlTemplate ?? '');
   const [active, setActive] = useState(house?.active ?? true);
   const [dataSource, setDataSource] = useState<'otg' | 'manual'>(house?.dataSource ?? 'manual');
+  // Taxa padrão da casa (comissão casa→agência) — string no input, parseada no save.
+  const [defaultCpa, setDefaultCpa] = useState<string>(house?.defaultCpa != null ? String(house.defaultCpa) : '');
+  const [defaultRev, setDefaultRev] = useState<string>(house?.defaultRev != null ? String(house.defaultRev) : '');
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -295,6 +298,8 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
         registerUrlTemplate: registerUrlTemplate.trim() || null,
         active,
         dataSource,
+        defaultCpa: defaultCpa.trim() === '' ? null : Number(defaultCpa),
+        defaultRev: defaultRev.trim() === '' ? null : Number(defaultRev),
         ...(logoBase64 ? { logoBase64 } : {}),
       };
       if (editing && house) {
@@ -419,6 +424,33 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                 ))}
               </div>
             </Field>
+
+            {dataSource === 'manual' && (
+              <Field label="Taxa padrão da casa" hint="comissão que a casa paga à AGÊNCIA — usada p/ derivar a comissão quando a planilha não traz a coluna 'comissao'. Sem isto, o lucro por casa fica negativo.">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">CPA (R$ por CPA)</span>
+                    <input
+                      type="number" inputMode="decimal" min="0" step="any"
+                      value={defaultCpa}
+                      onChange={(e) => setDefaultCpa(e.target.value)}
+                      placeholder="ex.: 150"
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <span className="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">REV (% do RVS)</span>
+                    <input
+                      type="number" inputMode="decimal" min="0" max="100" step="any"
+                      value={defaultRev}
+                      onChange={(e) => setDefaultRev(e.target.value)}
+                      placeholder="ex.: 25"
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+              </Field>
+            )}
 
             <label className="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 dark:bg-neutral-800/40 border border-slate-100 dark:border-neutral-800 cursor-pointer">
               <span className="text-sm font-semibold text-slate-700 dark:text-neutral-200 flex items-center gap-2">

@@ -27,10 +27,11 @@ import {
   rateStatus,
   calcAffiliatePayout,
   calcNetProfit,
+  houseCommissionForRow,
   type BrandRates,
   type AffiliateConfig,
 } from '../lib/commission';
-export { resolveBrandRates, rateStatus, calcAffiliatePayout, calcNetProfit };
+export { resolveBrandRates, rateStatus, calcAffiliatePayout, calcNetProfit, houseCommissionForRow };
 export type { BrandRates, AffiliateConfig };
 
 interface Affiliate {

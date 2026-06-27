@@ -66,6 +66,11 @@ export interface BrandMeta {
   // 'manual' = alimentados por upload (CSV) no backoffice. Só casas 'manual'
   // recebem import e entram no merge — a OTG nunca é tocada (sem double-count).
   dataSource?: 'otg' | 'manual';
+  // Taxa PADRÃO da casa = comissão que a CASA paga à AGÊNCIA por CPA/REV (receita).
+  // Usada p/ DERIVAR a comissão das linhas manuais SEM `comissao` importada (fallback,
+  // via houseCommissionForRow). Só faz sentido p/ casas 'manual'. CPA em R$, REV em %.
+  defaultCpa?: number | null;
+  defaultRev?: number | null;
 }
 
 const normBrandKey = (s?: string | null) => String(s ?? '').trim().toLowerCase();

@@ -1956,6 +1956,8 @@ export function createApp(deps: ServerDeps) {
       active: data.active !== false,
       order: Number.isFinite(Number(data.order)) ? Number(data.order) : 0,
       dataSource: data.dataSource === 'manual' ? 'manual' : 'otg',
+      defaultCpa: Number.isFinite(Number(data.defaultCpa)) ? Number(data.defaultCpa) : null,
+      defaultRev: Number.isFinite(Number(data.defaultRev)) ? Number(data.defaultRev) : null,
     };
   };
 
@@ -1980,6 +1982,8 @@ export function createApp(deps: ServerDeps) {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
     try {
       const { name, brandId, registerUrlTemplate, active, order, dataSource, logoBase64 } = req.body || {};
+      // Taxa padrão da casa (comissão casa→agência): número finito OU null (vazio).
+      const numOrNull = (v: any) => (v == null || v === '' ? null : (Number.isFinite(Number(v)) ? Number(v) : null));
       const cleanName = String(name ?? '').trim();
       if (!cleanName) return res.status(400).json({ error: 'O nome da casa é obrigatório.' });
       const slug = slugifyHouse(req.body?.slug || cleanName);
@@ -2000,6 +2004,8 @@ export function createApp(deps: ServerDeps) {
         order: Number.isFinite(Number(order)) ? Number(order) : 0,
         // Casa nova nasce 'manual' (recebe upload); a OTG fica nas sementes.
         dataSource: dataSource === 'otg' ? 'otg' : 'manual',
+        defaultCpa: numOrNull(req.body?.defaultCpa),
+        defaultRev: numOrNull(req.body?.defaultRev),
         createdByUid: (req as any).user?.uid ?? null,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -2030,6 +2036,9 @@ export function createApp(deps: ServerDeps) {
       if (body.active !== undefined) patch.active = body.active !== false;
       if (body.order !== undefined && Number.isFinite(Number(body.order))) patch.order = Number(body.order);
       if (body.dataSource !== undefined) patch.dataSource = body.dataSource === 'otg' ? 'otg' : 'manual';
+      const numOrNull = (v: any) => (v == null || v === '' ? null : (Number.isFinite(Number(v)) ? Number(v) : null));
+      if (body.defaultCpa !== undefined) patch.defaultCpa = numOrNull(body.defaultCpa);
+      if (body.defaultRev !== undefined) patch.defaultRev = numOrNull(body.defaultRev);
       if (body.logoBase64) patch.logo = await uploadHouseLogo((snap.data() as any)?.slug ?? ref.id, String(body.logoBase64));
       else if (body.logo === null) patch.logo = null;
       await ref.set(patch, { merge: true });
