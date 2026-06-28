@@ -375,12 +375,12 @@ export default function Home() {
               <p className="text-neutral-400">Busca controle, estabilidade e transparência.</p>
             </div>
 
-            <a
-              href="#contato"
+          <Link
+              to="/register"
               className="shrink-0 w-full md:w-auto px-8 py-4 rounded-xl bg-white text-neutral-950 font-bold text-lg text-center hover:bg-neutral-200 transition-transform active:scale-95"
             >
               Aplicar para Parceria
-            </a>
+            </Link>
           </div>
         </section>
 

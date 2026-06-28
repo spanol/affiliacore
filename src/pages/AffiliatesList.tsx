@@ -881,6 +881,7 @@ export default function AffiliatesList() {
                             <InfoTooltip
                               text="Repasse PADRÃO ao afiliado, válido em TODAS as casas (o que a agência paga a ele). Taxa diferente em uma casa? Abra o afiliado → Override por casa. Não é a taxa de Casas (que é a receita da casa)."
                               size={12}
+                              align="left"
                             />
                           </span>
                           <div className="relative">
@@ -902,6 +903,7 @@ export default function AffiliatesList() {
                             <InfoTooltip
                               text="REV Share PADRÃO do afiliado (% sobre o RVS), válido em todas as casas. O override por casa fica na ficha do afiliado."
                               size={12}
+                              align="right"
                             />
                           </span>
                           <div className="relative">
@@ -1003,7 +1005,7 @@ function ListingHelp() {
         <Info size={18} />
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-3 z-40 w-[20rem] max-w-[calc(100vw_-_2rem)] rounded-2xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 text-left shadow-xl normal-case tracking-normal">
+        <div className="fixed inset-x-4 top-20 z-40 rounded-2xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 text-left shadow-xl normal-case tracking-normal sm:absolute sm:inset-x-auto sm:left-0 sm:top-full sm:mt-3 sm:w-[20rem] sm:max-w-[calc(100vw_-_2rem)]">
           <p className="text-xs font-bold text-slate-900 dark:text-white">Como um afiliado fica operacional aqui</p>
           <p className="mt-1.5 text-[11px] leading-relaxed font-medium text-slate-500 dark:text-neutral-400">
             Para constar nesta lista e gerar repasse correto, ele precisa de:
