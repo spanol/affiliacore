@@ -14,6 +14,7 @@ import { withKnownHouses } from '../lib/knownHouses';
 import { findAffiliateInList } from '../lib/affiliateLookup';
 import { getDefaultRange } from '../lib/dateRange';
 import { getKnownBrands } from '../lib/brand';
+import { eurToBrl, fetchEurBrlRate, getCachedEurBrlRate } from '../lib/currency';
 import { fetchHouseResults } from './houseService';
 import {
   StoredManualRow, Metrics, METRIC_KEYS,
@@ -533,17 +534,23 @@ export function manualForAffiliates(rows: StoredManualRow[], ids: (string | numb
 }
 
 // Taxa padrão (defaultCpa/defaultRev) de uma casa manual pelo slug, do registro vivo
-// de casas — fonte do `rateOf` que deriva a comissão da casa.
-function houseRateOf(slug: string) {
+// de casas — fonte do `rateOf` que deriva a comissão da casa. O `defaultCpa` é GRAVADO
+// EM EUR (a casa nos passa o CPA em euro); convertemos p/ BRL AQUI, pela cotação ao
+// vivo, p/ que `houseCommissionForRow` siga puro e em R$. `defaultRev` é % (não converte).
+function houseRateOf(slug: string, eurBrlRate: number) {
   const b = getKnownBrands().find((x) => x.slug === slug);
-  return b ? { defaultCpa: b.defaultCpa, defaultRev: b.defaultRev } : null;
+  return b ? { defaultCpa: eurToBrl(b.defaultCpa, eurBrlRate), defaultRev: b.defaultRev } : null;
 }
 
 // Enriquece as linhas manuais com a comissão da casa derivada (deriveManualCommission
 // puro + o rateOf do registro de casas). Exportado p/ o AdminDashboard aplicar a MESMA
 // derivação que os cards por casa usam — sem isso, comissão do card e lucro divergiam.
-export function deriveManualRowsCommission(rows: StoredManualRow[]): StoredManualRow[] {
-  return deriveManualCommission(rows, houseRateOf);
+// `eurBrlRate` converte o CPA (EUR) p/ R$; default = última cotação em cache.
+export function deriveManualRowsCommission(
+  rows: StoredManualRow[],
+  eurBrlRate: number = getCachedEurBrlRate()
+): StoredManualRow[] {
+  return deriveManualCommission(rows, (slug) => houseRateOf(slug, eurBrlRate));
 }
 
 // Linha de marca (groupBy=brand) a partir do total de uma casa manual.
@@ -614,11 +621,12 @@ export async function fetchAffiliateResultsByBrand(id: string, opts: DateRangeOp
   try {
     // Casas conhecidas aparecem mesmo vazias (modelo OTG); as casas MANUAIS do
     // afiliado entram com a produção atribuída a ele (house_results).
-    const [otg, manual] = await Promise.all([
+    const [otg, manual, eur] = await Promise.all([
       fetchResultsGrouped('brand', { affiliateIds: id, ...opts }),
       fetchManualRowsSafe(opts),
+      fetchEurBrlRate(),
     ]);
-    const mine = deriveManualRowsCommission(manualForAffiliates(manual, [id]));
+    const mine = deriveManualRowsCommission(manualForAffiliates(manual, [id]), eur.rate);
     return withKnownHouses(appendManualBrandRows(otg, aggregateByHouse(mine)));
   } catch (error) {
     console.error(`Error fetching brand results for affiliate ${id}:`, error);
@@ -688,11 +696,12 @@ export async function fetchAllResultsByBrand(opts: DateRangeOpts = {}): Promise<
   try {
     // Casas conhecidas aparecem mesmo vazias (modelo OTG); casas MANUAIS entram
     // com o agregado da casa no range (house_results).
-    const [otg, manual] = await Promise.all([
+    const [otg, manual, eur] = await Promise.all([
       fetchResultsGrouped('brand', opts),
       fetchManualRowsSafe(opts),
+      fetchEurBrlRate(),
     ]);
-    return withKnownHouses(appendManualBrandRows(otg, aggregateByHouse(deriveManualRowsCommission(manual))));
+    return withKnownHouses(appendManualBrandRows(otg, aggregateByHouse(deriveManualRowsCommission(manual, eur.rate))));
   } catch (error) {
     console.error('Error fetching network brand results:', error);
     return [];

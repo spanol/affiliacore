@@ -22,6 +22,7 @@ import { buildImportRoster } from '../lib/boostAffiliate';
 import { canImport, buildImportPayload } from '../lib/houseImport';
 import { parseSpreadsheetFile, downloadResultsTemplate, isExcelFile } from '../lib/xlsx';
 import { humanizeName } from '../lib/utils';
+import { fetchEurBrlRate, eurToBrl, formatBrl, getCachedEurBrlQuote, EurBrlQuote } from '../lib/currency';
 
 // Backoffice de casas (betting houses) — admin. Cria/edita o registro próprio de
 // casas (nome/slug/brandId/logo/registerUrlTemplate/ativa) que alimenta logos,
@@ -260,10 +261,16 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
   const [active, setActive] = useState(house?.active ?? true);
   const [dataSource, setDataSource] = useState<'otg' | 'manual'>(house?.dataSource ?? 'manual');
   // Taxa padrão da casa (comissão casa→agência) — string no input, parseada no save.
+  // defaultCpa é GRAVADO EM EUR (inteiro); a conversão p/ R$ é feita no cálculo da
+  // comissão pela cotação ao vivo (não regravamos o valor quando o câmbio mexe).
   const [defaultCpa, setDefaultCpa] = useState<string>(house?.defaultCpa != null ? String(house.defaultCpa) : '');
   const [defaultRev, setDefaultRev] = useState<string>(house?.defaultRev != null ? String(house.defaultRev) : '');
+  const [eurQuote, setEurQuote] = useState<EurBrlQuote>(() => getCachedEurBrlQuote());
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Cotação EUR→BRL ao vivo (AwesomeAPI) p/ o preview do CPA em R$.
+  useEffect(() => { fetchEurBrlRate().then(setEurQuote).catch(() => {}); }, []);
 
   const autoSlug = useMemo(
     () => name.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
@@ -298,7 +305,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
         registerUrlTemplate: registerUrlTemplate.trim() || null,
         active,
         dataSource,
-        defaultCpa: defaultCpa.trim() === '' ? null : Number(defaultCpa),
+        defaultCpa: defaultCpa.trim() === '' ? null : Math.trunc(Number(defaultCpa)), // EUR inteiro
         defaultRev: defaultRev.trim() === '' ? null : Number(defaultRev),
         ...(logoBase64 ? { logoBase64 } : {}),
       };
@@ -426,17 +433,27 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
             </Field>
 
             {dataSource === 'manual' && (
-              <Field label="Taxa padrão da casa" hint="RECEITA: o que a casa paga à AGÊNCIA — NÃO é o repasse ao afiliado (esse fica em Afiliados). Usada p/ derivar a comissão quando a planilha não traz a coluna 'comissao'. Sem isto, o lucro por casa fica negativo.">
+              <Field label="Taxa padrão da casa" hint="RECEITA: o que a casa paga à AGÊNCIA — NÃO é o repasse ao afiliado (esse fica em Afiliados). Usada p/ derivar a comissão quando a planilha não traz a coluna 'comissao'. O CPA é informado em EUR (inteiro) e convertido p/ R$ pela cotação do dia automaticamente. Sem isto, o lucro por casa fica negativo.">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <span className="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">CPA (R$ por CPA)</span>
-                    <input
-                      type="number" inputMode="decimal" min="0" step="any"
-                      value={defaultCpa}
-                      onChange={(e) => setDefaultCpa(e.target.value)}
-                      placeholder="ex.: 150"
-                      className={inputCls}
-                    />
+                    <span className="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">CPA (€ por CPA)</span>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500 text-sm font-semibold">€</span>
+                      <input
+                        type="number" inputMode="numeric" min="0" step="1"
+                        value={defaultCpa}
+                        onChange={(e) => setDefaultCpa(e.target.value.replace(/[^0-9]/g, ''))}
+                        placeholder="ex.: 30"
+                        className={`${inputCls} pl-7`}
+                      />
+                    </div>
+                    <p className="mt-1 text-[10px] text-slate-400 dark:text-neutral-500">
+                      {defaultCpa.trim() === '' ? (
+                        <>1 € = {formatBrl(eurQuote.rate)}{!eurQuote.live && ' · cotação indisponível'}</>
+                      ) : (
+                        <>≈ <b className="text-emerald-600 dark:text-emerald-400">{formatBrl(eurToBrl(Number(defaultCpa), eurQuote.rate))}</b> por CPA · 1 € = {formatBrl(eurQuote.rate)}{!eurQuote.live && ' (estimada)'}</>
+                      )}
+                    </p>
                   </div>
                   <div>
                     <span className="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">REV (% do RVS)</span>

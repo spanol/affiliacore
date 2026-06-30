@@ -23,6 +23,7 @@ import BrandLogo from '../components/BrandLogo';
 import { getBrandName, uniqueBrands, ALL_BRANDS, getKnownBrandName, getBrandMeta, getKnownBrands } from '../lib/brand';
 import { withKnownBrandNames } from '../lib/knownHouses';
 import { StoredManualRow, aggregateByHouse, emptyMetrics, addMetrics } from '../lib/houseResults';
+import { fetchEurBrlRate, getCachedEurBrlRate } from '../lib/currency';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
 
 export default function AdminDashboard() {
@@ -44,6 +45,8 @@ export default function AdminDashboard() {
   // Resultados MANUAIS (casas 'manual', via upload) — incorporados aos totais e ao
   // lucro por casa sem contaminar a atribuição da OTG.
   const [manualRows, setManualRows] = useState<StoredManualRow[]>([]);
+  // Cotação EUR→BRL (AwesomeAPI) — converte o CPA das casas (gravado em EUR) p/ R$.
+  const [eurRate, setEurRate] = useState<number>(() => getCachedEurBrlRate());
 
   // Lista de afiliados (com brand) — base do filtro e do mapa id→marca.
   useEffect(() => {
@@ -79,13 +82,14 @@ export default function AdminDashboard() {
     async function getResults() {
       try {
         setLoading(true);
-        const [allResults, cfgs, campaigns, specialData, byBrand, manual] = await Promise.all([
+        const [allResults, cfgs, campaigns, specialData, byBrand, manual, eur] = await Promise.all([
           fetchAllResults(range),
           fetchAffiliateConfigs(),
           fetchAllResultsByCampaign(range, brandAffiliateIds ?? undefined),
           fetchSpecialAffiliates(),
           fetchAllResultsByBrand(range),
           fetchManualResults(range),
+          fetchEurBrlRate(),
         ]);
         setResults(Array.isArray(allResults) ? allResults : []);
         setConfigs(cfgs || {});
@@ -93,6 +97,7 @@ export default function AdminDashboard() {
         setSpecials(specialData || {});
         setBrandRows(Array.isArray(byBrand) ? byBrand : []);
         setManualRows(Array.isArray(manual) ? manual : []);
+        setEurRate(eur.rate);
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
         setResults([]);
@@ -119,7 +124,7 @@ export default function AdminDashboard() {
   // de CPA dá comissão 0 e o lucro do master fica NEGATIVO (0 − repasse). Enriquecemos
   // num ÚNICO ponto p/ que headline (manualAgg) e cards por casa (composeAdminProfit)
   // saiam da MESMA base. [[houseCommissionForRow]]
-  const manualRowsD = useMemo(() => deriveManualRowsCommission(manualRows), [manualRows]);
+  const manualRowsD = useMemo(() => deriveManualRowsCommission(manualRows, eurRate), [manualRows, eurRate]);
 
   // Linhas manuais no escopo da marca (ALL = todas; senão só as casas manuais cujo
   // nome canônico bate com o filtro). Casa OTG selecionada → nenhuma manual.
