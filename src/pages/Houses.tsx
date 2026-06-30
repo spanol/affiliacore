@@ -23,6 +23,7 @@ import { canImport, buildImportPayload } from '../lib/houseImport';
 import { parseSpreadsheetFile, downloadResultsTemplate, isExcelFile } from '../lib/xlsx';
 import { humanizeName } from '../lib/utils';
 import { fetchEurBrlRate, eurToBrl, formatBrl, getCachedEurBrlQuote, EurBrlQuote } from '../lib/currency';
+import EntityAuditHistory from '../components/EntityAuditHistory';
 
 // Backoffice de casas (betting houses) — admin. Cria/edita o registro próprio de
 // casas (nome/slug/brandId/logo/registerUrlTemplate/ativa) que alimenta logos,
@@ -485,6 +486,11 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${active ? 'translate-x-5' : ''}`} />
               </button>
             </label>
+
+            {/* Trilha de auditoria desta casa (admin-only). [[boost-audit-trail]] */}
+            {editing && house && (
+              <EntityAuditHistory entityType="house" entityId={house.id} title="Histórico da casa" />
+            )}
           </div>
 
           <div className="flex gap-3 p-6 pt-4 border-t border-slate-100 dark:border-neutral-800">

@@ -16,6 +16,7 @@ import { getDefaultRange } from '../lib/dateRange';
 import { getKnownBrands } from '../lib/brand';
 import { eurToBrl, fetchEurBrlRate, getCachedEurBrlRate } from '../lib/currency';
 import { fetchHouseResults } from './houseService';
+import type { AuditLogEntry } from '../lib/auditView';
 import {
   StoredManualRow, Metrics, METRIC_KEYS,
   aggregateByHouse, aggregateByDate, aggregateByAffiliate, deriveManualCommission,
@@ -1041,15 +1042,9 @@ export async function updateAffiliateStatus(affiliateId: string, status: 'active
   }
 }
 
-export interface AuditLog {
-  id?: string;
-  affiliateId: string;
-  actorId?: string;
-  actorName?: string;
-  action: string;
-  reason?: string;
-  createdAt?: any;
-}
+// Formato generalizado da trilha (Fase 1+). Re-exporta o tipo puro de lib/auditView
+// p/ os call-sites antigos (Settings) seguirem importando `AuditLog` daqui.
+export type AuditLog = AuditLogEntry;
 
 export async function createAuditLog(log: AuditLog): Promise<AuditLog> {
   try {
@@ -1072,9 +1067,21 @@ export async function createAuditLog(log: AuditLog): Promise<AuditLog> {
   }
 }
 
-export async function fetchAuditLogs(): Promise<AuditLog[]> {
+export interface AuditLogQuery {
+  limit?: number;          // teto de logs (server clampeia em 1..1000)
+  entityType?: string;     // histórico de UMA entidade (ex.: 'house', 'affiliate', 'user')
+  entityId?: string;       // id da entidade (combina com entityType)
+}
+
+export async function fetchAuditLogs(opts: AuditLogQuery = {}): Promise<AuditLog[]> {
   try {
-    const response = await authFetch('/api/audit-logs', {
+    const params = new URLSearchParams();
+    if (opts.limit != null) params.set('limit', String(opts.limit));
+    if (opts.entityType) params.set('entityType', opts.entityType);
+    if (opts.entityId) params.set('entityId', opts.entityId);
+    const qs = params.toString();
+
+    const response = await authFetch(`/api/audit-logs${qs ? `?${qs}` : ''}`, {
       method: 'GET',
       headers: { 'Accept': 'application/json' }
     });
@@ -1090,6 +1097,11 @@ export async function fetchAuditLogs(): Promise<AuditLog[]> {
     console.error('Error fetching audit logs:', error);
     throw error;
   }
+}
+
+// Histórico de auditoria de UMA entidade (ficha do afiliado, modal da casa).
+export async function fetchEntityAuditLogs(entityType: string, entityId: string, limit = 100): Promise<AuditLog[]> {
+  return fetchAuditLogs({ entityType, entityId, limit });
 }
 
 export async function fetchRegisteredUsers(): Promise<Array<{ uid: string; affiliateId?: string; name?: string; email?: string; role?: string }>> {

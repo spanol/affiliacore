@@ -63,6 +63,7 @@ import BrandFilter from '../components/BrandFilter';
 import BrandConfigEditor from '../components/BrandConfigEditor';
 import CampaignBreakdown from '../components/CampaignBreakdown';
 import DailyPerformanceChart from '../components/DailyPerformanceChart';
+import EntityAuditHistory from '../components/EntityAuditHistory';
 import DateRangePicker from '../components/DateRangePicker';
 import InfoTooltip from '../components/InfoTooltip';
 import TrendBadge from '../components/TrendBadge';
@@ -926,6 +927,11 @@ export default function AffiliateDetails() {
                         </div>
                       )}
                     </div>
+                  )}
+
+                  {/* Trilha de auditoria desta ficha (admin-only). [[boost-audit-trail]] */}
+                  {isAdmin && id && (
+                    <EntityAuditHistory entityType="affiliate" entityId={id} className="mb-6" />
                   )}
 
                   {/* Por Campanha (dados reais da API externa, groupBy=campaign).

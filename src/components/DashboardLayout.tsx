@@ -21,7 +21,8 @@ import {
   Database,
   Building2,
   Megaphone,
-  Trophy
+  Trophy,
+  ScrollText
 } from 'lucide-react';
 import { cn, humanizeName } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -123,6 +124,7 @@ export default function DashboardLayout() {
           { label: 'Casas', path: '/casas', icon: Building2 },
           { label: 'Roster OTG', path: '/roster-otg', icon: Database },
           { label: 'API Parceiros', path: '/parceiros-api', icon: Plug },
+          { label: 'Auditoria', path: '/auditoria', icon: ScrollText },
           { label: 'Configurações', path: '/settings', icon: Settings }
         ] : [])
       ] 
@@ -237,6 +239,8 @@ export default function DashboardLayout() {
                 ? 'Casas'
                 : location.pathname === '/roster-otg'
                 ? 'Roster OTG'
+                : location.pathname === '/auditoria'
+                ? 'Auditoria'
                 : location.pathname === '/financeiro'
                 ? 'Financeiro'
                 : location.pathname === '/avisos'

@@ -23,6 +23,7 @@ import Financeiro from './pages/Financeiro';
 import PartnerApiExplorer from './pages/PartnerApiExplorer';
 import OtgRoster from './pages/OtgRoster';
 import Houses from './pages/Houses';
+import Auditoria from './pages/Auditoria';
 import NotFound from './pages/NotFound';
 import DashboardLayout from './components/DashboardLayout';
 import UpdateBanner from './components/UpdateBanner';
@@ -136,6 +137,11 @@ export default function App() {
             <Route path="/casas" element={
               <ProtectedRoute role="admin">
                 <Houses />
+              </ProtectedRoute>
+            } />
+            <Route path="/auditoria" element={
+              <ProtectedRoute role="admin">
+                <Auditoria />
               </ProtectedRoute>
             } />
             <Route path="/affiliates/:id" element={<AffiliateDetailsRoute />} />
