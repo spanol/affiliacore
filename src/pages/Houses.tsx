@@ -487,9 +487,10 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
               </button>
             </label>
 
-            {/* Trilha de auditoria desta casa (admin-only). [[boost-audit-trail]] */}
+            {/* Trilha de auditoria desta casa (admin-only): ciclo de vida da casa +
+                import/clear de resultados (ambos chaveados pelo slug). [[boost-audit-trail]] */}
             {editing && house && (
-              <EntityAuditHistory entityType="house" entityId={house.id} title="Histórico da casa" />
+              <EntityAuditHistory entityType={['house', 'house_results']} entityId={house.id} title="Histórico da casa" />
             )}
           </div>
 

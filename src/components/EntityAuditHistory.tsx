@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react';
 import { ScrollText, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchEntityAuditLogs, AuditLog } from '../services/affiliateService';
-import { actionLabel, actorDisplay, auditDetail } from '../lib/auditView';
+import { actionLabel, actorDisplay, auditDetail, logDateMillis } from '../lib/auditView';
 
 interface Props {
-  entityType: string;   // 'affiliate' | 'house' | 'user' | ...
+  // Um tipo OU vários que compartilham o mesmo id (ex.: a casa: 'house' p/ o ciclo de
+  // vida + 'house_results' p/ import/clear, ambos chaveados pelo slug). O merge ordena
+  // os dois por data.
+  entityType: string | string[];
   entityId: string;     // id da entidade (affiliateId, slug da casa, uid…)
   title?: string;
   limit?: number;
@@ -24,13 +27,18 @@ export default function EntityAuditHistory({ entityType, entityId, title = 'Hist
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const types = Array.isArray(entityType) ? entityType : [entityType];
+  const typesKey = types.join(',');
+
   async function load() {
     if (!entityId) return;
     try {
       setLoading(true);
       setError('');
-      const data = await fetchEntityAuditLogs(entityType, entityId, limit);
-      setLogs(data);
+      // Cada tipo é um fetch (o server filtra por 1 entityType); junta e ordena por data.
+      const batches = await Promise.all(types.map((t) => fetchEntityAuditLogs(t, entityId, limit)));
+      const merged = batches.flat().sort((a, b) => logDateMillis(b) - logDateMillis(a)).slice(0, limit);
+      setLogs(merged);
     } catch (err: any) {
       console.error('Erro carregando histórico de auditoria', err);
       setError(err?.message || 'Não foi possível carregar o histórico.');
@@ -43,7 +51,7 @@ export default function EntityAuditHistory({ entityType, entityId, title = 'Hist
     if (!isAdmin) return;
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, entityType, entityId]);
+  }, [isAdmin, typesKey, entityId]);
 
   if (!isAdmin) return null;
 
