@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { authFetch } from '../lib/api';
+import { OTG_ENABLED } from '../lib/instanceClient';
 import { withKnownHouses } from '../lib/knownHouses';
 import { findAffiliateInList } from '../lib/affiliateLookup';
 import { getDefaultRange } from '../lib/dateRange';
@@ -65,6 +66,16 @@ interface ApiErrorInfo {
 // de fetch direto nem leitura de env `VITE_*` de credencial no browser — qualquer
 // VITE_* seria embarcado no bundle estático e vazaria a chave do parceiro.
 async function fetchAffiliateApi(endpoint: string, query?: URLSearchParams): Promise<Response> {
+  // P2 (produtização): instância OTG-free nem fala com o proxy — devolve uma
+  // resposta sintética "sem dados" ({ data: [] }, a MESMA forma da API) p/ todos
+  // os fetchers caírem no empty state sem rede, sem erro e sem toast. Este é o
+  // ÚNICO ponto de saída ao /api/external no client (não crie outro).
+  if (!OTG_ENABLED) {
+    return new Response(JSON.stringify({ data: [] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
   const proxyUrl = `/api/external/${endpoint}${query && query.toString() ? `?${query.toString()}` : ''}`;
   return authFetch(proxyUrl, {
     method: 'GET',
@@ -1258,6 +1269,8 @@ export interface PendingAffiliate {
 }
 
 export async function fetchPendingAffiliates(): Promise<PendingAffiliate[]> {
+  // P2: pré-cadastro é conceito da OTG — instância OTG-free não tem (e a rota 503a).
+  if (!OTG_ENABLED) return [];
   try {
     const response = await authFetch('/api/pending-affiliates', { method: 'GET', headers: { Accept: 'application/json' } });
     if (!response.ok) {

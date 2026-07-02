@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url';
 import { renderErrorPage } from './errorPage';
 import { isBotUserAgent, appendSubid, clickStatDay } from './src/lib/tracking';
 import { resolveIsSpecial, resolveServerToday, resolveScopedAffiliateIds } from './src/lib/scope';
+import { otgEnabled } from './src/lib/instance';
 import { computeRankingEntries, mergeManualIntoRankingRows } from './src/lib/ranking';
 import { expandAffiliateIdsParam } from './src/lib/affiliateIdsParam';
 import { hrDocId, sanitizeMetrics } from './src/lib/houseResultsDoc';
@@ -149,6 +150,19 @@ export function createApp(deps: ServerDeps) {
       return res.status(500).json({ error: 'Erro ao verificar permissões.' });
     }
     (req as any).user = { uid: decoded.uid, email: decoded.email, name };
+    next();
+  };
+
+  // --- P2 (produtização): integração OTG como módulo por instância ----------
+  // VITE_OTG_ENABLED='false' → instância OTG-free (white-label): as rotas OTG
+  // (proxy externo, sync, pending-affiliates, analytics) respondem 503 e o ranking
+  // pula a paginação OTG (fica só com as casas manuais). Ausente/qualquer outro
+  // valor → ligada (a instância atual não muda nada). Fonte única: src/lib/instance.
+  const OTG_ENABLED = otgEnabled(process.env.VITE_OTG_ENABLED);
+  const requireOtg: express.RequestHandler = (_req, res, next) => {
+    if (!OTG_ENABLED) {
+      return res.status(503).json({ error: 'Integração OTG desativada nesta instância.', code: 'OTG_DISABLED' });
+    }
     next();
   };
 
@@ -1126,42 +1140,47 @@ export function createApp(deps: ServerDeps) {
     generatedByName: string,
   ): Promise<{ date: string; count: number; entries: any[] }> {
     if (!adminDb) throw Object.assign(new Error('Firebase Admin não está inicializado.'), { status: 500 });
-    const BASE_URL = process.env.VITE_AFFILIATE_API_BASE_URL || 'https://affiliate-api-prd.partnersotg.com';
-    const apiKey = process.env.AFFILIATE_API_KEY;
-    if (!apiKey) throw Object.assign(new Error('Chave de API externa não configurada.'), { status: 500 });
 
-    // Resultados do dia, todas as páginas (a OTG entrega pageSize=50).
-    const baseParams = new URLSearchParams();
-    baseParams.set('startDate', date);
-    baseParams.set('endDate', date);
-    baseParams.set('groupBy', 'affiliate');
-    const MAX_PAGES = 50;
+    // Resultados do dia na OTG, todas as páginas (a OTG entrega pageSize=50).
+    // P2: instância OTG-free pula este trecho inteiro (ranking sai só das casas
+    // manuais) — e não exige AFFILIATE_API_KEY.
     const rows: any[] = [];
-    let page = 1;
-    let totalPages = 1;
-    do {
-      const params = new URLSearchParams(baseParams);
-      params.set('page', String(page));
-      const resp = await fetchImpl(`${BASE_URL}/api/v2/external/results?${params.toString()}`, {
-        headers: { 'x-api-key': apiKey, Accept: 'application/json', 'User-Agent': 'AgenciaBoost-App/1.0' },
-      });
-      const text = await resp.text();
-      let body: any = null;
-      try { body = text ? JSON.parse(text) : null; } catch { body = null; }
-      if (!resp.ok) {
-        const requestId = crypto.randomBytes(8).toString('hex');
-        console.error(`[rankings] ${requestId} results upstream ${resp.status} (page ${page}):`, text);
-        // code "040" (sem dados) não é erro: grava ranking vazio.
-        if (body?.code === '040') break;
-        throw Object.assign(new Error('Falha ao consultar o relatório do dia.'), { status: 502, code: body?.code, requestId });
-      }
-      const d = body?.data;
-      const pageRows = Array.isArray(d?.data) ? d.data : (Array.isArray(d) ? d : (Array.isArray(body) ? body : []));
-      rows.push(...pageRows);
-      const tp = Number(d?.meta?.totalPages);
-      totalPages = Number.isFinite(tp) && tp > 0 ? tp : 1;
-      page++;
-    } while (page <= totalPages && page <= MAX_PAGES);
+    if (OTG_ENABLED) {
+      const BASE_URL = process.env.VITE_AFFILIATE_API_BASE_URL || 'https://affiliate-api-prd.partnersotg.com';
+      const apiKey = process.env.AFFILIATE_API_KEY;
+      if (!apiKey) throw Object.assign(new Error('Chave de API externa não configurada.'), { status: 500 });
+
+      const baseParams = new URLSearchParams();
+      baseParams.set('startDate', date);
+      baseParams.set('endDate', date);
+      baseParams.set('groupBy', 'affiliate');
+      const MAX_PAGES = 50;
+      let page = 1;
+      let totalPages = 1;
+      do {
+        const params = new URLSearchParams(baseParams);
+        params.set('page', String(page));
+        const resp = await fetchImpl(`${BASE_URL}/api/v2/external/results?${params.toString()}`, {
+          headers: { 'x-api-key': apiKey, Accept: 'application/json', 'User-Agent': 'AgenciaBoost-App/1.0' },
+        });
+        const text = await resp.text();
+        let body: any = null;
+        try { body = text ? JSON.parse(text) : null; } catch { body = null; }
+        if (!resp.ok) {
+          const requestId = crypto.randomBytes(8).toString('hex');
+          console.error(`[rankings] ${requestId} results upstream ${resp.status} (page ${page}):`, text);
+          // code "040" (sem dados) não é erro: grava ranking vazio.
+          if (body?.code === '040') break;
+          throw Object.assign(new Error('Falha ao consultar o relatório do dia.'), { status: 502, code: body?.code, requestId });
+        }
+        const d = body?.data;
+        const pageRows = Array.isArray(d?.data) ? d.data : (Array.isArray(d) ? d : (Array.isArray(body) ? body : []));
+        rows.push(...pageRows);
+        const tp = Number(d?.meta?.totalPages);
+        totalPages = Number.isFinite(tp) && tp > 0 ? tp : 1;
+        page++;
+      } while (page <= totalPages && page <= MAX_PAGES);
+    }
 
     // Resultados MANUAIS do dia (house_results atribuídos) entram no ranking com a
     // MESMA fórmula — antes ficavam de fora e o ranking saía zerado enquanto a
@@ -1424,7 +1443,7 @@ export function createApp(deps: ServerDeps) {
   };
 
   // Sync the external affiliate list into the local `affiliates` collection.
-  app.post('/api/affiliates/sync', requireAdmin, async (req, res) => {
+  app.post('/api/affiliates/sync', requireAdmin, requireOtg, async (req, res) => {
     if (!adminDb) {
       return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     }
@@ -1466,7 +1485,7 @@ export function createApp(deps: ServerDeps) {
   });
 
   // Lista os pré-cadastros (afiliados aprovados importados do snapshot da OTG).
-  app.get('/api/pending-affiliates', requireAdmin, async (_req, res) => {
+  app.get('/api/pending-affiliates', requireAdmin, requireOtg, async (_req, res) => {
     if (!adminDb) {
       return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     }
@@ -1482,7 +1501,7 @@ export function createApp(deps: ServerDeps) {
 
   // Importa o snapshot de aprovados (upsert por nameKey+casa) e já reconcilia
   // contra o relatório atual. Não rebaixa pendentes já reconciliados.
-  app.post('/api/pending-affiliates/import', requireAdmin, async (req, res) => {
+  app.post('/api/pending-affiliates/import', requireAdmin, requireOtg, async (req, res) => {
     if (!adminDb) {
       return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     }
@@ -1510,7 +1529,7 @@ export function createApp(deps: ServerDeps) {
   // o mesmo upsert + reconciliação do import manual — tira o "manual" do snapshot.
   // Usa as creds do .env (OTG_LINKS_*). Pode ser chamado por um scheduler externo
   // (cron batendo neste endpoint) ou pelo botão do /admin. Ver otgLinksPull.ts.
-  app.post('/api/pending-affiliates/refresh', requireAdmin, async (_req, res) => {
+  app.post('/api/pending-affiliates/refresh', requireAdmin, requireOtg, async (_req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     if (!isOtgLinksConfigured()) {
       return res.status(503).json({ error: 'Pull automático não configurado (defina OTG_LINKS_* no .env).' });
@@ -1631,7 +1650,7 @@ export function createApp(deps: ServerDeps) {
   // (caso "Lucas Guimarães"). Auth via OTG_DASH_ACCESS_TOKEN (dashboard tem 2FA →
   // sem password-grant; ver SPIKE-OTG-V1-ANALYTICS.md). Range default = mês corrente
   // no fuso BR. Por ora pull+retorna (persistência/UI = próxima fatia).
-  app.post('/api/analytics/refresh', requireAdmin, async (req, res) => {
+  app.post('/api/analytics/refresh', requireAdmin, requireOtg, async (req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     if (!isOtgAnalyticsConfigured()) {
       return res.status(503).json({ error: 'v1 analítica não configurada (defina OTG_DASH_API_BASE + OTG_DASH_ACCESS_TOKEN no Secret Manager).' });
@@ -1994,7 +2013,7 @@ export function createApp(deps: ServerDeps) {
   });
 
   // Proxy route for Affiliate API to handle multiple endpoints dynamically
-  app.get('/api/external/:endpoint/:id?', requireAuth, async (req, res) => {
+  app.get('/api/external/:endpoint/:id?', requireAuth, requireOtg, async (req, res) => {
     try {
       const { endpoint, id } = req.params;
       const BASE_URL = process.env.VITE_AFFILIATE_API_BASE_URL || 'https://affiliate-api-prd.partnersotg.com';

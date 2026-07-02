@@ -59,16 +59,22 @@ Hoje o app é operado por quem o construiu; vendido, ele roda nas mãos de estra
 
 A versão vendida é naturalmente OTG-free (a x-api-key é da operação do Carlos).
 
-- Feature-flag de instância (ex.: `settings/instance` ou env `ENABLE_OTG_INTEGRATION`) que,
-  desligada, remove/desliga: `affiliates/sync`, proxy `/api/external`, página OtgRoster,
-  import de pending_affiliates, pipeline v1 analytics, casas `dataSource:'otg'` no seed.
-- O seam já é concentrado (~38 arquivos, todos na borda: `affiliateService`, `knownHouses`,
-  `otgAnalytics`, `OtgRoster`, `pendingAffiliates`, proxy) — a lógica de dinheiro em
-  `src/lib` é pura e não sabe o que é OTG.
-- Critério de aceite: **smoke test "instância OTG-free"** — app completo funcionando só com
-  casas manuais (`/casas` + import + afiliado nativo + comissão + auditoria + ranking).
-- Bônus: o mesmo seam vira o ponto de encaixe p/ futuras integrações (outra plataforma no
-  lugar da OTG).
+- ✅ **NÚCLEO ENTREGUE 2026-07-02**: flag **`VITE_OTG_ENABLED`** (fonte única
+  `src/lib/instance.ts`; ausente = ligada → instância atual não muda; `'false'` =
+  OTG-free). Servidor: middleware `requireOtg` → 503 `OTG_DISABLED` em
+  `/api/external/*`, `affiliates/sync`, `pending-affiliates` (GET/import/refresh) e
+  `analytics/refresh`; `computeAndStoreRanking` pula a paginação OTG (ranking sai
+  das casas manuais, sem exigir `AFFILIATE_API_KEY`). Cliente: `fetchAffiliateApi`
+  (único ponto de saída ao proxy) devolve "sem dados" sintético sem rede;
+  menu/rota Roster OTG e botão "Sincronizar afiliados" somem; textos de ajuda
+  adaptados. Config documentada em `.env.example` + `apphosting.yaml`
+  (BUILD+RUNTIME).
+- **Falta (fecha na instância do cliente 0 do white-label):** smoke test
+  "instância OTG-free" de ponta a ponta num projeto Firebase novo (P4) — casas
+  manuais + import + afiliado nativo + comissão + auditoria + ranking, tudo com a
+  flag em `false`.
+- Bônus: o mesmo seam vira o ponto de encaixe p/ futuras integrações (outra
+  plataforma no lugar da OTG).
 
 ## P3 · White-label (marca configurável)
 

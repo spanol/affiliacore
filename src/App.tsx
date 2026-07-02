@@ -22,6 +22,7 @@ import SpecialAffiliatesList from './pages/SpecialAffiliatesList';
 import Financeiro from './pages/Financeiro';
 import PartnerApiExplorer from './pages/PartnerApiExplorer';
 import OtgRoster from './pages/OtgRoster';
+import { OTG_ENABLED } from './lib/instanceClient';
 import Houses from './pages/Houses';
 import Auditoria from './pages/Auditoria';
 import NotFound from './pages/NotFound';
@@ -129,11 +130,14 @@ export default function App() {
                 <PartnerApiExplorer />
               </ProtectedRoute>
             } />
-            <Route path="/roster-otg" element={
-              <ProtectedRoute role="admin">
-                <OtgRoster />
-              </ProtectedRoute>
-            } />
+            {/* P2: rota do roster só existe com o módulo OTG ligado nesta instância. */}
+            {OTG_ENABLED && (
+              <Route path="/roster-otg" element={
+                <ProtectedRoute role="admin">
+                  <OtgRoster />
+                </ProtectedRoute>
+              } />
+            )}
             <Route path="/casas" element={
               <ProtectedRoute role="admin">
                 <Houses />

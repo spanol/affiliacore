@@ -20,6 +20,7 @@ import {
   X
 } from 'lucide-react';
 import { fetchAffiliates, fetchAffiliateConfigs, fetchAffiliateStatuses, saveAffiliateConfig, buildBrandConfigTopPayload, updateAffiliateStatus, fetchRegisteredUsers, updateUserRole, syncAffiliates, AffiliateConfig, fetchSpecialAffiliates, SpecialAffiliate, fetchPendingAffiliates, importPendingAffiliates, createAccessInvite } from '../services/affiliateService';
+import { OTG_ENABLED } from '../lib/instanceClient';
 import SpecialAffiliateModal from '../components/SpecialAffiliateModal';
 import { useToast } from '../contexts/ToastContext';
 import { cn, humanizeName } from '../lib/utils';
@@ -482,7 +483,8 @@ export default function AffiliatesList() {
               Importar aprovados
             </button>
           )} */}
-          {isAdmin && (
+          {/* P2: sincronizar puxa da OTG — some na instância OTG-free. */}
+          {isAdmin && OTG_ENABLED && (
             <button
               onClick={handleSync}
               disabled={syncing || loading}
@@ -1007,7 +1009,7 @@ function ListingHelp() {
             Para constar nesta lista e gerar repasse correto, ele precisa de:
           </p>
           <ol className="mt-2 space-y-1.5 text-[11px] leading-relaxed font-medium text-slate-600 dark:text-neutral-300">
-            <li className="flex gap-2"><span className="font-bold text-amber-600 dark:text-amber-400">1.</span><span><b>Produção</b> — aparecer no relatório da OTG (ou estar como pré-cadastro).</span></li>
+            <li className="flex gap-2"><span className="font-bold text-amber-600 dark:text-amber-400">1.</span><span><b>Produção</b> — {OTG_ENABLED ? 'aparecer no relatório da OTG (ou estar como pré-cadastro).' : 'ter resultados importados de uma casa (planilha) ou cadastro direto na plataforma.'}</span></li>
             <li className="flex gap-2"><span className="font-bold text-amber-600 dark:text-amber-400">2.</span><span><b>Acesso</b> — um login gerado via convite.</span></li>
             <li className="flex gap-2"><span className="font-bold text-amber-600 dark:text-amber-400">3.</span><span><b>Comissão</b> — CPA/REV configurados. Sem isso, o repasse fica <b>R$&nbsp;0</b>.</span></li>
           </ol>
@@ -1019,10 +1021,13 @@ function ListingHelp() {
               <li className="flex gap-2"><span className="text-amber-600 dark:text-amber-400 font-bold">•</span><span>Em <Link to="/casas" className="font-bold text-amber-600 dark:text-amber-400 hover:underline">Casas</Link> — a <b>Taxa padrão da casa</b> é a <b>receita</b> (o que a casa paga à agência), <b>não</b> o repasse ao afiliado.</span></li>
             </ul>
           </div>
-          <p className="mt-3 pt-3 border-t border-slate-100 dark:border-neutral-800 text-[11px] leading-relaxed font-medium text-slate-500 dark:text-neutral-400">
-            Aprovados na OTG <b>sem produção</b> ainda não aparecem aqui — ficam em{' '}
-            <Link to="/roster-otg" className="font-bold text-amber-600 dark:text-amber-400 hover:underline">Roster OTG</Link> até reconciliar.
-          </p>
+          {/* P2: referência ao roster só faz sentido com o módulo OTG ligado. */}
+          {OTG_ENABLED && (
+            <p className="mt-3 pt-3 border-t border-slate-100 dark:border-neutral-800 text-[11px] leading-relaxed font-medium text-slate-500 dark:text-neutral-400">
+              Aprovados na OTG <b>sem produção</b> ainda não aparecem aqui — ficam em{' '}
+              <Link to="/roster-otg" className="font-bold text-amber-600 dark:text-amber-400 hover:underline">Roster OTG</Link> até reconciliar.
+            </p>
+          )}
         </div>
       )}
     </span>

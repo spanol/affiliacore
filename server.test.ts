@@ -1037,6 +1037,66 @@ describe('cron interno daily-ranking', () => {
 });
 
 // =============================================================================
+// P2 — instância OTG-free (VITE_OTG_ENABLED='false'): módulo OTG desligado
+// =============================================================================
+describe('P2 · módulo OTG desligado por instância', () => {
+  const seed = { users: { 'admin-uid': { role: 'admin', name: 'Master' } } };
+
+  beforeAll(() => {
+    process.env.VITE_OTG_ENABLED = 'false';
+  });
+  afterAll(() => {
+    delete process.env.VITE_OTG_ENABLED;
+  });
+
+  it('rotas OTG respondem 503 OTG_DISABLED (proxy, sync, pending×3, analytics)', async () => {
+    const app = buildApp({ seed });
+    const expect503 = async (req: request.Test) => {
+      const res = await req.set('Authorization', 'Bearer admin-uid').expect(503);
+      expect(res.body.code).toBe('OTG_DISABLED');
+    };
+    await expect503(request(app).get('/api/external/results'));
+    await expect503(request(app).post('/api/affiliates/sync'));
+    await expect503(request(app).get('/api/pending-affiliates'));
+    await expect503(request(app).post('/api/pending-affiliates/import'));
+    await expect503(request(app).post('/api/pending-affiliates/refresh'));
+    await expect503(request(app).post('/api/analytics/refresh'));
+  });
+
+  it('o gate NÃO afeta rotas não-OTG (affiliate-configs segue 200)', async () => {
+    const app = buildApp({ seed });
+    await request(app).get('/api/affiliate-configs').set('Authorization', 'Bearer admin-uid').expect(200);
+  });
+
+  it('ranking OTG-free: zero chamadas de rede, sem exigir AFFILIATE_API_KEY, só casas manuais', async () => {
+    const prevKey = process.env.AFFILIATE_API_KEY;
+    delete process.env.AFFILIATE_API_KEY; // instância OTG-free não tem a chave
+    try {
+      const db = makeFirestore({
+        ...seed,
+        affiliates: { 'AFF-M': { id: 'AFF-M', name: 'Manuel' } },
+        affiliate_configs: { 'AFF-M': { affiliateId: 'AFF-M', cpaValue: 50, revPercentage: 0 } },
+        house_results: {
+          r1: { houseSlug: 'betfair', date: '2099-02-02', affiliateId: 'AFF-M', qualified_cpa: 2, rvs: 0 },
+        },
+      });
+      const { fetchImpl, calls } = captureFetch();
+      const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl });
+      const res = await request(app)
+        .post('/api/rankings/compute')
+        .set('Authorization', 'Bearer admin-uid')
+        .send({ date: '2099-02-02' })
+        .expect(200);
+      expect(res.body.count).toBe(1);
+      expect(res.body.entries[0]).toMatchObject({ affiliateId: 'AFF-M', commission: 100 }); // 2 × R$50
+      expect(calls).toHaveLength(0); // nenhuma chamada à OTG
+    } finally {
+      if (prevKey !== undefined) process.env.AFFILIATE_API_KEY = prevKey;
+    }
+  });
+});
+
+// =============================================================================
 // v1 ANALÍTICA da OTG — POST /api/analytics/refresh
 // Trava o WIRING da rota: admin-only, 503 sem creds, param fix repassado ao pull,
 // resiliência (superbet-404 → 200 parcial) e auth expirada (401 em todas → 502).

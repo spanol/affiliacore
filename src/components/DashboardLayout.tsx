@@ -25,6 +25,7 @@ import {
   ScrollText
 } from 'lucide-react';
 import { cn, humanizeName } from '../lib/utils';
+import { OTG_ENABLED } from '../lib/instanceClient';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from '../contexts/ThemeContext';
 import NotificationBell from './NotificationBell';
@@ -122,7 +123,8 @@ export default function DashboardLayout() {
         ...(profile?.role === 'admin' ? [
           { label: 'Afiliados Especiais', path: '/special-affiliates', icon: Crown },
           { label: 'Casas', path: '/casas', icon: Building2 },
-          { label: 'Roster OTG', path: '/roster-otg', icon: Database },
+          // P2: instância OTG-free não tem roster da OTG (módulo desligado).
+          ...(OTG_ENABLED ? [{ label: 'Roster OTG', path: '/roster-otg', icon: Database }] : []),
           { label: 'API Parceiros', path: '/parceiros-api', icon: Plug },
           { label: 'Auditoria', path: '/auditoria', icon: ScrollText },
           { label: 'Configurações', path: '/settings', icon: Settings }

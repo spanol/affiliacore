@@ -26,6 +26,15 @@ env:
     availability:
       - RUNTIME
 
+  # P2 (produtização): módulo OTG por instância. NESTA instância (Carlos) fica ligado.
+  # Numa instância white-label OTG-free, troque para 'false' — precisa de BUILD e
+  # RUNTIME (a flag vale no bundle do cliente E nas rotas do servidor).
+  - variable: VITE_OTG_ENABLED
+    value: 'true'
+    availability:
+      - BUILD
+      - RUNTIME
+
   # Credenciais do Firebase Admin SDK (conteúdo do service-account.json).
   # Criar com:  firebase apphosting:secrets:set firebase-service-account-key
   - variable: FIREBASE_SERVICE_ACCOUNT_KEY
