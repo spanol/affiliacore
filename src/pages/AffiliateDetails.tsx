@@ -929,9 +929,11 @@ export default function AffiliateDetails() {
                     </div>
                   )}
 
-                  {/* Trilha de auditoria desta ficha (admin-only). [[boost-audit-trail]] */}
+                  {/* Trilha de auditoria desta ficha (admin-only): ações sobre o
+                      afiliado + mudanças de comissão (config.update, Fase 3).
+                      [[boost-audit-trail]] */}
                   {isAdmin && id && (
-                    <EntityAuditHistory entityType="affiliate" entityId={id} className="mb-6" />
+                    <EntityAuditHistory entityType={['affiliate', 'affiliate_config']} entityId={id} className="mb-6" />
                   )}
 
                   {/* Por Campanha (dados reais da API externa, groupBy=campaign).

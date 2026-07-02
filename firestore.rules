@@ -54,8 +54,13 @@ service cloud.firestore {
     // que escopa por papel (admin = todas; afiliado = própria + sub-rede do especial).
     // Cliente direto é BLOQUEADO — antes era `read: isSignedIn()` e qualquer afiliado
     // logado lia a coleção inteira (CPA/REV/byBrand de todos). Espelha payment_profiles.
+    // Fase 3 (auditoria de dinheiro): ESCRITA server-only — nem ADMIN grava direto.
+    // Toda mudança de CPA/REV passa pelo PATCH /api/affiliate-configs/:id (Admin SDK),
+    // que grava a trilha config.update (antes→depois) no mesmo batch; escrita direta
+    // do cliente escaparia da auditoria. Leitura segue admin-only (a UI usa o GET).
     match /affiliate_configs/{affiliateId} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     // Alias de e-mail -> affiliateId (Boost-first). Doc id = e-mail normalizado.

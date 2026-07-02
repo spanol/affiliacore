@@ -248,10 +248,14 @@ describe('affiliate_configs/{id} (R5 — taxas mediadas pelo servidor)', () => {
     );
   });
 
-  it('admin lê e escreve config', async () => {
+  it('admin lê config (a UI usa o GET do servidor; leitura direta segue admin-only)', async () => {
     await seedAdmin();
     await assertSucceeds(getDoc(doc(asAdmin(), 'affiliate_configs', 'AFF-1')));
-    await assertSucceeds(
+  });
+
+  it('nem ADMIN escreve config direto (Fase 3: escrita só pelo servidor — senão a mudança de CPA/REV escapa da trilha config.update)', async () => {
+    await seedAdmin();
+    await assertFails(
       setDoc(doc(asAdmin(), 'affiliate_configs', 'AFF-2'), { cpaValue: 100 }),
     );
   });

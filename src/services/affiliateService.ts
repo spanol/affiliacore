@@ -133,15 +133,22 @@ export async function fetchAffiliateAnalytics(): Promise<AffiliateFunnel[]> {
 
 // Aceita payload PARCIAL: omitir cpaValue/revPercentage (em vez de mandar 0)
 // preserva a AUSÊNCIA da taxa no merge — é o que impede o "0 fantasma" de topo.
+// Fase 3 (auditoria de dinheiro): a escrita vai pelo SERVIDOR (PATCH
+// /api/affiliate-configs/:id) — Admin SDK + trilha config.update (antes→depois)
+// no mesmo batch. A rule de affiliate_configs bloqueia escrita direta do cliente
+// (nem admin), senão a mudança de CPA/REV escaparia da auditoria.
 export async function saveAffiliateConfig(config: Partial<AffiliateConfig> & { affiliateId: string }): Promise<void> {
   try {
-    const docRef = doc(db, 'affiliate_configs', config.affiliateId);
-    // merge:true → preserva `byBrand` (overrides por casa) quando o editor de taxa
-    // de topo salva só cpaValue/revPercentage. [[B6]]
-    await setDoc(docRef, {
-      ...config,
-      updatedAt: serverTimestamp()
-    }, { merge: true });
+    const { affiliateId, ...patch } = config;
+    const resp = await authFetch(`/api/affiliate-configs/${encodeURIComponent(affiliateId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => null);
+      throw new Error(body?.error || `Erro ${resp.status} ao salvar comissão.`);
+    }
   } catch (error) {
     console.error('Error saving affiliate config:', error);
     throw error;
@@ -166,18 +173,25 @@ export function buildBrandConfigTopPayload(
   return Object.keys(top).length > 0 ? top : null;
 }
 
-// B6 · salva apenas os overrides por casa de um afiliado (admin — affiliate_configs
-// é admin-only nas rules). merge:true preserva as taxas de topo. Envie o mapa
-// COMPLETO de casas que devem ter override; remover um override = reescrever o
-// mapa sem aquela chave + recarregar (no MVP dev o editor sempre manda todas as
-// casas presentes, então não há fluxo de remoção parcial).
+// B6 · salva apenas os overrides por casa de um afiliado. Fase 3: também vai pelo
+// PATCH do servidor (auditado como config.update). O merge do servidor preserva as
+// taxas de topo. Envie o mapa COMPLETO de casas que devem ter override; remover um
+// override = reescrever o mapa sem aquela chave + recarregar (no MVP dev o editor
+// sempre manda todas as casas presentes, então não há fluxo de remoção parcial).
 export async function saveAffiliateBrandRates(
   affiliateId: string,
   byBrand: Record<string, BrandRates>
 ): Promise<void> {
   try {
-    const docRef = doc(db, 'affiliate_configs', affiliateId);
-    await setDoc(docRef, { affiliateId, byBrand, updatedAt: serverTimestamp() }, { merge: true });
+    const resp = await authFetch(`/api/affiliate-configs/${encodeURIComponent(affiliateId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ byBrand }),
+    });
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => null);
+      throw new Error(body?.error || `Erro ${resp.status} ao salvar comissão por casa.`);
+    }
   } catch (error) {
     console.error('Error saving affiliate brand rates:', error);
     throw error;

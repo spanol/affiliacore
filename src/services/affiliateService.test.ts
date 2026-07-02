@@ -32,6 +32,8 @@ import {
   composeAdminProfit,
   calcAffiliatePayout,
   calcNetProfit,
+  saveAffiliateConfig,
+  saveAffiliateBrandRates,
 } from './affiliateService';
 import { StoredManualRow, emptyMetrics, addMetrics } from '../lib/houseResults';
 import fc from 'fast-check';
@@ -96,6 +98,39 @@ describe('wrappers Boost-native (authFetch)', () => {
     expect(await fetchEmailAliases()).toEqual([]);
     vi.mocked(authFetch).mockResolvedValue({ ok: true, json: async () => ({ aliases: [{ email: 'a@x.com', affiliateId: 'b' }] }) } as any);
     expect(await fetchEmailAliases()).toEqual([{ email: 'a@x.com', affiliateId: 'b' }]);
+  });
+});
+
+// Fase 3 (auditoria de dinheiro): a escrita de CPA/REV deixou o setDoc direto e
+// passou pelo PATCH do servidor (trilha config.update + rule write server-only).
+describe('saveAffiliateConfig / saveAffiliateBrandRates · escrita via servidor (Fase 3)', () => {
+  it('saveAffiliateConfig faz PATCH com o payload SEM o affiliateId (vai na URL)', async () => {
+    vi.mocked(authFetch).mockResolvedValue({ ok: true, json: async () => ({}) } as any);
+    await saveAffiliateConfig({ affiliateId: 'AFF-1', cpaValue: 250 });
+    const [url, init] = vi.mocked(authFetch).mock.calls.at(-1)!;
+    expect(url).toBe('/api/affiliate-configs/AFF-1');
+    expect((init as any).method).toBe('PATCH');
+    expect(JSON.parse((init as any).body)).toEqual({ cpaValue: 250 });
+  });
+
+  it('payload parcial preserva a ausência: só REV digitado → body só com revPercentage', async () => {
+    vi.mocked(authFetch).mockResolvedValue({ ok: true, json: async () => ({}) } as any);
+    await saveAffiliateConfig({ affiliateId: 'AFF-1', revPercentage: 12 });
+    const [, init] = vi.mocked(authFetch).mock.calls.at(-1)!;
+    expect(JSON.parse((init as any).body)).toEqual({ revPercentage: 12 }); // sem cpaValue:0 fantasma
+  });
+
+  it('saveAffiliateBrandRates envia só o byBrand', async () => {
+    vi.mocked(authFetch).mockResolvedValue({ ok: true, json: async () => ({}) } as any);
+    await saveAffiliateBrandRates('AFF-1', { sb: { cpaValue: 300 } } as any);
+    const [url, init] = vi.mocked(authFetch).mock.calls.at(-1)!;
+    expect(url).toBe('/api/affiliate-configs/AFF-1');
+    expect(JSON.parse((init as any).body)).toEqual({ byBrand: { sb: { cpaValue: 300 } } });
+  });
+
+  it('resposta !ok → lança com a mensagem de erro do servidor', async () => {
+    vi.mocked(authFetch).mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: 'cpaValue inválido (número ≥ 0).' }) } as any);
+    await expect(saveAffiliateConfig({ affiliateId: 'AFF-1', cpaValue: -1 as any })).rejects.toThrow('cpaValue inválido');
   });
 });
 

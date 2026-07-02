@@ -214,6 +214,17 @@ export function createApp(deps: ServerDeps) {
     }
     return changes;
   }
+  // Nome do afiliado no mirror `affiliates` (best-effort) p/ o entityLabel do audit —
+  // snapshot do nome no momento da ação, exibido sem join na /auditoria.
+  async function affiliateNameOf(affiliateId: string): Promise<string | null> {
+    if (!adminDb) return null;
+    try {
+      const snap = await adminDb.collection('affiliates').doc(affiliateId).get();
+      return snap.exists ? ((snap.data() as any)?.name ?? null) : null;
+    } catch {
+      return null;
+    }
+  }
 
   // Notificação "novos resultados" (decisão do produto): variante de CONTAGENS ativa;
   // 'money' (R$) fica pronta mas só liga via env RESULTS_NOTIFICATION_VARIANT=money.
@@ -354,12 +365,35 @@ export function createApp(deps: ServerDeps) {
         return res.status(400).json({ error: `A comissão do sub não pode passar da sua taxa (teto: R$ ${tetoCpa}/CPA · ${tetoRev}% REV).` });
       }
 
-      await adminDb.collection('affiliate_configs').doc(subId).set({
+      // Fase 3 (auditoria de dinheiro): a mudança de taxa do sub também é
+      // config.update — autor = o ESPECIAL (carimbado pelo token), antes→depois
+      // no MESMO batch da gravação (atômico). [[boost-audit-trail Fase 3]]
+      const subRef = adminDb.collection('affiliate_configs').doc(subId);
+      const beforeSnap = await subRef.get();
+      const configPatch = { cpaValue: cpa, revPercentage: rev };
+      const changes = diffChanges(
+        beforeSnap.exists ? (beforeSnap.data() as any) : undefined,
+        configPatch,
+        ['cpaValue', 'revPercentage'],
+      );
+
+      const batch = adminDb.batch();
+      batch.set(subRef, {
         affiliateId: subId,
-        cpaValue: cpa,
-        revPercentage: rev,
+        ...configPatch,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
+      if (changes.length) {
+        appendAuditLog(batch, req, {
+          entityType: 'affiliate_config',
+          entityId: subId,
+          entityLabel: await affiliateNameOf(subId),
+          action: 'config.update',
+          changes,
+          metadata: { via: 'special/sub-config', specialAffiliateId: callerAffiliateId },
+        });
+      }
+      await batch.commit();
 
       return res.json({ affiliateId: subId, cpaValue: cpa, revPercentage: rev });
     } catch (error: any) {
@@ -663,6 +697,101 @@ export function createApp(deps: ServerDeps) {
     } catch (error: any) {
       console.error('[affiliate-configs] get:', error);
       return res.status(500).json({ error: error.message || 'Erro ao carregar configs.' });
+    }
+  });
+
+  // Fase 3 (auditoria de dinheiro): a ESCRITA de CPA/REV é mediada aqui — o cliente
+  // não grava mais `affiliate_configs` direto (rule: write server-only, nem admin).
+  // Whitelist de campos (cpaValue/revPercentage/byBrand) preservando a AUSÊNCIA
+  // (ausência≠R$0: campo omitido no body não entra no merge → nunca nasce 0 fantasma)
+  // + trilha `config.update` com antes→depois no MESMO batch da gravação (atômico).
+  // [[boost-audit-trail Fase 3]]
+  app.patch('/api/affiliate-configs/:id', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const id = String(req.params.id || '').trim();
+      if (!id) return res.status(400).json({ error: 'affiliateId é obrigatório.' });
+      const body = req.body ?? {};
+
+      // Taxa válida = número finito ≥ 0. Inválido NÃO vira 0 (0 é taxa real;
+      // ausência≠R$0) — devolve 400 pro editor corrigir.
+      const rateNum = (v: unknown): number | null => {
+        const n = Number(v);
+        return Number.isFinite(n) && n >= 0 ? n : null;
+      };
+
+      const patch: Record<string, unknown> = {};
+      if ('cpaValue' in body) {
+        const n = rateNum(body.cpaValue);
+        if (n === null) return res.status(400).json({ error: 'cpaValue inválido (número ≥ 0).' });
+        patch.cpaValue = n;
+      }
+      if ('revPercentage' in body) {
+        const n = rateNum(body.revPercentage);
+        if (n === null) return res.status(400).json({ error: 'revPercentage inválido (número ≥ 0).' });
+        patch.revPercentage = n;
+      }
+      if ('byBrand' in body) {
+        const raw = body.byBrand;
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+          return res.status(400).json({ error: 'byBrand deve ser um mapa casa → taxas.' });
+        }
+        const byBrand: Record<string, Record<string, number>> = {};
+        for (const [brandId, rates] of Object.entries(raw as Record<string, unknown>)) {
+          if (!rates || typeof rates !== 'object' || Array.isArray(rates)) {
+            return res.status(400).json({ error: `byBrand['${brandId}'] deve ser um objeto de taxas.` });
+          }
+          const entry: Record<string, number> = {};
+          const r = rates as Record<string, unknown>;
+          if ('cpaValue' in r) {
+            const n = rateNum(r.cpaValue);
+            if (n === null) return res.status(400).json({ error: `byBrand['${brandId}'].cpaValue inválido (número ≥ 0).` });
+            entry.cpaValue = n;
+          }
+          if ('revPercentage' in r) {
+            const n = rateNum(r.revPercentage);
+            if (n === null) return res.status(400).json({ error: `byBrand['${brandId}'].revPercentage inválido (número ≥ 0).` });
+            entry.revPercentage = n;
+          }
+          byBrand[String(brandId)] = entry;
+        }
+        patch.byBrand = byBrand;
+      }
+      if (Object.keys(patch).length === 0) {
+        return res.status(400).json({ error: 'Nada para atualizar (cpaValue, revPercentage ou byBrand).' });
+      }
+
+      const ref = adminDb.collection('affiliate_configs').doc(id);
+      const beforeSnap = await ref.get();
+      const changes = diffChanges(
+        beforeSnap.exists ? (beforeSnap.data() as any) : undefined,
+        patch,
+        ['cpaValue', 'revPercentage', 'byBrand'],
+      );
+
+      const batch = adminDb.batch();
+      // merge:true → editar só o topo preserva byBrand e vice-versa (mesma semântica
+      // do setDoc antigo do cliente).
+      batch.set(ref, {
+        ...patch,
+        affiliateId: id,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      if (changes.length) {
+        appendAuditLog(batch, req, {
+          entityType: 'affiliate_config',
+          entityId: id,
+          entityLabel: await affiliateNameOf(id),
+          action: 'config.update',
+          changes,
+        });
+      }
+      await batch.commit();
+
+      return res.json({ affiliateId: id, updated: Object.keys(patch), changed: changes.length });
+    } catch (error: any) {
+      console.error('[affiliate-configs] patch:', error);
+      return res.status(500).json({ error: error.message || 'Erro ao salvar comissão.' });
     }
   });
 

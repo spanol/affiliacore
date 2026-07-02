@@ -308,6 +308,152 @@ describe('import de resultados grava log + notifica o afiliado atribuído', () =
 });
 
 // =============================================================================
+// Fase 3 — comissão (CPA/REV) gravada pelo SERVIDOR com trilha config.update
+// =============================================================================
+describe('PATCH /api/affiliate-configs/:id — escrita de comissão auditada', () => {
+  const seed = {
+    users: {
+      'admin-uid': { role: 'admin', name: 'Master' },
+      'client-uid': { role: 'client', affiliateId: 'AFF-1' },
+    },
+    affiliates: { 'AFF-1': { id: 'AFF-1', name: 'Lucas' } },
+    affiliate_configs: {
+      'AFF-1': { affiliateId: 'AFF-1', cpaValue: 200, byBrand: { sb: { cpaValue: 300 } } },
+    },
+  };
+
+  it('não-admin → 403 e nada é gravado', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .patch('/api/affiliate-configs/AFF-1')
+      .set('Authorization', 'Bearer client-uid')
+      .send({ cpaValue: 999 })
+      .expect(403);
+    expect(db.__store.get('affiliate_configs')?.get('AFF-1')?.cpaValue).toBe(200);
+    expect(db.__store.get('audit_logs')?.size ?? 0).toBe(0);
+  });
+
+  it('grava topo com merge (byBrand preservado) + audit config.update antes→depois', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app)
+      .patch('/api/affiliate-configs/AFF-1')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ cpaValue: 250 })
+      .expect(200);
+    expect(res.body).toMatchObject({ affiliateId: 'AFF-1', changed: 1 });
+
+    const cfg = db.__store.get('affiliate_configs')?.get('AFF-1');
+    expect(cfg.cpaValue).toBe(250);
+    expect(cfg.byBrand).toEqual({ sb: { cpaValue: 300 } }); // merge preservou o override
+
+    const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({
+      entityType: 'affiliate_config', entityId: 'AFF-1', entityLabel: 'Lucas',
+      action: 'config.update', actorId: 'admin-uid', actorName: 'Master',
+    });
+    expect(logs[0].changes).toEqual([{ field: 'cpaValue', before: 200, after: 250 }]);
+  });
+
+  it('ausência≠R$0: PATCH só de REV em afiliado sem config NÃO cria cpaValue', async () => {
+    const db = makeFirestore({ users: seed.users });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .patch('/api/affiliate-configs/AFF-9')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ revPercentage: 12 })
+      .expect(200);
+    const cfg = db.__store.get('affiliate_configs')?.get('AFF-9');
+    expect(cfg.revPercentage).toBe(12);
+    expect('cpaValue' in cfg).toBe(false); // nada de 0 fantasma
+  });
+
+  it('sem mudança real → grava (updatedAt) mas NÃO loga', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app)
+      .patch('/api/affiliate-configs/AFF-1')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ cpaValue: 200 })
+      .expect(200);
+    expect(res.body.changed).toBe(0);
+    expect(db.__store.get('audit_logs')?.size ?? 0).toBe(0);
+  });
+
+  it('body vazio/valor inválido → 400; cpaValue 0 é VÁLIDO (taxa real, ausência≠R$0)', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const patchReq = () => request(app).patch('/api/affiliate-configs/AFF-1').set('Authorization', 'Bearer admin-uid');
+    await patchReq().send({}).expect(400);
+    await patchReq().send({ cpaValue: 'abc' }).expect(400);
+    await patchReq().send({ cpaValue: -5 }).expect(400);
+    await patchReq().send({ byBrand: { sb: { cpaValue: 'x' } } }).expect(400);
+    expect(db.__store.get('audit_logs')?.size ?? 0).toBe(0); // nenhum 400 logou
+    await patchReq().send({ cpaValue: 0 }).expect(200);
+    expect(db.__store.get('audit_logs')?.size ?? 0).toBe(1); // 200→0 é mudança real
+  });
+
+  it('byBrand: campo omitido no override não vira 0 e o diff loga o mapa', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .patch('/api/affiliate-configs/AFF-1')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ byBrand: { sb: { cpaValue: 350 }, bf: { revPercentage: 25 } } })
+      .expect(200);
+    const cfg = db.__store.get('affiliate_configs')?.get('AFF-1');
+    expect(cfg.byBrand).toEqual({ sb: { cpaValue: 350 }, bf: { revPercentage: 25 } });
+    expect(cfg.cpaValue).toBe(200); // topo preservado pelo merge
+    const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
+    expect(logs).toHaveLength(1);
+    expect(logs[0].changes[0].field).toBe('byBrand');
+  });
+});
+
+describe('POST /api/special/sub-config — taxa do sub também vira config.update', () => {
+  const seed = {
+    users: { 'esp-uid': { role: 'client', affiliateId: 'ESP-1', name: 'Especial' } },
+    special_affiliates: { 'ESP-1': { active: true, subAffiliateIds: ['SUB-1'] } },
+    affiliate_configs: {
+      'ESP-1': { cpaValue: 400, revPercentage: 30 },
+      'SUB-1': { affiliateId: 'SUB-1', cpaValue: 100, revPercentage: 10 },
+    },
+    affiliates: { 'SUB-1': { id: 'SUB-1', name: 'Sub Um' } },
+  };
+
+  it('grava a taxa e loga config.update com autor = especial (via metadata)', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/special/sub-config')
+      .set('Authorization', 'Bearer esp-uid')
+      .send({ subAffiliateId: 'SUB-1', cpaValue: 150, revPercentage: 10 })
+      .expect(200);
+    const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({
+      entityType: 'affiliate_config', entityId: 'SUB-1', entityLabel: 'Sub Um',
+      action: 'config.update', actorId: 'esp-uid',
+      metadata: { via: 'special/sub-config', specialAffiliateId: 'ESP-1' },
+    });
+    expect(logs[0].changes).toEqual([{ field: 'cpaValue', before: 100, after: 150 }]);
+  });
+
+  it('taxa igual → grava mas NÃO loga (diff vazio)', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/special/sub-config')
+      .set('Authorization', 'Bearer esp-uid')
+      .send({ subAffiliateId: 'SUB-1', cpaValue: 100, revPercentage: 10 })
+      .expect(200);
+    expect(db.__store.get('audit_logs')?.size ?? 0).toBe(0);
+  });
+});
+
+// =============================================================================
 // R4 — IDOR no proxy externo /api/external/:endpoint
 // =============================================================================
 describe('proxy externo / IDOR (R4)', () => {
