@@ -101,10 +101,20 @@ const loginForAccessToken = async (fetchImpl: FetchImpl): Promise<string> => {
   const body = await resp.json().catch(() => null);
   const data = body?.data ?? {};
   const accessToken = data.access_token || data.accessToken || data.token;
-  if (!accessToken) {
-    throw new Error('OTG login: resposta 200 sem access_token (shape mudou?). data keys: ' + Object.keys(data).join(','));
+  if (accessToken) return accessToken;
+  // 200 mas com DESAFIO de 2FA ({requires2FA, pendingToken, maskedEmail}): o deviceToken
+  // não pulou o OTP — quase sempre porque EXPIROU (~8h) ou foi invalidado. NÃO é mudança
+  // de contrato; é o estado esperado quando o deviceToken vence. Mensagem ACIONÁVEL (o que
+  // o operador precisa fazer) em vez do genérico "shape mudou?". [[boost-v1-analytics-integration]]
+  if (data.requires2FA || data.pendingToken || data.maskedEmail) {
+    const masked = data.maskedEmail ? ` (código enviado a ${data.maskedEmail})` : '';
+    throw new Error(
+      `OTG login exigiu 2FA: o deviceToken expirou ou foi invalidado (~8h)${masked}. ` +
+        'Recapture o `2fa:login` (localStorage do dashboard) pós-2FA e atualize o secret OTG_DASH_DEVICE_TOKEN, ' +
+        'ou defina OTG_DASH_ACCESS_TOKEN (manual, ~15 min). Ver SPIKE-OTG-V1-ANALYTICS.md.'
+    );
   }
-  return accessToken;
+  throw new Error('OTG login: resposta 200 sem access_token (shape mudou?). data keys: ' + Object.keys(data).join(','));
 };
 
 // Resolve um access_token válido: 1) override manual; 2) login durável (cacheado).

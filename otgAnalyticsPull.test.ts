@@ -199,6 +199,18 @@ describe('auth durável via login (sem token manual)', () => {
     await expect(pullAnalytics(RANGE, fetchImpl)).rejects.toThrow(/deviceToken/);
   });
 
+  it('login 200 com desafio de 2FA (deviceToken venceu) → erro acionável, NÃO "shape mudou?"', async () => {
+    // OTG passou a devolver 200 com o desafio de 2FA em vez do access_token quando o
+    // deviceToken não pula mais o OTP. Deve virar mensagem acionável (recapturar token).
+    const fetchImpl: any = async (url: string) =>
+      url.includes('/auth/login')
+        ? resp(200, { data: { requires2FA: true, pendingToken: 'pt-1', maskedEmail: 'c***@x.org' } })
+        : resp(200, sportingbetPage([]));
+    await expect(pullAnalytics(RANGE, fetchImpl)).rejects.toThrow(/exigiu 2FA.*deviceToken/);
+    await expect(pullAnalytics(RANGE, fetchImpl)).rejects.toThrow(/c\*\*\*@x\.org/); // maskedEmail na dica
+    await expect(pullAnalytics(RANGE, fetchImpl)).rejects.not.toThrow(/shape mudou/); // sem o genérico enganoso
+  });
+
   it('cacheia o access_token: 2 pulls = 1 login só', async () => {
     let logins = 0;
     const fetchImpl: any = async (url: string) => {
