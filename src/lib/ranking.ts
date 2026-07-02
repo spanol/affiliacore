@@ -4,7 +4,7 @@
 // override por casa (byBrand) e divergindo dos dashboards (R2). Agora usa o MESMO
 // calcAffiliatePayout, aplicando a taxa por casa quando o brandId do afiliado é
 // conhecido (resolvido pelo caller a partir do mirror `affiliates`).
-import { AffiliateConfig, calcAffiliatePayout } from './commission';
+import { AffiliateConfig, calcAffiliatePayout, num } from './commission';
 
 export interface RankingEntry {
   pos: number;
@@ -18,6 +18,30 @@ export interface RankingOpts {
   brandIdOf?: (affiliateId: string) => string | undefined;
   nameById?: Record<string, string>;
   limit?: number; // top N (default 100)
+}
+
+// Merge ADITIVO dos resultados de casas MANUAIS (house_results do dia) nas linhas
+// por-afiliado da OTG, antes do cálculo do ranking. Sem isso o ranking só via a OTG
+// e saía ZERADO enquanto a produção real estava nas casas manuais (bug 2026-07-02).
+// Mesma semântica do merge manual dos dashboards: soma qualified_cpa/rvs por
+// afiliado; linha manual SEM atribuição (affiliateId null = agregado da casa) não
+// entra — ranking é por afiliado. num() guarda métrica string/NaN.
+export function mergeManualIntoRankingRows(otgRows: any[], manualRows: any[]): any[] {
+  const byId = new Map<string, any>();
+  for (const r of Array.isArray(otgRows) ? otgRows : []) {
+    const id = String(r?.affiliate_id ?? r?.id ?? '').trim();
+    if (!id) continue;
+    byId.set(id, { ...r });
+  }
+  for (const m of Array.isArray(manualRows) ? manualRows : []) {
+    const id = m?.affiliateId != null ? String(m.affiliateId).trim() : '';
+    if (!id) continue;
+    const cur = byId.get(id) ?? { affiliate_id: id, qualified_cpa: 0, rvs: 0 };
+    cur.qualified_cpa = num(cur.qualified_cpa) + num(m?.qualified_cpa);
+    cur.rvs = num(cur.rvs) + num(m?.rvs);
+    byId.set(id, cur);
+  }
+  return [...byId.values()];
 }
 
 export function computeRankingEntries(

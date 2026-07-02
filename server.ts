@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 import { renderErrorPage } from './errorPage';
 import { isBotUserAgent, appendSubid, clickStatDay } from './src/lib/tracking';
 import { resolveIsSpecial, resolveServerToday, resolveScopedAffiliateIds } from './src/lib/scope';
-import { computeRankingEntries } from './src/lib/ranking';
+import { computeRankingEntries, mergeManualIntoRankingRows } from './src/lib/ranking';
 import { expandAffiliateIdsParam } from './src/lib/affiliateIdsParam';
 import { hrDocId, sanitizeMetrics } from './src/lib/houseResultsDoc';
 import { makeBoostAffiliateId, normalizeEmailKey } from './src/lib/boostAffiliate';
@@ -1163,6 +1163,15 @@ export function createApp(deps: ServerDeps) {
       page++;
     } while (page <= totalPages && page <= MAX_PAGES);
 
+    // Resultados MANUAIS do dia (house_results atribuídos) entram no ranking com a
+    // MESMA fórmula — antes ficavam de fora e o ranking saía zerado enquanto a
+    // produção estava nas casas manuais (bug 2026-07-02, diagnóstico em prod:
+    // 6 rankings count=0 vs house_results com atividade quase diária).
+    const manualSnap = await adminDb.collection('house_results').where('date', '==', date).get();
+    const manualRows: any[] = [];
+    manualSnap.forEach((d) => manualRows.push(d.data()));
+    const allRows = mergeManualIntoRankingRows(rows, manualRows);
+
     // Configs (taxa por afiliado, COM byBrand) e nome+marca do mirror.
     const [cfgSnap, affSnap] = await Promise.all([
       adminDb.collection('affiliate_configs').get(),
@@ -1184,7 +1193,7 @@ export function createApp(deps: ServerDeps) {
     });
 
     // Mesma fórmula/repasse dos dashboards (calcAffiliatePayout), com a taxa por casa.
-    const entries = computeRankingEntries(rows, configs, {
+    const entries = computeRankingEntries(allRows, configs, {
       brandIdOf: (id) => brandIdByAffiliate[id],
       nameById: names,
     });

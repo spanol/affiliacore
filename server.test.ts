@@ -974,6 +974,33 @@ describe('cron interno daily-ranking', () => {
     expect(fs.__store.get('direct_messages').get(`ranking-reminder__${date}__cli-uid`)).toBeUndefined();
   });
 
+  it('resultados MANUAIS do dia entram no ranking mesmo com a OTG vazia (fix ranking zerado)', async () => {
+    process.env.RANKING_CRON_SECRET = 'right-secret';
+    delete process.env.MASTER_ADMIN_EMAIL;
+    const fs = makeFirestore({
+      ...seed,
+      affiliates: { 'AFF-M': { id: 'AFF-M', name: 'Manuel Manual' } },
+      affiliate_configs: { 'AFF-M': { affiliateId: 'AFF-M', cpaValue: 40, revPercentage: 0 } },
+      house_results: {
+        r1: { houseSlug: 'betfair', date: '2099-01-01', affiliateId: 'AFF-M', qualified_cpa: 3, rvs: 0 },
+        r2: { houseSlug: 'betfair', date: '2099-01-01', affiliateId: null, qualified_cpa: 99, rvs: 0 }, // agregado: fora
+      },
+    });
+    const { fetchImpl } = captureFetch(); // OTG devolve { data: [] } → 0 linhas
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs, fetchImpl });
+    // usa a rota admin com date no body p/ cravar o dia do seed (mesmo computeAndStoreRanking do cron)
+    const res = await request(app)
+      .post('/api/rankings/compute')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ date: '2099-01-01' })
+      .expect(200);
+    expect(res.body.count).toBe(1);
+    const doc = fs.__store.get('daily_rankings').get('2099-01-01');
+    expect(doc.entries).toEqual([
+      { pos: 1, affiliateId: 'AFF-M', name: 'Manuel Manual', commission: 120 }, // 3 × R$40
+    ]);
+  });
+
   it('re-rodar no mesmo dia é idempotente (não acumula lembrete)', async () => {
     process.env.RANKING_CRON_SECRET = 'right-secret';
     const fs = makeFirestore(seed);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeRankingEntries } from './ranking';
+import { computeRankingEntries, mergeManualIntoRankingRows } from './ranking';
 
 describe('computeRankingEntries · leaderboard usa byBrand (R2)', () => {
   const rows = [
@@ -60,5 +60,48 @@ describe('computeRankingEntries · leaderboard usa byBrand (R2)', () => {
   it('ignora linha sem affiliate_id e tolera entrada vazia', () => {
     expect(computeRankingEntries([{ qualified_cpa: 9 }], {})).toEqual([]);
     expect(computeRankingEntries(null as any, {})).toEqual([]);
+  });
+});
+
+// Bug 2026-07-02: o ranking só via a OTG → count=0 todo dia enquanto a produção
+// real estava nas casas manuais (house_results). O merge aditivo fecha o buraco.
+describe('mergeManualIntoRankingRows · manual entra no ranking (fix ranking zerado)', () => {
+  it('afiliado SÓ-manual vira linha nova; agregado (affiliateId null) fica de fora', () => {
+    const manual = [
+      { houseSlug: 'betfair', date: '2026-06-30', affiliateId: 'm1', qualified_cpa: 3, rvs: 200 },
+      { houseSlug: 'betfair', date: '2026-06-30', affiliateId: null, qualified_cpa: 99, rvs: 0 }, // agregado da casa
+    ];
+    const rows = mergeManualIntoRankingRows([], manual);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ affiliate_id: 'm1', qualified_cpa: 3, rvs: 200 });
+  });
+
+  it('afiliado com OTG + manual SOMA as métricas (merge aditivo, igual aos dashboards)', () => {
+    const otg = [{ affiliate_id: 'a', qualified_cpa: 5, rvs: 100, total_commission: 900 }];
+    const manual = [
+      { houseSlug: 'betano', date: '2026-06-30', affiliateId: 'a', qualified_cpa: 2, rvs: 50 },
+      { houseSlug: 'betfair', date: '2026-06-30', affiliateId: 'a', qualified_cpa: 1, rvs: 0 },
+    ];
+    const rows = mergeManualIntoRankingRows(otg, manual);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].qualified_cpa).toBe(8); // 5 + 2 + 1
+    expect(rows[0].rvs).toBe(150);         // 100 + 50
+    expect(rows[0].total_commission).toBe(900); // campos da OTG preservados
+  });
+
+  it('métrica string/NaN não propaga (num) e entradas vazias são toleradas', () => {
+    const rows = mergeManualIntoRankingRows(null as any, [
+      { affiliateId: 'x', qualified_cpa: '2,5', rvs: 'oops' },
+    ]);
+    expect(rows[0]).toMatchObject({ affiliate_id: 'x', qualified_cpa: 0, rvs: 0 });
+    expect(mergeManualIntoRankingRows(null as any, null as any)).toEqual([]);
+  });
+
+  it('ponta a ponta: manual do dia gera comissão no ranking pela taxa do afiliado', () => {
+    const merged = mergeManualIntoRankingRows([], [
+      { houseSlug: 'betfair', date: '2026-06-30', affiliateId: 'm1', qualified_cpa: 3, rvs: 0 },
+    ]);
+    const entries = computeRankingEntries(merged, { m1: { affiliateId: 'm1', cpaValue: 40, revPercentage: 0 } } as any);
+    expect(entries).toEqual([{ pos: 1, affiliateId: 'm1', name: 'Afiliado #m1', commission: 120 }]);
   });
 });
