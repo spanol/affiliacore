@@ -100,7 +100,8 @@ function searchableText(log: AuditLogEntry): string {
     entityDisplay(log), log.entityId, log.affiliateId,
     actorDisplay(log), log.actorEmail,
     log.reason,
-    log.metadata ? JSON.stringify(log.metadata) : '',
+    auditDetail(log),                                        // detalhe já traduzido (pt-BR)
+    log.metadata ? JSON.stringify(log.metadata) : '',        // chaves/valores crus (busca por termo em inglês)
     log.changes ? JSON.stringify(log.changes) : '',
   ];
   return parts.filter(Boolean).join(' ').toLowerCase();
@@ -169,16 +170,87 @@ export function uniqueActors(logs: AuditLogEntry[]): Array<{ id: string; label: 
     .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
 }
 
-// Formata um valor solto p/ exibição (vazio → traço; objeto → JSON; resto → string).
-function fmtValue(v: unknown): string {
+// Rótulo pt-BR de um campo (changes[].field) ou chave de metadata. Cobre TODAS as
+// chaves que o servidor grava (changes de user/house, metadata de create/sync/invite/
+// import). Chave desconhecida cai em si mesma (não some da UI) — igual às ações/tipos.
+const FIELD_LABELS: Record<string, string> = {
+  // identidade / vínculo (users)
+  affiliateId: 'Afiliado',
+  isSpecial: 'Especial',
+  email: 'E-mail',
+  role: 'Papel',
+  mustChangePassword: 'Precisa trocar senha',
+  name: 'Nome',
+  // casa (houses)
+  brandId: 'Marca (OTG)',
+  registerUrlTemplate: 'Link de cadastro',
+  active: 'Status',
+  order: 'Ordem',
+  dataSource: 'Origem dos dados',
+  defaultCpa: 'CPA padrão',
+  defaultRev: 'REV padrão',
+  logo: 'Logo',
+  // comissão (config.update)
+  cpaValue: 'CPA',
+  revPercentage: 'REV (%)',
+  // convite / sincronização
+  expiresAt: 'Expira em',
+  synced: 'Sincronizados',
+  total: 'Total',
+  reconciled: 'Reconciliados',
+  house: 'Casa',
+  hasEmail: 'Com e-mail',
+  invited: 'Convidado',
+  // import / limpeza de resultados
+  dates: 'Datas',
+  date: 'Data',
+  imported: 'Importados',
+  deleted: 'Removidos',
+  attributedAffiliates: 'Afiliados atribuídos',
+};
+
+export function fieldLabel(key: string): string {
+  return FIELD_LABELS[key] ?? key;
+}
+
+// Valores enumerados/booleanos conhecidos → rótulo pt-BR, por campo (chave = valor cru
+// em string, incl. 'true'/'false'). Campo sem entrada usa o fallback genérico.
+const VALUE_LABELS: Record<string, Record<string, string>> = {
+  role: { admin: 'Administrador', client: 'Afiliado' },
+  dataSource: { otg: 'OTG', manual: 'Manual' },
+  active: { true: 'Ativa', false: 'Inativa' },
+};
+
+// Campos cujo valor é uma data ('YYYY-MM-DD' ou ISO completo) → exibir DD/MM/AAAA.
+const DATE_FIELDS = new Set(['dates', 'date', 'expiresAt']);
+
+// 'YYYY-MM-DD' ou ISO completo → 'DD/MM/AAAA' (sem `new Date`, p/ não deslocar o dia por
+// fuso). Não-data (ex.: 'todas' no clear) volta como veio.
+function fmtDateish(s: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : s;
+}
+
+// Formata um valor p/ exibição, ciente do campo: vazio → traço; array → itens juntos;
+// enum/booleano conhecido → pt-BR; booleano genérico → Sim/Não; data → DD/MM/AAAA;
+// objeto → JSON; resto → string.
+function fmtFieldValue(field: string, v: unknown): string {
   if (v === null || v === undefined || v === '') return '—';
+  if (Array.isArray(v)) return v.length ? v.map((x) => fmtFieldValue(field, x)).join(', ') : '—';
+  const enumMap = VALUE_LABELS[field];
+  if (enumMap) {
+    const key = typeof v === 'boolean' ? String(v) : (typeof v === 'string' ? v : null);
+    if (key != null && key in enumMap) return enumMap[key];
+  }
+  if (typeof v === 'boolean') return v ? 'Sim' : 'Não';
   if (typeof v === 'object') return JSON.stringify(v);
+  if (typeof v === 'string' && DATE_FIELDS.has(field)) return fmtDateish(v);
   return String(v);
 }
 
-// Resumo curto de uma mudança p/ exibir na linha (ex.: "affiliateId: — → AFF-1").
+// Resumo curto de uma mudança p/ exibir na linha (ex.: "Afiliado: — → AFF-1").
 export function formatChange(change: AuditChange): string {
-  return `${change.field}: ${fmtValue(change.before)} → ${fmtValue(change.after)}`;
+  return `${fieldLabel(change.field)}: ${fmtFieldValue(change.field, change.before)} → ${fmtFieldValue(change.field, change.after)}`;
 }
 
 // Resumo da coluna "Detalhe": motivo > mudanças (antes→depois) > metadata > traço.
@@ -186,7 +258,7 @@ export function auditDetail(log: AuditLogEntry): string {
   if (log.reason) return log.reason;
   if (log.changes && log.changes.length) return log.changes.map(formatChange).join(' · ');
   if (log.metadata && Object.keys(log.metadata).length) {
-    return Object.entries(log.metadata).map(([k, v]) => `${k}: ${fmtValue(v)}`).join(' · ');
+    return Object.entries(log.metadata).map(([k, v]) => `${fieldLabel(k)}: ${fmtFieldValue(k, v)}`).join(' · ');
   }
   return '—';
 }

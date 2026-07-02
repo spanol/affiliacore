@@ -11,6 +11,8 @@ import {
   uniqueActions,
   uniqueActors,
   formatChange,
+  auditDetail,
+  fieldLabel,
   type AuditLogEntry,
 } from './auditView';
 
@@ -133,9 +135,62 @@ describe('uniques p/ os selects de filtro', () => {
   });
 });
 
+describe('fieldLabel', () => {
+  it('traduz chaves conhecidas de changes/metadata', () => {
+    expect(fieldLabel('affiliateId')).toBe('Afiliado');
+    expect(fieldLabel('attributedAffiliates')).toBe('Afiliados atribuídos');
+    expect(fieldLabel('deleted')).toBe('Removidos');
+    expect(fieldLabel('imported')).toBe('Importados');
+    expect(fieldLabel('dates')).toBe('Datas');
+  });
+  it('chave desconhecida cai em si mesma (não some da UI)', () => {
+    expect(fieldLabel('campoNovo')).toBe('campoNovo');
+  });
+});
+
 describe('formatChange', () => {
-  it('mostra antes → depois, vazio vira traço', () => {
-    expect(formatChange({ field: 'affiliateId', before: null, after: 'AFF-1' })).toBe('affiliateId: — → AFF-1');
-    expect(formatChange({ field: 'active', before: true, after: false })).toBe('active: true → false');
+  it('traduz o campo e mostra antes → depois, vazio vira traço', () => {
+    expect(formatChange({ field: 'affiliateId', before: null, after: 'AFF-1' })).toBe('Afiliado: — → AFF-1');
+  });
+  it('booleano genérico vira Sim/Não', () => {
+    expect(formatChange({ field: 'isSpecial', before: false, after: true })).toBe('Especial: Não → Sim');
+  });
+  it('enum por campo: status e origem em pt-BR', () => {
+    expect(formatChange({ field: 'active', before: true, after: false })).toBe('Status: Ativa → Inativa');
+    expect(formatChange({ field: 'dataSource', before: 'otg', after: 'manual' })).toBe('Origem dos dados: OTG → Manual');
+  });
+});
+
+describe('auditDetail', () => {
+  it('motivo tem prioridade', () => {
+    expect(auditDetail(log({ reason: 'corrigir nome' }))).toBe('corrigir nome');
+  });
+  it('changes traduzidos e unidos por ·', () => {
+    const d = auditDetail(log({
+      reason: null,
+      changes: [
+        { field: 'affiliateId', before: null, after: 'AFF-1' },
+        { field: 'isSpecial', before: false, after: true },
+      ],
+    }));
+    expect(d).toBe('Afiliado: — → AFF-1 · Especial: Não → Sim');
+  });
+  it('metadata do import: chaves traduzidas, datas DD/MM/AAAA e contagens', () => {
+    const d = auditDetail(log({
+      reason: null,
+      metadata: { dates: ['2026-06-30', '2026-07-01'], imported: 12, deleted: 3, attributedAffiliates: 5 },
+    }));
+    expect(d).toBe('Datas: 30/06/2026, 01/07/2026 · Importados: 12 · Removidos: 3 · Afiliados atribuídos: 5');
+  });
+  it('metadata do user.create: papel e booleano em pt-BR', () => {
+    const d = auditDetail(log({
+      reason: null,
+      metadata: { email: 'a@b.com', role: 'client', mustChangePassword: true },
+    }));
+    expect(d).toBe('E-mail: a@b.com · Papel: Afiliado · Precisa trocar senha: Sim');
+  });
+  it("clear de resultados: 'todas' preservado", () => {
+    const d = auditDetail(log({ reason: null, metadata: { date: 'todas', deleted: 8 } }));
+    expect(d).toBe('Data: todas · Removidos: 8');
   });
 });
