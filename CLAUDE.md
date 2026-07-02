@@ -126,7 +126,7 @@ Esta seção destila os bugs reais que escaparam dos testes (auditoria 2026-06) 
 
 - **Project: `agencia-boost-app`** (created May 2026; the original `agencia-boost` project from the first dev is inaccessible). Web config lives in `firebase-applet-config.json`; Firestore is in `southamerica-east1`.
 - **Server Admin SDK** authenticates via `GOOGLE_APPLICATION_CREDENTIALS=./service-account.json` (gitignored). Without it, all `/api/*` routes fail with "Unable to detect a Project Id". `server.ts` falls back to `admin.initializeApp()` (ADC) when `FIREBASE_SERVICE_ACCOUNT_KEY` is unset.
-- **`firestore.rules`** is role-based (`isAdmin()` checks `users/{uid}.role == 'admin'`). Deploy changes with `firebase deploy --only firestore:rules`. Known hardening gap: self-register currently lets a client set its own `role` (needed to bootstrap the first admin) — lock this down once admin/affiliate creation is fully server-side.
+- **`firestore.rules`** is role-based (`isAdmin()` checks `users/{uid}.role == 'admin'`). Deploy changes with `firebase deploy --only firestore:rules`. O antigo "hardening gap" do self-register foi **FECHADO** (R6, auditoria 2026-06): `create` força `role == 'client'` e bloqueia `affiliateId`/`isSpecial`; `update` trava os três campos (server-only). O 1º admin de uma instância nova é promovido pelo OPERADOR (console/Admin SDK) — ver `PRODUTIZACAO.md` P4.
 
 ## Deploy (Firebase App Hosting)
 

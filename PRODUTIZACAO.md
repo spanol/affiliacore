@@ -45,10 +45,11 @@ O que já estava combinado e falta entregar antes de pensar em produto:
 
 Hoje o app é operado por quem o construiu; vendido, ele roda nas mãos de estranhos.
 
-- **P1.1 — Fechar o bootstrap do 1º admin** (blocker de venda nº 1): o self-register ainda
-  permite o cliente setar o próprio `role`. Trocar por bootstrap explícito (ex.: env
-  `BOOTSTRAP_ADMIN_EMAIL` no primeiro deploy, ou script de provisionamento que cria o
-  admin via Admin SDK) e travar `role` no self-register de vez.
+- **P1.1 — Bootstrap do 1º admin** — ✅ **a parte de SEGURANÇA já estava fechada** (verificado
+  2026-07-02): a rule de `users` força `role == 'client'` no self-create e trava
+  `role`/`affiliateId`/`isSpecial` no update (R6, auditoria de junho). Cliente NÃO consegue
+  se promover. O que resta é OPERACIONAL e migra pro P4: script de provisionamento que cria
+  o 1º admin da instância nova via Admin SDK (hoje o operador promove manualmente no console).
 - **P1.2 — App Check** (já era follow-up da auditoria).
 - **P1.3 — Revisão de rules com olhar "instância de terceiro"**: varrer `read: isSignedIn()`
   em dados que numa agência desconhecida seriam sensíveis. (Grande parte já foi na
