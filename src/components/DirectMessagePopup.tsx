@@ -71,7 +71,7 @@ export default function DirectMessagePopup() {
             </span>
             <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">{current.title}</h3>
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500 mt-1">
-              {current.createdByName || 'Gerência Boost'}{when ? ` · ${when}` : ''}
+              {current.createdByName || 'Gerência'}{when ? ` · ${when}` : ''}
             </p>
           </div>
 

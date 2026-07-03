@@ -19,6 +19,7 @@ import {
 import { cn } from '../lib/utils';
 import { createContactInquiry, type ContactInquiryInput } from '../services/contactService';
 import { useToast } from '../contexts/ToastContext';
+import { BRAND } from '../lib/brandingClient';
 
 const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`;
 
@@ -86,7 +87,7 @@ export default function Home() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-neutral-950/80 backdrop-blur-md border-b border-neutral-800/50">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <img src={asset('boost-home/logo.svg')} alt="Boost" className="h-6 w-auto" />
+            <img src={BRAND.logoUrl} alt={BRAND.shortName} className="h-6 w-auto" />
           </Link>
 
           <div className="hidden md:flex items-center gap-4">
@@ -195,7 +196,7 @@ export default function Home() {
               <div className="rounded-xl overflow-hidden border border-neutral-700/50 bg-neutral-950">
                 <img
                   src={asset('boost-home/dashboard-escuro.jpeg')}
-                  alt="Plataforma Boost"
+                  alt={`Plataforma ${BRAND.shortName}`}
                   className="w-full h-auto block"
                 />
               </div>
@@ -240,7 +241,7 @@ export default function Home() {
               Afiliados de alta performance <span className="text-neutral-500">estão migrando</span>
             </h2>
             <p className="text-neutral-400 text-lg max-w-2xl mx-auto">
-              Operações amadoras perdem dinheiro com ferramentas genéricas. A Boost foi construída
+              Operações amadoras perdem dinheiro com ferramentas genéricas. A {BRAND.shortName} foi construída
               para quem busca controle absoluto.
             </p>
           </div>
@@ -273,7 +274,7 @@ export default function Home() {
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-white/10 transition-colors duration-500" />
 
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-white/5 border border-white/10 text-neutral-200 text-sm font-semibold uppercase tracking-wider mb-8 relative">
-                O Padrão Boost
+                O Padrão {BRAND.shortName}
               </div>
 
               <ul className="space-y-6 relative">
@@ -313,7 +314,7 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-6">
             <div className="max-w-3xl mb-16">
               <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-6">
-                A Boost centraliza seus dados e{' '}
+                A {BRAND.shortName} centraliza seus dados e{' '}
                 <span className="text-neutral-500">entrega inteligência</span>
               </h2>
               <p className="text-xl text-neutral-400 leading-relaxed">
@@ -392,14 +393,14 @@ export default function Home() {
           <div className="grid lg:grid-cols-2 gap-16 lg:gap-24">
             <div>
               <img
-                src={asset('boost-home/logo.svg')}
-                alt="Boost"
+                src={BRAND.logoUrl}
+                alt={BRAND.shortName}
                 className="h-9 w-auto mb-8"
               />
               <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-6">
                 Seja agora um
                 <br />
-                <span className="text-white">Afiliado Boost</span>
+                <span className="text-white">Afiliado {BRAND.shortName}</span>
               </h2>
               <p className="text-lg text-neutral-400 mb-8 max-w-md">
                 Nosso time analisará o seu perfil. Preencha os dados abaixo e entraremos em contato
@@ -555,9 +556,9 @@ export default function Home() {
       <footer className="relative z-10 border-t border-neutral-800/50 bg-neutral-900/30">
         <div className="max-w-7xl mx-auto px-6 py-12 flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-3">
-            <img src={asset('boost-home/logo.svg')} alt="Boost" className="h-6 w-auto opacity-80" />
+            <img src={BRAND.logoUrl} alt={BRAND.shortName} className="h-6 w-auto opacity-80" />
             <span className="font-display font-medium text-sm text-neutral-500">
-              &copy; {new Date().getFullYear()} Boost
+              &copy; {new Date().getFullYear()} {BRAND.shortName}
             </span>
           </div>
 

@@ -12,6 +12,7 @@ import { renderErrorPage } from './errorPage';
 import { isBotUserAgent, appendSubid, clickStatDay } from './src/lib/tracking';
 import { resolveIsSpecial, resolveServerToday, resolveScopedAffiliateIds } from './src/lib/scope';
 import { otgEnabled } from './src/lib/instance';
+import { resolveBrand } from './src/lib/branding';
 import { computeRankingEntries, mergeManualIntoRankingRows } from './src/lib/ranking';
 import { expandAffiliateIdsParam } from './src/lib/affiliateIdsParam';
 import { hrDocId, sanitizeMetrics } from './src/lib/houseResultsDoc';
@@ -159,6 +160,10 @@ export function createApp(deps: ServerDeps) {
   // pula a paginação OTG (fica só com as casas manuais). Ausente/qualquer outro
   // valor → ligada (a instância atual não muda nada). Fonte única: src/lib/instance.
   const OTG_ENABLED = otgEnabled(process.env.VITE_OTG_ENABLED);
+
+  // P3 (produtização): marca da instância nas strings geradas pelo servidor
+  // (remetentes de mensagem/lembrete). Mesma fonte única do client: lib/branding.
+  const BRAND = resolveBrand(process.env);
   const requireOtg: express.RequestHandler = (_req, res, next) => {
     if (!OTG_ENABLED) {
       return res.status(503).json({ error: 'Integração OTG desativada nesta instância.', code: 'OTG_DISABLED' });
@@ -1077,7 +1082,7 @@ export function createApp(deps: ServerDeps) {
       const affiliateName = (affSnap.exists ? (affSnap.data() as any)?.name : null)
         || (usersSnap.docs[0].data() as any)?.name || 'Afiliado';
       const adminSnap = await adminDb.collection('users').doc((req as any).user.uid).get();
-      const createdByName = (adminSnap.exists ? (adminSnap.data() as any)?.name : null) || 'Gerência Boost';
+      const createdByName = (adminSnap.exists ? (adminSnap.data() as any)?.name : null) || `Gerência ${BRAND.shortName}`;
 
       const batch = adminDb.batch();
       let delivered = 0;
@@ -1272,7 +1277,7 @@ export function createApp(deps: ServerDeps) {
         affiliateName: 'Sistema',
         title,
         body,
-        createdByName: 'Sistema Boost',
+        createdByName: `Sistema ${BRAND.shortName}`,
         readAt: null,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -1303,7 +1308,7 @@ export function createApp(deps: ServerDeps) {
     const date = isoDateRe.test(String(req.body?.date)) ? String(req.body.date) : resolveServerToday();
     try {
       const adminSnap = await adminDb.collection('users').doc((req as any).user.uid).get();
-      const generatedByName = (adminSnap.exists ? (adminSnap.data() as any)?.name : null) || 'Gerência Boost';
+      const generatedByName = (adminSnap.exists ? (adminSnap.data() as any)?.name : null) || `Gerência ${BRAND.shortName}`;
       const result = await computeAndStoreRanking(date, generatedByName);
       return res.json({ ...result, generatedAt: new Date().toISOString() });
     } catch (error: any) {

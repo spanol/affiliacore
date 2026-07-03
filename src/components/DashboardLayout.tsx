@@ -31,8 +31,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import NotificationBell from './NotificationBell';
 import DirectMessagePopup from './DirectMessagePopup';
 import { LOCAL_VERSION, LOCAL_COMMIT } from '../lib/version';
-
-const boostLogo = `${import.meta.env.BASE_URL}boost-home/logo.svg`;
+import { BRAND } from '../lib/brandingClient';
 
 export default function DashboardLayout() {
   const { profile } = useAuth();
@@ -144,8 +143,8 @@ export default function DashboardLayout() {
       <div className="p-6 pb-4">
         <Link to="/" className="flex items-center gap-2 group">
           <img
-            src={boostLogo}
-            alt="Boost"
+            src={BRAND.logoUrl}
+            alt={BRAND.shortName}
             className="h-[30px] w-auto invert dark:invert-0 transition-opacity group-hover:opacity-80"
           />
         </Link>

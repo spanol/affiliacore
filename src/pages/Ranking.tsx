@@ -144,7 +144,7 @@ export default function Ranking() {
               ? 'A OTG atualiza os resultados entre 13h–14h. Atualize mais tarde para ver o ranking do dia.'
               : isAdmin
                 ? 'Clique em "Gerar ranking de hoje" para calcular a partir dos resultados do dia.'
-                : 'Aguarde o ciclo de atualização — a Boost calcula a partir dos resultados do dia.'}
+                : 'Aguarde o ciclo de atualização — a plataforma calcula a partir dos resultados do dia.'}
           </p>
         </div>
       ) : (

@@ -616,7 +616,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
     try {
       const created = await createBoostAffiliates(toCreate, { generateInvite });
       const invites = created.filter((c) => c.invite).length;
-      push({ type: 'success', message: `Cadastrado(s) ${created.length} afiliado(s) na Boost${invites ? ` · ${invites} convite(s) gerado(s)` : ''}.` });
+      push({ type: 'success', message: `Cadastrado(s) ${created.length} afiliado(s) na plataforma${invites ? ` · ${invites} convite(s) gerado(s)` : ''}.` });
       await loadMeta();
     } catch (e: any) {
       push({ type: 'error', message: e?.message || 'Erro ao cadastrar afiliados.' });
@@ -851,8 +851,8 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                 {analysis.unresolved.length > 0 && (
                   <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 p-3 space-y-2">
                     <div>
-                      <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300">Afiliados não encontrados na Boost</p>
-                      <p className="text-[11px] text-amber-700/70 dark:text-amber-300/60">Cadastre-os como afiliados Boost (passam a cruzar pelo e-mail) ou vincule cada um a um afiliado já existente.</p>
+                      <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300">Afiliados não encontrados na plataforma</p>
+                      <p className="text-[11px] text-amber-700/70 dark:text-amber-300/60">Cadastre-os como afiliados da casa (passam a cruzar pelo e-mail) ou vincule cada um a um afiliado já existente.</p>
                     </div>
                     <div className="space-y-1 max-h-44 overflow-y-auto">
                       {analysis.unresolved.map((u) => (
@@ -911,7 +911,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-[11px] font-bold hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       >
                         {creating ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                        Cadastrar {analysis.unresolved.length} na Boost
+                        Cadastrar {analysis.unresolved.length} na plataforma
                       </button>
                     </div>
                   </div>

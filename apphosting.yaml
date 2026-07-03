@@ -35,6 +35,14 @@ env:
       - BUILD
       - RUNTIME
 
+  # P3 (produtização): marca por instância. NESTA instância os defaults já são a
+  # marca Boost — as envs ficam de fora de propósito. Numa instância white-label,
+  # declare (BUILD + RUNTIME, como o VITE_OTG_ENABLED):
+  #   VITE_BRAND_NAME:        nome completo (título/badges, ex. "Agência Alfa")
+  #   VITE_BRAND_SHORT:       nome curto p/ meio de frase, tratado no feminino
+  #   VITE_BRAND_LOGO_URL:    URL do logo (Storage da instância ou CDN)
+  #   VITE_BRAND_FAVICON_URL: URL do favicon
+
   # Credenciais do Firebase Admin SDK (conteúdo do service-account.json).
   # Criar com:  firebase apphosting:secrets:set firebase-service-account-key
   - variable: FIREBASE_SERVICE_ACCOUNT_KEY

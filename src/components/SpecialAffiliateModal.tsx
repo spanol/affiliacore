@@ -110,7 +110,7 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
             <>
               {!affiliate.userUid && (
                 <p className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
-                  Este afiliado ainda não tem conta Boost — ele precisará se cadastrar (convite) para acessar a view de especial.
+                  Este afiliado ainda não tem conta na plataforma — ele precisará se cadastrar (convite) para acessar a view de especial.
                 </p>
               )}
 

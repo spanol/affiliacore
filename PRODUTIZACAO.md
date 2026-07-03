@@ -78,11 +78,19 @@ A versão vendida é naturalmente OTG-free (a x-api-key é da operação do Carl
 
 ## P3 · White-label (marca configurável)
 
-- Config de marca por instância: nome da agência, logo, cor primária, favicon — num doc
-  (`settings/branding`) ou build-time config. Aplicar em: título/OG, tela de login, sidebar,
-  Home, textos de convite.
-- ~74 ocorrências "Boost/Agência" em 24 arquivos de `src/`, mas parte é naming interno
-  (`boostAffiliate`, `boost_<uuid>`) que **não muda** — só o user-facing.
+- ✅ **NÚCLEO ENTREGUE 2026-07-03** (branch `feat/p3-branding`): envs
+  **`VITE_BRAND_NAME` / `VITE_BRAND_SHORT` / `VITE_BRAND_LOGO_URL` /
+  `VITE_BRAND_FAVICON_URL`** (fonte única `src/lib/branding.ts`, mesmo padrão dual
+  client/server do P2; ausência de todas = marca Boost atual). Aplicado em: título +
+  favicon (runtime, boot do App), login/registro/convite, sidebar, 404, landing
+  (Home: copy + logos + footer ©), strings do servidor (`Gerência/Sistema {marca}`)
+  e textos neutros onde "Boost" significava "a plataforma" (/casas, avisos,
+  ranking, modais). Convenção documentada: `VITE_BRAND_SHORT` é tratado no
+  FEMININO no meio de frase.
+- **Fora do núcleo (P3.1, avaliar depois):** cor primária configurável — o app
+  usa `amber-*` hardcoded em dezenas de arquivos (inclusive com semântica de
+  aviso); remapear exige token de accent via CSS var + varredura cuidadosa.
+- Naming interno (`boostAffiliate`, `boost_<uuid>`, coleções) **não muda**.
 
 ## P4 · Playbook "novo cliente em 1 dia"
 

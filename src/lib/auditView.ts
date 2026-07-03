@@ -32,7 +32,7 @@ const ACTION_LABELS: Record<string, string> = {
   'affiliate.activate': 'Ativou afiliado',
   'affiliate.deactivate': 'Desativou afiliado',
   'affiliate.sync': 'Sincronizou afiliados (OTG)',
-  'affiliate.create_boost': 'Criou afiliado nativo (Boost)',
+  'affiliate.create_boost': 'Criou afiliado nativo (na plataforma)',
   'affiliate.link_email': 'Vinculou e-mail a afiliado',
   'invite.create': 'Gerou convite',
   'house.create': 'Criou casa',

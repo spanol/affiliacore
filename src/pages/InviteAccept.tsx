@@ -9,7 +9,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
 import { maskCPF, maskPhone, isValidCPF, isValidPhone } from '../lib/validators';
 
-const boostLogo = `${import.meta.env.BASE_URL}boost-home/logo.svg`;
+import { BRAND } from '../lib/brandingClient';
 
 export default function InviteAccept() {
   const { token } = useParams<{ token: string }>();
@@ -142,7 +142,7 @@ export default function InviteAccept() {
   return shell(
     <>
       <div className="text-center mb-8">
-        <img src={boostLogo} alt="Boost" className="h-7 w-auto mx-auto mb-4 invert dark:invert-0" />
+        <img src={BRAND.logoUrl} alt={BRAND.shortName} className="h-7 w-auto mx-auto mb-4 invert dark:invert-0" />
         <p className="text-slate-400 dark:text-neutral-500 text-[10px] font-bold uppercase tracking-widest">Ative seu acesso de afiliado</p>
       </div>
 

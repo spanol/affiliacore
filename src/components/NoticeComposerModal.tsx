@@ -200,7 +200,7 @@ export default function NoticeComposerModal({ editing, onClose, onSaved }: Props
                 </div>
                 <p className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 mt-2 flex items-start gap-2">
                   <AlertTriangle size={13} className="shrink-0 mt-0.5" />
-                  Vira um popup privado. Só funciona se o afiliado já tiver login Boost vinculado.
+                  Vira um popup privado. Só funciona se o afiliado já tiver login vinculado na plataforma.
                 </p>
               </div>
             )}

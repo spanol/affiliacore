@@ -97,7 +97,7 @@ export default function Avisos() {
           <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">
             {isAdmin
               ? 'Publique comunicados para a rede ou envie uma mensagem direta a um afiliado.'
-              : 'Atualizações e comunicados da Boost.'}
+              : 'Atualizações e comunicados da agência.'}
           </p>
         </div>
         {isAdmin && (
@@ -125,7 +125,7 @@ export default function Avisos() {
           </div>
           <h3 className="text-sm font-bold text-slate-800 dark:text-neutral-100 mb-1">Nenhum aviso por aqui</h3>
           <p className="text-xs text-slate-500 dark:text-neutral-400">
-            {isAdmin ? 'Crie o primeiro comunicado para a rede.' : 'Quando a Boost publicar algo, aparece aqui.'}
+            {isAdmin ? 'Crie o primeiro comunicado para a rede.' : 'Quando a agência publicar algo, aparece aqui.'}
           </p>
         </div>
       ) : (
