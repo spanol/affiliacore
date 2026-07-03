@@ -1,0 +1,35 @@
+# Instância BOOST (Carlos) — override por ambiente do App Hosting.
+# Ativação (one-time, console): App Hosting → backend `boost-agency-server` →
+# Settings → Environment → nome `boost` → Save. A partir daí o build desta
+# instância mescla este arquivo sobre o apphosting.yaml base (específico vence).
+#
+# PROPÓSITO (inversão produto ⇄ instância): a marca Boost fica PINADA aqui,
+# explícita — quando os defaults do repo virarem a marca do PRODUTO (pós-escolha
+# do nome, ver PRODUTIZACAO.md), esta instância não muda um pixel.
+env:
+  - variable: VITE_OTG_ENABLED
+    value: 'true'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: VITE_BRAND_NAME
+    value: 'Agência Boost'
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_BRAND_SHORT
+    value: 'Boost'
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_BRAND_LOGO_URL
+    value: '/boost-home/logo.svg'
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_BRAND_FAVICON_URL
+    value: '/boost-home/favicon.svg'
+    availability:
+      - BUILD
+      - RUNTIME

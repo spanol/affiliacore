@@ -45,8 +45,11 @@ firebase apphosting:backends:create --project <project-id>
 # conectar o repo GitHub spanol/boost-afiliiados, branch main, região us-east4
 ```
 
-Config por instância: criar `apphosting.<backend-id>.yaml` no repo (override do
-`apphosting.yaml` base — o App Hosting escolhe pelo id do backend):
+Config por instância: criar `apphosting.<ambiente>.yaml` no repo (override que o
+App Hosting MESCLA sobre o `apphosting.yaml` base, específico vence) e associar o
+nome do ambiente ao backend no console: **App Hosting → backend → Settings →
+Environment → `<ambiente>`** (sem associação, o backend usa só o base). Convenção:
+ambiente = nome do cliente (ex.: `alfa` → `apphosting.alfa.yaml`):
 
 ```yaml
 env:

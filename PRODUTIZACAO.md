@@ -112,6 +112,30 @@ A versão vendida é naturalmente OTG-free (a x-api-key é da operação do Carl
 - **Falta**: executar o playbook de verdade na instância do cliente 0 (valida P2
   OTG-free + P3 marca + este P4 de uma vez) e a instância demo com dados fictícios.
 
+## P4.1 · Inversão produto ⇄ instância ("des-Boostificação", decisão 2026-07-03)
+
+> Decisão: **NÃO forkar** (fork = manutenção dupla eterna). Em vez disso, inverter a
+> titularidade: **o repo é o PRODUTO; o Boost do Carlos vira a instância nº 0**,
+> pinada por config. Pós P2/P3/P4 o vínculo com o Boost já é só configuração.
+
+- ✅ **`apphosting.boost.yaml` criado** — pina a instância do Carlos na marca Boost +
+  OTG ligada, imune a qualquer flip futuro de defaults.
+- **Passo do operador (pode fazer JÁ, 1 min, inócuo):** console App Hosting → backend
+  `boost-agency-server` → Settings → Environment → nome **`boost`** → Save. (Hoje os
+  valores do yaml são idênticos aos defaults; a associação só passa a importar no flip.)
+- **Destravam com o NOME do produto (P5.1):**
+  1. **Flip dos defaults** (1 commit): `src/lib/branding.ts` (name/shortName/logo/favicon
+     default → marca do PRODUTO) + assets do produto em `public/` + `<title>`/favicon
+     default do `index.html`. ⚠️ SÓ depois da associação `boost` acima estar salva e
+     verificada — senão um rebuild da instância do Carlos mostraria a marca do produto.
+  2. **Rename do repo GitHub** `boost-afiliiados` → `<produto>`: o GitHub redireciona
+     remotes/URLs antigos; RECONFERIR a conexão App Hosting/Developer Connect de cada
+     backend após o rename (refazer o link se o build parar de disparar).
+  3. **Jurídico (P5.2) espelha**: plataforma `<Produto>` é do Vinicius; a agência do
+     Carlos licencia uma instância white-label com a marca Boost dele.
+- **Naming interno NÃO muda** (`boost_<uuid>`, coleções, `boostAffiliate.ts`): dados de
+  produção dependem, usuário não vê, risco sem ganho.
+
 ## P5 · Comercial — quebrado em pedaços pequenos
 
 > A parte "assustadora". Regra: quase tudo aqui se constrói igual a código, em passos
