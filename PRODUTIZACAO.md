@@ -118,9 +118,22 @@ A versão vendida é naturalmente OTG-free (a x-api-key é da operação do Carl
 > pequenos e com ajuda. As únicas coisas que SÓ o Vinicius faz: conversar com prospects
 > e assinar papel.
 
-- **P5.1 — Nome e marca**: shortlist de nomes (Claude gera + confere domínio .com.br/.app e
-  colisão óbvia de marca), registro do domínio, logo simples (freelancer/ferramenta —
-  custo baixo; não precisa "branding agency"). O produto pode nascer com nome próprio e o
+- **P5.1 — Nome e marca**: ✅ shortlist gerada com domínio `.com.br` **verificado LIVRE
+  no registro.br** (2026-07-03; conferir de novo ao registrar — e buscar no INPI +
+  handle de Instagram antes de bater o martelo):
+  | Nome | Domínio livre | Leitura |
+  |---|---|---|
+  | **AfiliaCore** ⭐ | afiliacore.com.br | soa produto/plataforma B2B; curto |
+  | **Afiliagora** ⭐ | afiliagora.com.br | "afilia agora" + ágora (praça); marca própria |
+  | PainelAfiliado | painelafiliado.com.br | descritivo, vende sozinho; menos "marca" |
+  | Afiliado360 | afiliado360.com.br | descritivo, ideia de visão completa |
+  | CentralAfiliados | centralafiliados.com.br | descritivo sólido |
+  | AfiliaTec | afiliatec.com.br | tech genérico |
+  | GestorAfiliados | gestorafiliados.com.br | descritivo, tom backoffice |
+  | RedeBoost | redeboost.com.br | só se quiser manter a família "Boost" (colide c/ a marca do Carlos) |
+  Ocupados (descartados): afilia, afiliahub, afiliapp, repassepro, comissa, comissio,
+  margemapp, trakto, upafiliados, basebet. Próximo passo: Vinicius escolhe → registrar
+  domínio (registro.br, ~R$40/ano) → logo simples. O produto nasce com nome próprio; o
   Boost do Carlos continua sendo a instância dele.
 - **P5.2 — Jurídico mínimo (1 visita a advogado)**: (a) formalizar por escrito a
   titularidade do IP com o Carlos — barato agora, caro depois; (b) contrato-modelo de
