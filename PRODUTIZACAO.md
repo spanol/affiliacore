@@ -94,14 +94,23 @@ A versão vendida é naturalmente OTG-free (a x-api-key é da operação do Carl
 
 ## P4 · Playbook "novo cliente em 1 dia"
 
-- Checklist + scripts de provisionamento: criar projeto Firebase (região
-  `southamerica-east1`), secrets, `firebase deploy --only firestore:rules`, backend App
-  Hosting, domínio, 1º admin (via P1.1), cron do ranking, seed de casas.
-- **Decisão de arquitetura de deploy**: mesmo repo/`main` para todos os clientes + config por
-  instância (recomendado) — cada cliente é um backend App Hosting em outro projeto Firebase
-  apontando pro mesmo repo. Nada de fork/branch por cliente (manutenção explode).
-- **Instância demo com dados fictícios** — é o playbook aplicado + seed de dados de
-  demonstração. Vira a principal ferramenta de venda (ponte para P5).
+- ✅ **NÚCLEO ENTREGUE 2026-07-03** (branch `feat/p3-branding`):
+  - **Playbook passo a passo em `scripts/provision/README.md`** — projeto Firebase →
+    rules → 1º admin → secrets → backend App Hosting + `apphosting.<backend>.yaml`
+    (override por instância c/ OTG-free + marca) → cron do ranking → domínio →
+    checklist de smoke de aceite.
+  - **`scripts/provision/bootstrap-admin.cjs`** — cria/promove o 1º admin da
+    instância via Admin SDK (senha temporária forte + `mustChangePassword`;
+    idempotente; verifica o role após gravar). Fecha o resto do P1.1.
+  - **Config web do Firebase POR INSTÂNCIA** — `src/lib/firebaseConfig.ts` +
+    define `__FIREBASE_WEBAPP_CONFIG__`: o App Hosting injeta a config do projeto
+    do backend no build (env `FIREBASE_WEBAPP_CONFIG`); o
+    `firebase-applet-config.json` commitado virou só fallback de dev. Era o último
+    acoplamento de código ao projeto do Carlos.
+- **Decisão de arquitetura confirmada**: mesmo repo/`main` para todos os clientes;
+  push na main rebuilda todos os backends conectados. Nada de fork por cliente.
+- **Falta**: executar o playbook de verdade na instância do cliente 0 (valida P2
+  OTG-free + P3 marca + este P4 de uma vez) e a instância demo com dados fictícios.
 
 ## P5 · Comercial — quebrado em pedaços pequenos
 

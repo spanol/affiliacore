@@ -2,7 +2,16 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import firebaseConfig from '../../firebase-applet-config.json';
+import appletConfig from '../../firebase-applet-config.json';
+import { resolveFirebaseConfig } from './firebaseConfig';
+
+// P4 (produtização): cada instância (App Hosting) builda com a config do PRÓPRIO
+// projeto via __FIREBASE_WEBAPP_CONFIG__ (define do vite.config); o JSON commitado
+// é só o fallback de dev/AI Studio. `typeof` guarda ambientes sem o define (vitest).
+const firebaseConfig = resolveFirebaseConfig(
+  typeof __FIREBASE_WEBAPP_CONFIG__ !== 'undefined' ? __FIREBASE_WEBAPP_CONFIG__ : '',
+  appletConfig as Record<string, unknown>,
+);
 
 const app = initializeApp(firebaseConfig);
 

@@ -17,3 +17,6 @@ interface ImportMeta {
 declare const __APP_VERSION__: string;
 declare const __BUILD_TIME__: string;
 declare const __BUILD_COMMIT__: string;
+// P4: JSON do web app do Firebase injetado pelo App Hosting (FIREBASE_WEBAPP_CONFIG)
+// no build da instância; '' fora do App Hosting → fallback no JSON commitado.
+declare const __FIREBASE_WEBAPP_CONFIG__: string;

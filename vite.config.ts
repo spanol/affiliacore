@@ -23,6 +23,12 @@ export default defineConfig(() => {
       __APP_VERSION__: JSON.stringify(v.version || 'dev'),
       __BUILD_TIME__: JSON.stringify(v.buildTime || ''),
       __BUILD_COMMIT__: JSON.stringify(v.commit || ''),
+      // P4 (produtização): o App Hosting injeta FIREBASE_WEBAPP_CONFIG (JSON do web
+      // app do PROJETO do backend) no build — repassada ao bundle p/ cada instância
+      // apontar pro próprio Firebase (mesmo repo, sem fork). Vazia em dev/AI Studio
+      // → src/lib/firebase.ts cai no firebase-applet-config.json commitado.
+      // NÃO é segredo (config web do Firebase é pública por natureza).
+      __FIREBASE_WEBAPP_CONFIG__: JSON.stringify(process.env.FIREBASE_WEBAPP_CONFIG || ''),
     },
     plugins: [react(), tailwindcss()],
     // SECURITY (MEDIUM-3): NÃO inlinar GEMINI_API_KEY (nem qualquer segredo) no
