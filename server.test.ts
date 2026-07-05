@@ -163,12 +163,14 @@ function buildApp(args: { seed?: any; adminAppOpts?: any; fetchImpl?: any } = {}
 function captureFetch() {
   const calls: string[] = [];
   const fetchImpl = async (url: any) => {
-    calls.push(String(url));
-    return {
-      ok: true,
-      status: 200,
-      text: async () => JSON.stringify({ data: [] }),
-    } as any;
+    const u = String(url);
+    calls.push(u);
+    // Cotação EUR→BRL das casas manuais (ranking): bid FIXO 5 (≠ FALLBACK_EUR_BRL=6) p/
+    // provar que a conversão usa a cotação BUSCADA, não o fallback. Demais URLs (OTG) → vazio.
+    if (u.includes('awesomeapi')) {
+      return { ok: true, status: 200, text: async () => JSON.stringify({ EURBRL: { bid: '5' } }) } as any;
+    }
+    return { ok: true, status: 200, text: async () => JSON.stringify({ data: [] }) } as any;
   };
   return { fetchImpl, calls };
 }
@@ -980,13 +982,15 @@ describe('cron interno daily-ranking', () => {
     const fs = makeFirestore({
       ...seed,
       affiliates: { 'AFF-M': { id: 'AFF-M', name: 'Manuel Manual' } },
-      affiliate_configs: { 'AFF-M': { affiliateId: 'AFF-M', cpaValue: 40, revPercentage: 0 } },
+      // A métrica NÃO usa mais affiliate_configs — a comissão da casa manual vem da TAXA
+      // DA CASA (defaultCpa em EUR → BRL pela cotação). betfair 40 EUR × bid 5 = R$200/CPA.
+      houses: { betfair: { name: 'Betfair', dataSource: 'manual', defaultCpa: 40, defaultRev: 0 } },
       house_results: {
         r1: { houseSlug: 'betfair', date: '2099-01-01', affiliateId: 'AFF-M', qualified_cpa: 3, rvs: 0 },
         r2: { houseSlug: 'betfair', date: '2099-01-01', affiliateId: null, qualified_cpa: 99, rvs: 0 }, // agregado: fora
       },
     });
-    const { fetchImpl } = captureFetch(); // OTG devolve { data: [] } → 0 linhas
+    const { fetchImpl } = captureFetch(); // OTG devolve { data: [] } → 0 linhas; awesomeapi → bid 5
     const app = createApp({ adminApp: makeAdminApp(), adminDb: fs, fetchImpl });
     // usa a rota admin com date no body p/ cravar o dia do seed (mesmo computeAndStoreRanking do cron)
     const res = await request(app)
@@ -997,7 +1001,35 @@ describe('cron interno daily-ranking', () => {
     expect(res.body.count).toBe(1);
     const doc = fs.__store.get('daily_rankings').get('2099-01-01');
     expect(doc.entries).toEqual([
-      { pos: 1, affiliateId: 'AFF-M', name: 'Manuel Manual', commission: 120 }, // 3 × R$40
+      { pos: 1, affiliateId: 'AFF-M', name: 'Manuel Manual', commission: 600 }, // 3 CPA × (40 EUR × 5)
+    ]);
+  });
+
+  it('OTG: ranqueia pela comissão bruta (total_commission), inclusive produção só-REV (o bug)', async () => {
+    // A produção real da OTG é quase toda REV-share (qualified_cpa=0, rvs>0). O ranking
+    // ANTIGO recalculava pela config CPA/REV (revPercentage=0) e zerava esses afiliados
+    // (ex.: rvs=1624 → R$0). Agora vale o total_commission que a própria OTG reporta.
+    const fs = makeFirestore({ ...seed, affiliates: { A: { id: 'A', name: 'Ana' }, B: { id: 'B', name: 'Beto' } } });
+    const otgRows = [
+      { id: 'A', label: 'Ana', total_commission: 1624.03, qualified_cpa: 0, rvs: 1624.03 }, // SÓ-REV
+      { id: 'B', label: 'Beto', total_commission: 300, qualified_cpa: 2, rvs: 0 },
+      { id: 'Z', label: 'Zero', total_commission: 0, qualified_cpa: 0, rvs: 0 },
+    ];
+    const fetchImpl = async () => ({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ data: { data: otgRows, meta: { totalPages: 1 } } }),
+    } as any);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs, fetchImpl });
+    const res = await request(app)
+      .post('/api/rankings/compute')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ date: '2099-03-03' })
+      .expect(200);
+    expect(res.body.count).toBe(2); // Zero (total_commission 0) filtrado
+    expect(res.body.entries).toEqual([
+      { pos: 1, affiliateId: 'A', name: 'Ana', commission: 1624.03 }, // só-REV, NÃO zerado
+      { pos: 2, affiliateId: 'B', name: 'Beto', commission: 300 },
     ]);
   });
 
@@ -1068,14 +1100,14 @@ describe('P2 · módulo OTG desligado por instância', () => {
     await request(app).get('/api/affiliate-configs').set('Authorization', 'Bearer admin-uid').expect(200);
   });
 
-  it('ranking OTG-free: zero chamadas de rede, sem exigir AFFILIATE_API_KEY, só casas manuais', async () => {
+  it('ranking OTG-free: nenhuma chamada à OTG (só a cotação p/ as casas manuais), sem exigir AFFILIATE_API_KEY', async () => {
     const prevKey = process.env.AFFILIATE_API_KEY;
     delete process.env.AFFILIATE_API_KEY; // instância OTG-free não tem a chave
     try {
       const db = makeFirestore({
         ...seed,
         affiliates: { 'AFF-M': { id: 'AFF-M', name: 'Manuel' } },
-        affiliate_configs: { 'AFF-M': { affiliateId: 'AFF-M', cpaValue: 50, revPercentage: 0 } },
+        houses: { betfair: { name: 'Betfair', dataSource: 'manual', defaultCpa: 40, defaultRev: 0 } },
         house_results: {
           r1: { houseSlug: 'betfair', date: '2099-02-02', affiliateId: 'AFF-M', qualified_cpa: 2, rvs: 0 },
         },
@@ -1088,8 +1120,10 @@ describe('P2 · módulo OTG desligado por instância', () => {
         .send({ date: '2099-02-02' })
         .expect(200);
       expect(res.body.count).toBe(1);
-      expect(res.body.entries[0]).toMatchObject({ affiliateId: 'AFF-M', commission: 100 }); // 2 × R$50
-      expect(calls).toHaveLength(0); // nenhuma chamada à OTG
+      expect(res.body.entries[0]).toMatchObject({ affiliateId: 'AFF-M', commission: 400 }); // 2 CPA × (40 EUR × 5)
+      // nenhuma chamada à OTG; a única chamada de rede é a cotação EUR→BRL das casas manuais.
+      expect(calls.filter((u) => u.includes('external/results'))).toHaveLength(0);
+      expect(calls.filter((u) => u.includes('awesomeapi'))).toHaveLength(1);
     } finally {
       if (prevKey !== undefined) process.env.AFFILIATE_API_KEY = prevKey;
     }

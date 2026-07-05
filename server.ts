@@ -10,13 +10,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { renderErrorPage } from './errorPage';
 import { isBotUserAgent, appendSubid, clickStatDay } from './src/lib/tracking';
-import { resolveIsSpecial, resolveServerToday, resolveScopedAffiliateIds } from './src/lib/scope';
+import { resolveIsSpecial, resolveServerToday, resolveServerYesterday, resolveScopedAffiliateIds } from './src/lib/scope';
 import { otgEnabled } from './src/lib/instance';
-import { computeRankingEntries, mergeManualIntoRankingRows } from './src/lib/ranking';
+import { computeRankingEntries } from './src/lib/ranking';
 import { expandAffiliateIdsParam } from './src/lib/affiliateIdsParam';
 import { hrDocId, sanitizeMetrics } from './src/lib/houseResultsDoc';
 import { makeBoostAffiliateId, normalizeEmailKey } from './src/lib/boostAffiliate';
-import type { AffiliateConfig } from './src/lib/commission';
+import { eurToBrl, parseEurBrlRate, FALLBACK_EUR_BRL } from './src/lib/currency';
 import { DEFAULT_BRANDS } from './src/lib/brand';
 import { projectPartnerResults } from './src/lib/partnerResults';
 import { pullApprovedRoster, isOtgLinksConfigured } from './otgLinksPull';
@@ -1130,11 +1130,29 @@ export function createApp(deps: ServerDeps) {
   // daily_rankings/{data} — que todo afiliado lê (leaderboard público com nomes).
   const isoDateRe = /^\d{4}-\d{2}-\d{2}$/;
 
+  // Cotação EUR→BRL p/ derivar a comissão das casas manuais no ranking (defaultCpa em
+  // EUR). Best-effort via o fetch INJETADO (mesma DI da OTG) → testável e sem rede real
+  // nos testes; nunca lança, cai no FALLBACK_EUR_BRL. Espelha currency.ts (client) sem o
+  // cache de módulo do browser. Usa .text()+JSON.parse (igual ao proxy OTG).
+  async function fetchEurBrlForRanking(): Promise<number> {
+    try {
+      const resp = await fetchImpl('https://economia.awesomeapi.com.br/last/EUR-BRL', {
+        headers: { Accept: 'application/json' },
+      });
+      if (!resp.ok) return FALLBACK_EUR_BRL;
+      const text = await resp.text();
+      const rate = parseEurBrlRate(text ? JSON.parse(text) : null);
+      return rate ?? FALLBACK_EUR_BRL;
+    } catch {
+      return FALLBACK_EUR_BRL;
+    }
+  }
+
   // Núcleo REUSÁVEL da geração do ranking (fonte única — CLAUDE.md): pagina os results
-  // do dia, calcula o repasse de cada afiliado (mesma fórmula byBrand dos dashboards) e
-  // grava daily_rankings/{date}. Reusado pela rota admin (botão) E pela rota de cron.
-  // Lança em falha dura (Error.status p/ o chamador mapear); code "040" (sem dados) não
-  // é erro → grava ranking vazio. NUNCA reimplemente este cálculo inline (R2).
+  // do dia, soma a comissão BRUTA de cada afiliado (mesma base dos dashboards: OTG
+  // total_commission + manual derivado da taxa da casa) e grava daily_rankings/{date}.
+  // Reusado pela rota admin (botão) E pela rota de cron. Lança em falha dura (Error.status
+  // p/ o chamador mapear); code "040" (sem dados) não é erro → grava ranking vazio.
   async function computeAndStoreRanking(
     date: string,
     generatedByName: string,
@@ -1182,39 +1200,45 @@ export function createApp(deps: ServerDeps) {
       } while (page <= totalPages && page <= MAX_PAGES);
     }
 
-    // Resultados MANUAIS do dia (house_results atribuídos) entram no ranking com a
-    // MESMA fórmula — antes ficavam de fora e o ranking saía zerado enquanto a
-    // produção estava nas casas manuais (bug 2026-07-02, diagnóstico em prod:
-    // 6 rankings count=0 vs house_results com atividade quase diária).
+    // Resultados MANUAIS do dia (house_results atribuídos). Entram no ranking com a
+    // MESMA comissão bruta dos dashboards; a linha manual tem total_commission=0, então
+    // a comissão é DERIVADA pela taxa da casa (houseRateOf abaixo). Sem isso o ranking
+    // via só a OTG e saía zerado enquanto a produção estava nas casas manuais.
     const manualSnap = await adminDb.collection('house_results').where('date', '==', date).get();
     const manualRows: any[] = [];
     manualSnap.forEach((d) => manualRows.push(d.data()));
-    const allRows = mergeManualIntoRankingRows(rows, manualRows);
 
-    // Configs (taxa por afiliado, COM byBrand) e nome+marca do mirror.
-    const [cfgSnap, affSnap] = await Promise.all([
-      adminDb.collection('affiliate_configs').get(),
-      adminDb.collection('affiliates').get(),
-    ]);
-    // Config COMPLETA (inclui byBrand) — antes guardava só cpaValue/revPercentage e
-    // o ranking nunca via o override por casa (R2).
-    const configs: Record<string, AffiliateConfig | undefined> = {};
-    cfgSnap.forEach((d) => { configs[d.id] = d.data() as AffiliateConfig; });
+    // Nome do afiliado (mirror). A métrica é a comissão BRUTA por afiliado (total_commission
+    // da OTG + comissão derivada das casas manuais) — NÃO depende mais de affiliate_configs;
+    // a produção real é quase toda REV-share e as configs eram só-CPA, zerando o ranking.
+    const affSnap = await adminDb.collection('affiliates').get();
     const names: Record<string, string> = {};
-    const brandIdByAffiliate: Record<string, string> = {};
     affSnap.forEach((d) => {
       const v = d.data() as any;
       if (v?.name) names[d.id] = String(v.name);
-      // marca do afiliado (mirror: brand = {id,name}) → aplica a taxa byBrand da casa
-      // dele, MESMA atribuição afiliado→casa que o /admin usa (calcNetProfitByHouse).
-      const bid = v?.brand?.id ?? v?.brand_id;
-      if (bid) brandIdByAffiliate[d.id] = String(bid);
     });
 
-    // Mesma fórmula/repasse dos dashboards (calcAffiliatePayout), com a taxa por casa.
-    const entries = computeRankingEntries(allRows, configs, {
-      brandIdOf: (id) => brandIdByAffiliate[id],
+    // Taxa das casas manuais p/ derivar a comissão das linhas com total_commission=0.
+    // defaultCpa é gravado EM EUR (a casa nos passa o CPA em euro) → converte p/ BRL pela
+    // cotação ao vivo (best-effort, cai no fallback), IGUAL ao /admin (houseRateOf). Só
+    // busca cotação/casas quando há linha manual — a OTG já traz total_commission em R$.
+    let houseRateOf: ((slug: string | undefined) => { defaultCpa: number; defaultRev: number } | undefined) | undefined;
+    if (manualRows.length) {
+      const eurBrl = await fetchEurBrlForRanking();
+      const housesSnap = await adminDb.collection('houses').get();
+      const rateBySlug = new Map<string, { defaultCpa: number; defaultRev: number }>();
+      housesSnap.forEach((d) => {
+        const v = d.data() as any;
+        rateBySlug.set(d.id, { defaultCpa: eurToBrl(v?.defaultCpa, eurBrl), defaultRev: Number(v?.defaultRev) || 0 });
+      });
+      houseRateOf = (slug) => (slug ? rateBySlug.get(slug) : undefined);
+    }
+
+    // Comissão bruta por afiliado (mesma base do /admin): OTG (total_commission) + manual
+    // (derivado da taxa da casa). Ver src/lib/ranking.ts p/ a métrica.
+    const entries = computeRankingEntries([...rows, ...manualRows], {
       nameById: names,
+      houseRateOf,
     });
 
     await adminDb.collection('daily_rankings').doc(date).set({
@@ -1258,8 +1282,8 @@ export function createApp(deps: ServerDeps) {
       title = `Ranking de ${date} gerado`;
       body = `O ranking diário foi gerado automaticamente com ${outcome.count} afiliado(s). Confira em /ranking.`;
     } else if (outcome.ok) {
-      title = `Ranking de ${date} ainda sem dados`;
-      body = `A geração automática rodou, mas a OTG ainda não tem resultados de ${date}. Gere novamente em /ranking depois das 14h.`;
+      title = `Ranking de ${date} sem dados`;
+      body = `A geração automática rodou, mas não há resultados registrados para ${date}. Verifique em /ranking.`;
     } else {
       title = `Falha ao gerar o ranking de ${date}`;
       body = `A geração automática falhou${outcome.error ? ` (${outcome.error})` : ''}. Gere manualmente em /ranking.`;
@@ -1312,15 +1336,16 @@ export function createApp(deps: ServerDeps) {
     }
   });
 
-  // Gatilho DIÁRIO (Cloud Scheduler ~14h30 BR, depois da OTG atualizar 13h-14h). Gera o
-  // ranking de HOJE no fuso BR (resolveServerToday — R12) e manda um lembrete/relatório
-  // aos admins. Secret-gated (fora do requireAdmin — um cron não tem token Firebase).
-  // Idempotente: re-rodar no mesmo dia sobrescreve o ranking e o lembrete. Responde 200
-  // mesmo "sem dados" (o lembrete cobre; o scheduler não deve re-tentar por isso); 502
-  // só na falha real de upstream (aí um retry do scheduler faz sentido).
+  // Gatilho DIÁRIO (Cloud Scheduler ~14h30 BR). Gera o ranking de ONTEM no fuso BR
+  // (resolveServerYesterday) — a OTG só FECHA os resultados de um dia no dia seguinte, então
+  // "hoje" às 14h30 vem quase sempre vazio; ontem é o último dia completo. Manda um
+  // lembrete/relatório aos admins. Secret-gated (fora do requireAdmin — um cron não tem
+  // token Firebase). Idempotente: re-rodar no mesmo dia sobrescreve o ranking e o lembrete.
+  // Responde 200 mesmo "sem dados" (o scheduler não deve re-tentar por isso); 502 só na
+  // falha real de upstream (aí um retry do scheduler faz sentido).
   app.post('/api/internal/daily-ranking', requireCronSecret, async (_req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
-    const date = resolveServerToday();
+    const date = resolveServerYesterday();
     let outcome: { ok: boolean; count: number; error?: string };
     try {
       const result = await computeAndStoreRanking(date, 'Geração automática');

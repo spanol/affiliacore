@@ -27,6 +27,14 @@ export function todayISO(): string {
   return toISODate(new Date());
 }
 
+// Data de "ontem" (último dia FECHADO). A OTG só finaliza os resultados de um dia no
+// dia seguinte, então o ranking diário é exibido/gerado para ontem por padrão.
+export function yesterdayISO(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return toISODate(d);
+}
+
 // Realtime do ranking de um dia. Chama onData(null) quando o snapshot ainda não
 // foi calculado (doc inexistente).
 export function subscribeToDailyRanking(

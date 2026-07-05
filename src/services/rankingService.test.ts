@@ -5,6 +5,7 @@ import {
   subscribeToDailyRanking,
   computeDailyRanking,
   todayISO,
+  yesterdayISO,
 } from './rankingService';
 
 // O service lê o Firestore direto (doc/onSnapshot) e dispara o cálculo via authFetch.
@@ -118,5 +119,12 @@ describe('computeDailyRanking', () => {
 describe('todayISO', () => {
   it('retorna string no formato YYYY-MM-DD', () => {
     expect(todayISO()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe('yesterdayISO', () => {
+  it('retorna string YYYY-MM-DD e é anterior a hoje', () => {
+    expect(yesterdayISO()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(yesterdayISO() < todayISO()).toBe(true);
   });
 });

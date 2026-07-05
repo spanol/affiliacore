@@ -31,6 +31,20 @@ export function resolveServerToday(now: Date = new Date(), timeZone = 'America/S
   }).format(now);
 }
 
+// "Ontem" no fuso BR — o último dia FECHADO. A OTG só finaliza os resultados de um dia
+// no dia seguinte (hoje quase sempre vem vazio às 14h30), então o ranking diário é
+// gerado/exibido para ontem. Deriva de resolveServerToday e subtrai 1 dia via UTC
+// (calendário puro, sem depender do fuso do processo). Determinístico dado `now`.
+export function resolveServerYesterday(now: Date = new Date(), timeZone = 'America/Sao_Paulo'): string {
+  const today = resolveServerToday(now, timeZone);
+  const d = new Date(`${today}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export interface ScopeInput {
   role?: string | null;
   endpoint: string;
