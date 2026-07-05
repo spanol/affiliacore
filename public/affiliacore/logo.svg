@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 120" role="img" aria-label="AffiliaCore">
+  <!-- Wordmark placeholder do PRODUTO (AffiliaCore) — monocromático BRANCO de
+       propósito: o app aplica `invert dark:invert-0` (branco no dark, preto no
+       light), igual ao logo Boost. Trocar por logo definitivo no P5.1 (logo). -->
+  <text x="4" y="86" font-family="Arial, Helvetica, sans-serif" font-size="88" font-weight="800" letter-spacing="-3" fill="#ffffff">Affilia<tspan font-weight="400">Core</tspan></text>
+</svg>

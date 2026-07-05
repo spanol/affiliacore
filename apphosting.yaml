@@ -35,13 +35,33 @@ env:
       - BUILD
       - RUNTIME
 
-  # P3 (produtização): marca por instância. NESTA instância os defaults já são a
-  # marca Boost — as envs ficam de fora de propósito. Numa instância white-label,
-  # declare (BUILD + RUNTIME, como o VITE_OTG_ENABLED):
-  #   VITE_BRAND_NAME:        nome completo (título/badges, ex. "Agência Alfa")
-  #   VITE_BRAND_SHORT:       nome curto p/ meio de frase, tratado no feminino
-  #   VITE_BRAND_LOGO_URL:    URL do logo (Storage da instância ou CDN)
-  #   VITE_BRAND_FAVICON_URL: URL do favicon
+  # P3/P4.1 (produtização): marca por instância. Pós-inversão, os DEFAULTS do repo
+  # são a marca do PRODUTO (AffiliaCore) — então a marca Boost desta instância
+  # (Carlos) fica PINADA aqui explicitamente. Cinto-e-suspensório: estes valores
+  # também vivem em apphosting.boost.yaml (ambiente `boost`); quando a associação
+  # do ambiente ao backend boost-agency-server estiver confirmada no console, este
+  # bloco pode sair do base. Instância white-label nova: declarar os VITE_BRAND_*
+  # no apphosting.<ambiente>.yaml dela (ver scripts/provision/README.md).
+  - variable: VITE_BRAND_NAME
+    value: 'Agência Boost'
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_BRAND_SHORT
+    value: 'Boost'
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_BRAND_LOGO_URL
+    value: '/boost-home/logo.svg'
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_BRAND_FAVICON_URL
+    value: '/boost-home/favicon.svg'
+    availability:
+      - BUILD
+      - RUNTIME
 
   # Credenciais do Firebase Admin SDK (conteúdo do service-account.json).
   # Criar com:  firebase apphosting:secrets:set firebase-service-account-key

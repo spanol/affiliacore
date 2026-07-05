@@ -123,15 +123,17 @@ A versão vendida é naturalmente OTG-free (a x-api-key é da operação do Carl
 - **Passo do operador (pode fazer JÁ, 1 min, inócuo):** console App Hosting → backend
   `boost-agency-server` → Settings → Environment → nome **`boost`** → Save. (Hoje os
   valores do yaml são idênticos aos defaults; a associação só passa a importar no flip.)
-- **Destravam com o NOME do produto (P5.1):**
-  1. **Flip dos defaults** (1 commit): `src/lib/branding.ts` (name/shortName/logo/favicon
-     default → marca do PRODUTO) + assets do produto em `public/` + `<title>`/favicon
-     default do `index.html`. ⚠️ SÓ depois da associação `boost` acima estar salva e
-     verificada — senão um rebuild da instância do Carlos mostraria a marca do produto.
-  2. **Rename do repo GitHub** `boost-afiliiados` → `<produto>`: o GitHub redireciona
+- ✅ **FLIP EXECUTADO (2026-07-05, na branch):** defaults de `src/lib/branding.ts` →
+  **AffiliaCore** + assets placeholder em `public/affiliacore/` + `<title>`/favicon do
+  `index.html`. **Cinto-e-suspensório:** a marca Boost do Carlos está pinada em DOIS
+  lugares — no `apphosting.yaml` BASE (inline; remover depois) E no
+  `apphosting.boost.yaml` (ambiente `boost`) — merge seguro mesmo sem a associação no
+  console. Após confirmar a associação, limpar o bloco de marca do base.
+- **Restam:**
+  1. **Rename do repo GitHub** `boost-afiliiados` → `affiliacore`: o GitHub redireciona
      remotes/URLs antigos; RECONFERIR a conexão App Hosting/Developer Connect de cada
      backend após o rename (refazer o link se o build parar de disparar).
-  3. **Jurídico (P5.2) espelha**: plataforma `<Produto>` é do Vinicius; a agência do
+  2. **Jurídico (P5.2) espelha**: plataforma AffiliaCore é do Vinicius; a agência do
      Carlos licencia uma instância white-label com a marca Boost dele.
 - **Naming interno NÃO muda** (`boost_<uuid>`, coleções, `boostAffiliate.ts`): dados de
   produção dependem, usuário não vê, risco sem ganho.
@@ -142,9 +144,12 @@ A versão vendida é naturalmente OTG-free (a x-api-key é da operação do Carl
 > pequenos e com ajuda. As únicas coisas que SÓ o Vinicius faz: conversar com prospects
 > e assinar papel.
 
-- **P5.1 — Nome e marca**: ✅ shortlist gerada com domínio `.com.br` **verificado LIVRE
-  no registro.br** (2026-07-03; conferir de novo ao registrar — e buscar no INPI +
-  handle de Instagram antes de bater o martelo):
+- **P5.1 — Nome e marca**: ✅✅ **DECIDIDO (2026-07-05): o produto chama-se
+  `AffiliaCore`** — domínio **`affiliacore.com.br`** (com DOIS "f", grafia inglesa)
+  **registrado pelo Vinicius** (expira 2027-07-05). ⚠️ `afiliacore.com.br` (um "f", o
+  da shortlist) segue LIVRE — recomendado registrar também (~R$40) como typo-defense.
+  Pendentes: busca INPI, handle Instagram, logo definitivo (placeholder monocromático
+  em `public/affiliacore/`). Shortlist original (2026-07-03):
   | Nome | Domínio livre | Leitura |
   |---|---|---|
   | **AfiliaCore** ⭐ | afiliacore.com.br | soa produto/plataforma B2B; curto |

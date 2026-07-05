@@ -5,8 +5,12 @@
 //                        CONVENÇÃO pt-BR: o texto trata a marca no feminino
 //                        ("a {short} calcula...") — escolha um nome que caiba.
 //   VITE_BRAND_LOGO_URL / VITE_BRAND_FAVICON_URL — URLs (Storage da instância,
-//                        CDN ou caminho em /public). Default = assets do Boost.
-// Ausência de TODAS → marca Boost atual (a instância do Carlos não muda nada).
+//                        CDN ou caminho em /public).
+// P4.1 (inversão, 2026-07-05): ausência de TODAS → marca do PRODUTO,
+// **AffiliaCore** (domínio affiliacore.com.br — com DOIS "f" — registrado pelo
+// Vinicius). O repo é o produto; a instância Boost do Carlos fica pinada por env
+// (apphosting.yaml base + apphosting.boost.yaml). Não reintroduza "Boost" como
+// default aqui.
 // Puro e sem import.meta (o server importa daqui); o client usa brandingClient.ts.
 
 export interface Brand {
@@ -25,9 +29,9 @@ export function resolveBrand(env?: Record<string, unknown> | null, baseUrl = '/'
   const e = env ?? {};
   const base = typeof baseUrl === 'string' && baseUrl.length > 0 ? baseUrl : '/';
   return {
-    name: str(e.VITE_BRAND_NAME) ?? 'Agência Boost',
-    shortName: str(e.VITE_BRAND_SHORT) ?? 'Boost',
-    logoUrl: str(e.VITE_BRAND_LOGO_URL) ?? `${base}boost-home/logo.svg`,
-    faviconUrl: str(e.VITE_BRAND_FAVICON_URL) ?? `${base}boost-home/favicon.svg`,
+    name: str(e.VITE_BRAND_NAME) ?? 'AffiliaCore',
+    shortName: str(e.VITE_BRAND_SHORT) ?? 'AffiliaCore',
+    logoUrl: str(e.VITE_BRAND_LOGO_URL) ?? `${base}affiliacore/logo.svg`,
+    faviconUrl: str(e.VITE_BRAND_FAVICON_URL) ?? `${base}affiliacore/favicon.svg`,
   };
 }
