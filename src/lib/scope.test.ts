@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveIsSpecial, resolveServerToday, resolveScopedAffiliateIds } from './scope';
+import { resolveIsSpecial, resolveServerToday, resolveServerYesterday, resolveScopedAffiliateIds } from './scope';
 
 describe('resolveIsSpecial · definição única (R7)', () => {
   it('só é especial com active === true', () => {
@@ -30,6 +30,21 @@ describe('resolveServerToday · fuso BR, não UTC (R12)', () => {
 
   it('respeita o timeZone informado', () => {
     expect(resolveServerToday(new Date('2026-06-25T02:30:00Z'), 'UTC')).toBe('2026-06-25');
+  });
+});
+
+describe('resolveServerYesterday · último dia FECHADO no fuso BR', () => {
+  it('meio-dia BR → ontem', () => {
+    expect(resolveServerYesterday(new Date('2026-07-04T15:00:00Z'))).toBe('2026-07-03'); // 12:00 BR
+  });
+
+  it('23:30 BR (02:30Z do dia seguinte) → ontem-BR, não ontem-UTC', () => {
+    // 2026-07-04T23:30 BR: hoje-BR=04 → ontem=03 (UTC daria hoje=05 → ontem=04: bug).
+    expect(resolveServerYesterday(new Date('2026-07-05T02:30:00Z'))).toBe('2026-07-03');
+  });
+
+  it('vira o mês corretamente (01 → último dia do mês anterior)', () => {
+    expect(resolveServerYesterday(new Date('2026-07-01T15:00:00Z'))).toBe('2026-06-30');
   });
 });
 

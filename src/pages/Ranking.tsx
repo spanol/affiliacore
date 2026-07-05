@@ -11,7 +11,7 @@ import {
   RankingEntry,
   subscribeToDailyRanking,
   computeDailyRanking,
-  todayISO,
+  yesterdayISO,
 } from '../services/rankingService';
 
 const formatBRL = (v: number) =>
@@ -27,10 +27,12 @@ export default function Ranking() {
   const { profile } = useAuth();
   const { push } = useToast();
   const isAdmin = profile?.role === 'admin';
-  // Dia exibido: hoje por padrão; admin pode inspecionar/recalcular outro via ?date=YYYY-MM-DD.
+  // Dia exibido: ONTEM (último dia FECHADO) por padrão — a OTG só finaliza os resultados
+  // de um dia no dia seguinte. Admin inspeciona/recalcula outro (inclusive hoje) via
+  // ?date=YYYY-MM-DD.
   const [searchParams] = useSearchParams();
   const dateParam = searchParams.get('date');
-  const today = resolveRankingDate(dateParam, todayISO());
+  const displayDate = resolveRankingDate(dateParam, yesterdayISO());
 
   const [ranking, setRanking] = useState<DailyRanking | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,7 +42,7 @@ export default function Ranking() {
   useEffect(() => {
     setLoading(true);
     const unsubscribe = subscribeToDailyRanking(
-      today,
+      displayDate,
       (data) => {
         setRanking(data);
         setLoading(false);
@@ -52,12 +54,12 @@ export default function Ranking() {
       },
     );
     return () => unsubscribe();
-  }, [today]);
+  }, [displayDate]);
 
   const handleCompute = async () => {
     setComputing(true);
     try {
-      const { count } = await computeDailyRanking(today);
+      const { count } = await computeDailyRanking(displayDate);
       push({ type: 'success', message: `Ranking atualizado (${count} afiliado${count === 1 ? '' : 's'}).` });
     } catch (err) {
       push({ type: 'error', message: err instanceof Error ? err.message : 'Falha ao calcular o ranking.' });
@@ -86,7 +88,7 @@ export default function Ranking() {
         <div>
           <span className="inline-flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-            Gamificação · {formatRangeLabel({ startDate: today, endDate: today })}
+            Gamificação · {formatRangeLabel({ startDate: displayDate, endDate: displayDate })}
           </span>
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tighter flex items-center gap-3">
             <span className="p-2 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700/60">
@@ -105,7 +107,7 @@ export default function Ranking() {
             className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-neutral-900 rounded-full text-xs font-bold hover:opacity-90 transition-all shadow-sm self-start shrink-0 disabled:opacity-50"
           >
             {computing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            {ranking ? 'Atualizar ranking' : 'Gerar ranking de hoje'}
+            {ranking ? 'Atualizar ranking' : 'Gerar ranking do dia'}
           </button>
         )}
       </header>
@@ -116,7 +118,7 @@ export default function Ranking() {
           <div className="flex items-center gap-3">
             <span className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-500 text-white font-black text-sm shadow">#{myEntry.pos}</span>
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400">Sua posição hoje</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400">Sua posição no dia</p>
               <p className="text-sm font-bold text-slate-900 dark:text-white">{humanizeName(myEntry.name)}</p>
             </div>
           </div>
@@ -137,13 +139,13 @@ export default function Ranking() {
             <Trophy size={24} />
           </div>
           <h3 className="text-sm font-bold text-slate-800 dark:text-neutral-100 mb-1">
-            {ranking ? 'Sem comissão registrada neste dia (ainda)' : 'Ranking ainda não calculado para este dia'}
+            {ranking ? 'Sem comissão registrada neste dia' : 'Ranking ainda não calculado para este dia'}
           </h3>
           <p className="text-xs text-slate-500 dark:text-neutral-400">
             {ranking
-              ? 'A OTG atualiza os resultados entre 13h–14h. Atualize mais tarde para ver o ranking do dia.'
+              ? 'Nenhum afiliado gerou comissão neste dia.'
               : isAdmin
-                ? 'Clique em "Gerar ranking de hoje" para calcular a partir dos resultados do dia.'
+                ? 'Clique em "Gerar ranking do dia" para calcular a partir dos resultados.'
                 : 'Aguarde o ciclo de atualização — a plataforma calcula a partir dos resultados do dia.'}
           </p>
         </div>

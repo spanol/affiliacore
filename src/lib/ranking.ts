@@ -1,10 +1,17 @@
-// Cálculo PURO do leaderboard diário (ranking de comissão). Vive em lib (sem
-// Firebase) p/ o server.ts reusar e ser testável. Antes o server.ts reimplementava
-// a fórmula inline com SÓ a taxa de topo (cpaValue/revPercentage), ignorando o
-// override por casa (byBrand) e divergindo dos dashboards (R2). Agora usa o MESMO
-// calcAffiliatePayout, aplicando a taxa por casa quando o brandId do afiliado é
-// conhecido (resolvido pelo caller a partir do mirror `affiliates`).
-import { AffiliateConfig, calcAffiliatePayout, num } from './commission';
+// Cálculo PURO do leaderboard diário. Vive em lib (sem Firebase) p/ o server.ts
+// reusar e ser testável.
+//
+// MÉTRICA (decisão 2026-07-05): "quem produziu mais" = comissão BRUTA gerada para a
+// agência por afiliado — a MESMA base dos dashboards. Antes o ranking recalculava o
+// repasse Boost (calcAffiliatePayout, taxa CPA/REV por afiliado), mas a produção real
+// da OTG é quase toda REV-share e as configs Boost são só-CPA (revPercentage=0) ou
+// ausentes → a comissão dava 0 e o afiliado sumia do ranking, mesmo produzindo
+// (ex.: rvs=1624 → R$0). Agora usamos `houseCommissionForRow`, a fonte ÚNICA já usada
+// no /admin: linha da OTG traz `total_commission` preenchido (>0 → usado direto); linha
+// MANUAL (house_results, total_commission=0) deriva pela taxa da casa (defaultCpa em
+// BRL × qualified_cpa + rvs × defaultRev/100). Uma métrica só, consistente com o /admin,
+// sem depender de config por afiliado.
+import { HouseRate, houseCommissionForRow } from './commission';
 
 export interface RankingEntry {
   pos: number;
@@ -14,54 +21,47 @@ export interface RankingEntry {
 }
 
 export interface RankingOpts {
-  // brandId do afiliado → aplica a taxa POR CASA (byBrand) dele. Sem ele, taxa de topo.
-  brandIdOf?: (affiliateId: string) => string | undefined;
   nameById?: Record<string, string>;
+  // Taxa da casa JÁ EM BRL (defaultCpa convertido de EUR→BRL pelo caller), p/ derivar a
+  // comissão das linhas manuais (house_results, total_commission=0). Sem ela, ou p/
+  // linha da OTG (sem houseSlug), houseCommissionForRow usa o total_commission da linha.
+  houseRateOf?: (houseSlug: string | undefined) => HouseRate | null | undefined;
   limit?: number; // top N (default 100)
 }
 
-// Merge ADITIVO dos resultados de casas MANUAIS (house_results do dia) nas linhas
-// por-afiliado da OTG, antes do cálculo do ranking. Sem isso o ranking só via a OTG
-// e saía ZERADO enquanto a produção real estava nas casas manuais (bug 2026-07-02).
-// Mesma semântica do merge manual dos dashboards: soma qualified_cpa/rvs por
-// afiliado; linha manual SEM atribuição (affiliateId null = agregado da casa) não
-// entra — ranking é por afiliado. num() guarda métrica string/NaN.
-export function mergeManualIntoRankingRows(otgRows: any[], manualRows: any[]): any[] {
-  const byId = new Map<string, any>();
-  for (const r of Array.isArray(otgRows) ? otgRows : []) {
-    const id = String(r?.affiliate_id ?? r?.id ?? '').trim();
-    if (!id) continue;
-    byId.set(id, { ...r });
-  }
-  for (const m of Array.isArray(manualRows) ? manualRows : []) {
-    const id = m?.affiliateId != null ? String(m.affiliateId).trim() : '';
-    if (!id) continue;
-    const cur = byId.get(id) ?? { affiliate_id: id, qualified_cpa: 0, rvs: 0 };
-    cur.qualified_cpa = num(cur.qualified_cpa) + num(m?.qualified_cpa);
-    cur.rvs = num(cur.rvs) + num(m?.rvs);
-    byId.set(id, cur);
-  }
-  return [...byId.values()];
+// Extrai o affiliateId de uma linha, cobrindo as duas fontes: OTG usa `id`/`affiliate_id`,
+// house_results usa `affiliateId`. Linha agregada da casa (affiliateId null) → '' (fora).
+function rowAffiliateId(r: any): string {
+  const raw = r?.affiliate_id ?? r?.affiliateId ?? r?.id;
+  return raw == null ? '' : String(raw).trim();
 }
 
-export function computeRankingEntries(
-  rows: any[],
-  configById: Record<string, AffiliateConfig | undefined>,
-  opts: RankingOpts = {}
-): RankingEntry[] {
-  const { brandIdOf, nameById = {}, limit = 100 } = opts;
-  return (Array.isArray(rows) ? rows : [])
-    .map((r) => {
-      const affiliateId = String(r?.affiliate_id ?? r?.id ?? '').trim();
-      if (!affiliateId) return null;
-      // Mesma fórmula/repasse dos dashboards: taxa por casa (byBrand) quando conhecida.
-      const commission = calcAffiliatePayout(r, configById[affiliateId], brandIdOf?.(affiliateId));
-      const name =
+// Recebe a UNIÃO das linhas OTG (total_commission preenchido) + linhas manuais
+// (house_results, com houseSlug). Soma a comissão bruta por afiliado, filtra > 0,
+// ordena desc e numera. Um afiliado com produção OTG E manual soma as duas.
+export function computeRankingEntries(rows: any[], opts: RankingOpts = {}): RankingEntry[] {
+  const { nameById = {}, houseRateOf, limit = 100 } = opts;
+  const byId = new Map<string, { name: string; commission: number }>();
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const affiliateId = rowAffiliateId(r);
+    if (!affiliateId) continue;
+    const commission = houseCommissionForRow(r, houseRateOf?.(r?.houseSlug));
+    const cur = byId.get(affiliateId) ?? { name: '', commission: 0 };
+    cur.commission += commission;
+    if (!cur.name) {
+      cur.name =
         nameById[affiliateId] ||
         String(r?.name ?? r?.label ?? r?.affiliate_name ?? `Afiliado #${affiliateId}`);
-      return { affiliateId, name, commission: Math.round(commission * 100) / 100 };
-    })
-    .filter((e): e is { affiliateId: string; name: string; commission: number } => !!e && e.commission > 0)
+    }
+    byId.set(affiliateId, cur);
+  }
+  return [...byId.entries()]
+    .map(([affiliateId, v]) => ({
+      affiliateId,
+      name: v.name,
+      commission: Math.round(v.commission * 100) / 100,
+    }))
+    .filter((e) => e.commission > 0)
     .sort((a, b) => b.commission - a.commission)
     .slice(0, limit)
     .map((e, i) => ({ pos: i + 1, ...e }));
