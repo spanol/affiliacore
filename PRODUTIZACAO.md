@@ -130,9 +130,13 @@ A versão vendida é naturalmente OTG-free (a x-api-key é da operação do Carl
   `apphosting.boost.yaml` (ambiente `boost`) — merge seguro mesmo sem a associação no
   console. Após confirmar a associação, limpar o bloco de marca do base.
 - **Restam:**
-  1. **Rename do repo GitHub** `boost-afiliiados` → `affiliacore`: o GitHub redireciona
-     remotes/URLs antigos; RECONFERIR a conexão App Hosting/Developer Connect de cada
-     backend após o rename (refazer o link se o build parar de disparar).
+  1. ✅ **Rename do repo GitHub FEITO (2026-07-06)** — `boost-afiliiados` →
+     `spanol/affiliacore`. Confirmou-se na prática que o rename QUEBRA o vínculo do
+     Developer Connect (a tela Implantação perde o repositório e o push para de
+     disparar rollout): foi refeito o link no console (Configurações → Implantação →
+     repo `affiliacore` + branch `main`) e o backend voltou a apontar
+     (`gitRepositoryLinks/spanol-affiliacore`). Lição p/ instâncias futuras: renomear
+     repo ⇒ relinkar TODO backend que o usa.
   2. **Jurídico (P5.2) espelha**: plataforma AffiliaCore é do Vinicius; a agência do
      Carlos licencia uma instância white-label com a marca Boost dele.
 - **Naming interno NÃO muda** (`boost_<uuid>`, coleções, `boostAffiliate.ts`): dados de

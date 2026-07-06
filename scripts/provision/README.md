@@ -42,7 +42,7 @@ firebase apphosting:secrets:set affiliate-api-key
 
 ```bash
 firebase apphosting:backends:create --project <project-id>
-# conectar o repo GitHub spanol/boost-afiliiados, branch main, região us-east4
+# conectar o repo GitHub spanol/affiliacore, branch main, região us-east4
 ```
 
 Config por instância: criar `apphosting.<ambiente>.yaml` no repo (override que o
