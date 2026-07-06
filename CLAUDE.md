@@ -14,6 +14,7 @@ Originated as a Google AI Studio applet (see README / `firebase-applet-config.js
 - **`BACKLOG.md`** — sketches B1 (lucro líquido), B2 (date filters), B3 (sub-affiliates), B4 (banking data), B5 (admin access/visibility settings).
 - **`REVIEW-TEST-PLAN.md`** — plano de revisão total + testes (auditoria 2026-06). §0–§0.4 rastreiam **Fases 1–4 ENTREGUES** (money-math, byBrand, segurança + rules-emulator + supertest, services + AuthContext, páginas/fluxos + componentes; 381 testes + 42 de rules). **Falta só a Fase 5** (tooling/CI: `coverage.include`, thresholds por pasta, CI, fast-check, `firebase-tools` no devDeps). **Leia antes de continuar a revisão.**
 - **`public/mvp-inventario.html`** — static page (served at `/mvp-inventario.html`) cataloguing OTG dashboard data for the boss to qualify MVP scope.
+- **`PRODUTIZACAO.md`** — trilha de produtização/white-label: **o produto chama-se `AffiliaCore`** (domínio affiliacore.com.br); o Boost do Carlos é a instância nº 0, pinada por env (`apphosting.yaml` base + `apphosting.boost.yaml`). Defaults do repo = marca AffiliaCore; NUNCA reintroduza "Boost" como default user-facing. Config por instância: `VITE_OTG_ENABLED` + `VITE_BRAND_*` (+ `FIREBASE_WEBAPP_CONFIG` injetada pelo App Hosting). Playbook de instância nova em `scripts/provision/README.md` (+ `bootstrap-admin.cjs`). Estado das fases e próximos passos no fim do doc.
 
 ## Commands
 

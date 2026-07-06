@@ -178,8 +178,20 @@ A versão vendida é naturalmente OTG-free (a x-api-key é da operação do Carl
   afiliados BR), não de marketing pago. Comunidades e grupos de afiliados de apostas como
   segundo canal.
 
-## Próximo passo recomendado
+## Estado & próximo passo (atualizado 2026-07-05, fim da sessão da inversão)
 
-**P0.1 (Auditoria Fase 3)** — já tem plano detalhado, fecha a pendência de segurança
-combinada e é pré-requisito natural de P1. Em paralelo (sem código): começar P5.1
-(shortlist de nomes) quando o Vinicius quiser.
+**Feito:** P0.1 ✅ (prod) · P1.1 ✅ · P2 ✅ (prod) · P3 ✅ (branch) · P4 ✅ (branch) ·
+P4.1 flip ✅ (branch) · P5.1 nome ✅ (**AffiliaCore**, affiliacore.com.br registrado).
+Tudo da inversão vive na branch **`feat/p3-branding`** (pushada; main mergeada nela,
+incluindo o fix do ranking `71aac9e`). 628 testes verdes.
+
+**Próximos passos, na ordem (parados aqui em 2026-07-05 por decisão do Vinicius):**
+1. **Merge `feat/p3-branding` → main** (= deploy), com o Vinicius acompanhando. Seguro
+   p/ a instância do Carlos mesmo sem a associação (pin no apphosting.yaml base).
+2. Associar ambiente **`boost`** ao backend `boost-agency-server` (console) — ainda
+   NÃO feito — e depois **limpar o bloco VITE_BRAND_* do apphosting.yaml base**.
+3. **Rename do repo GitHub → `affiliacore`** (+ `git remote set-url` local; reconferir
+   o Developer Connect/App Hosting de cada backend).
+4. Registrar `afiliacore.com.br` (um "f") como typo-defense; INPI + Instagram + logo.
+5. Executar o playbook (`scripts/provision/README.md`) na instância do cliente 0.
+6. P5 restante: jurídico c/ Carlos (P5.2), demo (P5.3), landing c/ preço (P5.4).
