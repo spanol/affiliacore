@@ -66,7 +66,7 @@ export default function DirectMessagePopup() {
           className="w-full max-w-md bg-white dark:bg-neutral-900 rounded-3xl shadow-2xl border border-slate-200/70 dark:border-neutral-800 overflow-hidden"
         >
           <div className="p-6 border-b border-slate-100 dark:border-neutral-800">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 mb-3 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 mb-3 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-600 dark:text-accent-400 text-[10px] font-bold uppercase tracking-widest">
               <MailOpen size={12} /> Mensagem da gerência
             </span>
             <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">{current.title}</h3>
@@ -83,7 +83,7 @@ export default function DirectMessagePopup() {
             <button
               onClick={handleAck}
               disabled={busy}
-              className="px-5 py-2.5 rounded-full bg-amber-500 text-white text-xs font-bold hover:bg-amber-400 transition-all shadow-sm shadow-amber-500/20 disabled:opacity-50 flex items-center gap-2"
+              className="px-5 py-2.5 rounded-full bg-accent-500 text-accent-contrast text-xs font-bold hover:bg-accent-400 transition-all shadow-sm shadow-accent-500/20 disabled:opacity-50 flex items-center gap-2"
             >
               {busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
               Entendi

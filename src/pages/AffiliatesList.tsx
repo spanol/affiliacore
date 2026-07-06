@@ -422,8 +422,8 @@ export default function AffiliatesList() {
                 </div>
                 <button onClick={() => !importing && setImportModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 transition-colors"><X size={18} /></button>
               </div>
-              <label className={cn('mt-5 flex flex-col items-center justify-center gap-2 px-4 py-8 rounded-2xl border-2 border-dashed cursor-pointer transition-colors', importing ? 'opacity-60 pointer-events-none border-slate-200 dark:border-neutral-700' : 'border-slate-300 dark:border-neutral-700 hover:border-amber-500/60')}>
-                {importing ? <Loader2 size={22} className="text-amber-500 animate-spin" /> : <UploadCloud size={22} className="text-slate-400 dark:text-neutral-500" />}
+              <label className={cn('mt-5 flex flex-col items-center justify-center gap-2 px-4 py-8 rounded-2xl border-2 border-dashed cursor-pointer transition-colors', importing ? 'opacity-60 pointer-events-none border-slate-200 dark:border-neutral-700' : 'border-slate-300 dark:border-neutral-700 hover:border-accent-500/60')}>
+                {importing ? <Loader2 size={22} className="text-accent-500 animate-spin" /> : <UploadCloud size={22} className="text-slate-400 dark:text-neutral-500" />}
                 <span className="text-xs font-bold text-slate-600 dark:text-neutral-300">{importing ? 'Importando...' : 'Clique para selecionar o arquivo'}</span>
                 <span className="text-[10px] text-slate-400 dark:text-neutral-500">JSON do snapshot</span>
                 <input type="file" accept="application/json,.json" disabled={importing} className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.currentTarget.value = ''; }} />
@@ -442,7 +442,7 @@ export default function AffiliatesList() {
               <p className="text-sm text-slate-500 dark:text-neutral-400 mt-2">Envie este link para <span className="font-semibold text-slate-700 dark:text-neutral-200">{inviteModal.name}</span> criar o próprio acesso. Válido por 7 dias.</p>
               <div className="mt-4 flex items-center gap-2">
                 <input readOnly value={inviteModal.url || ''} className="flex-1 px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs font-mono outline-none dark:text-white" />
-                <button onClick={() => { navigator.clipboard.writeText(inviteModal.url || ''); push({ type: 'success', message: 'Link copiado.' }); }} className="p-2.5 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-900/10 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white transition-all" title="Copiar link"><Copy size={16} /></button>
+                <button onClick={() => { navigator.clipboard.writeText(inviteModal.url || ''); push({ type: 'success', message: 'Link copiado.' }); }} className="p-2.5 rounded-xl bg-accent-50 text-accent-600 hover:bg-accent-500 hover:text-accent-contrast dark:bg-accent-900/10 dark:text-accent-400 dark:hover:bg-accent-500 dark:hover:text-accent-contrast transition-all" title="Copiar link"><Copy size={16} /></button>
               </div>
               <div className="mt-6 flex justify-end">
                 <button onClick={() => setInviteModal({ open: false })} className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-bold hover:opacity-90 transition-all">Concluir</button>
@@ -477,7 +477,7 @@ export default function AffiliatesList() {
               onClick={() => setImportModal(true)}
               disabled={loading}
               title="Importar afiliados aprovados do snapshot da OTG (pré-cadastro)"
-              className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-full text-xs font-bold text-slate-600 dark:text-neutral-300 hover:border-amber-500/40 hover:text-amber-500 transition-all shadow-sm disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-full text-xs font-bold text-slate-600 dark:text-neutral-300 hover:border-accent-500/40 hover:text-accent-500 transition-all shadow-sm disabled:opacity-50"
             >
               <UploadCloud size={14} />
               Importar aprovados
@@ -514,7 +514,7 @@ export default function AffiliatesList() {
               placeholder="Buscar por nome, e-mail ou ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-full text-xs outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white"
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-full text-xs outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
             />
           </div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -534,7 +534,7 @@ export default function AffiliatesList() {
               </button>
             )}
             <BrandFilter brands={availableBrands} value={brandFilter} onChange={setBrandFilter} />
-            <button className="p-2.5 rounded-full border border-slate-200 dark:border-neutral-700 text-slate-500 dark:text-neutral-300 hover:text-amber-500 hover:border-amber-500/40 transition-colors">
+            <button className="p-2.5 rounded-full border border-slate-200 dark:border-neutral-700 text-slate-500 dark:text-neutral-300 hover:text-accent-500 hover:border-accent-500/40 transition-colors">
               <Filter size={16} />
             </button>
           </div>
@@ -558,7 +558,7 @@ export default function AffiliatesList() {
           </div>
         ) : loading ? (
           <div className="p-24 flex flex-col items-center justify-center gap-4">
-            <Loader2 size={40} className="text-amber-500 animate-spin" />
+            <Loader2 size={40} className="text-accent-500 animate-spin" />
             <p className="text-xs font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest animate-pulse">Sincronizando com a API...</p>
           </div>
         ) : visibleAffiliates.length === 0 ? (
@@ -675,7 +675,7 @@ export default function AffiliatesList() {
                               <select
                                 value={item.role || 'client'}
                                 onChange={async (e) => { e.stopPropagation(); const newRole = e.target.value as 'admin'|'client'; await handleRoleChange(item.userUid, newRole); }}
-                                className="w-full py-1.5 px-3 bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg text-sm font-semibold text-slate-700 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all"
+                                className="w-full py-1.5 px-3 bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg text-sm font-semibold text-slate-700 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all"
                               >
                                 <option value="client">Cliente</option>
                                 <option value="admin">Administrador</option>
@@ -696,7 +696,7 @@ export default function AffiliatesList() {
                                 }
                               }}
                               disabled={updatingStatusId === affiliateId}
-                              className="w-28 py-1.5 px-3 bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg text-sm font-semibold text-slate-700 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all disabled:opacity-50"
+                              className="w-28 py-1.5 px-3 bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg text-sm font-semibold text-slate-700 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all disabled:opacity-50"
                             >
                               <option value="active">Ativo</option>
                               <option value="inactive">Desativado</option>
@@ -712,7 +712,7 @@ export default function AffiliatesList() {
                                 value={config.cpaValue}
                                 onChange={(e) => handleConfigChange(affiliateId, 'cpaValue', e.target.value)}
                                 className={cn(
-                                  "w-24 pl-7 pr-2 py-1.5 border rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white",
+                                  "w-24 pl-7 pr-2 py-1.5 border rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white",
                                   pendingCfg ? "border-amber-400 dark:border-amber-500/60 bg-amber-50/60 dark:bg-amber-900/10" : "border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800/60"
                                 )}
                               />
@@ -729,7 +729,7 @@ export default function AffiliatesList() {
                                 value={config.revPercentage}
                                 onChange={(e) => handleConfigChange(affiliateId, 'revPercentage', e.target.value)}
                                 className={cn(
-                                  "w-24 pl-6 pr-2 py-1.5 border rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white",
+                                  "w-24 pl-6 pr-2 py-1.5 border rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white",
                                   pendingCfg ? "border-amber-400 dark:border-amber-500/60 bg-amber-50/60 dark:bg-amber-900/10" : "border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800/60"
                                 )}
                               />
@@ -742,7 +742,7 @@ export default function AffiliatesList() {
                                   onClick={(e) => handleGenerateInvite(item, e)}
                                   disabled={invitingId === affiliateId}
                                   title="Gerar convite de acesso para o afiliado"
-                                  className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-amber-500 dark:bg-neutral-800/60 dark:text-neutral-500 dark:hover:text-amber-400 transition-all disabled:opacity-50"
+                                  className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:text-accent-500 dark:bg-neutral-800/60 dark:text-neutral-500 dark:hover:text-accent-400 transition-all disabled:opacity-50"
                                 >
                                   {invitingId === affiliateId ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
                                 </button>
@@ -753,8 +753,8 @@ export default function AffiliatesList() {
                                 className={cn(
                                   "p-2 rounded-lg transition-all",
                                   specials[affiliateId]?.active
-                                    ? "bg-amber-500 text-white"
-                                    : "bg-slate-50 text-slate-400 hover:text-amber-500 dark:bg-neutral-800/60 dark:text-neutral-500 dark:hover:text-amber-400"
+                                    ? "bg-accent-500 text-accent-contrast"
+                                    : "bg-slate-50 text-slate-400 hover:text-accent-500 dark:bg-neutral-800/60 dark:text-neutral-500 dark:hover:text-accent-400"
                                 )}
                               >
                                 <Crown size={14} />
@@ -766,7 +766,7 @@ export default function AffiliatesList() {
                                   "p-2 rounded-lg transition-all",
                                   savedId === affiliateId
                                     ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                                    : "bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-900/10 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white"
+                                    : "bg-accent-50 text-accent-600 hover:bg-accent-500 hover:text-accent-contrast dark:bg-accent-900/10 dark:text-accent-400 dark:hover:bg-accent-500 dark:hover:text-accent-contrast"
                                 )}
                               >
                                 {savingId === affiliateId ? (
@@ -848,7 +848,7 @@ export default function AffiliatesList() {
                           <select
                             value={item.role || 'client'}
                             onChange={async (e) => { const nr = e.target.value as 'admin' | 'client'; await handleRoleChange(item.userUid, nr); }}
-                            className="w-full py-2 px-3 bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg text-sm font-semibold text-slate-700 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all"
+                            className="w-full py-2 px-3 bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg text-sm font-semibold text-slate-700 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all"
                           >
                             <option value="client">Cliente</option>
                             <option value="admin">Administrador</option>
@@ -867,7 +867,7 @@ export default function AffiliatesList() {
                               }
                             }}
                             disabled={updatingStatusId === affiliateId}
-                            className="w-full py-2 px-3 bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg text-sm font-semibold text-slate-700 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all disabled:opacity-50"
+                            className="w-full py-2 px-3 bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg text-sm font-semibold text-slate-700 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all disabled:opacity-50"
                           >
                             <option value="active">Ativo</option>
                             <option value="inactive">Desativado</option>
@@ -889,7 +889,7 @@ export default function AffiliatesList() {
                               value={config.cpaValue}
                               onChange={(e) => handleConfigChange(affiliateId, 'cpaValue', e.target.value)}
                               className={cn(
-                                "w-full pl-7 pr-2 py-2 border rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white",
+                                "w-full pl-7 pr-2 py-2 border rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white",
                                 pendingCfg ? "border-amber-400 dark:border-amber-500/60 bg-amber-50/60 dark:bg-amber-900/10" : "border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800/60"
                               )}
                             />
@@ -911,7 +911,7 @@ export default function AffiliatesList() {
                               value={config.revPercentage}
                               onChange={(e) => handleConfigChange(affiliateId, 'revPercentage', e.target.value)}
                               className={cn(
-                                "w-full pl-6 pr-2 py-2 border rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white",
+                                "w-full pl-6 pr-2 py-2 border rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white",
                                 pendingCfg ? "border-amber-400 dark:border-amber-500/60 bg-amber-50/60 dark:bg-amber-900/10" : "border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800/60"
                               )}
                             />
@@ -925,7 +925,7 @@ export default function AffiliatesList() {
                           "w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all",
                           savedId === affiliateId
                             ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                            : "bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-900/10 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white"
+                            : "bg-accent-50 text-accent-600 hover:bg-accent-500 hover:text-accent-contrast dark:bg-accent-900/10 dark:text-accent-400 dark:hover:bg-accent-500 dark:hover:text-accent-contrast"
                         )}
                       >
                         {savingId === affiliateId ? <Loader2 size={14} className="animate-spin" /> : savedId === affiliateId ? <CheckCircle size={14} /> : <Save size={14} />}
@@ -936,8 +936,8 @@ export default function AffiliatesList() {
                         className={cn(
                           "w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all",
                           specials[affiliateId]?.active
-                            ? "bg-amber-500 text-white border-amber-500"
-                            : "bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-700 text-slate-600 dark:text-neutral-300 hover:border-amber-500/40"
+                            ? "bg-accent-500 text-accent-contrast border-accent-500"
+                            : "bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-700 text-slate-600 dark:text-neutral-300 hover:border-accent-500/40"
                         )}
                       >
                         <Crown size={14} />
@@ -947,7 +947,7 @@ export default function AffiliatesList() {
                         <button
                           onClick={(e) => handleGenerateInvite(item, e)}
                           disabled={invitingId === affiliateId}
-                          className="w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border border-slate-200 dark:border-neutral-700 text-slate-600 dark:text-neutral-300 hover:border-amber-500/40 transition-all disabled:opacity-50"
+                          className="w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border border-slate-200 dark:border-neutral-700 text-slate-600 dark:text-neutral-300 hover:border-accent-500/40 transition-all disabled:opacity-50"
                         >
                           {invitingId === affiliateId ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
                           Gerar acesso
@@ -998,7 +998,7 @@ function ListingHelp() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="Como um afiliado fica operacional aqui"
-        className="text-slate-400 hover:text-amber-500 dark:text-neutral-500 dark:hover:text-amber-400 transition-colors"
+        className="text-slate-400 hover:text-accent-500 dark:text-neutral-500 dark:hover:text-accent-400 transition-colors"
       >
         <Info size={18} />
       </button>
@@ -1009,23 +1009,23 @@ function ListingHelp() {
             Para constar nesta lista e gerar repasse correto, ele precisa de:
           </p>
           <ol className="mt-2 space-y-1.5 text-[11px] leading-relaxed font-medium text-slate-600 dark:text-neutral-300">
-            <li className="flex gap-2"><span className="font-bold text-amber-600 dark:text-amber-400">1.</span><span><b>Produção</b> — {OTG_ENABLED ? 'aparecer no relatório da OTG (ou estar como pré-cadastro).' : 'ter resultados importados de uma casa (planilha) ou cadastro direto na plataforma.'}</span></li>
-            <li className="flex gap-2"><span className="font-bold text-amber-600 dark:text-amber-400">2.</span><span><b>Acesso</b> — um login gerado via convite.</span></li>
-            <li className="flex gap-2"><span className="font-bold text-amber-600 dark:text-amber-400">3.</span><span><b>Comissão</b> — CPA/REV configurados. Sem isso, o repasse fica <b>R$&nbsp;0</b>.</span></li>
+            <li className="flex gap-2"><span className="font-bold text-accent-600 dark:text-accent-400">1.</span><span><b>Produção</b> — {OTG_ENABLED ? 'aparecer no relatório da OTG (ou estar como pré-cadastro).' : 'ter resultados importados de uma casa (planilha) ou cadastro direto na plataforma.'}</span></li>
+            <li className="flex gap-2"><span className="font-bold text-accent-600 dark:text-accent-400">2.</span><span><b>Acesso</b> — um login gerado via convite.</span></li>
+            <li className="flex gap-2"><span className="font-bold text-accent-600 dark:text-accent-400">3.</span><span><b>Comissão</b> — CPA/REV configurados. Sem isso, o repasse fica <b>R$&nbsp;0</b>.</span></li>
           </ol>
           <div className="mt-3 pt-3 border-t border-slate-100 dark:border-neutral-800">
             <p className="text-[11px] font-bold text-slate-700 dark:text-neutral-200">Onde se configura o CPA/REV</p>
             <ul className="mt-1.5 space-y-1.5 text-[11px] leading-relaxed font-medium text-slate-500 dark:text-neutral-400">
-              <li className="flex gap-2"><span className="text-amber-600 dark:text-amber-400 font-bold">•</span><span><b>Aqui</b> — o repasse <b>padrão</b> do afiliado, válido em <b>todas as casas</b> (o que a agência paga a ele).</span></li>
-              <li className="flex gap-2"><span className="text-amber-600 dark:text-amber-400 font-bold">•</span><span><b>Na ficha do afiliado</b> — um <b>override por casa</b> (prioridade só naquela casa) sobre o padrão acima.</span></li>
-              <li className="flex gap-2"><span className="text-amber-600 dark:text-amber-400 font-bold">•</span><span>Em <Link to="/casas" className="font-bold text-amber-600 dark:text-amber-400 hover:underline">Casas</Link> — a <b>Taxa padrão da casa</b> é a <b>receita</b> (o que a casa paga à agência), <b>não</b> o repasse ao afiliado.</span></li>
+              <li className="flex gap-2"><span className="text-accent-600 dark:text-accent-400 font-bold">•</span><span><b>Aqui</b> — o repasse <b>padrão</b> do afiliado, válido em <b>todas as casas</b> (o que a agência paga a ele).</span></li>
+              <li className="flex gap-2"><span className="text-accent-600 dark:text-accent-400 font-bold">•</span><span><b>Na ficha do afiliado</b> — um <b>override por casa</b> (prioridade só naquela casa) sobre o padrão acima.</span></li>
+              <li className="flex gap-2"><span className="text-accent-600 dark:text-accent-400 font-bold">•</span><span>Em <Link to="/casas" className="font-bold text-accent-600 dark:text-accent-400 hover:underline">Casas</Link> — a <b>Taxa padrão da casa</b> é a <b>receita</b> (o que a casa paga à agência), <b>não</b> o repasse ao afiliado.</span></li>
             </ul>
           </div>
           {/* P2: referência ao roster só faz sentido com o módulo OTG ligado. */}
           {OTG_ENABLED && (
             <p className="mt-3 pt-3 border-t border-slate-100 dark:border-neutral-800 text-[11px] leading-relaxed font-medium text-slate-500 dark:text-neutral-400">
               Aprovados na OTG <b>sem produção</b> ainda não aparecem aqui — ficam em{' '}
-              <Link to="/roster-otg" className="font-bold text-amber-600 dark:text-amber-400 hover:underline">Roster OTG</Link> até reconciliar.
+              <Link to="/roster-otg" className="font-bold text-accent-600 dark:text-accent-400 hover:underline">Roster OTG</Link> até reconciliar.
             </p>
           )}
         </div>

@@ -84,13 +84,13 @@ export default function Avisos() {
 
       <header className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
-          <span className="inline-flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+          <span className="inline-flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-600 dark:text-accent-400 text-[10px] font-bold uppercase tracking-widest">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />
             Comunicação
           </span>
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tighter flex items-center gap-3">
             <span className="p-2 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700/60">
-              <Megaphone size={24} className="text-amber-500" />
+              <Megaphone size={24} className="text-accent-500" />
             </span>
             Avisos
           </h1>
@@ -113,7 +113,7 @@ export default function Avisos() {
 
       {loading ? (
         <div className="p-24 flex flex-col items-center justify-center gap-4">
-          <Loader2 size={40} className="text-amber-500 animate-spin" />
+          <Loader2 size={40} className="text-accent-500 animate-spin" />
           <p className="text-xs font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest animate-pulse">Carregando...</p>
         </div>
       ) : error ? (
@@ -164,7 +164,7 @@ export default function Avisos() {
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         onClick={() => setComposer({ open: true, editing: notice })}
-                        className="p-2 rounded-lg bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700 text-slate-500 dark:text-neutral-300 hover:border-amber-500/40 hover:text-amber-500 transition-all"
+                        className="p-2 rounded-lg bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700 text-slate-500 dark:text-neutral-300 hover:border-accent-500/40 hover:text-accent-500 transition-all"
                         title="Editar"
                       >
                         <Pencil size={14} />
@@ -188,7 +188,7 @@ export default function Avisos() {
                     href={notice.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 mt-3 text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline"
+                    className="inline-flex items-center gap-1.5 mt-3 text-xs font-bold text-accent-600 dark:text-accent-400 hover:underline"
                   >
                     Abrir link <ExternalLink size={13} />
                   </a>

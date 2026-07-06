@@ -168,7 +168,7 @@ export default function SpecialSubAffiliates() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <Loader2 size={40} className="text-amber-500 animate-spin" />
+        <Loader2 size={40} className="text-accent-500 animate-spin" />
         <p className="text-xs font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest animate-pulse">Carregando seus afiliados...</p>
       </div>
     );
@@ -178,13 +178,13 @@ export default function SpecialSubAffiliates() {
     <div className="space-y-8 pb-20">
       <header className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 mb-3 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 mb-3 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-600 dark:text-accent-400 text-[10px] font-bold uppercase tracking-widest">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />
             Sua rede
           </span>
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tighter flex items-center gap-3">
-            <span className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
-              <Users size={24} className="text-amber-500" />
+            <span className="p-2 rounded-xl bg-accent-500/10 border border-accent-500/20">
+              <Users size={24} className="text-accent-500" />
             </span>
             Meus afiliados
           </h1>
@@ -213,7 +213,7 @@ export default function SpecialSubAffiliates() {
                 placeholder="Buscar por nome ou ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-full text-xs outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-full text-xs outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
               />
             </div>
             <div className="flex items-center gap-3 flex-wrap">
@@ -302,7 +302,7 @@ export default function SpecialSubAffiliates() {
                                 type="number" min="0" max={ownConfig.cpaValue || 0} step="0.01"
                                 value={subEdits[id]?.cpaValue ?? 0}
                                 onChange={(e) => handleSubChange(id, 'cpaValue', e.target.value)}
-                                className="w-24 pl-7 pr-2 py-1.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white"
+                                className="w-24 pl-7 pr-2 py-1.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
                               />
                             </div>
                           </td>
@@ -313,7 +313,7 @@ export default function SpecialSubAffiliates() {
                                 type="number" min="0" max={ownConfig.revPercentage || 0} step="0.1"
                                 value={subEdits[id]?.revPercentage ?? 0}
                                 onChange={(e) => handleSubChange(id, 'revPercentage', e.target.value)}
-                                className="w-24 pl-6 pr-2 py-1.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white"
+                                className="w-24 pl-6 pr-2 py-1.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
                               />
                             </div>
                           </td>
@@ -323,14 +323,14 @@ export default function SpecialSubAffiliates() {
                                 onClick={() => handleSaveSub(id)}
                                 disabled={savingSub === id}
                                 title="Salvar comissão"
-                                className="p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-900/10 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white transition-all disabled:opacity-50"
+                                className="p-2 rounded-lg bg-accent-50 text-accent-600 hover:bg-accent-500 hover:text-accent-contrast dark:bg-accent-900/10 dark:text-accent-400 dark:hover:bg-accent-500 dark:hover:text-accent-contrast transition-all disabled:opacity-50"
                               >
                                 {savingSub === id ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                               </button>
                               <button
                                 onClick={() => navigate(`/affiliates/${id}`)}
                                 title="Ver dados do afiliado"
-                                className="p-2 rounded-lg border bg-slate-50 dark:bg-neutral-800/60 border-slate-100 dark:border-neutral-700/60 text-slate-400 dark:text-neutral-500 hover:text-amber-500 hover:border-amber-500/30 transition-colors"
+                                className="p-2 rounded-lg border bg-slate-50 dark:bg-neutral-800/60 border-slate-100 dark:border-neutral-700/60 text-slate-400 dark:text-neutral-500 hover:text-accent-500 hover:border-accent-500/30 transition-colors"
                               >
                                 <ArrowUpRight size={14} />
                               </button>
@@ -363,7 +363,7 @@ export default function SpecialSubAffiliates() {
                         <button
                           onClick={() => navigate(`/affiliates/${id}`)}
                           title="Ver dados do afiliado"
-                          className="shrink-0 p-2 rounded-xl border bg-slate-50 dark:bg-neutral-800/60 border-slate-100 dark:border-neutral-700/60 text-slate-400 dark:text-neutral-500 hover:text-amber-500 hover:border-amber-500/30 transition-colors"
+                          className="shrink-0 p-2 rounded-xl border bg-slate-50 dark:bg-neutral-800/60 border-slate-100 dark:border-neutral-700/60 text-slate-400 dark:text-neutral-500 hover:text-accent-500 hover:border-accent-500/30 transition-colors"
                         >
                           <ArrowUpRight size={16} />
                         </button>
@@ -393,7 +393,7 @@ export default function SpecialSubAffiliates() {
                               type="number" min="0" max={ownConfig.cpaValue || 0} step="0.01"
                               value={subEdits[id]?.cpaValue ?? 0}
                               onChange={(e) => handleSubChange(id, 'cpaValue', e.target.value)}
-                              className="w-full pl-7 pr-2 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white"
+                              className="w-full pl-7 pr-2 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
                             />
                           </div>
                           <div className="relative flex-1">
@@ -402,13 +402,13 @@ export default function SpecialSubAffiliates() {
                               type="number" min="0" max={ownConfig.revPercentage || 0} step="0.1"
                               value={subEdits[id]?.revPercentage ?? 0}
                               onChange={(e) => handleSubChange(id, 'revPercentage', e.target.value)}
-                              className="w-full pl-6 pr-2 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white"
+                              className="w-full pl-6 pr-2 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
                             />
                           </div>
                           <button
                             onClick={() => handleSaveSub(id)}
                             disabled={savingSub === id}
-                            className="p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white dark:bg-amber-900/10 dark:text-amber-400 dark:hover:bg-amber-500 dark:hover:text-white transition-all disabled:opacity-50"
+                            className="p-2 rounded-lg bg-accent-50 text-accent-600 hover:bg-accent-500 hover:text-accent-contrast dark:bg-accent-900/10 dark:text-accent-400 dark:hover:bg-accent-500 dark:hover:text-accent-contrast transition-all disabled:opacity-50"
                           >
                             {savingSub === id ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                           </button>

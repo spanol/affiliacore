@@ -80,13 +80,13 @@ export default function Financeiro() {
   if (profile && !profile.affiliateId) return <Navigate to="/profile" replace />;
 
   const inputCls =
-    'w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white';
+    'w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white';
   const labelCls = 'text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-1.5 block';
 
   return (
     <div className="space-y-8 pb-20 max-w-3xl">
       <header>
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 mb-3 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 mb-3 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-600 dark:text-accent-400 text-[10px] font-bold uppercase tracking-widest">
           <Wallet size={12} /> Financeiro
         </span>
         <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tighter">Dados de Pagamento</h1>
@@ -97,7 +97,7 @@ export default function Financeiro() {
 
       {loading ? (
         <div className="flex items-center justify-center h-48">
-          <Loader2 size={32} className="text-amber-500 animate-spin" />
+          <Loader2 size={32} className="text-accent-500 animate-spin" />
         </div>
       ) : (
         <motion.div
@@ -108,7 +108,7 @@ export default function Financeiro() {
           {/* PIX */}
           <section className="space-y-4">
             <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
-              <KeyRound size={16} className="text-amber-500" /> Recebimento (PIX)
+              <KeyRound size={16} className="text-accent-500" /> Recebimento (PIX)
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
@@ -129,7 +129,7 @@ export default function Financeiro() {
           {/* Dados fiscais / NF */}
           <section className="space-y-4 pt-2 border-t border-slate-100 dark:border-neutral-800">
             <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
-              <FileText size={16} className="text-amber-500" /> Dados para nota fiscal
+              <FileText size={16} className="text-accent-500" /> Dados para nota fiscal
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
@@ -161,7 +161,7 @@ export default function Financeiro() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-full bg-amber-500 text-white text-xs font-bold hover:bg-amber-400 transition-all shadow-sm shadow-amber-500/20 disabled:opacity-50"
+              className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-full bg-accent-500 text-accent-contrast text-xs font-bold hover:bg-accent-400 transition-all shadow-sm shadow-accent-500/20 disabled:opacity-50"
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               Salvar dados

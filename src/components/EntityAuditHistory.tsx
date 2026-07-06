@@ -85,7 +85,7 @@ export default function EntityAuditHistory({ entityType, entityId, title = 'Hist
           <ol className="relative border-l border-slate-200 dark:border-neutral-800 ml-1 space-y-4">
             {logs.map((log) => (
               <li key={log.id} className="ml-4">
-                <span className="absolute -left-[5px] mt-1.5 w-2.5 h-2.5 rounded-full bg-amber-500 border-2 border-white dark:border-neutral-900" />
+                <span className="absolute -left-[5px] mt-1.5 w-2.5 h-2.5 rounded-full bg-accent-500 border-2 border-white dark:border-neutral-900" />
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-neutral-200">
                     {actionLabel(log.action)}

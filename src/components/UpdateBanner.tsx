@@ -40,9 +40,9 @@ export default function UpdateBanner() {
           className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[70] w-[calc(100%-2rem)] max-w-md"
           role="alert"
         >
-          <div className="flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md shadow-2xl shadow-black/10 p-4">
-            <div className="shrink-0 w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/20 flex items-center justify-center">
-              <Sparkles size={16} className="text-amber-500" />
+          <div className="flex items-center gap-3 rounded-2xl border border-accent-500/30 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md shadow-2xl shadow-black/10 p-4">
+            <div className="shrink-0 w-9 h-9 rounded-xl bg-accent-500/15 border border-accent-500/20 flex items-center justify-center">
+              <Sparkles size={16} className="text-accent-500" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-slate-900 dark:text-white">Nova versão disponível</p>
@@ -52,7 +52,7 @@ export default function UpdateBanner() {
             </div>
             <button
               onClick={reloadApp}
-              className="shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500 text-white text-xs font-bold hover:bg-amber-400 transition-all shadow-sm shadow-amber-500/20"
+              className="shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent-500 text-accent-contrast text-xs font-bold hover:bg-accent-400 transition-all shadow-sm shadow-accent-500/20"
             >
               <RefreshCw size={14} />
               Atualizar agora

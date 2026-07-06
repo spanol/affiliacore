@@ -106,13 +106,13 @@ export default function SpecialAffiliatesList() {
 
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <span className="inline-flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+          <span className="inline-flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-600 dark:text-accent-400 text-[10px] font-bold uppercase tracking-widest">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />
             Rede de especiais
           </span>
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tighter flex items-center gap-3">
-            <span className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
-              <Crown size={24} className="text-amber-500" />
+            <span className="p-2 rounded-xl bg-accent-500/10 border border-accent-500/20">
+              <Crown size={24} className="text-accent-500" />
             </span>
             Afiliados Especiais
           </h1>
@@ -131,12 +131,12 @@ export default function SpecialAffiliatesList() {
 
       {loading ? (
         <div className="p-24 flex flex-col items-center justify-center gap-4">
-          <Loader2 size={40} className="text-amber-500 animate-spin" />
+          <Loader2 size={40} className="text-accent-500 animate-spin" />
           <p className="text-xs font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest animate-pulse">Carregando especiais...</p>
         </div>
       ) : activeSpecials.length === 0 ? (
         <div className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl shadow-sm p-24 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl border border-amber-200/70 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/30 text-amber-500 mb-4">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl border border-accent-200/70 dark:border-accent-900/40 bg-accent-50 dark:bg-accent-950/30 text-accent-500 mb-4">
             <Crown size={24} />
           </div>
           <h3 className="text-sm font-bold text-slate-800 dark:text-neutral-100 mb-1">Nenhum afiliado especial ainda</h3>
@@ -156,15 +156,15 @@ export default function SpecialAffiliatesList() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
-                className="group relative overflow-hidden p-6 rounded-2xl border bg-white dark:bg-neutral-900/60 border-amber-200/60 dark:border-amber-900/30 shadow-sm hover:border-amber-300 dark:hover:border-amber-800 transition-all"
+                className="group relative overflow-hidden p-6 rounded-2xl border bg-white dark:bg-neutral-900/60 border-accent-200/60 dark:border-accent-900/30 shadow-sm hover:border-accent-300 dark:hover:border-accent-800 transition-all"
               >
-                <div className="absolute top-0 right-0 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl -mr-12 -mt-12 pointer-events-none" />
+                <div className="absolute top-0 right-0 w-40 h-40 bg-accent-500/10 rounded-full blur-3xl -mr-12 -mt-12 pointer-events-none" />
                 <div className="relative flex items-start justify-between mb-4">
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{nameFor(id)}</p>
                     <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400 dark:text-neutral-500 mt-0.5">ID #{id}</p>
                   </div>
-                  <span className="shrink-0 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500">
+                  <span className="shrink-0 p-2 rounded-xl bg-accent-500/10 border border-accent-500/20 text-accent-500">
                     <Crown size={16} />
                   </span>
                 </div>
@@ -187,7 +187,7 @@ export default function SpecialAffiliatesList() {
 
                 <button
                   onClick={() => setModal({ open: true, affiliate: aff })}
-                  className="relative w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700/60 text-xs font-bold text-slate-600 dark:text-neutral-200 hover:border-amber-500/40 hover:text-amber-600 dark:hover:text-amber-400 transition-all"
+                  className="relative w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700/60 text-xs font-bold text-slate-600 dark:text-neutral-200 hover:border-accent-500/40 hover:text-accent-600 dark:hover:text-accent-400 transition-all"
                 >
                   <Settings2 size={14} />
                   Gerir sub-rede

@@ -186,13 +186,13 @@ export default function Profile() {
               )}
               {uploading && (
                 <div className="absolute inset-0 bg-white/60 dark:bg-neutral-900/60 rounded-full flex items-center justify-center backdrop-blur-[1px]">
-                  <Loader2 className="text-amber-500 animate-spin" size={24} />
+                  <Loader2 className="text-accent-500 animate-spin" size={24} />
                 </div>
               )}
             </div>
 
             <div className="w-full">
-              <label className="w-full flex flex-col items-center justify-center gap-2 px-4 py-3 bg-slate-50 dark:bg-neutral-800/50 border border-slate-200 dark:border-neutral-700 border-dashed rounded-2xl cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-500/10 hover:border-amber-500/50 transition-all text-slate-500 dark:text-neutral-400 hover:text-amber-600 dark:hover:text-amber-400 shadow-sm hover:shadow-md">
+              <label className="w-full flex flex-col items-center justify-center gap-2 px-4 py-3 bg-slate-50 dark:bg-neutral-800/50 border border-slate-200 dark:border-neutral-700 border-dashed rounded-2xl cursor-pointer hover:bg-accent-50 dark:hover:bg-accent-500/10 hover:border-accent-500/50 transition-all text-slate-500 dark:text-neutral-400 hover:text-accent-600 dark:hover:text-accent-400 shadow-sm hover:shadow-md">
                 <Upload size={18} />
                 <span className="text-[10px] font-bold uppercase tracking-tight">Alterar Foto</span>
                 <input
@@ -222,7 +222,7 @@ export default function Profile() {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       required
-                      className="w-full pl-10 pr-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs dark:text-white focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all outline-none"
+                      className="w-full pl-10 pr-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs dark:text-white focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all outline-none"
                     />
                   </div>
                 </div>
@@ -255,7 +255,7 @@ export default function Profile() {
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="••••••••"
                     minLength={6}
-                    className="w-full pl-10 pr-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs dark:text-white focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all outline-none"
+                    className="w-full pl-10 pr-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs dark:text-white focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all outline-none"
                   />
                 </div>
                 <p className="text-[9px] text-slate-400 dark:text-neutral-500 mt-1 italic">Mínimo 6 caracteres para alteração.</p>

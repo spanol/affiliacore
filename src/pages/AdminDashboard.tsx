@@ -526,7 +526,7 @@ export default function AdminDashboard() {
         {/* Top especiais (por comissão da rede: própria + subs) */}
         <div className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl shadow-sm overflow-hidden">
           <div className="p-6 border-b border-slate-100 dark:border-neutral-800 flex items-center gap-3">
-            <span className="shrink-0 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500"><Crown size={16} /></span>
+            <span className="shrink-0 p-2 rounded-xl bg-accent-500/10 border border-accent-500/20 text-accent-500"><Crown size={16} /></span>
             <div className="min-w-0">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">Top afiliados especiais</h3>
               <p className="text-[11px] text-slate-400 dark:text-neutral-500">Por comissão da rede (própria + subs) no período</p>
@@ -572,7 +572,7 @@ export default function AdminDashboard() {
                   <span className="shrink-0 w-6 h-6 rounded-lg bg-slate-100 dark:bg-neutral-800 text-slate-500 dark:text-neutral-400 text-[11px] font-black flex items-center justify-center">{i + 1}</span>
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-slate-800 dark:text-white truncate">{s.name}</p>
-                    <p className="text-[10px] text-amber-600 dark:text-amber-400 truncate">Pertence a {s.special}</p>
+                    <p className="text-[10px] text-accent-600 dark:text-accent-400 truncate">Pertence a {s.special}</p>
                   </div>
                 </div>
                 <span className="shrink-0 text-sm font-black text-slate-900 dark:text-white tabular-nums">R$ {s.commission.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>

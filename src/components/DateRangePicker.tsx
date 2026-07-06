@@ -64,7 +64,7 @@ export default function DateRangePicker({ value, onChange, className }: DateRang
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl text-slate-700 dark:text-neutral-300 hover:border-amber-500/40 transition-all font-bold text-xs uppercase tracking-wider shadow-sm"
+        className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl text-slate-700 dark:text-neutral-300 hover:border-accent-500/40 transition-all font-bold text-xs uppercase tracking-wider shadow-sm"
       >
         <Calendar size={16} className="text-slate-500 dark:text-neutral-400" />
         <span className="normal-case tracking-normal font-semibold">{formatRangeLabel(value)}</span>
@@ -83,7 +83,7 @@ export default function DateRangePicker({ value, onChange, className }: DateRang
                 className={cn(
                   'w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left',
                   isActive
-                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                    ? 'bg-accent-500/10 text-accent-600 dark:text-accent-400'
                     : 'text-slate-600 dark:text-neutral-300 hover:bg-slate-50 dark:hover:bg-white/5'
                 )}
               >
@@ -101,7 +101,7 @@ export default function DateRangePicker({ value, onChange, className }: DateRang
                 value={draftStart}
                 max={draftEnd || undefined}
                 onChange={(e) => setDraftStart(e.target.value)}
-                className="flex-1 min-w-0 px-2 py-2 bg-slate-50 dark:bg-neutral-800 border border-slate-100 dark:border-neutral-700 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 dark:text-white"
+                className="flex-1 min-w-0 px-2 py-2 bg-slate-50 dark:bg-neutral-800 border border-slate-100 dark:border-neutral-700 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 dark:text-white"
               />
               <span className="text-slate-400 dark:text-neutral-500 text-xs">–</span>
               <input
@@ -109,7 +109,7 @@ export default function DateRangePicker({ value, onChange, className }: DateRang
                 value={draftEnd}
                 min={draftStart || undefined}
                 onChange={(e) => setDraftEnd(e.target.value)}
-                className="flex-1 min-w-0 px-2 py-2 bg-slate-50 dark:bg-neutral-800 border border-slate-100 dark:border-neutral-700 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 dark:text-white"
+                className="flex-1 min-w-0 px-2 py-2 bg-slate-50 dark:bg-neutral-800 border border-slate-100 dark:border-neutral-700 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 dark:text-white"
               />
             </div>
             <button

@@ -229,7 +229,7 @@ export default function SpecialDashboard() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <Loader2 size={40} className="text-amber-500 animate-spin" />
+        <Loader2 size={40} className="text-accent-500 animate-spin" />
         <p className="text-xs font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest animate-pulse">Carregando sua rede...</p>
       </div>
     );
@@ -239,13 +239,13 @@ export default function SpecialDashboard() {
     <div className="space-y-8 pb-20">
       <header className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 mb-3 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 mb-3 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-600 dark:text-accent-400 text-[10px] font-bold uppercase tracking-widest">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />
             Afiliado especial
           </span>
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tighter flex items-center gap-3">
-            <span className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
-              <Crown size={24} className="text-amber-500" />
+            <span className="p-2 rounded-xl bg-accent-500/10 border border-accent-500/20">
+              <Crown size={24} className="text-accent-500" />
             </span>
             {humanizeName(profile?.name || '') || 'Sua rede'}
           </h1>
@@ -337,7 +337,7 @@ export default function SpecialDashboard() {
           Espelha o "Top afiliados" do /admin, capado à rede (own + subs). */}
       <section className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100 dark:border-neutral-800 flex items-center gap-3">
-          <span className="shrink-0 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500"><Crown size={16} /></span>
+          <span className="shrink-0 p-2 rounded-xl bg-accent-500/10 border border-accent-500/20 text-accent-500"><Crown size={16} /></span>
           <div className="min-w-0">
             <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">Top 5 afiliados da rede</h3>
             <p className="text-[11px] text-slate-400 dark:text-neutral-500">Você + sub-afiliados, por comissão à sua taxa no período</p>
@@ -353,7 +353,7 @@ export default function SpecialDashboard() {
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-slate-800 dark:text-white truncate flex items-center gap-1.5">
                     {a.name}
-                    {a.isOwn && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[8px] font-black uppercase tracking-wider"><Crown size={9} /> Você</span>}
+                    {a.isOwn && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-accent-500/10 text-accent-600 dark:text-accent-400 text-[8px] font-black uppercase tracking-wider"><Crown size={9} /> Você</span>}
                   </p>
                   <p className="text-[10px] text-slate-400 dark:text-neutral-500">{a.registrations.toLocaleString('pt-BR')} cadastros · {a.qualifiedCpa.toLocaleString('pt-BR')} CPA qualif.</p>
                 </div>

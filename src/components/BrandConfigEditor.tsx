@@ -150,9 +150,9 @@ export default function BrandConfigEditor({ affiliateId, brandRows, config, onSa
       </p>
 
       {/* #1 · Padrão do contrato (taxa de topo) — EDITÁVEL (antes era só texto) */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 mb-5 bg-amber-50/60 dark:bg-amber-900/10 rounded-2xl border border-amber-200/70 dark:border-amber-900/40">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 mb-5 bg-accent-50/60 dark:bg-accent-900/10 rounded-2xl border border-accent-200/70 dark:border-accent-900/40">
         <div className="flex items-center gap-3 sm:w-40 shrink-0">
-          <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
+          <div className="w-7 h-7 rounded-lg bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center text-accent-600 dark:text-accent-400">
             <Tag size={15} />
           </div>
           <span className="text-xs font-bold text-slate-700 dark:text-neutral-200">Padrão do contrato</span>

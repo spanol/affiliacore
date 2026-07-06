@@ -86,13 +86,13 @@ export default function Ranking() {
     <div className="space-y-8 pb-20">
       <header className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
-          <span className="inline-flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+          <span className="inline-flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-600 dark:text-accent-400 text-[10px] font-bold uppercase tracking-widest">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />
             Gamificação · {formatRangeLabel({ startDate: displayDate, endDate: displayDate })}
           </span>
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tighter flex items-center gap-3">
             <span className="p-2 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700/60">
-              <Trophy size={24} className="text-amber-500" />
+              <Trophy size={24} className="text-accent-500" />
             </span>
             Ranking diário
           </h1>
@@ -114,11 +114,11 @@ export default function Ranking() {
 
       {/* Faixa com a posição do próprio afiliado */}
       {myEntry && (
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-4 flex items-center justify-between gap-4">
+        <div className="rounded-2xl border border-accent-500/30 bg-accent-500/10 px-5 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-500 text-white font-black text-sm shadow">#{myEntry.pos}</span>
+            <span className="flex items-center justify-center w-10 h-10 rounded-full bg-accent-500 text-accent-contrast font-black text-sm shadow">#{myEntry.pos}</span>
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400">Sua posição no dia</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-accent-600 dark:text-accent-400">Sua posição no dia</p>
               <p className="text-sm font-bold text-slate-900 dark:text-white">{humanizeName(myEntry.name)}</p>
             </div>
           </div>
@@ -128,14 +128,14 @@ export default function Ranking() {
 
       {loading ? (
         <div className="p-24 flex flex-col items-center justify-center gap-4">
-          <Loader2 size={40} className="text-amber-500 animate-spin" />
+          <Loader2 size={40} className="text-accent-500 animate-spin" />
           <p className="text-xs font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest animate-pulse">Carregando...</p>
         </div>
       ) : error ? (
         <div className="py-20 text-center text-red-500">{error}</div>
       ) : !ranking || entries.length === 0 ? (
         <div className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl shadow-sm p-20 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl border border-slate-100 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800 text-amber-500 mb-4">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl border border-slate-100 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800 text-accent-500 mb-4">
             <Trophy size={24} />
           </div>
           <h3 className="text-sm font-bold text-slate-800 dark:text-neutral-100 mb-1">
@@ -166,7 +166,7 @@ export default function Ranking() {
                   className={cn(
                     'relative p-6 rounded-3xl border bg-white dark:bg-neutral-900/60 shadow-sm flex flex-col items-center text-center ring-1',
                     style.ring,
-                    isMe ? 'border-amber-500/50' : 'border-slate-200/70 dark:border-neutral-800',
+                    isMe ? 'border-accent-500/50' : 'border-slate-200/70 dark:border-neutral-800',
                   )}
                 >
                   <span className={cn('inline-flex items-center justify-center w-12 h-12 rounded-2xl mb-3', style.bg, style.text)}>
@@ -190,13 +190,13 @@ export default function Ranking() {
                     key={entry.affiliateId}
                     className={cn(
                       'flex items-center gap-4 px-5 py-3.5 transition-colors',
-                      isMe ? 'bg-amber-500/10' : 'hover:bg-slate-50/70 dark:hover:bg-white/[0.03]',
+                      isMe ? 'bg-accent-500/10' : 'hover:bg-slate-50/70 dark:hover:bg-white/[0.03]',
                     )}
                   >
                     <span className="w-8 text-center text-sm font-black text-slate-400 dark:text-neutral-500">{entry.pos}</span>
                     <span className="flex-1 min-w-0 text-sm font-semibold text-slate-800 dark:text-neutral-100 truncate">
                       {humanizeName(entry.name)}
-                      {isMe && <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400">você</span>}
+                      {isMe && <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-accent-600 dark:text-accent-400">você</span>}
                     </span>
                     <span className="text-sm font-bold text-slate-900 dark:text-white">{formatBRL(entry.commission)}</span>
                   </div>

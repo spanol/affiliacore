@@ -116,7 +116,7 @@ export default function PartnerApiExplorer() {
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             placeholder="bsk_..."
-            className="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800/60 text-sm text-slate-900 dark:text-white font-mono placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+            className="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800/60 text-sm text-slate-900 dark:text-white font-mono placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/40"
           />
           <button onClick={() => setShowKey((v) => !v)} className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-500 dark:text-neutral-300 hover:bg-slate-100 dark:hover:bg-white/5">
             {showKey ? 'Ocultar' : 'Ver'}
@@ -138,11 +138,11 @@ export default function PartnerApiExplorer() {
               className={cn(
                 'p-3 rounded-xl border text-left transition-all',
                 endpoint === ep.id
-                  ? 'bg-amber-500/15 border-amber-500/40 shadow-sm'
+                  ? 'bg-accent-500/15 border-accent-500/40 shadow-sm'
                   : 'border-slate-200 dark:border-neutral-700 hover:bg-slate-50 dark:hover:bg-white/5'
               )}
             >
-              <p className={cn('text-sm font-bold', endpoint === ep.id ? 'text-amber-600 dark:text-amber-400' : 'text-slate-700 dark:text-neutral-200')}>{ep.label}</p>
+              <p className={cn('text-sm font-bold', endpoint === ep.id ? 'text-accent-600 dark:text-accent-400' : 'text-slate-700 dark:text-neutral-200')}>{ep.label}</p>
               <p className="text-[10px] text-slate-400 dark:text-neutral-500 mt-0.5 leading-tight">{ep.desc}</p>
             </button>
           ))}
@@ -193,7 +193,7 @@ export default function PartnerApiExplorer() {
         <button
           onClick={send}
           disabled={loading || !apiKey.trim()}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-900 dark:bg-amber-500 text-white dark:text-neutral-950 text-sm font-bold hover:opacity-90 disabled:opacity-40 transition-opacity"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-900 dark:bg-accent-500 text-white dark:text-neutral-950 text-sm font-bold hover:opacity-90 disabled:opacity-40 transition-opacity"
         >
           {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
           {loading ? 'Enviando...' : 'Enviar requisição'}
@@ -279,7 +279,7 @@ export default function PartnerApiExplorer() {
 }
 
 const inputCls =
-  'w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800/60 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/40';
+  'w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800/60 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent-500/40';
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (

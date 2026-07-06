@@ -102,13 +102,13 @@ export default function Houses() {
 
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <span className="inline-flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+          <span className="inline-flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-600 dark:text-accent-400 text-[10px] font-bold uppercase tracking-widest">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />
             Backoffice
           </span>
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tighter flex items-center gap-3">
-            <span className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
-              <Building2 size={24} className="text-amber-500" />
+            <span className="p-2 rounded-xl bg-accent-500/10 border border-accent-500/20">
+              <Building2 size={24} className="text-accent-500" />
             </span>
             Casas
           </h1>
@@ -128,12 +128,12 @@ export default function Houses() {
 
       {loading ? (
         <div className="p-24 flex flex-col items-center justify-center gap-4">
-          <Loader2 size={40} className="text-amber-500 animate-spin" />
+          <Loader2 size={40} className="text-accent-500 animate-spin" />
           <p className="text-xs font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest animate-pulse">Carregando casas...</p>
         </div>
       ) : houses.length === 0 ? (
         <div className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl shadow-sm p-24 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl border border-amber-200/70 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/30 text-amber-500 mb-4">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl border border-accent-200/70 dark:border-accent-900/40 bg-accent-50 dark:bg-accent-950/30 text-accent-500 mb-4">
             <Building2 size={24} />
           </div>
           <h3 className="text-sm font-bold text-slate-800 dark:text-neutral-100 mb-1">Nenhuma casa cadastrada</h3>
@@ -149,7 +149,7 @@ export default function Houses() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.04 }}
-              className="group relative overflow-hidden p-6 rounded-2xl border bg-white dark:bg-neutral-900/60 border-slate-200/70 dark:border-neutral-800 shadow-sm hover:border-amber-300 dark:hover:border-amber-800 transition-all"
+              className="group relative overflow-hidden p-6 rounded-2xl border bg-white dark:bg-neutral-900/60 border-slate-200/70 dark:border-neutral-800 shadow-sm hover:border-accent-300 dark:hover:border-accent-800 transition-all"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3 min-w-0">
@@ -173,7 +173,7 @@ export default function Houses() {
                   <dt className="text-slate-400 dark:text-neutral-500 font-medium">Resultados</dt>
                   <dd>
                     {h.dataSource === 'manual' ? (
-                      <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-semibold"><FileSpreadsheet size={11} /> Upload manual</span>
+                      <span className="inline-flex items-center gap-1 text-accent-600 dark:text-accent-400 font-semibold"><FileSpreadsheet size={11} /> Upload manual</span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 font-semibold"><Cloud size={11} /> Automático (OTG)</span>
                     )}
@@ -198,7 +198,7 @@ export default function Houses() {
               {h.dataSource === 'manual' && (
                 <button
                   onClick={() => setResultsModal({ open: true, house: h })}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 mb-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs font-bold text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-all"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 mb-2 rounded-xl bg-accent-500/10 border border-accent-500/30 text-xs font-bold text-accent-600 dark:text-accent-400 hover:bg-accent-500/20 transition-all"
                 >
                   <Table2 size={14} /> Importar resultados
                 </button>
@@ -206,7 +206,7 @@ export default function Houses() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setModal({ open: true, house: h })}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700/60 text-xs font-bold text-slate-600 dark:text-neutral-200 hover:border-amber-500/40 hover:text-amber-600 dark:hover:text-amber-400 transition-all"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700/60 text-xs font-bold text-slate-600 dark:text-neutral-200 hover:border-accent-500/40 hover:text-accent-600 dark:hover:text-accent-400 transition-all"
                 >
                   <Pencil size={13} /> Editar
                 </button>
@@ -242,7 +242,7 @@ function HouseLogo({ house, size = 40 }: { house: House; size?: number }) {
     );
   }
   return (
-    <span style={dim} className="rounded-xl bg-amber-500 text-white flex items-center justify-center font-black text-sm shrink-0">
+    <span style={dim} className="rounded-xl bg-accent-500 text-accent-contrast flex items-center justify-center font-black text-sm shrink-0">
       {(house.name || '?').charAt(0).toUpperCase()}
     </span>
   );
@@ -336,7 +336,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
         >
           <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-100 dark:border-neutral-800">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Building2 size={18} className="text-amber-500" />
+              <Building2 size={18} className="text-accent-500" />
               {editing ? 'Editar casa' : 'Nova casa'}
             </h2>
             <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-neutral-800 hover:text-slate-600 dark:hover:text-neutral-200 transition-colors">
@@ -351,7 +351,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                 {logoPreview ? (
                   <img src={logoPreview} alt="logo" className="w-16 h-16 rounded-2xl object-contain bg-white border border-slate-200 dark:border-neutral-700" />
                 ) : (
-                  <div className="w-16 h-16 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-black text-xl">
+                  <div className="w-16 h-16 rounded-2xl bg-accent-500 text-accent-contrast flex items-center justify-center font-black text-xl">
                     {(name || '?').charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -362,7 +362,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                 <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-600 dark:text-neutral-200 hover:border-amber-500/40 transition-all"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-600 dark:text-neutral-200 hover:border-accent-500/40 transition-all"
                 >
                   <Upload size={13} /> {logoPreview ? 'Trocar logo' : 'Enviar logo'}
                 </button>
@@ -420,11 +420,11 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                     onClick={() => setDataSource(opt.v)}
                     className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all ${
                       dataSource === opt.v
-                        ? 'border-amber-500 bg-amber-500/10'
+                        ? 'border-accent-500 bg-accent-500/10'
                         : 'border-slate-200 dark:border-neutral-700 hover:border-slate-300 dark:hover:border-neutral-600'
                     }`}
                   >
-                    <span className={`flex items-center gap-1.5 text-xs font-bold ${dataSource === opt.v ? 'text-amber-600 dark:text-amber-400' : 'text-slate-700 dark:text-neutral-200'}`}>
+                    <span className={`flex items-center gap-1.5 text-xs font-bold ${dataSource === opt.v ? 'text-accent-600 dark:text-accent-400' : 'text-slate-700 dark:text-neutral-200'}`}>
                       <opt.icon size={13} /> {opt.title}
                     </span>
                     <span className="text-[10px] text-slate-400 dark:text-neutral-500">{opt.desc}</span>
@@ -504,7 +504,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 disabled:opacity-60 transition-all"
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-accent-500 text-accent-contrast text-xs font-bold hover:bg-accent-600 disabled:opacity-60 transition-all"
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
               {editing ? 'Salvar' : 'Criar casa'}
@@ -755,7 +755,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
               </div>
               <button
                 onClick={() => downloadResultsTemplate(house.name).catch(() => push({ type: 'error', message: 'Não foi possível gerar o modelo.' }))}
-                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 text-white text-[11px] font-bold hover:bg-amber-600 transition-all"
+                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-accent-500 text-accent-contrast text-[11px] font-bold hover:bg-accent-600 transition-all"
               >
                 <Download size={13} /> Baixar modelo
               </button>
@@ -800,7 +800,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                 <button
                   onClick={() => fileRef.current?.click()}
                   disabled={reading}
-                  className="mt-1.5 w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl border-2 border-dashed border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-500 dark:text-neutral-400 hover:border-amber-500/50 hover:text-amber-600 dark:hover:text-amber-400 transition-all disabled:opacity-60"
+                  className="mt-1.5 w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl border-2 border-dashed border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-500 dark:text-neutral-400 hover:border-accent-500/50 hover:text-accent-600 dark:hover:text-accent-400 transition-all disabled:opacity-60"
                 >
                   {reading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                   {reading ? 'Lendo planilha…' : 'Selecionar planilha Excel (.xlsx) ou .csv'}
@@ -818,7 +818,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                 onChange={(e) => onTypeText(e.target.value)}
                 rows={5}
                 placeholder={`${TEMPLATE_HEADERS.join('\t')}\n${TEMPLATE_EXAMPLE_ROWS[0].join('\t')}`}
-                className="mt-2 w-full px-3 py-2.5 rounded-xl bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-xs font-mono text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-neutral-600 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all"
+                className="mt-2 w-full px-3 py-2.5 rounded-xl bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-xs font-mono text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-neutral-600 focus:outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 transition-all"
               />
             </details>
 
@@ -864,7 +864,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                             </span>
                             <button
                               onClick={() => { setLinkingLine(linkingLine === u.line ? null : u.line); setLinkQuery(''); }}
-                              className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline"
+                              className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-accent-600 dark:text-accent-400 hover:underline"
                             >
                               <Link2 size={11} /> {linkingLine === u.line ? 'Cancelar' : 'Vincular'}
                             </button>
@@ -875,7 +875,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                                 value={linkQuery}
                                 onChange={(e) => setLinkQuery(e.target.value)}
                                 placeholder="Buscar afiliado existente…"
-                                className="w-full px-2 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-[11px] text-slate-900 dark:text-white focus:outline-none focus:border-amber-500"
+                                className="w-full px-2 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-[11px] text-slate-900 dark:text-white focus:outline-none focus:border-accent-500"
                               />
                               <div className="mt-1 max-h-32 overflow-y-auto rounded-lg border border-slate-100 dark:border-neutral-800">
                                 {!u.email ? (
@@ -886,7 +886,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                                   <button
                                     key={o.id}
                                     onClick={() => handleLink(u.email || '', o.id)}
-                                    className="block w-full text-left px-2 py-1.5 text-[11px] text-slate-600 dark:text-neutral-300 hover:bg-amber-500/10"
+                                    className="block w-full text-left px-2 py-1.5 text-[11px] text-slate-600 dark:text-neutral-300 hover:bg-accent-500/10"
                                   >
                                     {o.name}
                                     {o.emails.length > 0 && (
@@ -902,13 +902,13 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                     </div>
                     <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-amber-100 dark:border-amber-900/30">
                       <label className="inline-flex items-center gap-1.5 text-[11px] text-amber-700/80 dark:text-amber-300/70 cursor-pointer select-none">
-                        <input type="checkbox" checked={generateInvite} onChange={(e) => setGenerateInvite(e.target.checked)} className="accent-amber-500" />
+                        <input type="checkbox" checked={generateInvite} onChange={(e) => setGenerateInvite(e.target.checked)} className="accent-accent-500" />
                         Gerar convite de acesso
                       </label>
                       <button
                         onClick={handleCreateBoost}
                         disabled={creating}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-[11px] font-bold hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-500 text-accent-contrast text-[11px] font-bold hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       >
                         {creating ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
                         Cadastrar {analysis.unresolved.length} na plataforma
@@ -991,7 +991,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
             <button
               onClick={handleImport}
               disabled={!canImportFile || importing}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-accent-500 text-accent-contrast text-xs font-bold hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {importing ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
               Confirmar importação
@@ -1003,7 +1003,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
   );
 }
 
-const inputCls = 'w-full px-3 py-2.5 rounded-xl bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-sm text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-neutral-600 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all disabled:opacity-60 disabled:cursor-not-allowed';
+const inputCls = 'w-full px-3 py-2.5 rounded-xl bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-sm text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-neutral-600 focus:outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 transition-all disabled:opacity-60 disabled:cursor-not-allowed';
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (

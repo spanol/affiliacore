@@ -165,12 +165,12 @@ export default function DashboardLayout() {
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-medium border border-transparent",
                     isActive(item.path)
-                      ? "bg-amber-500/15 text-amber-500 font-bold border-amber-500/30 shadow-sm"
+                      ? "bg-accent-500/15 text-accent-500 font-bold border-accent-500/30 shadow-sm"
                       : "text-slate-600 dark:text-neutral-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white hover:border-slate-200 dark:hover:border-neutral-800 hover:shadow-sm"
                   )}
                 >
                   <item.icon size={18} className={cn(
-                    isActive(item.path) ? "text-amber-500" : "text-slate-600 dark:text-neutral-300"
+                    isActive(item.path) ? "text-accent-500" : "text-slate-600 dark:text-neutral-300"
                   )} />
                   {item.label}
                 </Link>

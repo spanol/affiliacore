@@ -148,7 +148,7 @@ export default function Settings() {
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx"
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all outline-none"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all outline-none"
                   />
                   <div className="absolute right-3 top-1/2 -translate-y-1/2">
                     <ShieldCheck size={16} className="text-slate-400 dark:text-neutral-400" aria-label="Armazenamento Seguro" />

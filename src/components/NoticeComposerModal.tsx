@@ -111,7 +111,7 @@ export default function NoticeComposerModal({ editing, onClose, onSaved }: Props
     }
   };
 
-  const inputClass = 'w-full px-4 py-3 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all outline-none';
+  const inputClass = 'w-full px-4 py-3 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all outline-none';
   const labelClass = 'text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest ml-1 block mb-2';
 
   return createPortal(
@@ -125,7 +125,7 @@ export default function NoticeComposerModal({ editing, onClose, onSaved }: Props
         >
           <div className="shrink-0 p-6 border-b border-slate-100 dark:border-neutral-800 flex items-start justify-between gap-4">
             <div>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 mb-2 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 mb-2 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-600 dark:text-accent-400 text-[10px] font-bold uppercase tracking-widest">
                 <Megaphone size={12} /> {isDirect ? 'Mensagem direta' : isEdit ? 'Editar aviso' : 'Novo aviso'}
               </span>
               <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
@@ -151,7 +151,7 @@ export default function NoticeComposerModal({ editing, onClose, onSaved }: Props
                     className={cn(
                       'px-2 py-2 rounded-xl text-xs font-bold border transition-all',
                       audience === o.id
-                        ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/40'
+                        ? 'bg-accent-500/15 text-accent-600 dark:text-accent-400 border-accent-500/40'
                         : 'bg-slate-50 dark:bg-neutral-800/60 text-slate-500 dark:text-neutral-400 border-slate-200 dark:border-neutral-700 hover:border-slate-300 dark:hover:border-neutral-600',
                     )}
                   >
@@ -175,7 +175,7 @@ export default function NoticeComposerModal({ editing, onClose, onSaved }: Props
                     placeholder="Buscar por nome ou ID..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
                   />
                 </div>
                 <div className="max-h-44 overflow-y-auto rounded-xl border border-slate-100 dark:border-neutral-800 divide-y divide-slate-100 dark:divide-neutral-800">
@@ -189,7 +189,7 @@ export default function NoticeComposerModal({ editing, onClose, onSaved }: Props
                     const checked = selectedAff === a.id;
                     return (
                       <label key={a.id} className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/[0.03]">
-                        <input type="radio" name="aff" checked={checked} onChange={() => setSelectedAff(a.id)} className="w-4 h-4 accent-amber-500" />
+                        <input type="radio" name="aff" checked={checked} onChange={() => setSelectedAff(a.id)} className="w-4 h-4 accent-accent-500" />
                         <span className="flex-1 min-w-0">
                           <span className="block text-xs font-semibold text-slate-700 dark:text-neutral-200 truncate">{a.name || 'Sem Nome'}</span>
                           <span className="block text-[10px] font-mono text-slate-400 dark:text-neutral-500">#{a.id}</span>
@@ -218,7 +218,7 @@ export default function NoticeComposerModal({ editing, onClose, onSaved }: Props
                       className={cn(
                         'px-3 py-2 rounded-xl text-xs font-bold border transition-all flex-1',
                         category === c.id
-                          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/40'
+                          ? 'bg-accent-500/15 text-accent-600 dark:text-accent-400 border-accent-500/40'
                           : 'bg-slate-50 dark:bg-neutral-800/60 text-slate-500 dark:text-neutral-400 border-slate-200 dark:border-neutral-700 hover:border-slate-300 dark:hover:border-neutral-600',
                       )}
                     >
@@ -250,7 +250,7 @@ export default function NoticeComposerModal({ editing, onClose, onSaved }: Props
                     <p className="text-sm font-bold text-slate-800 dark:text-neutral-100">Publicado</p>
                     <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5">Desligado, o aviso fica oculto para os afiliados.</p>
                   </div>
-                  <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="w-5 h-5 accent-amber-500" />
+                  <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="w-5 h-5 accent-accent-500" />
                 </label>
               </>
             )}
@@ -263,7 +263,7 @@ export default function NoticeComposerModal({ editing, onClose, onSaved }: Props
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-5 py-2.5 rounded-full bg-amber-500 text-white text-xs font-bold hover:bg-amber-400 transition-all shadow-sm shadow-amber-500/20 disabled:opacity-50 flex items-center gap-2"
+              className="px-5 py-2.5 rounded-full bg-accent-500 text-accent-contrast text-xs font-bold hover:bg-accent-400 transition-all shadow-sm shadow-accent-500/20 disabled:opacity-50 flex items-center gap-2"
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : isDirect ? <Send size={14} /> : <Save size={14} />}
               {isDirect ? 'Enviar' : isEdit ? 'Salvar' : 'Publicar'}

@@ -74,14 +74,14 @@ export default function Auditoria() {
   }
 
   const selectCls =
-    'rounded-xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm text-slate-700 dark:text-neutral-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500/40';
+    'rounded-xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm text-slate-700 dark:text-neutral-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent-500/40';
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-500">
+          <span className="p-2.5 bg-accent-500/10 rounded-xl border border-accent-500/20 text-accent-500">
             <ScrollText size={20} />
           </span>
           <div>

@@ -144,7 +144,7 @@ export default function OtgRoster() {
             onClick={handleRefresh}
             disabled={refreshing || loading}
             title="Puxar o roster fresco direto da OTG e reconciliar"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-slate-900 dark:bg-amber-500 text-white dark:text-neutral-950 text-xs font-bold hover:opacity-90 disabled:opacity-50 transition-opacity shadow-sm"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-slate-900 dark:bg-accent-500 text-white dark:text-neutral-950 text-xs font-bold hover:opacity-90 disabled:opacity-50 transition-opacity shadow-sm"
           >
             {refreshing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             {refreshing ? 'Atualizando...' : 'Atualizar da OTG'}
@@ -168,7 +168,7 @@ export default function OtgRoster() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nome..."
-            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900/60 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900/60 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/40"
           />
         </div>
         <select value={house} onChange={(e) => setHouse(e.target.value)} className={selectCls}>
@@ -236,7 +236,7 @@ export default function OtgRoster() {
                     </td>
                     <td className="px-4 py-3 max-w-[220px]">
                       {r.registerUrl ? (
-                        <a href={r.registerUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 hover:underline truncate max-w-full" title={r.registerUrl}>
+                        <a href={r.registerUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-accent-600 dark:text-accent-400 hover:underline truncate max-w-full" title={r.registerUrl}>
                           <ExternalLink size={12} className="shrink-0" />
                           <span className="truncate">{r.registerUrl.replace(/^https?:\/\//, '')}</span>
                         </a>
@@ -287,7 +287,7 @@ export default function OtgRoster() {
               </div>
               <div className="flex gap-2">
                 <input readOnly value={inviteModal.url || ''} className="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800/60 text-xs text-slate-700 dark:text-neutral-200 font-mono" />
-                <button onClick={copyUrl} className="px-3 py-2.5 rounded-xl bg-slate-900 dark:bg-amber-500 text-white dark:text-neutral-950 text-xs font-bold hover:opacity-90 transition-opacity">
+                <button onClick={copyUrl} className="px-3 py-2.5 rounded-xl bg-slate-900 dark:bg-accent-500 text-white dark:text-neutral-950 text-xs font-bold hover:opacity-90 transition-opacity">
                   {copied ? <Check size={14} /> : <Copy size={14} />}
                 </button>
               </div>
@@ -301,7 +301,7 @@ export default function OtgRoster() {
 }
 
 const selectCls =
-  'px-3 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900/60 text-sm text-slate-700 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-amber-500/40';
+  'px-3 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900/60 text-sm text-slate-700 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-accent-500/40';
 
 function StatCard({ label, value, sub, tone }: { label: string; value: number; sub?: string; tone?: 'amber' | 'emerald' }) {
   return (

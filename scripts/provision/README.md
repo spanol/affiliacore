@@ -68,6 +68,12 @@ env:
   - variable: VITE_BRAND_FAVICON_URL
     value: 'https://<storage-ou-cdn>/favicon.svg'
     availability: [BUILD, RUNTIME]
+  - variable: VITE_BRAND_ACCENT     # P3.1: cor de destaque da marca (1 hex; gera a
+    value: '#E11D48'                # escala inteira + contraste WCAG em runtime)
+    availability: [BUILD, RUNTIME]
+  - variable: VITE_BRAND_SURFACE    # opcional: navy de superfície (login/hero)
+    value: '#141C2A'
+    availability: [BUILD, RUNTIME]
   - variable: FIREBASE_STORAGE_BUCKET
     value: '<project-id>.firebasestorage.app'
     availability: [RUNTIME]

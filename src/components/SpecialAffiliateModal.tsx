@@ -86,7 +86,7 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
         >
         <div className="shrink-0 p-6 border-b border-slate-100 dark:border-neutral-800 flex items-start justify-between gap-4">
           <div>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 mb-2 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 mb-2 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-600 dark:text-accent-400 text-[10px] font-bold uppercase tracking-widest">
               <Crown size={12} /> Afiliado especial
             </span>
             <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">{affiliate.name || affiliate.label || 'Sem Nome'}</h3>
@@ -103,7 +103,7 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
               <p className="text-sm font-bold text-slate-800 dark:text-neutral-100">Ativar como afiliado especial</p>
               <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5">Dá a ele uma view da própria sub-rede.</p>
             </div>
-            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="w-5 h-5 accent-amber-500" />
+            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="w-5 h-5 accent-accent-500" />
           </label>
 
           {active && (
@@ -123,7 +123,7 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest">Sub-afiliados</p>
-                  <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">{subs.length} selecionado(s)</span>
+                  <span className="text-[10px] font-bold text-accent-600 dark:text-accent-400">{subs.length} selecionado(s)</span>
                 </div>
                 <div className="relative mb-2">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-400" size={14} />
@@ -132,7 +132,7 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
                     placeholder="Buscar afiliado..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all dark:text-white"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
                   />
                 </div>
                 <div className="max-h-52 overflow-y-auto rounded-xl border border-slate-100 dark:border-neutral-800 divide-y divide-slate-100 dark:divide-neutral-800">
@@ -143,7 +143,7 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
                     const checked = subs.includes(id);
                     return (
                       <label key={id} className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-white/[0.03]">
-                        <input type="checkbox" checked={checked} onChange={() => toggleSub(id)} className="w-4 h-4 accent-amber-500" />
+                        <input type="checkbox" checked={checked} onChange={() => toggleSub(id)} className="w-4 h-4 accent-accent-500" />
                         <span className="flex-1 min-w-0">
                           <span className="block text-xs font-semibold text-slate-700 dark:text-neutral-200 truncate">{a.name || a.label || 'Sem Nome'}</span>
                           <span className="block text-[10px] font-mono text-slate-400 dark:text-neutral-500">#{id}</span>
@@ -167,7 +167,7 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-5 py-2.5 rounded-full bg-amber-500 text-white text-xs font-bold hover:bg-amber-400 transition-all shadow-sm shadow-amber-500/20 disabled:opacity-50 flex items-center gap-2"
+            className="px-5 py-2.5 rounded-full bg-accent-500 text-accent-contrast text-xs font-bold hover:bg-accent-400 transition-all shadow-sm shadow-accent-500/20 disabled:opacity-50 flex items-center gap-2"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             Salvar

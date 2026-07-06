@@ -89,7 +89,7 @@ export default function NotificationBell() {
       >
         <Bell size={16} />
         {unread > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center shadow">
+          <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-accent-500 text-accent-contrast text-[10px] font-bold flex items-center justify-center shadow">
             {unread > 9 ? '9+' : unread}
           </span>
         )}
@@ -124,7 +124,7 @@ export default function NotificationBell() {
             </div>
             <button
               onClick={() => { setOpen(false); navigate('/avisos'); }}
-              className={cn('w-full px-4 py-3 text-center text-xs font-bold text-amber-600 dark:text-amber-400 hover:bg-slate-50 dark:hover:bg-white/[0.03] border-t border-slate-100 dark:border-neutral-800 transition-colors')}
+              className={cn('w-full px-4 py-3 text-center text-xs font-bold text-accent-600 dark:text-accent-400 hover:bg-slate-50 dark:hover:bg-white/[0.03] border-t border-slate-100 dark:border-neutral-800 transition-colors')}
             >
               Ver todos
             </button>

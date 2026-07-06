@@ -87,9 +87,18 @@ A versão vendida é naturalmente OTG-free (a x-api-key é da operação do Carl
   e textos neutros onde "Boost" significava "a plataforma" (/casas, avisos,
   ranking, modais). Convenção documentada: `VITE_BRAND_SHORT` é tratado no
   FEMININO no meio de frase.
-- **Fora do núcleo (P3.1, avaliar depois):** cor primária configurável — o app
-  usa `amber-*` hardcoded em dezenas de arquivos (inclusive com semântica de
-  aviso); remapear exige token de accent via CSS var + varredura cuidadosa.
+- **P3.1 · TEMA por instância — ✅ ENTREGUE (2026-07-06, branch `feat/p3.1-theming`):**
+  novas envs `VITE_BRAND_ACCENT` (1 hex → `src/lib/theming.ts` gera a escala
+  `accent-50..950` + `--color-accent-contrast` por contraste WCAG, tudo puro e
+  testado) e `VITE_BRAND_SURFACE` (navy de superfície; a variante clara é
+  derivada). Mecânica: tokens `accent-*` no `@theme` do Tailwind v4 (default =
+  amber → instância Boost pixel-idêntica sem env) compilam p/ `var()`;
+  `applyBrandToDocument` sobrescreve as vars no `:root` em runtime — zero
+  rebuild por cliente. Sweep semântico feito nos 26 arquivos: `accent-*` =
+  MARCA (botões, nav ativo, focus, badges, spinners); `amber-*` PERMANECE como
+  cor de AVISO (pendências, "não configurado", "em captação", ouro do pódio,
+  estado sujo de edição) e não muda com o tema. Validado ao vivo: dev com
+  `#E11D48` → UI rose com texto de contraste branco; sem env → amber intacto.
 - Naming interno (`boostAffiliate`, `boost_<uuid>`, coleções) **não muda**.
 
 ## P4 · Playbook "novo cliente em 1 dia"
@@ -200,7 +209,12 @@ registrado).
 4. **Repo GitHub renomeado → `spanol/affiliacore`** (`gh repo rename` + `git remote
    set-url` local; o remote antigo redireciona).
 
+**P3.1 (tema por instância) ✅ entregue em 2026-07-06 na branch `feat/p3.1-theming`**
+(ver seção P3.1 acima) — merge na main com o Vinicius acompanhando.
+
 **Próximos passos, na ordem:**
-1. Registrar `afiliacore.com.br` (um "f") como typo-defense; INPI + Instagram + logo.
-2. Executar o playbook (`scripts/provision/README.md`) na instância do cliente 0.
-3. P5 restante: jurídico c/ Carlos (P5.2), demo (P5.3), landing c/ preço (P5.4).
+1. Merge `feat/p3.1-theming` → main (deploya; instância Boost fica pixel-idêntica —
+   defaults = amber/navy atuais).
+2. Registrar `afiliacore.com.br` (um "f") como typo-defense; INPI + Instagram + logo.
+3. Executar o playbook (`scripts/provision/README.md`) na instância do cliente 0.
+4. P5 restante: jurídico c/ Carlos (P5.2), demo (P5.3), landing c/ preço (P5.4).

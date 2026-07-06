@@ -517,7 +517,7 @@ export default function AffiliateDetails() {
             // Especial vendo um sub da própria rede: volta pra lista de afiliados dele.
             <button
               onClick={() => navigate('/network/afiliados')}
-              className="shrink-0 p-3 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl text-slate-500 hover:text-amber-500 transition-all shadow-sm"
+              className="shrink-0 p-3 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl text-slate-500 hover:text-accent-500 transition-all shadow-sm"
             >
               <ArrowLeft size={20} />
             </button>
@@ -589,8 +589,8 @@ export default function AffiliateDetails() {
                 className={cn(
                   "flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all font-bold text-xs uppercase tracking-wider shadow-sm border disabled:opacity-50",
                   isCurrentSpecialActive
-                    ? "bg-amber-500 text-white border-amber-500 hover:bg-amber-400"
-                    : "bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-800 text-slate-700 dark:text-neutral-300 hover:border-amber-500/40"
+                    ? "bg-accent-500 text-accent-contrast border-accent-500 hover:bg-accent-400"
+                    : "bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-800 text-slate-700 dark:text-neutral-300 hover:border-accent-500/40"
                 )}
               >
                 {loadingSpecial ? <Loader2 size={16} className="animate-spin" /> : <Crown size={16} />}
@@ -599,7 +599,7 @@ export default function AffiliateDetails() {
               {isCurrentSpecialActive && (
                 <button
                   onClick={openCadastros}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 text-slate-700 dark:text-neutral-300 rounded-xl hover:border-amber-500/40 transition-all font-bold text-xs uppercase tracking-wider shadow-sm"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 text-slate-700 dark:text-neutral-300 rounded-xl hover:border-accent-500/40 transition-all font-bold text-xs uppercase tracking-wider shadow-sm"
                 >
                   <Users size={16} /> Afiliados Vinculados
                 </button>
@@ -761,7 +761,7 @@ export default function AffiliateDetails() {
                   {/* Aviso: afiliado especial → os números abaixo contabilizam a REDE
                       (produção própria + sub-afiliados vinculados), não só o link dele. */}
                   {isNetworkView && (
-                    <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
+                    <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-accent-500/10 border border-accent-500/20 text-accent-700 dark:text-accent-400">
                       <Users size={15} className="shrink-0" />
                       <p className="text-[11px] font-bold">
                         Afiliado especial — os números abaixo somam a <strong>rede inteira</strong> (produção própria + sub-afiliados vinculados).
@@ -890,12 +890,12 @@ export default function AffiliateDetails() {
                     <div className="bg-white dark:bg-neutral-900 border border-slate-100 dark:border-neutral-800 rounded-3xl shadow-sm overflow-hidden">
                       <div className="p-6 border-b border-slate-50 dark:border-neutral-800 flex justify-between items-center bg-slate-50/50 dark:bg-neutral-800/30">
                         <h3 className="flex items-center gap-2 font-black text-xs text-slate-800 dark:text-white uppercase tracking-widest">
-                          <Wallet size={14} className="text-amber-500" /> Dados de Pagamento
+                          <Wallet size={14} className="text-accent-500" /> Dados de Pagamento
                         </h3>
                         {paymentProfile?.pixKey && (
                           <button
                             onClick={() => setRevealPayment((v) => !v)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-neutral-800 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-300 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-neutral-800 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-300 hover:text-accent-600 dark:hover:text-accent-400 transition-colors"
                           >
                             {revealPayment ? <EyeOff size={12} /> : <Eye size={12} />}
                             {revealPayment ? 'Ocultar' : 'Revelar'}
@@ -1324,7 +1324,7 @@ export default function AffiliateDetails() {
           >
             <div className="shrink-0 p-6 border-b border-slate-50 dark:border-neutral-800 flex justify-between items-center gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <span className="shrink-0 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500"><Users size={18} /></span>
+                <span className="shrink-0 p-2 rounded-xl bg-accent-500/10 border border-accent-500/20 text-accent-500"><Users size={18} /></span>
                 <div className="min-w-0">
                   <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm truncate">CPA da rede</h3>
                   <p className="text-[11px] text-slate-400 dark:text-neutral-500 truncate">
@@ -1336,7 +1336,7 @@ export default function AffiliateDetails() {
             </div>
 
             {loadingNetwork ? (
-              <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 text-amber-500 animate-spin" /></div>
+              <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 text-accent-500 animate-spin" /></div>
             ) : (
               <>
                 <div className="shrink-0 px-6 py-4 bg-slate-50/60 dark:bg-neutral-800/30 border-b border-slate-50 dark:border-neutral-800 flex items-center justify-between">
@@ -1350,7 +1350,7 @@ export default function AffiliateDetails() {
                         <span className={cn(
                           "shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-[11px] font-black border",
                           n.isOwn
-                            ? "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                            ? "bg-accent-500/10 border-accent-500/20 text-accent-600 dark:text-accent-400"
                             : "bg-slate-50 dark:bg-neutral-800/60 border-slate-100 dark:border-neutral-700/60 text-slate-500 dark:text-neutral-400"
                         )}>
                           {n.isOwn ? <Crown size={15} /> : n.name.charAt(0).toUpperCase()}
