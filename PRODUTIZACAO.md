@@ -117,6 +117,22 @@ A versão vendida é naturalmente OTG-free (a x-api-key é da operação do Carl
   proposta corporativa: `#2563eb` + `solid`; proposta vibrante: `#E11D48` +
   `glass`). Follow-up possível (não feito): preset `flat` que também remove os
   efeitos decorativos da LP/auth (glow-white, bg-grid-white, ambient glows).
+- **P3.3 · CANVAS escuro + tema inicial — ✅ ENTREGUE (2026-07-06, mesma branch
+  `feat/p3.2-glass-theming`):** motivado pelo teste side-by-side do Vinicius
+  (Alfa solid+azul vs Boost em dark "quase iguais") — diagnóstico: no dark, o que
+  domina a tela é o CANVAS (`neutral-950/900/800` hardcoded, fora do tema), os
+  cards do /admin nunca foram glass e o accent pinta elementos pequenos. Duas
+  envs novas: **`VITE_BRAND_CANVAS`** (1 hex → `buildCanvasRamp` re-tinta a ramp
+  `--color-neutral-50..950` inteira em runtime; luminosidade FIXA na curva slate
+  (contraste preservado p/ qualquer matiz), entrada contribui matiz + saturação
+  domada (≤0.55, re-escalada por degrau); os tokens `--color-glass-*-dark`
+  acompanham a ramp — translúcidos no glass, opacos no solid) e
+  **`VITE_BRAND_THEME`** (`'light'`|`'dark'` = tema inicial p/ usuário sem
+  preferência salva; precedência `resolveInitialTheme`: salva > instância > SO;
+  ausência = SO = comportamento Boost inalterado, por isso SEM pin no
+  apphosting.boost.yaml). Zero sweep: `dark:bg-neutral-900` etc. já compilam p/
+  `var(--color-neutral-900)`. Receita "tema corporativo completo" = `ACCENT` +
+  `STYLE=solid` + `CANVAS` + `THEME=light`.
 - Naming interno (`boostAffiliate`, `boost_<uuid>`, coleções) **não muda**.
 
 ## P4 · Playbook "novo cliente em 1 dia"
@@ -228,13 +244,14 @@ registrado).
    set-url` local; o remote antigo redireciona).
 
 **P3.1 (tema por instância) ✅ entregue e MERGEADO na main (`e58ad9f`, 2026-07-06).**
-**P3.2 (estilo glass por instância) ✅ entregue em 2026-07-06 na branch
-`feat/p3.2-glass-theming`** (ver seção P3.2 acima) — merge na main com o Vinicius
-acompanhando.
+**P3.2 (estilo glass) + P3.3 (canvas escuro + tema inicial) ✅ entregues em
+2026-07-06 na branch `feat/p3.2-glass-theming`** (ver seções acima) — merge na
+main com o Vinicius acompanhando.
 
 **Próximos passos, na ordem:**
 1. Merge `feat/p3.2-glass-theming` → main (deploya; Boost fica pixel-idêntica —
-   defaults glass = os combos antigos + pin explícito no apphosting.boost.yaml).
+   defaults glass/neutral = os valores antigos + pin do style no
+   apphosting.boost.yaml; canvas/theme sem env = comportamento atual).
 2. Registrar `afiliacore.com.br` (um "f") como typo-defense; INPI + Instagram + logo.
 3. Executar o playbook (`scripts/provision/README.md`) na instância do cliente 0.
 4. P5 restante: jurídico c/ Carlos (P5.2), demo (P5.3), landing c/ preço (P5.4).

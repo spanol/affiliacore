@@ -3,10 +3,13 @@ import {
   ACCENT_STEPS,
   SOLID_STYLE_VARS,
   buildAccentRamp,
+  buildCanvasRamp,
   lightenSurface,
   parseHex,
   relativeLuminance,
   resolveBrandStyle,
+  resolveDefaultTheme,
+  resolveInitialTheme,
   resolveThemeTokens,
 } from './theming';
 
@@ -164,5 +167,108 @@ describe('resolveBrandStyle', () => {
     expect(resolveBrandStyle('')).toBeNull();
     expect(resolveBrandStyle(undefined)).toBeNull();
     expect(resolveBrandStyle(null)).toBeNull();
+  });
+});
+
+describe('buildCanvasRamp (P3.3)', () => {
+  it('hex inválido → null (neutral original do Tailwind vale)', () => {
+    expect(buildCanvasRamp('')).toBeNull();
+    expect(buildCanvasRamp(undefined)).toBeNull();
+    expect(buildCanvasRamp('#zz')).toBeNull();
+  });
+
+  it('gera os 11 degraus em hsl, com o matiz da entrada em todos', () => {
+    const ramp = buildCanvasRamp('#0f172a')!; // slate-900
+    for (const step of ACCENT_STEPS) {
+      expect(ramp[step]).toMatch(/^hsl\(/);
+      expect(hueOf(ramp[step])).toBeCloseTo(hueOf(ramp['900']), 0);
+    }
+  });
+
+  it('luminosidade estritamente decrescente 50→950 (contraste preservado p/ qualquer matiz)', () => {
+    for (const hex of ['#0f172a', '#16a34a', '#7c3aed', '#000080']) {
+      const ramp = buildCanvasRamp(hex)!;
+      const ls = ACCENT_STEPS.map((s) => lightnessOf(ramp[s]));
+      for (let i = 1; i < ls.length; i++) {
+        expect(ls[i], `${hex}: degrau ${ACCENT_STEPS[i]}`).toBeLessThan(ls[i - 1]);
+      }
+    }
+  });
+
+  it('entrada slate-900 reproduz ≈slate (sanidade da curva)', () => {
+    const ramp = buildCanvasRamp('#0f172a')!;
+    expect(lightnessOf(ramp['900'])).toBeCloseTo(11.2, 0);
+    expect(lightnessOf(ramp['950'])).toBeCloseTo(4.9, 0);
+    expect(lightnessOf(ramp['800'])).toBeCloseTo(17.5, 0);
+  });
+
+  it('entrada supersaturada é domada (canvas não vira cor chapada)', () => {
+    const ramp = buildCanvasRamp('#0000ff')!; // s=100%
+    const satOf = (hsl: string): number => {
+      const m = /hsl\([\d.]+ ([\d.]+)% /.exec(hsl);
+      if (!m) throw new Error(`hsl inesperado: ${hsl}`);
+      return parseFloat(m[1]);
+    };
+    expect(satOf(ramp['900'])).toBeLessThanOrEqual(55);
+    expect(satOf(ramp['500'])).toBeLessThanOrEqual(25);
+  });
+});
+
+describe('resolveThemeTokens · canvas (P3.3)', () => {
+  it('VITE_BRAND_CANVAS emite a ramp neutral-* + tokens glass escuros translúcidos', () => {
+    const { cssVars } = resolveThemeTokens({ VITE_BRAND_CANVAS: '#0f172a' });
+    for (const step of ACCENT_STEPS) {
+      expect(cssVars[`--color-neutral-${step}`]).toMatch(/^hsl\(/);
+    }
+    // glass escuro acompanha o canvas, mantendo os alphas dos defaults
+    expect(cssVars['--color-glass-chrome-dark']).toMatch(/\/ 0\.8\)$/);
+    expect(cssVars['--color-glass-card-dark']).toMatch(/\/ 0\.6\)$/);
+    expect(cssVars['--color-glass-banner-dark']).toMatch(/\/ 0\.95\)$/);
+    // lado claro do glass NÃO muda (canvas é eixo do dark)
+    expect(cssVars['--color-glass-chrome']).toBeUndefined();
+    expect(cssVars['--color-glass-card']).toBeUndefined();
+  });
+
+  it('canvas + solid: fills opacos saem da ramp tintada (sem alpha) e blur zera', () => {
+    const { cssVars } = resolveThemeTokens({
+      VITE_BRAND_CANVAS: '#0f172a',
+      VITE_BRAND_STYLE: 'solid',
+    });
+    expect(cssVars['--blur-glass-strong']).toBe('0px');
+    for (const name of [
+      '--color-glass-chrome-dark', '--color-glass-card-dark',
+      '--color-glass-frame-dark', '--color-glass-banner-dark',
+      '--color-glass-thead-dark',
+    ]) {
+      expect(cssVars[name], name).toMatch(/^hsl\(/);
+      expect(cssVars[name], name).not.toMatch(/\//);
+    }
+    // e o lado claro segue o preset solid normal
+    expect(cssVars['--color-glass-chrome']).toBe('#ffffff');
+  });
+
+  it('sem VITE_BRAND_CANVAS não emite nenhuma var neutral-*', () => {
+    const { cssVars } = resolveThemeTokens({ VITE_BRAND_STYLE: 'solid' });
+    expect(Object.keys(cssVars).some((k) => k.startsWith('--color-neutral-'))).toBe(false);
+  });
+});
+
+describe('resolveDefaultTheme / resolveInitialTheme (P3.3)', () => {
+  it("resolveDefaultTheme: só 'light'/'dark' (case-insensitive); resto → null", () => {
+    expect(resolveDefaultTheme('light')).toBe('light');
+    expect(resolveDefaultTheme(' DARK ')).toBe('dark');
+    expect(resolveDefaultTheme('auto')).toBeNull();
+    expect(resolveDefaultTheme('')).toBeNull();
+    expect(resolveDefaultTheme(undefined)).toBeNull();
+  });
+
+  it('precedência: preferência salva > default da instância > SO', () => {
+    expect(resolveInitialTheme('dark', 'light', false)).toBe('dark');
+    expect(resolveInitialTheme('light', 'dark', true)).toBe('light');
+    expect(resolveInitialTheme(null, 'light', true)).toBe('light');
+    expect(resolveInitialTheme(null, 'dark', false)).toBe('dark');
+    expect(resolveInitialTheme(null, null, true)).toBe('dark');
+    expect(resolveInitialTheme(null, null, false)).toBe('light');
+    expect(resolveInitialTheme('lixo', null, true)).toBe('dark');
   });
 });

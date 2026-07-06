@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { BRAND_DEFAULT_THEME } from '../lib/brandingClient';
+import { resolveInitialTheme } from '../lib/theming';
 
 type Theme = 'light' | 'dark';
 
@@ -10,11 +12,14 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem('theme');
-    if (saved === 'light' || saved === 'dark') return saved;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
+  // P3.3: preferência salva > tema default da instância (VITE_BRAND_THEME) > SO.
+  const [theme, setTheme] = useState<Theme>(() =>
+    resolveInitialTheme(
+      localStorage.getItem('theme'),
+      BRAND_DEFAULT_THEME,
+      window.matchMedia('(prefers-color-scheme: dark)').matches,
+    ),
+  );
 
   useEffect(() => {
     const root = window.document.documentElement;

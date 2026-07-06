@@ -77,6 +77,12 @@ env:
   - variable: VITE_BRAND_STYLE      # P3.2: 'glass' (default, look Boost) ou
     value: 'solid'                  # 'solid' (opaco, sem blur — corporativo)
     availability: [BUILD, RUNTIME]
+  - variable: VITE_BRAND_CANVAS     # P3.3: matiz do canvas ESCURO (re-tinta a
+    value: '#0f172a'                # ramp neutral-*; ausência = cinza neutro)
+    availability: [BUILD, RUNTIME]
+  - variable: VITE_BRAND_THEME      # P3.3: tema inicial sem preferência salva
+    value: 'light'                  # ('light'|'dark'; ausência = SO)
+    availability: [BUILD, RUNTIME]
   - variable: FIREBASE_STORAGE_BUCKET
     value: '<project-id>.firebasestorage.app'
     availability: [RUNTIME]
