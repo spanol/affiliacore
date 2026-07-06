@@ -178,20 +178,25 @@ A versão vendida é naturalmente OTG-free (a x-api-key é da operação do Carl
   afiliados BR), não de marketing pago. Comunidades e grupos de afiliados de apostas como
   segundo canal.
 
-## Estado & próximo passo (atualizado 2026-07-05, fim da sessão da inversão)
+## Estado & próximo passo (atualizado 2026-07-05, noite — inversão DEPLOYADA e provada)
 
-**Feito:** P0.1 ✅ (prod) · P1.1 ✅ · P2 ✅ (prod) · P3 ✅ (branch) · P4 ✅ (branch) ·
-P4.1 flip ✅ (branch) · P5.1 nome ✅ (**AffiliaCore**, affiliacore.com.br registrado).
-Tudo da inversão vive na branch **`feat/p3-branding`** (pushada; main mergeada nela,
-incluindo o fix do ranking `71aac9e`). 628 testes verdes.
+**Feito:** P0.1 ✅ (prod) · P1.1 ✅ · P2 ✅ (prod) · P3 ✅ (prod) · P4 ✅ (prod) ·
+P4.1 flip ✅ (**prod, provado**) · P5.1 nome ✅ (**AffiliaCore**, affiliacore.com.br
+registrado).
 
-**Próximos passos, na ordem (parados aqui em 2026-07-05 por decisão do Vinicius):**
-1. **Merge `feat/p3-branding` → main** (= deploy), com o Vinicius acompanhando. Seguro
-   p/ a instância do Carlos mesmo sem a associação (pin no apphosting.yaml base).
-2. Associar ambiente **`boost`** ao backend `boost-agency-server` (console) — ainda
-   NÃO feito — e depois **limpar o bloco VITE_BRAND_* do apphosting.yaml base**.
-3. **Rename do repo GitHub → `affiliacore`** (+ `git remote set-url` local; reconferir
-   o Developer Connect/App Hosting de cada backend).
-4. Registrar `afiliacore.com.br` (um "f") como typo-defense; INPI + Instagram + logo.
-5. Executar o playbook (`scripts/provision/README.md`) na instância do cliente 0.
-6. P5 restante: jurídico c/ Carlos (P5.2), demo (P5.3), landing c/ preço (P5.4).
+**Inversão em produção (2026-07-05 ~23h30, Vinicius acompanhando), na ordem executada:**
+1. Ambiente **`boost`** associado ao backend `boost-agency-server` (console →
+   Configurações → Ambiente). Verificado 2×: campo persistiu + CLI
+   (`apphosting:backends:get --json`) retorna `"environment": "boost"`.
+2. Merge `feat/p3-branding` → main (fast-forward, `e301b39`) + push → deploy OK,
+   marca Boost intacta (pin do base ainda ativo).
+3. Pin `VITE_BRAND_*` removido do `apphosting.yaml` base (`b818dff`) + push →
+   **PROVA: prod sem pin no base segue "Agência Boost"** — a marca do Carlos vem
+   exclusivamente do `apphosting.boost.yaml`. Override por ambiente FUNCIONA.
+4. **Repo GitHub renomeado → `spanol/affiliacore`** (`gh repo rename` + `git remote
+   set-url` local; o remote antigo redireciona).
+
+**Próximos passos, na ordem:**
+1. Registrar `afiliacore.com.br` (um "f") como typo-defense; INPI + Instagram + logo.
+2. Executar o playbook (`scripts/provision/README.md`) na instância do cliente 0.
+3. P5 restante: jurídico c/ Carlos (P5.2), demo (P5.3), landing c/ preço (P5.4).
