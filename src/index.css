@@ -25,6 +25,29 @@
      com VITE_BRAND_ACCENT a ramp calcula preto/branco pelo contraste WCAG. */
   --color-accent-contrast: #ffffff;
 
+  /* P3.2: efeito "glass" por instância (VITE_BRAND_STYLE, src/lib/theming.ts).
+     Defaults = os combos EXATOS que as superfícies de marca usavam inline
+     (regressão-zero p/ Boost): chrome = header do app / nav da LP (white/90 ·
+     neutral-950/80, blur md), card = cards de auth (white · neutral-900/60,
+     blur xl), frame = vitrines da LP (neutral-900/50, fixo-escuro), banner =
+     UpdateBanner (white/95 · neutral-900/95, blur md), thead = cabeçalho sticky
+     de tabela (slate-50 · neutral-800/50, blur sm). O preset 'solid' zera os
+     --blur-glass-* e torna os fills opacos em runtime. Scrim de modal
+     (bg-black/N + backdrop-blur-sm) é FUNCIONAL, não é tema — segue inline. */
+  --color-glass-chrome: rgb(255 255 255 / 0.90);
+  --color-glass-chrome-dark: rgb(10 10 10 / 0.80);
+  --color-glass-card: #ffffff;
+  --color-glass-card-dark: rgb(23 23 23 / 0.60);
+  --color-glass-frame-dark: rgb(23 23 23 / 0.50);
+  --color-glass-banner: rgb(255 255 255 / 0.95);
+  --color-glass-banner-dark: rgb(23 23 23 / 0.95);
+  --color-glass-thead: #f8fafc;
+  --color-glass-thead-dark: rgb(38 38 38 / 0.50);
+
+  --blur-glass-soft: 8px;
+  --blur-glass-medium: 12px;
+  --blur-glass-strong: 24px;
+
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Plus Jakarta Sans", "Inter", sans-serif;
 }

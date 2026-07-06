@@ -399,7 +399,7 @@ export default function ClientDashboard() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-slate-50 dark:bg-neutral-800/50 text-[10px] text-slate-400 uppercase tracking-widest sticky top-0 backdrop-blur-sm z-10 border-b border-slate-100 dark:border-neutral-800">
+                <thead className="bg-glass-thead dark:bg-glass-thead-dark text-[10px] text-slate-400 uppercase tracking-widest sticky top-0 backdrop-blur-glass-soft z-10 border-b border-slate-100 dark:border-neutral-800">
                   <tr>
                     <th className="px-8 py-5 font-black">Nome</th>
                     <th className="px-8 py-5 font-black">Valor do primeiro depósito</th>

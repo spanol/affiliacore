@@ -74,6 +74,9 @@ env:
   - variable: VITE_BRAND_SURFACE    # opcional: navy de superfície (login/hero)
     value: '#141C2A'
     availability: [BUILD, RUNTIME]
+  - variable: VITE_BRAND_STYLE      # P3.2: 'glass' (default, look Boost) ou
+    value: 'solid'                  # 'solid' (opaco, sem blur — corporativo)
+    availability: [BUILD, RUNTIME]
   - variable: FIREBASE_STORAGE_BUCKET
     value: '<project-id>.firebasestorage.app'
     availability: [RUNTIME]

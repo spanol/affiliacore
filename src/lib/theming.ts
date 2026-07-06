@@ -4,6 +4,11 @@
 //                        + --color-accent-contrast (texto legível sobre o accent).
 //   VITE_BRAND_SURFACE — hex do navy de superfície (--color-brand); a variante
 //                        clara (--color-brand-light) é derivada automaticamente.
+//   VITE_BRAND_STYLE   — P3.2: estilo das superfícies de marca. 'glass' (default,
+//                        o look da Boost: fills translúcidos + backdrop-blur) ou
+//                        'solid' (fills opacos, blur zerado — look corporativo).
+//                        Mecânica idêntica: os tokens --color-glass-*/--blur-glass-*
+//                        do index.css são sobrescritos no :root em runtime.
 // Mecânica: no Tailwind v4 cada classe `bg-accent-500` compila para
 // var(--color-accent-500) — sobrescrever a var no :root re-tematiza em runtime.
 // Ausência das envs → null → as vars ficam com o default do index.css (amber/navy,
@@ -116,6 +121,32 @@ export interface ThemeTokens {
   cssVars: Record<string, string>;
 }
 
+// ——— P3.2: estilo das superfícies de marca (efeito glass) ————————————————
+
+export type BrandStyle = 'glass' | 'solid';
+
+/** 'glass' | 'solid' (case-insensitive); qualquer outra coisa → null (default). */
+export function resolveBrandStyle(input: unknown): BrandStyle | null {
+  const s = typeof input === 'string' ? input.trim().toLowerCase() : '';
+  return s === 'glass' || s === 'solid' ? s : null;
+}
+
+// Preset 'solid': mesmos cinzas das superfícies glass (neutral-950/900/800 do
+// Tailwind), só que OPACOS, e todo backdrop-blur zerado. Tokens já-opacos no
+// default (card light, thead light) não precisam de override e ficam de fora.
+export const SOLID_STYLE_VARS: Record<string, string> = {
+  '--color-glass-chrome': '#ffffff',
+  '--color-glass-chrome-dark': '#0a0a0a',
+  '--color-glass-card-dark': '#171717',
+  '--color-glass-frame-dark': '#171717',
+  '--color-glass-banner': '#ffffff',
+  '--color-glass-banner-dark': '#171717',
+  '--color-glass-thead-dark': '#262626',
+  '--blur-glass-soft': '0px',
+  '--blur-glass-medium': '0px',
+  '--blur-glass-strong': '0px',
+};
+
 /** Deriva a variante clara da superfície (ex.: brand → brand-light). */
 export function lightenSurface(hex: unknown, amount = 0.09): string | null {
   const rgb = parseHex(hex);
@@ -143,6 +174,11 @@ export function resolveThemeTokens(env?: Record<string, unknown> | null): ThemeT
     const light = lightenSurface(e.VITE_BRAND_SURFACE);
     cssVars['--color-brand'] = hslCss(rgbToHsl(surface.r, surface.g, surface.b));
     if (light) cssVars['--color-brand-light'] = light;
+  }
+
+  // 'glass' (ou ausente/inválida) = default do CSS — não emite nada.
+  if (resolveBrandStyle(e.VITE_BRAND_STYLE) === 'solid') {
+    Object.assign(cssVars, SOLID_STYLE_VARS);
   }
 
   return { cssVars };

@@ -99,6 +99,24 @@ A versão vendida é naturalmente OTG-free (a x-api-key é da operação do Carl
   cor de AVISO (pendências, "não configurado", "em captação", ouro do pódio,
   estado sujo de edição) e não muda com o tema. Validado ao vivo: dev com
   `#E11D48` → UI rose com texto de contraste branco; sem env → amber intacto.
+- **P3.2 · ESTILO glass por instância — ✅ ENTREGUE (2026-07-06, branch
+  `feat/p3.2-glass-theming`):** nova env `VITE_BRAND_STYLE` — `'glass'` (default,
+  o look da Boost) ou `'solid'` (fills opacos + blur zerado, look corporativo).
+  Mecânica idêntica ao P3.1: as superfícies de MARCA que usavam combos inline
+  (`bg-white/90 dark:bg-neutral-950/80 backdrop-blur-md` etc.) viraram tokens
+  semânticos no `@theme` — `--color-glass-{chrome,card,frame,banner,thead}(-dark)`
+  + `--blur-glass-{soft,medium,strong}` — com defaults EXATOS aos valores antigos
+  (regressão-zero p/ Boost); o preset `solid` (`SOLID_STYLE_VARS` em
+  `src/lib/theming.ts`) sobrescreve as vars no `:root` em runtime. Sweep: header
+  do app (DashboardLayout), cards de auth (Login/Register/InviteAccept), LP
+  (nav + vitrine hero + card de contato), UpdateBanner e theads sticky
+  (ClientDashboard/AffiliateDetails). **Scrim de modal (bg-black/N +
+  backdrop-blur-sm) é FUNCIONAL e ficou fora de propósito** — não muda com o
+  tema. `apphosting.boost.yaml` pina `VITE_BRAND_STYLE=glass` explícito.
+  Um "tema de cliente" completo agora = `ACCENT` + `SURFACE` + `STYLE` (ex.
+  proposta corporativa: `#2563eb` + `solid`; proposta vibrante: `#E11D48` +
+  `glass`). Follow-up possível (não feito): preset `flat` que também remove os
+  efeitos decorativos da LP/auth (glow-white, bg-grid-white, ambient glows).
 - Naming interno (`boostAffiliate`, `boost_<uuid>`, coleções) **não muda**.
 
 ## P4 · Playbook "novo cliente em 1 dia"
@@ -209,12 +227,14 @@ registrado).
 4. **Repo GitHub renomeado → `spanol/affiliacore`** (`gh repo rename` + `git remote
    set-url` local; o remote antigo redireciona).
 
-**P3.1 (tema por instância) ✅ entregue em 2026-07-06 na branch `feat/p3.1-theming`**
-(ver seção P3.1 acima) — merge na main com o Vinicius acompanhando.
+**P3.1 (tema por instância) ✅ entregue e MERGEADO na main (`e58ad9f`, 2026-07-06).**
+**P3.2 (estilo glass por instância) ✅ entregue em 2026-07-06 na branch
+`feat/p3.2-glass-theming`** (ver seção P3.2 acima) — merge na main com o Vinicius
+acompanhando.
 
 **Próximos passos, na ordem:**
-1. Merge `feat/p3.1-theming` → main (deploya; instância Boost fica pixel-idêntica —
-   defaults = amber/navy atuais).
+1. Merge `feat/p3.2-glass-theming` → main (deploya; Boost fica pixel-idêntica —
+   defaults glass = os combos antigos + pin explícito no apphosting.boost.yaml).
 2. Registrar `afiliacore.com.br` (um "f") como typo-defense; INPI + Instagram + logo.
 3. Executar o playbook (`scripts/provision/README.md`) na instância do cliente 0.
 4. P5 restante: jurídico c/ Carlos (P5.2), demo (P5.3), landing c/ preço (P5.4).

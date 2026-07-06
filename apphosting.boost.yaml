@@ -33,3 +33,11 @@ env:
     availability:
       - BUILD
       - RUNTIME
+
+  # P3.2: estilo glass pinado explicitamente (é o default do produto hoje, mas o
+  # pin garante que a instância do Carlos não muda se o default do repo mudar).
+  - variable: VITE_BRAND_STYLE
+    value: 'glass'
+    availability:
+      - BUILD
+      - RUNTIME

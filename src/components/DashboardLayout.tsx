@@ -230,7 +230,7 @@ export default function DashboardLayout() {
         <div className="pointer-events-none fixed top-[-15%] right-[-10%] w-[45%] h-[45%] rounded-full bg-white/5 blur-[120px] hidden dark:block z-0" />
 
         {/* Header */}
-        <header className="h-16 bg-white/90 dark:bg-neutral-950/80 backdrop-blur-md border-b border-slate-200 dark:border-neutral-800/80 flex items-center justify-between px-8 sticky top-0 z-20 transition-colors duration-300">
+        <header className="h-16 bg-glass-chrome dark:bg-glass-chrome-dark backdrop-blur-glass-medium border-b border-slate-200 dark:border-neutral-800/80 flex items-center justify-between px-8 sticky top-0 z-20 transition-colors duration-300">
           <h2 className="text-xs font-bold text-slate-700 uppercase tracking-widest dark:text-neutral-300">
             {location.pathname === '/admin'
               ? 'Painel Administrativo'

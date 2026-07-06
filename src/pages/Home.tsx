@@ -84,7 +84,7 @@ export default function Home() {
       <div className="fixed bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-white/5 blur-[120px] pointer-events-none" />
 
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-neutral-950/80 backdrop-blur-md border-b border-neutral-800/50">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-glass-chrome-dark backdrop-blur-glass-medium border-b border-neutral-800/50">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <img src={BRAND.logoUrl} alt={BRAND.shortName} className="h-6 w-auto" />
@@ -192,7 +192,7 @@ export default function Home() {
             className="mt-24 w-full relative"
           >
             <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-transparent to-transparent z-10 pointer-events-none" />
-            <div className="rounded-2xl md:rounded-[2rem] border border-neutral-800/60 bg-neutral-900/50 p-2 md:p-3 backdrop-blur-xl shadow-2xl relative overflow-hidden glow-white">
+            <div className="rounded-2xl md:rounded-[2rem] border border-neutral-800/60 bg-glass-frame-dark p-2 md:p-3 backdrop-blur-glass-strong shadow-2xl relative overflow-hidden glow-white">
               <div className="rounded-xl overflow-hidden border border-neutral-700/50 bg-neutral-950">
                 <img
                   src={asset('boost-home/dashboard-escuro.jpeg')}
@@ -408,7 +408,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="bg-neutral-900/50 rounded-3xl border border-neutral-800 p-8 pt-10 relative overflow-hidden backdrop-blur-sm">
+            <div className="bg-glass-frame-dark rounded-3xl border border-neutral-800 p-8 pt-10 relative overflow-hidden backdrop-blur-glass-soft">
               {status === 'success' ? (
                 <div className="flex flex-col items-center justify-center text-center min-h-[420px] gap-5">
                   <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">

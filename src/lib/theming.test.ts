@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   ACCENT_STEPS,
+  SOLID_STYLE_VARS,
   buildAccentRamp,
   lightenSurface,
   parseHex,
   relativeLuminance,
+  resolveBrandStyle,
   resolveThemeTokens,
 } from './theming';
 
@@ -122,5 +124,45 @@ describe('resolveThemeTokens', () => {
     });
     expect(cssVars['--color-accent-500']).toBeDefined();
     expect(cssVars['--color-brand']).toBeDefined();
+  });
+
+  it("VITE_BRAND_STYLE='solid' emite os overrides do preset (blur zerado, fills opacos)", () => {
+    const { cssVars } = resolveThemeTokens({ VITE_BRAND_STYLE: 'solid' });
+    expect(cssVars).toEqual(SOLID_STYLE_VARS);
+    expect(cssVars['--blur-glass-soft']).toBe('0px');
+    expect(cssVars['--blur-glass-medium']).toBe('0px');
+    expect(cssVars['--blur-glass-strong']).toBe('0px');
+    // opacos: nenhum valor do preset carrega canal alpha
+    for (const [name, value] of Object.entries(cssVars)) {
+      if (!name.startsWith('--color-')) continue;
+      expect(value, name).toMatch(/^#[0-9a-f]{6}$/);
+    }
+  });
+
+  it("VITE_BRAND_STYLE='glass', ausente ou lixo → nenhuma var (default do CSS)", () => {
+    expect(resolveThemeTokens({ VITE_BRAND_STYLE: 'glass' }).cssVars).toEqual({});
+    expect(resolveThemeTokens({ VITE_BRAND_STYLE: 'vidro' }).cssVars).toEqual({});
+    expect(resolveThemeTokens({ VITE_BRAND_STYLE: 42 }).cssVars).toEqual({});
+  });
+
+  it('estilo + accent convivem (tema completo de instância)', () => {
+    const { cssVars } = resolveThemeTokens({
+      VITE_BRAND_ACCENT: '#2563eb',
+      VITE_BRAND_STYLE: 'solid',
+    });
+    expect(cssVars['--color-accent-500']).toBeDefined();
+    expect(cssVars['--blur-glass-strong']).toBe('0px');
+  });
+});
+
+describe('resolveBrandStyle', () => {
+  it('normaliza caixa/espaços; só aceita os presets conhecidos', () => {
+    expect(resolveBrandStyle('solid')).toBe('solid');
+    expect(resolveBrandStyle('  SOLID ')).toBe('solid');
+    expect(resolveBrandStyle('Glass')).toBe('glass');
+    expect(resolveBrandStyle('flat')).toBeNull();
+    expect(resolveBrandStyle('')).toBeNull();
+    expect(resolveBrandStyle(undefined)).toBeNull();
+    expect(resolveBrandStyle(null)).toBeNull();
   });
 });

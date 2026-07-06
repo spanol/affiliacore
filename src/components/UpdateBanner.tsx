@@ -40,7 +40,7 @@ export default function UpdateBanner() {
           className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[70] w-[calc(100%-2rem)] max-w-md"
           role="alert"
         >
-          <div className="flex items-center gap-3 rounded-2xl border border-accent-500/30 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md shadow-2xl shadow-black/10 p-4">
+          <div className="flex items-center gap-3 rounded-2xl border border-accent-500/30 bg-glass-banner dark:bg-glass-banner-dark backdrop-blur-glass-medium shadow-2xl shadow-black/10 p-4">
             <div className="shrink-0 w-9 h-9 rounded-xl bg-accent-500/15 border border-accent-500/20 flex items-center justify-center">
               <Sparkles size={16} className="text-accent-500" />
             </div>
