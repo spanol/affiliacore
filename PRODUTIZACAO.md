@@ -269,15 +269,23 @@ no `apphosting.<cliente>.yaml`, sem rebuild.
    do app), `logo-color-dark.svg` (LP/redes), `logo-color-light.svg`
    (propostas), `favicon.svg` (tile #26181C). Boost intacta (pina
    `/boost-home/*`). Card "✔ Final" no projeto de design mostra os SVGs shipados.
-   **Pendência NOVA derivada: flip das CORES default do produto** (accent amber →
-   ember `#E11D48` + canvas `#26181C` no index.css) — antes, pinar
-   `VITE_BRAND_ACCENT` amber (e canvas/theme) na `apphosting.boost.yaml`
-   (cinto-e-suspensório, igual ao flip de marca do P4.1).
-2. **LP hero: substituir o screenshot estático por um mock VIVO da dashboard**
-   — miniatura com os componentes REAIS do app (que assim seguem o tema da
-   instância) em vez da imagem fixa do painel Boost (âmbar/BOOST) que hoje
-   aparece em qualquer instância. Ideia do Vinicius: "mock pequeno da dashboard
-   com componentes reais em tamanho menor".
+   ✅ **FLIP DE CORES EXECUTADO (2026-07-07, commit `b9390ee`):** o tema do
+   produto (ember `#E11D48` + canvas `#26181C` + surface `#3F1D2B`) entra por
+   ENV no `apphosting.yaml` BASE — os defaults do `index.css` CONTINUAM
+   amber/neutral de propósito (a engine de ramps não reproduz a paleta Tailwind
+   exata a partir de 1 hex; a Boost depende dela p/ ficar pixel-idêntica). A
+   Boost "des-seta" ACCENT/CANVAS/SURFACE com string VAZIA no
+   `apphosting.boost.yaml` ('' = ausente p/ os resolvers — contrato travado por
+   teste). ⚠️ Validação REAL do valor vazio só no 1º rollout (plano B no yaml:
+   mover o tema do base p/ os yaml por instância). Verificado ao vivo em dev:
+   LP + hero mock inteiros em ember com as envs; look Boost intacto sem elas.
+2. ✅ **LP hero: mock VIVO da dashboard ENTREGUE (2026-07-07, commit
+   `ebe5a0a`):** `HeroDashboardMock` (sidebar + métricas + top afiliados +
+   funil + desempenho por casa, números fictícios) montado com os tokens do
+   tema (`accent-*`/`neutral-*` → var()) e a marca da instância
+   (`BRAND.logoUrl/shortName`) — o hero segue `VITE_BRAND_*` sem rebuild. O
+   jpeg estático do painel Boost foi removido. Verificado ao vivo nos dois
+   temas (default amber e ember por env).
 3. Registrar `afiliacore.com.br` (um "f") como typo-defense; INPI + Instagram.
 4. Executar o playbook (`scripts/provision/README.md`) na instância do cliente 0.
 5. P5 restante: jurídico c/ Carlos (P5.2), demo (P5.3), landing c/ preço (P5.4).
