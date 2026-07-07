@@ -244,14 +244,25 @@ registrado).
    set-url` local; o remote antigo redireciona).
 
 **P3.1 (tema por instância) ✅ entregue e MERGEADO na main (`e58ad9f`, 2026-07-06).**
-**P3.2 (estilo glass) + P3.3 (canvas escuro + tema inicial) ✅ entregues em
-2026-07-06 na branch `feat/p3.2-glass-theming`** (ver seções acima) — merge na
-main com o Vinicius acompanhando.
+**P3.2 (estilo glass) + P3.3 (canvas escuro + tema inicial) ✅ MERGEADOS E
+DEPLOYADOS (2026-07-06 ~17h, main `a5db1df`, Vinicius acompanhando):** rollout
+automático ~7min (build `2026.07.06-200122`); verificado em prod — version.json
+no commit, tokens glass no CSS com os defaults exatos, header do /admin
+computando `rgba(10,10,10,0.8)+blur(12px)` (pixel-idêntico), `neutral-900` sem
+override na Boost, marca/telas intactas. **A trilha de theming (P3.1–P3.3) está
+COMPLETA em produção**: cliente novo = 4 envs (`ACCENT`+`STYLE`+`CANVAS`+`THEME`)
+no `apphosting.<cliente>.yaml`, sem rebuild.
 
-**Próximos passos, na ordem:**
-1. Merge `feat/p3.2-glass-theming` → main (deploya; Boost fica pixel-idêntica —
-   defaults glass/neutral = os valores antigos + pin do style no
-   apphosting.boost.yaml; canvas/theme sem env = comportamento atual).
-2. Registrar `afiliacore.com.br` (um "f") como typo-defense; INPI + Instagram + logo.
-3. Executar o playbook (`scripts/provision/README.md`) na instância do cliente 0.
-4. P5 restante: jurídico c/ Carlos (P5.2), demo (P5.3), landing c/ preço (P5.4).
+**Próximos passos, na ordem (atualizado 2026-07-06, fim da sessão do theming):**
+1. **Branding da marca AffiliaCore via Claude design** (decisão do Vinicius,
+   2026-07-06): montar a identidade — logo definitivo (substitui o placeholder
+   monocromático de `public/affiliacore/`), paleta, tipografia — usando a
+   ferramenta de design do Claude. Cobre a pendência "logo" do P5.1.
+2. **LP hero: substituir o screenshot estático por um mock VIVO da dashboard**
+   — miniatura com os componentes REAIS do app (que assim seguem o tema da
+   instância) em vez da imagem fixa do painel Boost (âmbar/BOOST) que hoje
+   aparece em qualquer instância. Ideia do Vinicius: "mock pequeno da dashboard
+   com componentes reais em tamanho menor".
+3. Registrar `afiliacore.com.br` (um "f") como typo-defense; INPI + Instagram.
+4. Executar o playbook (`scripts/provision/README.md`) na instância do cliente 0.
+5. P5 restante: jurídico c/ Carlos (P5.2), demo (P5.3), landing c/ preço (P5.4).
