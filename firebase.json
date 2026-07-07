@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "affiliacore",
+    "site": "affiliacore-br",
     "public": "landing",
     "cleanUrls": true,
     "headers": [

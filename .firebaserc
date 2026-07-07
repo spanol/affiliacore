@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "agencia-boost-app"
+    "default": "agencia-boost-app",
+    "www": "affiliacore"
   }
 }

@@ -303,22 +303,30 @@ no `apphosting.<cliente>.yaml`, sem rebuild.
 4. Registrar `afiliacore.com.br` (um "f") como typo-defense (~R$40) + **INPI**
    (classes 42/35 — também destrava a reivindicação do @affiliacore).
 5. Executar o playbook (`scripts/provision/README.md`) na instância do cliente 0.
-6. ✅ **P5.4 LANDING COMERCIAL NO AR (2026-07-07, commit `3f03cd5`, deploy
-   verificado em https://affiliacore.web.app):** one-pager estático em
+6. ✅ **P5.4 LANDING COMERCIAL NO AR (2026-07-07, deploy verificado em
+   https://affiliacore-br.web.app):** one-pager estático em
    `landing/` (identidade C: ember/plum, Bricolage+Inter self-hosted, logo em
    curvas) com hero + mock de dashboard em CSS puro, features, white-label,
    **preço publicado** (setup a partir de R$ 3.000 + mensal a partir de
    R$ 600, card de preço de fundador) e CTA pro direct do @affiliacore.br.
-   Servida por **site dedicado `affiliacore`** no Firebase Hosting do mesmo
-   projeto (bloco `hosting` no `firebase.json`, `public: landing`; deploy:
-   `firebase deploy --only hosting`). Lição: `backdrop-filter` no header
-   sticky causou white-out de compositing no Chrome/Windows → header sólido +
-   `html{background}`. Domínio **affiliacore.com.br ADICIONADO no console**
-   (Hosting → domínio personalizado); **falta o OPERADOR** no registro.br:
-   adicionar `A 199.36.158.100` + `TXT "hosting-site=affiliacore"` e REMOVER
-   os 2 `A` do parking (13.248.243.5 / 76.223.105.230); cert TLS provisiona
-   em até ~24h. Link na bio do IG = app do celular (web não edita o campo
-   Site): usar https://affiliacore.web.app JÁ e trocar pro .com.br quando o
-   TLS subir. **Backend de leads = fase seguinte** (CTA hoje é o direct).
+   Servida pelo **projeto Firebase PRÓPRIO `affiliacore`** (decisão
+   2026-07-07: a presença comercial do produto NÃO mora no projeto da
+   instância 0), site `affiliacore-br`, alias `www` no `.firebaserc` —
+   deploy: **`firebase deploy --only hosting --project www`** (bloco
+   `hosting` no `firebase.json`, `public: landing`; rules seguem no default
+   `agencia-boost-app`). LIÇÕES: (a) `backdrop-filter` no header sticky
+   causou white-out de compositing no Chrome/Windows → header sólido +
+   `html{background}`; (b) site-ID de Hosting deletado fica **tombstoned
+   global pra sempre** — o `affiliacore` original foi deletado do
+   agencia-boost-app na migração e nunca mais pode ser recriado (daí o
+   `-br`). Domínio **affiliacore.com.br adicionado no console do projeto
+   novo**; a zona DNS fica na **GoDaddy** (nameservers domaincontrol.com,
+   NÃO registro.br); o `A 199.36.158.100` já entrou — **falta o OPERADOR**:
+   REMOVER os 2 `A` do parking (13.248.243.5 / 76.223.105.230) e TROCAR o
+   TXT p/ `hosting-site=affiliacore-br` (o antigo `hosting-site=affiliacore`
+   sai); cert TLS provisiona em até ~24h. Link na bio do IG = app do celular
+   (web não edita o campo Site): usar https://affiliacore-br.web.app JÁ e
+   trocar pro .com.br quando o TLS subir. **Backend de leads = fase
+   seguinte** (CTA hoje é o direct) — hospedar no projeto `affiliacore`.
 7. P5 restante: jurídico c/ Carlos (P5.2), demo (P5.3); P5.5 (precificação
    publicada) coberta em parte pela LP — falta formalizar os degraus.
