@@ -288,6 +288,22 @@ no `apphosting.<cliente>.yaml`, sem rebuild.
    (`BRAND.logoUrl/shortName`) — o hero segue `VITE_BRAND_*` sem rebuild. O
    jpeg estático do painel Boost foi removido. Verificado ao vivo nos dois
    temas (default amber e ember por env).
-3. Registrar `afiliacore.com.br` (um "f") como typo-defense; INPI + Instagram.
-4. Executar o playbook (`scripts/provision/README.md`) na instância do cliente 0.
-5. P5 restante: jurídico c/ Carlos (P5.2), demo (P5.3), landing c/ preço (P5.4).
+3. ✅ **INSTAGRAM NO AR COM A CAMPANHA LANÇADA (2026-07-07):** conta
+   **@affiliacore.br** criada pelo Vinicius (o `@affiliacore` está ocupado por
+   perfil inativo — o INPI habilita reivindicar via formulário de marca da
+   Meta) e populada via browser: avatar C-núcleo, bio, **conta comercial** e
+   **post 1 da campanha PUBLICADO** (injeção canvas à prova de CSP, texto em
+   curvas). Kit completo (avatar/capa/4 posts/legendas/checklist) em
+   `marketing/affiliacore/` (`808dbc6`); técnica destilada na skill
+   **`.claude/skills/instagram/`** (`b41370d`, + versão genérica user-level).
+   Restam no app do celular (operador): link `affiliacore.com.br` na bio,
+   categoria → "Empresa de software" (busca do IG web quebrada), agendar
+   posts 2–4 (Meta Business Suite, dias 3·5·7). LinkedIn: kit pronto, página
+   a criar (operador).
+4. Registrar `afiliacore.com.br` (um "f") como typo-defense (~R$40) + **INPI**
+   (classes 42/35 — também destrava a reivindicação do @affiliacore).
+5. Executar o playbook (`scripts/provision/README.md`) na instância do cliente 0.
+6. P5 restante: jurídico c/ Carlos (P5.2), demo (P5.3), **landing comercial
+   com preço publicado (P5.4)** — próximo item BUILDÁVEL: one-pager estático
+   da AffiliaCore (identidade C, preço de fundador) p/ apontar o
+   affiliacore.com.br via Firebase Hosting.
