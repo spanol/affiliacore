@@ -18,3 +18,6 @@ service-account.json
 # OTG approved-affiliates snapshots — contêm PII (e-mail/telefone). Manter local;
 # versiona-se só o script e o README (ver scripts/otg-approved/README.md).
 scripts/otg-approved/snapshot-*.json
+
+# Firebase Hosting deploy cache
+.firebase/

@@ -1,4 +1,19 @@
 {
+  "hosting": {
+    "site": "affiliacore",
+    "public": "landing",
+    "cleanUrls": true,
+    "headers": [
+      {
+        "source": "**/*.@(woff2|svg|png)",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800, immutable" }]
+      },
+      {
+        "source": "**/*.html",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      }
+    ]
+  },
   "firestore": {
     "rules": "firestore.rules"
   },

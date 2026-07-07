@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AffiliaCore — Gestão de afiliados para agências de apostas</title>
+<meta name="description" content="Comissão CPA/REV por casa, portal do afiliado, ranking e trilha de auditoria — white-label, com a marca da sua agência. Preço publicado, setup em dias.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="canonical" href="https://affiliacore.com.br/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="AffiliaCore — Gestão de afiliados para agências de apostas">
+<meta property="og:description" content="CPA/REV por casa, portal do afiliado e auditoria — white-label, com a sua marca. Preço publicado.">
+<meta property="og:url" content="https://affiliacore.com.br/">
+<meta property="og:image" content="https://affiliacore.com.br/og.png">
+<meta property="og:locale" content="pt_BR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#26181C">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Organization","name":"AffiliaCore","url":"https://affiliacore.com.br","logo":"https://affiliacore.com.br/logo.svg","sameAs":["https://www.instagram.com/affiliacore.br/"]}
+</script>
+<style>
+@font-face{font-family:'Bricolage Grotesque';font-weight:500;font-style:normal;font-display:swap;src:url('/fonts/bricolage-grotesque-500.woff2') format('woff2')}
+@font-face{font-family:'Bricolage Grotesque';font-weight:800;font-style:normal;font-display:swap;src:url('/fonts/bricolage-grotesque-800.woff2') format('woff2')}
+@font-face{font-family:'Inter';font-weight:400;font-style:normal;font-display:swap;src:url('/fonts/inter-400.woff2') format('woff2')}
+@font-face{font-family:'Inter';font-weight:600;font-style:normal;font-display:swap;src:url('/fonts/inter-600.woff2') format('woff2')}
+
+:root{
+  --ink:#11070A; --plum:#26181C; --surface:#3F1D2B;
+  --ember:#E11D48; --ember-l:#E45B79;
+  --text:#FFF6F8; --muted:#AF9DA2; --faint:#816E74;
+  --line:rgba(255,255,255,.09);
+  --radius:16px;
+  --display:'Bricolage Grotesque',system-ui,sans-serif;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;background:#150A0D}
+body{
+  font-family:var(--body);color:var(--text);background:var(--ink);
+  background:linear-gradient(180deg,#150A0D 0%,var(--plum) 42%,#1B0F13 100%);
+  -webkit-font-smoothing:antialiased;line-height:1.6;overflow-x:hidden;
+}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+h1,h2,h3{font-family:var(--display);font-weight:800;line-height:1.12;letter-spacing:-.02em}
+a{color:inherit}
+section{padding:88px 0}
+
+/* ——— header ——— */
+header{
+  position:sticky;top:0;z-index:50;
+  background:rgba(23,11,15,.97);
+  border-bottom:1px solid var(--line);
+}
+.nav{display:flex;align-items:center;justify-content:space-between;height:64px}
+.nav img{height:22px;display:block}
+.nav-links{display:flex;gap:28px;align-items:center;font-size:.92rem;color:var(--muted)}
+.nav-links a{text-decoration:none;transition:color .15s}
+.nav-links a:hover{color:var(--text)}
+
+/* ——— buttons ——— */
+.btn{
+  display:inline-flex;align-items:center;gap:10px;text-decoration:none;
+  font-family:var(--body);font-weight:600;font-size:1rem;border-radius:12px;
+  padding:14px 26px;transition:transform .15s,box-shadow .15s,background .15s;
+}
+.btn-primary{
+  background:linear-gradient(135deg,var(--ember) 0%,#C4123B 100%);color:#fff;
+  box-shadow:0 8px 28px rgba(225,29,72,.35);
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 34px rgba(225,29,72,.45)}
+.btn-ghost{border:1px solid var(--line);color:var(--text);background:rgba(255,255,255,.03)}
+.btn-ghost:hover{background:rgba(255,255,255,.07)}
+.btn-sm{padding:9px 18px;font-size:.9rem}
+
+/* ——— hero ——— */
+.hero{padding:96px 0 72px;position:relative}
+.hero::before{
+  content:'';position:absolute;inset:-180px 0 auto;height:640px;pointer-events:none;
+  background:radial-gradient(ellipse 60% 50% at 70% 20%,rgba(225,29,72,.16),transparent 70%);
+}
+.hero .wrap{position:relative}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;font-size:.82rem;font-weight:600;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--ember-l);
+  border:1px solid rgba(225,29,72,.35);background:rgba(225,29,72,.08);
+  padding:7px 14px;border-radius:999px;margin-bottom:26px;
+}
+.hero h1{font-size:clamp(2.3rem,5.4vw,3.7rem);max-width:15ch}
+.hero h1 em{font-style:normal;color:var(--ember-l)}
+.hero p.lead{font-size:1.17rem;color:var(--muted);max-width:56ch;margin:22px 0 34px}
+.cta-row{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.cta-note{font-size:.85rem;color:var(--faint);margin-top:14px}
+
+/* ——— dashboard mock ——— */
+.mock{
+  margin-top:64px;border-radius:18px;border:1px solid var(--line);overflow:hidden;
+  background:#1C1014;box-shadow:0 40px 90px rgba(0,0,0,.5);
+  font-size:12.5px;
+}
+.mock-bar{display:flex;align-items:center;gap:8px;padding:11px 16px;background:#241419;border-bottom:1px solid var(--line)}
+.dot{width:10px;height:10px;border-radius:50%;background:#4A3038}
+.mock-url{
+  margin-left:12px;flex:1;max-width:340px;background:rgba(255,255,255,.05);
+  border-radius:7px;padding:4px 12px;color:var(--faint);font-size:11.5px;
+}
+.mock-body{display:grid;grid-template-columns:180px 1fr;min-height:340px}
+.mock-side{background:#170D10;border-right:1px solid var(--line);padding:16px 12px}
+.mock-brand{display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:800;font-size:13px;padding:4px 8px 16px}
+.mock-brand i{width:20px;height:20px;border-radius:6px;background:linear-gradient(135deg,var(--ember),#9F1239);display:inline-block}
+.mock-nav div{padding:8px 10px;border-radius:8px;color:var(--faint);margin-bottom:2px}
+.mock-nav div.on{background:rgba(225,29,72,.14);color:var(--ember-l)}
+.mock-main{padding:18px;display:flex;flex-direction:column;gap:14px}
+.mock-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.stat{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.stat b{display:block;font-family:var(--display);font-weight:800;font-size:19px;margin-top:2px}
+.stat span{color:var(--faint);font-size:11px}
+.stat .up{color:#4ADE80;font-size:11px;font-weight:600}
+.mock-cols{display:grid;grid-template-columns:1.25fr 1fr;gap:12px;flex:1}
+.panel{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:12px;padding:14px}
+.panel h4{font-family:var(--body);font-weight:600;font-size:12px;color:var(--muted);margin-bottom:12px}
+.hrow{display:grid;grid-template-columns:86px 1fr 60px;gap:10px;align-items:center;margin-bottom:10px;color:var(--faint);font-size:11.5px}
+.hbar{height:8px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden}
+.hbar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--ember),var(--ember-l))}
+.hrow b{text-align:right;color:var(--text);font-weight:600}
+.trow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);color:var(--muted);font-size:12px}
+.trow:last-child{border:none}
+.trow b{color:var(--text);font-weight:600}
+.medal{margin-right:8px}
+
+/* ——— sections ——— */
+.sec-head{max-width:640px;margin-bottom:52px}
+.sec-head h2{font-size:clamp(1.7rem,3.6vw,2.5rem);margin-bottom:14px}
+.sec-head p{color:var(--muted);font-size:1.08rem}
+.kicker{font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ember-l);display:block;margin-bottom:12px}
+
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.card{
+  background:rgba(63,29,43,.35);border:1px solid var(--line);border-radius:var(--radius);
+  padding:26px;transition:border-color .2s,transform .2s;
+}
+.card:hover{border-color:rgba(225,29,72,.4);transform:translateY(-3px)}
+.card .ico{
+  width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+  background:rgba(225,29,72,.12);border:1px solid rgba(225,29,72,.28);margin-bottom:18px;
+}
+.card h3{font-size:1.08rem;font-weight:800;margin-bottom:8px}
+.card p{color:var(--muted);font-size:.94rem}
+
+/* ——— white-label ——— */
+.wl{background:rgba(63,29,43,.22);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.wl-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+.wl-list{list-style:none;display:flex;flex-direction:column;gap:16px;margin-top:26px}
+.wl-list li{display:flex;gap:14px;color:var(--muted)}
+.wl-list li b{color:var(--text);font-weight:600}
+.check{flex:none;width:22px;height:22px;border-radius:50%;background:rgba(225,29,72,.14);border:1px solid rgba(225,29,72,.4);display:flex;align-items:center;justify-content:center;margin-top:3px}
+.check svg{width:11px;height:11px}
+.wl-visual{display:flex;flex-direction:column;gap:14px}
+.wl-chip{
+  display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:14px;
+  padding:16px 20px;background:#1C1014;
+}
+.wl-chip i{width:34px;height:34px;border-radius:9px;flex:none}
+.wl-chip div b{display:block;font-family:var(--display);font-weight:800;font-size:.98rem}
+.wl-chip div span{font-size:.8rem;color:var(--faint)}
+
+/* ——— pricing ——— */
+.price-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:760px}
+.price-card{background:rgba(63,29,43,.35);border:1px solid var(--line);border-radius:var(--radius);padding:30px}
+.price-card .tag{font-size:.8rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.price-card .pre{display:block;font-size:.88rem;color:var(--muted);margin-top:14px}
+.price-card .val{font-family:var(--display);font-weight:800;font-size:2rem;margin:2px 0 4px;white-space:nowrap}
+.price-card .val small{font-size:1rem;color:var(--muted);font-weight:500}
+.price-card p{color:var(--muted);font-size:.92rem;margin-top:10px}
+.founder{
+  margin-top:18px;max-width:760px;border-radius:var(--radius);padding:30px;
+  background:linear-gradient(135deg,rgba(225,29,72,.16),rgba(225,29,72,.05));
+  border:1px solid rgba(225,29,72,.45);
+  display:flex;gap:24px;align-items:center;justify-content:space-between;flex-wrap:wrap;
+}
+.founder h3{font-size:1.25rem;margin-bottom:6px}
+.founder p{color:var(--muted);font-size:.95rem;max-width:46ch}
+
+/* ——— final cta ——— */
+.final{text-align:center;padding:110px 0}
+.final h2{font-size:clamp(1.9rem,4.2vw,2.9rem);max-width:20ch;margin:0 auto 16px}
+.final p{color:var(--muted);max-width:44ch;margin:0 auto 34px}
+
+/* ——— footer ——— */
+footer{border-top:1px solid var(--line);padding:34px 0;font-size:.88rem;color:var(--faint)}
+footer .wrap{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
+footer img{height:16px;opacity:.85}
+footer a{color:var(--muted);text-decoration:none}
+footer a:hover{color:var(--text)}
+
+@media (max-width:880px){
+  section{padding:64px 0}
+  .nav-links a:not(.btn){display:none}
+  .wl-grid{grid-template-columns:1fr;gap:36px}
+  .grid3{grid-template-columns:1fr}
+  .price-grid{grid-template-columns:1fr}
+  .mock-body{grid-template-columns:1fr}
+  .mock-side{display:none}
+  .mock-stats{grid-template-columns:1fr 1fr}
+  .mock-cols{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a href="#"><img src="/logo.svg" alt="AffiliaCore"></a>
+    <nav class="nav-links">
+      <a href="#produto">O produto</a>
+      <a href="#whitelabel">White-label</a>
+      <a href="#preco">Preço</a>
+      <a class="btn btn-primary btn-sm" href="https://ig.me/m/affiliacore.br" target="_blank" rel="noopener">Falar com a gente</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <span class="eyebrow">White-label para agências de apostas</span>
+    <h1>A gestão dos seus afiliados, <em>com a sua marca</em>.</h1>
+    <p class="lead">Comissão CPA + REV calculada por casa, portal onde cada afiliado vê só os próprios resultados, ranking e trilha de auditoria completa — rodando no seu domínio, com o seu logo e as suas cores.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://ig.me/m/affiliacore.br" target="_blank" rel="noopener">Chamar no Instagram
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <a class="btn btn-ghost" href="#preco">Ver o preço</a>
+    </div>
+    <p class="cta-note">Sem formulário, sem "fale com vendas" — a conversa começa no direct.</p>
+
+    <div class="mock" aria-hidden="true">
+      <div class="mock-bar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="mock-url">painel.<b style="color:#AF9DA2">suaagencia</b>.com.br</span>
+      </div>
+      <div class="mock-body">
+        <div class="mock-side">
+          <div class="mock-brand"><i></i> Sua Agência</div>
+          <div class="mock-nav">
+            <div class="on">Dashboard</div>
+            <div>Afiliados</div>
+            <div>Casas</div>
+            <div>Ranking</div>
+            <div>Auditoria</div>
+          </div>
+        </div>
+        <div class="mock-main">
+          <div class="mock-stats">
+            <div class="stat"><span>Comissão do mês</span><b>R$ 48.230</b><span class="up">▲ 12% vs. mês anterior</span></div>
+            <div class="stat"><span>Afiliados ativos</span><b>62</b><span class="up">▲ 5 novos</span></div>
+            <div class="stat"><span>FTDs no mês</span><b>214</b><span class="up">▲ 9%</span></div>
+          </div>
+          <div class="mock-cols">
+            <div class="panel">
+              <h4>Desempenho por casa</h4>
+              <div class="hrow"><span>Casa Alfa</span><span class="hbar"><i style="width:82%"></i></span><b>R$ 26,4k</b></div>
+              <div class="hrow"><span>Casa Bravo</span><span class="hbar"><i style="width:54%"></i></span><b>R$ 14,1k</b></div>
+              <div class="hrow"><span>Casa Cedro</span><span class="hbar"><i style="width:30%"></i></span><b>R$ 7,7k</b></div>
+            </div>
+            <div class="panel">
+              <h4>Top afiliados — hoje</h4>
+              <div class="trow"><span><span class="medal">🥇</span>Yago M.</span><b>R$ 2.119</b></div>
+              <div class="trow"><span><span class="medal">🥈</span>Larissa P.</span><b>R$ 1.640</b></div>
+              <div class="trow"><span><span class="medal">🥉</span>Bruno C.</span><b>R$ 1.205</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="produto">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">O produto</span>
+      <h2>Sua planilha pede aposentadoria.</h2>
+      <p>Se a sua agência ainda fecha comissão no Excel, você conhece o roteiro: horas conferindo linha por linha, taxa desatualizada e ninguém sabe quem mudou o quê. A AffiliaCore fecha isso em minutos.</p>
+    </div>
+    <div class="grid3">
+      <div class="card">
+        <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="2" stroke-linecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        <h3>Comissão CPA + REV por casa</h3>
+        <p>Taxa configurada por afiliado e por casa de aposta — a taxa da casa sobrepõe a padrão. O fechamento do mês sai calculado, sem fórmula quebrada.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+        <h3>Portal do afiliado</h3>
+        <p>Cada afiliado entra com o próprio login e vê só os próprios resultados. Onboarding por link de convite — sem criar senha na mão.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <h3>Trilha de auditoria</h3>
+        <p>Toda alteração de taxa e de cadastro fica registrada: quem mudou, quando e o antes → depois. Transparência que encerra discussão de comissão.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4v11h2zM13 4h-2v16h2zM20 13h-2v7h2z"/><path d="M4 20h16"/></svg></div>
+        <h3>Ranking diário</h3>
+        <p>Pódio dos afiliados gerado automaticamente todo dia. Gamificação que puxa produção sem você montar nada.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></div>
+        <h3>Import de resultados</h3>
+        <p>Casa sem integração? Sobe a planilha Excel e os resultados entram no mesmo painel, somados aos das casas integradas.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+        <h3>Multi-casa consolidado</h3>
+        <p>Resultados de várias casas de aposta consolidados por afiliado e por casa — o agregado sempre bate com o detalhamento.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="whitelabel" class="wl">
+  <div class="wrap wl-grid">
+    <div>
+      <span class="kicker">White-label de verdade</span>
+      <h2 style="font-size:clamp(1.7rem,3.6vw,2.5rem)">Para os seus afiliados, é o sistema da <em style="font-style:normal;color:var(--ember-l)">sua</em> agência.</h2>
+      <ul class="wl-list">
+        <li><span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span><b>Seu domínio, seu logo, suas cores.</b> O painel roda em painel.suaagencia.com.br com a sua identidade — a AffiliaCore não aparece.</span></li>
+        <li><span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span><b>Instância própria, dados isolados.</b> Cada agência tem a sua instalação — nada de banco compartilhado com concorrente.</span></li>
+        <li><span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span><b>Setup em dias, não meses.</b> Implantação, marca e onboarding dos primeiros afiliados incluídos no setup.</span></li>
+      </ul>
+    </div>
+    <div class="wl-visual" aria-hidden="true">
+      <div class="wl-chip"><i style="background:linear-gradient(135deg,#E11D48,#9F1239)"></i><div><b>Sua Agência</b><span>painel.suaagencia.com.br</span></div></div>
+      <div class="wl-chip"><i style="background:linear-gradient(135deg,#F59E0B,#B45309)"></i><div><b>Agência Norte</b><span>afiliados.agencianorte.bet</span></div></div>
+      <div class="wl-chip"><i style="background:linear-gradient(135deg,#0EA5E9,#0369A1)"></i><div><b>Padrino Partners</b><span>app.padrino.com.br</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="preco">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">Preço publicado</span>
+      <h2>Sem "solicite uma cotação".</h2>
+      <p>Todo o segmento esconde preço atrás de call de vendas. A gente publica: você faz a conta antes de mandar a primeira mensagem.</p>
+    </div>
+    <div class="price-grid">
+      <div class="price-card">
+        <span class="tag">Implantação</span>
+        <span class="pre">a partir de</span>
+        <div class="val">R$ 3.000 <small>· único</small></div>
+        <p>Instância própria com a sua marca e o seu domínio, migração das taxas e onboarding da equipe e dos primeiros afiliados.</p>
+      </div>
+      <div class="price-card">
+        <span class="tag">Mensalidade</span>
+        <span class="pre">a partir de</span>
+        <div class="val">R$ 600 <small>/mês</small></div>
+        <p>Degraus pelo número de afiliados ativos. Inclui hospedagem, manutenção e a evolução contínua do produto.</p>
+      </div>
+    </div>
+    <div class="founder">
+      <div>
+        <h3>🎯 Preço de fundador</h3>
+        <p>As 3 primeiras agências entram com condição travada enquanto forem clientes — em troca de feedback de perto durante a implantação.</p>
+      </div>
+      <a class="btn btn-primary" href="https://ig.me/m/affiliacore.br" target="_blank" rel="noopener">Quero ser fundador</a>
+    </div>
+  </div>
+</section>
+
+<section class="final">
+  <div class="wrap">
+    <h2>Tira a sua agência da planilha.</h2>
+    <p>Chama no direct, conta quantos afiliados e quais casas você opera — a gente responde com o preço fechado.</p>
+    <a class="btn btn-primary" href="https://ig.me/m/affiliacore.br" target="_blank" rel="noopener">Chamar no Instagram
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <a href="#"><img src="/logo.svg" alt="AffiliaCore"></a>
+    <span>Gestão de afiliados para agências de apostas · Brasil</span>
+    <a href="https://www.instagram.com/affiliacore.br/" target="_blank" rel="noopener">@affiliacore.br</a>
+  </div>
+</footer>
+
+</body>
+</html>
