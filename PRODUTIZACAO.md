@@ -258,6 +258,15 @@ no `apphosting.<cliente>.yaml`, sem rebuild.
    2026-07-06): montar a identidade — logo definitivo (substitui o placeholder
    monocromático de `public/affiliacore/`), paleta, tipografia — usando a
    ferramenta de design do Claude. Cobre a pendência "logo" do P5.1.
+   **EM ANDAMENTO (2026-07-06, noite):** projeto **"AffiliaCore Design System"**
+   criado no claude.ai/design com **3 direções completas** p/ o Vinicius escolher —
+   A "Órbita" (núcleo+rede, indigo #4F46E5, Space Grotesk), B "Rede" (monograma-A
+   grafo, teal #0D9488, Sora), C "Core" (wordmark-first + glifo C-núcleo, ember
+   #E11D48, Bricolage Grotesque). Cada direção traz símbolo/wordmark/variações
+   mono (convenção `invert` do app mantida)/favicon/mock in-app + paleta gerada
+   pela **engine real** (`buildAccentRamp`/`buildCanvasRamp`) com envs
+   `VITE_BRAND_*` prontas. Falta: Vinicius escolher direção → refinar → converter
+   wordmark em curvas → SVGs finais em `public/affiliacore/`.
 2. **LP hero: substituir o screenshot estático por um mock VIVO da dashboard**
    — miniatura com os componentes REAIS do app (que assim seguem o tema da
    instância) em vez da imagem fixa do painel Boost (âmbar/BOOST) que hoje
