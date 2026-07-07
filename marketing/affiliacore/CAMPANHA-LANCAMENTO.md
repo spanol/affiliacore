@@ -1,0 +1,100 @@
+# AffiliaCore — Redes sociais + campanha de lançamento (2026-07-07)
+
+## Handles (verificados em 2026-07-07)
+
+| Rede | Handle | Status |
+|---|---|---|
+| Instagram | **@affiliacore.br** | ✅ LIVRE — recomendado (casa com o domínio) |
+| Instagram | @affiliacore | ❌ OCUPADO — perfil "affiliation/online sales", 1 post, 11 seguidores, quase inativo |
+| LinkedIn | página "AffiliaCore" (slug `affiliacore`) | criar junto |
+
+> O @affiliacore ocupado reforça o INPI: com a marca registrada (classe 42/35),
+> dá pra reivindicar o handle pelo formulário de marca da Meta depois.
+
+## Bio Instagram (≤150 chars)
+
+> Gestão de afiliados para agências de apostas 🎯 CPA/REV por casa, portal do
+> afiliado e auditoria — white-label, com a sua marca.
+
+- Categoria: **Software**
+- Link: `https://affiliacore.com.br`
+- Tagline LinkedIn: "Gestão de afiliados para agências de apostas — white-label"
+
+## Assets (nesta pasta)
+
+- `avatar.png` — foto de perfil (1024², glifo centrado, seguro p/ crop circular)
+- `capa-linkedin.png` — capa da página (1584×396)
+- `post-1-lancamento.png` … `post-4-fundador.png` — feed 1080×1080
+
+## Campanha de lançamento — 4 posts (cadência sugerida: dias 1 · 3 · 5 · 7)
+
+### Post 1 — Lançamento (fixar no perfil)
+
+Chegou a AffiliaCore: a plataforma de gestão de afiliados feita para agências
+de apostas brasileiras. 🇧🇷
+
+Comissão CPA/REV calculada por casa, portal onde cada afiliado vê só os
+próprios resultados, ranking e trilha de auditoria completa — tudo com a marca
+da SUA agência.
+
+affiliacore.com.br
+
+`#afiliados #gestaodeafiliados #igaming #apostasesportivas #whitelabel #saasbrasil`
+
+### Post 2 — A dor da planilha
+
+Planilha quebra. Fórmula some. Afiliado cobra. 😵‍💫
+
+Se a sua agência ainda fecha comissão no Excel, você conhece o roteiro: horas
+conferindo linha por linha, taxa desatualizada, e ninguém sabe quem mudou o quê.
+
+A AffiliaCore fecha isso em minutos: cálculo CPA + REV por casa automático,
+cada afiliado com o próprio painel, e toda alteração registrada na auditoria.
+
+Sua planilha pede aposentadoria. 📊
+
+`#afiliados #gestaodeafiliados #igaming #agenciadeafiliados`
+
+### Post 3 — White-label
+
+White-label de verdade: o painel roda no SEU domínio, com o SEU logo e as SUAS
+cores. Para os seus afiliados, é o sistema da sua agência — instância própria,
+dados isolados.
+
+Setup em dias, não meses.
+
+`#whitelabel #saas #igaming #afiliados`
+
+### Post 4 — Vagas de fundador (CTA)
+
+As 3 primeiras agências entram com preço de fundador — condição travada
+enquanto forem clientes, em troca de feedback de perto.
+
+Se a sua agência gerencia afiliados de casas de aposta e quer sair da
+planilha, chama no direct. 🎯
+
+`#afiliados #igaming #gestaodeafiliados #apostas`
+
+## Checklist de cadastro (ações do operador — contas/pagamento)
+
+1. **Instagram**: criar conta com o e-mail da empresa → handle **@affiliacore.br**
+   → converter em conta profissional (categoria Software) → subir `avatar.png`
+   → bio + link acima → publicar Post 1 (feed + stories) e fixar no perfil.
+2. **LinkedIn**: criar página de empresa "AffiliaCore" (slug `affiliacore`) →
+   `avatar.png` + `capa-linkedin.png` + tagline → replicar Post 1.
+3. (Opcional) Reservar @affiliacore.br em X/TikTok mesmo sem usar.
+4. Agendar posts 2–4 (intervalo de 2–3 dias; app Meta Business Suite agenda de graça).
+5. **INPI**: pedido de registro "AffiliaCore" (classes 42 e 35) — além da
+   proteção, habilita reivindicar o @affiliacore ocupado via Meta.
+6. **registro.br**: `afiliacore.com.br` (1 "f", typo-defense, ~R$40/ano).
+
+> Campanha PAGA (Meta Ads) fica para um segundo momento: exige Business
+> Manager + cartão (ação do operador). Os criativos desta pasta já servem;
+> segmentação sugerida: interesses "marketing de afiliados/apostas esportivas",
+> lookalike de seguidores, BR, 25–45.
+
+## Regenerar os assets
+
+Gerador em `generator/` (SVG + fontes reais → PNG via resvg). As fontes woff2
+(Bricolage Grotesque 500/800, Inter 400/600) baixam da Fontsource/jsDelivr —
+ver comentário no topo de cada script.
