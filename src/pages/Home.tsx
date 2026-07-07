@@ -20,6 +20,7 @@ import { cn } from '../lib/utils';
 import { createContactInquiry, type ContactInquiryInput } from '../services/contactService';
 import { useToast } from '../contexts/ToastContext';
 import { BRAND } from '../lib/brandingClient';
+import HeroDashboardMock from '../components/HeroDashboardMock';
 
 const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`;
 
@@ -184,7 +185,9 @@ export default function Home() {
             </Link>
           </motion.div>
 
-          {/* Dashboard mockup — real Boost screenshot framed in the designer's chrome */}
+          {/* Mock VIVO da dashboard no chrome do designer — componentes em
+              miniatura com os tokens do tema, seguem a marca da instância
+              (antes: screenshot estático da Boost, âmbar em qualquer marca). */}
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
@@ -194,11 +197,7 @@ export default function Home() {
             <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-transparent to-transparent z-10 pointer-events-none" />
             <div className="rounded-2xl md:rounded-[2rem] border border-neutral-800/60 bg-glass-frame-dark p-2 md:p-3 backdrop-blur-glass-strong shadow-2xl relative overflow-hidden glow-white">
               <div className="rounded-xl overflow-hidden border border-neutral-700/50 bg-neutral-950">
-                <img
-                  src={asset('boost-home/dashboard-escuro.jpeg')}
-                  alt={`Plataforma ${BRAND.shortName}`}
-                  className="w-full h-auto block"
-                />
+                <HeroDashboardMock />
               </div>
             </div>
           </motion.div>
