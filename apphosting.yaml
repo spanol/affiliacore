@@ -41,6 +41,29 @@ env:
   # instância do Carlos vive em apphosting.boost.yaml (ambiente `boost`, associado
   # ao backend boost-agency-server no console em 2026-07-05).
 
+  # P5.1 (flip de cores, 2026-07-07): TEMA do produto — AffiliaCore Direção C
+  # "Core" (ember + canvas plum). Entra por ENV, e não pelos defaults do
+  # index.css, porque a engine de ramps (theming.ts) não reproduz as paletas
+  # Tailwind exatas a partir de 1 hex — os defaults do CSS têm que continuar
+  # amber/neutral p/ a Boost seguir pixel-idêntica. A Boost "des-seta" estas
+  # envs com valor VAZIO no apphosting.boost.yaml ('' = ausente p/ os
+  # resolvers; testado em theming.test.ts/branding.test.ts).
+  - variable: VITE_BRAND_ACCENT
+    value: '#E11D48'
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_BRAND_CANVAS
+    value: '#26181C'
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_BRAND_SURFACE
+    value: '#3F1D2B'
+    availability:
+      - BUILD
+      - RUNTIME
+
   # Credenciais do Firebase Admin SDK (conteúdo do service-account.json).
   # Criar com:  firebase apphosting:secrets:set firebase-service-account-key
   - variable: FIREBASE_SERVICE_ACCOUNT_KEY

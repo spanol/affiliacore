@@ -105,6 +105,21 @@ describe('resolveThemeTokens', () => {
     expect(resolveThemeTokens({ VITE_BRAND_ACCENT: 'não-é-hex' }).cssVars).toEqual({});
   });
 
+  it('CONTRATO do pin da Boost (P5.1): todas as envs de tema com string VAZIA equivalem a ausentes', () => {
+    // O apphosting.yaml BASE define o tema AffiliaCore; o apphosting.boost.yaml
+    // "des-seta" com '' p/ a Boost cair nos defaults do index.css (amber/neutral
+    // /navy). Se '' deixar de significar "ausente", a Boost muda de cara em prod.
+    const { cssVars } = resolveThemeTokens({
+      VITE_BRAND_ACCENT: '',
+      VITE_BRAND_CANVAS: '',
+      VITE_BRAND_SURFACE: '',
+      VITE_BRAND_STYLE: '',
+      VITE_BRAND_THEME: '',
+    });
+    expect(cssVars).toEqual({});
+    expect(resolveDefaultTheme('')).toBeNull();
+  });
+
   it('VITE_BRAND_ACCENT emite a escala completa + contrast', () => {
     const { cssVars } = resolveThemeTokens({ VITE_BRAND_ACCENT: '#E11D48' });
     expect(Object.keys(cssVars)).toHaveLength(ACCENT_STEPS.length + 1);

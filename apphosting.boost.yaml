@@ -41,3 +41,27 @@ env:
     availability:
       - BUILD
       - RUNTIME
+
+  # P5.1 (flip de cores, 2026-07-07): o apphosting.yaml BASE agora define o tema
+  # do PRODUTO (AffiliaCore ember: ACCENT/CANVAS/SURFACE). A Boost fica no look
+  # ORIGINAL (amber + neutral + navy = defaults do index.css): valor VAZIO
+  # "des-seta" a env — os resolvers de theming.ts/branding.ts tratam '' como
+  # ausente. NÃO trocar por um hex amber: a engine gera ramp ≠ paleta Tailwind
+  # exata (a instância deixaria de ser pixel-idêntica). Plano B, se o rollout
+  # rejeitar valor vazio: tirar o tema do base e declará-lo só nos yaml POR
+  # instância (o base fica sem VITE_BRAND_ACCENT/CANVAS/SURFACE).
+  - variable: VITE_BRAND_ACCENT
+    value: ''
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_BRAND_CANVAS
+    value: ''
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_BRAND_SURFACE
+    value: ''
+    availability:
+      - BUILD
+      - RUNTIME
