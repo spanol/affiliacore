@@ -274,11 +274,13 @@ no `apphosting.<cliente>.yaml`, sem rebuild.
    ENV no `apphosting.yaml` BASE — os defaults do `index.css` CONTINUAM
    amber/neutral de propósito (a engine de ramps não reproduz a paleta Tailwind
    exata a partir de 1 hex; a Boost depende dela p/ ficar pixel-idêntica). A
-   Boost "des-seta" ACCENT/CANVAS/SURFACE com string VAZIA no
-   `apphosting.boost.yaml` ('' = ausente p/ os resolvers — contrato travado por
-   teste). ⚠️ Validação REAL do valor vazio só no 1º rollout (plano B no yaml:
-   mover o tema do base p/ os yaml por instância). Verificado ao vivo em dev:
-   LP + hero mock inteiros em ember com as envs; look Boost intacto sem elas.
+   Boost "des-seta" ACCENT/CANVAS/SURFACE no `apphosting.boost.yaml` (contrato
+   não-hex = ausente travado por teste). **DEPLOYADO E PROVADO EM PROD
+   (2026-07-07 ~3h20, rollout `e084c6d`):** o 1º rollout com `value: ''`
+   (`ace835d`, build-07-07-002) **FALHOU na validação** — confirmando o risco
+   previsto; o pin virou **`'none'`** (string não-hex ⇒ resolvers ignoram,
+   e084c6d) e o rollout passou. Verificado na tela: Boost pixel-idêntica
+   (logo BOOST, amber, canvas neutro) com o base carregando o tema ember.
 2. ✅ **LP hero: mock VIVO da dashboard ENTREGUE (2026-07-07, commit
    `ebe5a0a`):** `HeroDashboardMock` (sidebar + métricas + top afiliados +
    funil + desempenho por casa, números fictícios) montado com os tokens do
