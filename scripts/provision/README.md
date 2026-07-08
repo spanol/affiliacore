@@ -88,6 +88,13 @@ env:
     availability: [RUNTIME]
 ```
 
+**⚠️ Neutralizar os secrets OTG do base (obrigatório em instância OTG-free):** o
+`apphosting.yaml` base referencia secrets que só existem no projeto da instância 0
+(`affiliate-api-key`, `otg-links-*`, `otg-dash-*`) — num projeto novo o rollout
+FALHA na validação de secret inexistente. Copie pro seu yaml o bloco de overrides
+plain (`value: 'unused'`, NUNCA string vazia) do `apphosting.demo.yaml`, incluindo
+o `MASTER_ADMIN_EMAIL` (vira e-mail inline do admin da instância).
+
 Commitar o yaml novo na `main` (é só config; não afeta as outras instâncias) e
 disparar o 1º rollout (push ou `firebase apphosting:rollouts:create <backend-id>`).
 
@@ -111,6 +118,62 @@ Atualizar a URL do job do Scheduler se ele foi criado antes do domínio.
 - [ ] Comissão: configurar CPA/REV → log `config.update` na `/auditoria`.
 - [ ] `/ranking`: gerar o dia com dados importados → entradas > 0; popup-lembrete chega no admin master.
 - [ ] `POST /api/internal/daily-ranking` sem header → 401 (503 = secret faltando).
+
+## Instância DEMO (P5.3 · fim-de-funil, acesso controlado)
+
+A demo é uma instância OTG-free com dados FICTÍCIOS no projeto Firebase
+**`affiliacore`** (o mesmo da landing — decisão 2026-07-07: a presença comercial
+mora toda lá). Sem link público: o acesso é entregue a lead quente, com senha
+rotativa. Difere do playbook padrão em 3 pontos: **Blaze**, **rules mescladas**
+e **seed**.
+
+1. **Plano Blaze** no projeto `affiliacore` (App Hosting exige; custo ~zero com
+   `minInstances: 0`). Console → Configurações → Uso e faturamento.
+2. **Authentication** → ativar **E-mail/senha** (os logins demo usam Auth).
+   Storage é opcional (só p/ upload de logo de casa nova; a demo semeia sem).
+3. **Registrar um app Web** no projeto (o App Hosting injeta o
+   `FIREBASE_WEBAPP_CONFIG` a partir dele).
+4. **Rules MESCLADAS** (instância + bloco `leads` da landing — mesmo banco!):
+   ```bash
+   node scripts/provision/build-affiliacore-rules.cjs
+   firebase deploy --config firebase.affiliacore.json --project www --only firestore
+   ```
+   NUNCA deployar o `firestore.rules` raiz no projeto affiliacore (apagaria o
+   bloco leads); sempre que o `firestore.rules` mudar, regenerar + re-deployar.
+5. **Service account**: console → Contas de serviço → gerar chave →
+   `service-account.affiliacore.json` (NÃO commitar).
+6. **Secrets** (só os dois; os OTG são neutralizados pelo `apphosting.demo.yaml`):
+   ```bash
+   firebase apphosting:secrets:set firebase-service-account-key --project affiliacore
+   firebase apphosting:secrets:set ranking-cron-secret --project affiliacore
+   ```
+7. **Backend** (`firebase apphosting:backends:create --project affiliacore`,
+   repo `spanol/affiliacore`, branch `main`) + associar o ambiente **`demo`** no
+   console (Settings → Environment). 1º rollout → conferir marca "AffiliaCore
+   Demo" + tema ember + `/casas` VAZIO (sem Superbet/SportingBet fantasma).
+8. **Seed** (imprime as 3 senhas UMA vez — admin/afiliado/especial):
+   ```bash
+   GOOGLE_APPLICATION_CREDENTIALS=./service-account.affiliacore.json \
+     node scripts/provision/seed-demo.cjs
+   ```
+   O script tem GUARD de projeto (só roda no `affiliacore`) e protege `leads`.
+   Validar a matemática sem Firebase: `node scripts/provision/seed-demo.cjs --plan`.
+9. **Smoke da demo** (como demo@affiliacore.com.br):
+   - [ ] `/admin` com preset **"Últimos 30 dias"** = números do mock da LP
+         (comissão R$ 24.831,90 · 38 afiliados · funil 1.204/312/187 · card
+         "Total depositado" no lugar de "Total CPA").
+   - [ ] `/ranking` → gerar o dia → pódio com ≥10 afiliados.
+   - [ ] Portal do afiliado (afiliado@...) mostra SÓ os números do Yago; sino
+         com aviso + notificação.
+   - [ ] `/network` do especial (especial@...) com a sub-rede de 3.
+   - [ ] `/auditoria` populada; `/casas` com as 3 casas manuais.
+   - [ ] Form da landing (affiliacore.com.br) SEGUE gravando lead (rules
+         mescladas) — testar e LIMPAR o lead de teste (confirmando via console).
+10. **Operação com leads**: entregar as credenciais por canal seguro; depois de
+    cada lead, `--rotate` (troca senhas + revoga sessões); periodicamente
+    `--wipe --yes` (reseta dados fictícios E o rastro do lead: convites,
+    auditoria, casas criadas...). Cron do ranking é opcional (o admin gera pelo
+    botão); se quiser, seguir o §5 do playbook padrão.
 
 ## Notas
 

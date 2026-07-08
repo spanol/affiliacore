@@ -344,15 +344,54 @@ no `apphosting.<cliente>.yaml`, sem rebuild.
    2 vias + negativos 403; teste limpo e confirmado no console). Leads
    chegam SEM notificação (Spark) — consultar no console; e-mail/push =
    futuro com Blaze.
-7. **PRÓXIMO (decidido 2026-07-07):** (a) **demo fim-de-funil (P5.3)** —
-   instância OTG-free marca "Demo" no projeto `affiliacore`, dados fictícios,
-   acesso controlado (SEM link na LP; Vinicius libera a leads quentes p/
-   fechamento; credenciais revogáveis + reset periódico); (b) **refinar as
-   demonstrações da LP p/ maior fidelidade com o produto** — o mock do hero
-   e novas vinhetas (ranking/pódio, auditoria, portal do afiliado) devem
-   espelhar as telas REAIS do app (referência: `HeroDashboardMock` do
-   `src/`, sidebar/da paleta reais); avaliar usar a demo semeada como fonte
-   de screenshots/estrutura. Sequência sugerida: demo primeiro → LP herda a
-   fidelidade.
-8. P5 restante: jurídico c/ Carlos (P5.2); P5.5 (precificação publicada)
+7. ✅ **P5.3 · DEMO — LADO DE CÓDIGO PRONTO (2026-07-07/08, sessão "agora é a
+   demo"; commits na main SEM push).** Desenho: instância OTG-free
+   "AffiliaCore Demo" no projeto `affiliacore` (mesmo da landing), dados
+   fictícios, acesso controlado (SEM link na LP; credenciais revogáveis +
+   reset periódico). Entregue:
+   - **`scripts/provision/seed-demo.cjs`** — seed determinístico (PRNG com
+     semente fixa + maior-resto em centavos): na janela "Últimos 30 dias" os
+     totais batem EXATOS com o mock da LP (comissão R$ 24.831,90 · FTD 312 ·
+     cadastros 1.204 · CPA 187 · REV R$ 6.591,90 · Superbet/Betano/BetMGM),
+     ~30 dias anteriores a ~87% (comparações fazem sentido), atividade
+     garantida ONTEM (ranking gera pódio com ≥10), 38 afiliados nativos
+     (20 produtores com pesos das barras do mock: Yago/Ana/Lucas/... + 18
+     em captação), especial (Ana) com sub-rede de 3, 2 sem config (estado
+     "não configurado"), avisos + notificação + trilha de auditoria
+     plausível. Logins: demo@/afiliado@/especial@affiliacore.com.br.
+     Modos: `--plan` (valida a matemática SEM Firebase — rodado ✔),
+     `--wipe --yes` (reset TOTAL verificado por query; `leads` PROTEGIDO
+     por contagem antes/depois), `--rotate` (senhas novas + revoga
+     sessões), `--verify-only`. GUARD: aborta fora do projeto `affiliacore`.
+   - **`scripts/provision/build-affiliacore-rules.cjs`** — o banco do
+     `affiliacore` agora serve leads E demo ⇒ `firestore.affiliacore.rules`
+     virou arquivo GERADO = firestore.rules (instância) + bloco `leads`;
+     regenerar + re-deployar a cada mudança de rules.
+   - **`apphosting.demo.yaml`** (ambiente `demo`): OTG-free, marca
+     "AffiliaCore Demo", tema ember herdado do base, e **neutralização dos
+     secrets OTG do base** (`value: 'unused'`; NUNCA '' — rollout reprova
+     env vazio). ⚠️ Essa neutralização é OBRIGATÓRIA em QUALQUER instância
+     nova (o base referencia otg-links-*/otg-dash-*/affiliate-api-key que só
+     existem no projeto do Carlos) — playbook §4 atualizado.
+   - **Fixes de produto p/ instância OTG-free**: (a) auto-seed de casas
+     (`ensureHousesSeeded`) gateado por OTG — demo não nasce com
+     Superbet/SportingBet 'otg' fantasma (+2 testes no server.test.ts);
+     (b) card "Total CPA" do /admin (que seria R$ 0,00 eterno — CPA-dinheiro
+     só existe na OTG) vira **"Total depositado"** quando OTG off.
+   - **Playbook § "Instância DEMO"** no scripts/provision/README.md com os
+     GATES DO OPERADOR: Blaze no projeto `affiliacore`, Auth e-mail/senha,
+     app Web, deploy das rules mescladas, service account, 2 secrets,
+     backend + ambiente `demo`, seed e smoke (checklist).
+   - Gap de fidelidade CONHECIDO p/ o item (b): a LP mostra "Total CPA
+     R$ 18.240" — na demo esse card é "Total depositado" (instância manual
+     não tem CPA-dinheiro). Ao refinar os mocks da LP, espelhar o card novo.
+8. **PRÓXIMO (re-priorizado 2026-07-08, decisão do Vinicius: "montar a demo
+   não vale o esforço agora"):** (a) **refinar as demonstrações da LP p/
+   fidelidade com o produto** — mock do hero + vinhetas (ranking/pódio,
+   auditoria, portal do afiliado) espelhando as telas reais; trocar o card
+   "Total CPA" do mock pelo "Total depositado" (é o que uma instância
+   OTG-free mostra). A demo P5.3 fica ESTACIONADA com o lado de código
+   pronto (item 7) — executar o playbook do operador só quando houver lead
+   que justifique.
+9. P5 restante: jurídico c/ Carlos (P5.2); P5.5 (precificação publicada)
    coberta em parte pela LP — falta formalizar os degraus.

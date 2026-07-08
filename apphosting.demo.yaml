@@ -1,0 +1,83 @@
+# Instância DEMO (P5.3 · fim-de-funil, acesso controlado) — projeto Firebase
+# `affiliacore` (o MESMO da landing; Firestore divide o banco com `leads`, por
+# isso as rules deployadas lá são as MESCLADAS: firestore.affiliacore.rules).
+#
+# Ativação (one-time, console do projeto affiliacore): App Hosting → backend da
+# demo → Settings → Environment → nome `demo` → Save. Playbook completo (Blaze,
+# Auth, secrets, seed) em scripts/provision/README.md § "Instância DEMO".
+#
+# SEM link público: a demo não aparece na landing — o Vinicius entrega o acesso
+# a leads quentes (senhas rotativas: scripts/provision/seed-demo.cjs --rotate).
+env:
+  # OTG-free: padrão de venda white-label; roda 100% em casas manuais.
+  - variable: VITE_OTG_ENABLED
+    value: 'false'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Marca: produto + sufixo explícito de demo (honesto em print/screenshot).
+  # SHORT/logo/favicon/tema ficam nos defaults do produto (AffiliaCore ember).
+  - variable: VITE_BRAND_NAME
+    value: 'AffiliaCore Demo'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: FIREBASE_STORAGE_BUCKET
+    value: 'affiliacore.firebasestorage.app'
+    availability:
+      - RUNTIME
+
+  # --- Neutralização dos secrets OTG do apphosting.yaml base -----------------
+  # O base referencia secrets que SÓ existem no projeto da instância 0 (Carlos):
+  # affiliate-api-key, otg-links-*, otg-dash-*. Num projeto novo o rollout FALHA
+  # na validação de secret inexistente — então TODA instância OTG-free sobrepõe
+  # essas variáveis com um valor plain inofensivo ('unused'; NUNCA string vazia —
+  # env vazio reprova na validação do rollout, lição de 2026-07-07). Com
+  # VITE_OTG_ENABLED=false o servidor nunca lê nenhuma delas.
+  # (Validar no 1º rollout: a premissa é que o yaml por ambiente substitui a
+  # entrada inteira da variável — secret: → value:. Plano B: remover as OTG do
+  # base e declará-las só no apphosting.boost.yaml.)
+  - variable: AFFILIATE_API_KEY
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_LINKS_SUPABASE_URL
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_LINKS_SUPABASE_ANON_KEY
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_LINKS_EMAIL
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_LINKS_PASSWORD
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_DASH_EMAIL
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_DASH_PASSWORD
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_DASH_DEVICE_TOKEN
+    value: 'unused'
+    availability:
+      - RUNTIME
+
+  # Lembrete do ranking vai pro admin da demo (o base referencia o secret
+  # master-admin-email, que não existe neste projeto — override plain).
+  - variable: MASTER_ADMIN_EMAIL
+    value: 'demo@affiliacore.com.br'
+    availability:
+      - RUNTIME
+
+  # FIREBASE_SERVICE_ACCOUNT_KEY e RANKING_CRON_SECRET seguem como SECRETS do
+  # base — o operador cria os dois no projeto affiliacore (playbook § demo).
