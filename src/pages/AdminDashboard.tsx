@@ -303,21 +303,21 @@ export default function AdminDashboard() {
 
   const metrics = [
     { label: 'Total de Afiliados', value: affiliatesCount.toString(), icon: Users, color: 'brand' },
-    { label: 'Total comissão', value: `R$ ${totals.commission.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: DollarSign, color: 'green' },
+    { label: 'Total comissão', value: `R$ ${totals.commission.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: DollarSign, color: 'green' },
     // 'Total CPA' (R$) é métrica que SÓ a OTG reporta — o import manual coleta a
     // CONTAGEM de CPA, não o dinheiro (`cpa` manual = 0 no v1). Numa instância
     // OTG-free o card seria um R$ 0,00 eterno; vira o total depositado (P5.3).
     OTG_ENABLED
-      ? { label: 'Total CPA', value: `R$ ${totals.cpa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: BarChart3, color: 'blue' }
-      : { label: 'Total depositado', value: `R$ ${totals.deposit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: BarChart3, color: 'blue' },
-    { label: 'Total REV', value: `R$ ${totals.rev.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: TrendingUp, color: 'purple' },
+      ? { label: 'Total CPA', value: `R$ ${totals.cpa.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: BarChart3, color: 'blue' }
+      : { label: 'Total depositado', value: `R$ ${totals.deposit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: BarChart3, color: 'blue' },
+    { label: 'Total REV', value: `R$ ${totals.rev.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: TrendingUp, color: 'purple' },
   ];
 
   // Funil agregado da rede — soma dos dados que antes só apareciam ao abrir um afiliado.
   const funnel = [
     { label: 'Cadastros', value: totals.registrations.toLocaleString('pt-BR'), icon: UserPlus },
     { label: 'Primeiros Depósitos', value: totals.firstDeposits.toLocaleString('pt-BR'), icon: Wallet },
-    { label: 'Valor Depositado', value: `R$ ${totals.deposit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: Banknote },
+    { label: 'Valor Depositado', value: `R$ ${totals.deposit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: Banknote },
     { label: 'CPA Qualificado', value: totals.qualifiedCpa.toLocaleString('pt-BR'), icon: Target },
   ];
 
@@ -499,17 +499,17 @@ export default function AdminDashboard() {
                   <span className="text-sm font-bold text-slate-900 dark:text-white truncate">{h.name}</span>
                 </div>
                 <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 dark:text-neutral-500">Comissão (casa)</p>
-                <h4 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight mb-3">R$ {h.commission.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
+                <h4 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight mb-3">R$ {h.commission.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h4>
                 {/* Lucro líquido da casa = comissão − repasse cruzado afiliado×casa.
                     Margem da agência só no master (regra do lucro líquido). */}
                 <div className="flex items-center justify-between gap-2 mb-3 px-3 py-2.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/40">
                   <div className="min-w-0">
                     <p className="text-[9px] uppercase font-bold tracking-widest text-emerald-700/70 dark:text-emerald-400/70">Lucro líquido (casa)</p>
-                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400 tracking-tight tabular-nums">R$ {h.netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400 tracking-tight tabular-nums">R$ {h.netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-[9px] uppercase font-bold tracking-widest text-slate-400 dark:text-neutral-500">Repasse</p>
-                    <p className="text-xs font-semibold text-slate-500 dark:text-neutral-400 tabular-nums">R$ {h.payout.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-xs font-semibold text-slate-500 dark:text-neutral-400 tabular-nums">R$ {h.payout.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-center pt-3 border-t border-slate-100 dark:border-neutral-800">
@@ -552,7 +552,7 @@ export default function AdminDashboard() {
                     <p className="text-[10px] text-slate-400 dark:text-neutral-500">{s.subs} sub-afiliado(s)</p>
                   </div>
                 </div>
-                <span className="shrink-0 text-sm font-black text-slate-900 dark:text-white tabular-nums">R$ {s.commission.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                <span className="shrink-0 text-sm font-black text-slate-900 dark:text-white tabular-nums">R$ {s.commission.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             ))}
           </div>
@@ -581,7 +581,7 @@ export default function AdminDashboard() {
                     <p className="text-[10px] text-accent-600 dark:text-accent-400 truncate">Pertence a {s.special}</p>
                   </div>
                 </div>
-                <span className="shrink-0 text-sm font-black text-slate-900 dark:text-white tabular-nums">R$ {s.commission.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                <span className="shrink-0 text-sm font-black text-slate-900 dark:text-white tabular-nums">R$ {s.commission.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             ))}
           </div>

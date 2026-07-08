@@ -152,7 +152,7 @@ export default function AffiliatePerformanceChart({
                 itemStyle={{ fontSize: '12px', fontWeight: 700, color: theme === 'dark' ? '#E5E5E5' : '#334155' }}
                 labelStyle={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: theme === 'dark' ? '#A3A3A3' : '#64748B', marginBottom: '8px' }}
                 formatter={(value: any, name: any) => [
-                  `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+                  `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
                   name,
                 ]}
               />
