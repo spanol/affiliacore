@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { connectAuthEmulator, getAuth } from 'firebase/auth';
+import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import appletConfig from '../../firebase-applet-config.json';
 import { resolveFirebaseConfig } from './firebaseConfig';
@@ -19,6 +19,15 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
+
+// DEV-ONLY (P5.3 · preview local da demo): VITE_USE_EMULATORS='true' aponta o
+// client pros emuladores locais (Auth 9099 / Firestore 8080) — permite navegar a
+// demo SEMEADA (seed-demo.cjs) sem tocar em nenhum projeto real. Nunca setar essa
+// env numa instância (os apphosting.yaml não a declaram; ausente = no-op).
+if ((import.meta as any).env?.VITE_USE_EMULATORS === 'true') {
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectFirestoreEmulator(db, '127.0.0.1', 8080);
+}
 
 // Standardized Firestore Error Handler
 export enum OperationType {

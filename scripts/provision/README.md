@@ -175,6 +175,35 @@ e **seed**.
     auditoria, casas criadas...). Cron do ranking é opcional (o admin gera pelo
     botão); se quiser, seguir o §5 do playbook padrão.
 
+### Preview LOCAL da demo (sem provisionar nada — validado 2026-07-08)
+
+Roda a demo completa nos EMULADORES (Firestore+Auth): nenhum projeto real é
+tocado. Requer Java (mesma dependência do `npm run test:rules`).
+
+```bash
+# 1) emuladores (terminal 1)
+firebase emulators:start --only firestore,auth --project affiliacore
+
+# 2) seed (terminal 2) — imprime as senhas dos 3 logins
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
+GCLOUD_PROJECT=affiliacore GOOGLE_CLOUD_PROJECT=affiliacore \
+  node scripts/provision/seed-demo.cjs
+
+# 3) app em modo demo (terminal 2) — http://localhost:3123
+GOOGLE_APPLICATION_CREDENTIALS='' FIREBASE_SERVICE_ACCOUNT_KEY='' \
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
+GCLOUD_PROJECT=affiliacore GOOGLE_CLOUD_PROJECT=affiliacore \
+FIREBASE_WEBAPP_CONFIG='{"apiKey":"demo-local","authDomain":"127.0.0.1","projectId":"affiliacore","storageBucket":"affiliacore.firebasestorage.app","appId":"1:demo:web:demo"}' \
+VITE_USE_EMULATORS=true VITE_OTG_ENABLED=false VITE_BRAND_NAME='AffiliaCore Demo' \
+VITE_BRAND_ACCENT='#E11D48' VITE_BRAND_CANVAS='#26181C' VITE_BRAND_SURFACE='#3F1D2B' \
+PORT=3123 npm run dev
+```
+
+Notas: `VITE_USE_EMULATORS` liga o wiring dev-only de `src/lib/firebase.ts`;
+os `GOOGLE_APPLICATION_CREDENTIALS=''`/`FIREBASE_SERVICE_ACCOUNT_KEY=''` vazios
+impedem o dotenv de apontar o Admin SDK pro projeto da instância 0; no preset
+"Últimos 30 dias" o /admin bate EXATO com o mock da LP no dia do seed.
+
 ## Notas
 
 - **Nunca** editar `firebase-applet-config.json` por cliente — é fallback de dev.

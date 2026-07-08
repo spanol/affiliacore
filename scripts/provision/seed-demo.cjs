@@ -4,7 +4,8 @@
  *
  * Popula o Firestore do projeto `affiliacore` com uma operação FICTÍCIA porém
  * verossímil, alinhada aos números do mock da landing (HeroDashboardMock):
- * na janela "Últimos 30 dias" (ontem − 29 → ontem) os totais batem EXATOS:
+ * na janela "Últimos 30 dias" (hoje − 29 → hoje, MESMA definição do preset do
+ * app em lib/dateRange) os totais batem EXATOS:
  *   comissão R$ 24.831,90 · FTD 312 · cadastros 1.204 · CPA qualif. 187 ·
  *   REV R$ 6.591,90 · por casa: Superbet 14.930,10/178 · Betano 6.480,00/89 ·
  *   BetMGM 3.421,80/45. (Total CPA em R$ fica 0 — instância manual não coleta
@@ -239,7 +240,12 @@ function buildRowsForHouse(house, targets, days, { forceYesterdayFor = new Set()
     const wantDays = Math.max(2, Math.min(days.length, Math.round((p.w / 92) * 16 + 3 + rnd() * 3)));
     const shuffled = [...days].sort(() => rnd() - 0.5);
     const active = new Set(shuffled.slice(0, wantDays).map((d) => toISO(d)));
-    if (forceYesterdayFor.has(pIdx)) active.add(toISO(days[days.length - 1]));
+    if (forceYesterdayFor.has(pIdx)) {
+      // últimos DOIS dias da janela: ontem (ranking do dia fechado) e hoje
+      // (dia corrente não-zerado) — a janela termina HOJE.
+      active.add(toISO(days[days.length - 1]));
+      if (days.length > 1) active.add(toISO(days[days.length - 2]));
+    }
     const activeDays = days.filter((d) => active.has(toISO(d)));
 
     const dayW = activeDays.map((d) => ([5, 6, 0].includes(d.getDay()) ? 1.4 : 1) * (0.6 + rnd() * 0.8));
@@ -423,9 +429,10 @@ async function seed() {
   }
 
   const today = new Date();
-  const yesterday = addDays(today, -1);
-  const w1Days = Array.from({ length: 30 }, (_, i) => addDays(yesterday, i - 29)); // ontem−29 → ontem
-  const w0Days = Array.from({ length: 30 }, (_, i) => addDays(yesterday, i - 59)); // janela anterior
+  // Janela exata = preset "Últimos 30 dias" do app (hoje−29 → hoje). Ontem e hoje
+  // têm produção garantida (forceYesterdayFor) p/ ranking e dia corrente.
+  const w1Days = Array.from({ length: 30 }, (_, i) => addDays(today, i - 29));
+  const w0Days = Array.from({ length: 30 }, (_, i) => addDays(today, i - 59)); // janela anterior
 
   // Nomes do 1º/2º produtor entram nos logins demo.
   LOGINS.afiliado.name = PRODUCERS[0].name;
@@ -638,14 +645,14 @@ function printLogins(passwords) {
 async function main() {
   if (MODE.plan) {
     // Sem Firebase: valida a matemática de alocação em memória.
-    const yesterday = addDays(new Date(), -1);
-    const w1Days = Array.from({ length: 30 }, (_, i) => addDays(yesterday, i - 29));
-    const w0Days = Array.from({ length: 30 }, (_, i) => addDays(yesterday, i - 59));
+    const today = new Date();
+    const w1Days = Array.from({ length: 30 }, (_, i) => addDays(today, i - 29));
+    const w0Days = Array.from({ length: 30 }, (_, i) => addDays(today, i - 59));
     const rows = buildAllRows(w1Days, w0Days);
     console.log(`— PLAN (em memória, sem Firebase) — ${rows.length} linhas geradas`);
     const acc = sumWindow(rows, toISO(w1Days[0]), toISO(w1Days[29]));
     const ok = reportAgainstTargets(acc);
-    const yISO = toISO(yesterday);
+    const yISO = toISO(addDays(today, -1));
     const yAffs = new Set(rows.filter((r) => r.date === yISO && r.total_commission > 0).map((r) => r.affiliateId));
     console.log(`  afiliados com comissão ONTEM (ranking): ${yAffs.size} (mínimo esperado: 10)`);
     const badCells = rows.filter((r) => r.first_deposits > r.registrations || r.qualified_cpa > r.first_deposits);
@@ -671,8 +678,8 @@ async function main() {
     return;
   }
   if (MODE.verifyOnly) {
-    const yesterday = addDays(new Date(), -1);
-    await verify({ startDate: toISO(addDays(yesterday, -29)), endDate: toISO(yesterday) });
+    const today = new Date();
+    await verify({ startDate: toISO(addDays(today, -29)), endDate: toISO(today) });
     return;
   }
   if (MODE.wipe) {
