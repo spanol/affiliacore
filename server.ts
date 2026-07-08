@@ -2326,8 +2326,12 @@ export function createApp(deps: ServerDeps) {
 
   // Semeia as casas-semente (DEFAULT_BRANDS) na 1ª vez que a coleção está vazia,
   // p/ produção nunca ficar sem Superbet/SportingBet. Idempotente.
+  // P5.3 (produtização): as sementes são casas OTG — numa instância OTG-free
+  // (demo/white-label) elas nasceriam "fantasma" (dataSource 'otg' nunca recebe
+  // dado sem a API). Instância OTG-free começa com /casas vazio; o admin (ou o
+  // seed-demo.cjs) cria as casas manuais dela.
   const ensureHousesSeeded = async () => {
-    if (!adminDb) return;
+    if (!adminDb || !OTG_ENABLED) return;
     const snap = await adminDb.collection('houses').limit(1).get();
     if (!snap.empty) return;
     const batch = adminDb.batch();

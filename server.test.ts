@@ -1069,6 +1069,19 @@ describe('cron interno daily-ranking', () => {
 });
 
 // =============================================================================
+// GET /api/houses — auto-seed das casas-semente (só com o módulo OTG LIGADO)
+// =============================================================================
+describe('GET /api/houses — auto-seed das casas OTG', () => {
+  it('instância OTG ligada: coleção vazia → 1ª listagem semeia as DEFAULT_BRANDS', async () => {
+    const fs = makeFirestore({ users: { 'admin-uid': { role: 'admin' } } });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs });
+    const res = await request(app).get('/api/houses').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(res.body.houses.map((h: any) => h.slug).sort()).toEqual(['sportingbet', 'superbet']);
+    expect(fs.__store.get('houses')?.size).toBe(2);
+  });
+});
+
+// =============================================================================
 // P2 — instância OTG-free (VITE_OTG_ENABLED='false'): módulo OTG desligado
 // =============================================================================
 describe('P2 · módulo OTG desligado por instância', () => {
@@ -1098,6 +1111,16 @@ describe('P2 · módulo OTG desligado por instância', () => {
   it('o gate NÃO afeta rotas não-OTG (affiliate-configs segue 200)', async () => {
     const app = buildApp({ seed });
     await request(app).get('/api/affiliate-configs').set('Authorization', 'Bearer admin-uid').expect(200);
+  });
+
+  it('OTG-free: GET /api/houses NÃO auto-semeia as casas OTG (Superbet/SportingBet fantasma)', async () => {
+    // P5.3: numa instância OTG-free as sementes (dataSource 'otg') nunca receberiam
+    // dados — a coleção vazia tem que CONTINUAR vazia até o admin criar casas manuais.
+    const fs = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs });
+    const res = await request(app).get('/api/houses').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(res.body.houses).toEqual([]);
+    expect(fs.__store.get('houses')?.size ?? 0).toBe(0);
   });
 
   it('ranking OTG-free: nenhuma chamada à OTG (só a cotação p/ as casas manuais), sem exigir AFFILIATE_API_KEY', async () => {
