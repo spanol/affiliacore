@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { BRAND } from '../lib/brandingClient';
+import { OTG_ENABLED } from '../lib/instanceClient';
 
 // LP hero: miniatura VIVA da dashboard — substitui o screenshot estático da
 // Boost (a arte antiga aparecia âmbar/BOOST em qualquer instância). Montada
@@ -34,7 +35,11 @@ const NAV = [
 const METRICS = [
   { label: 'Total de Afiliados', value: '38', icon: Users, dark: true },
   { label: 'Total comissão', value: 'R$ 24.831,90', icon: DollarSign, dark: false },
-  { label: 'Total CPA', value: 'R$ 18.240,00', icon: BarChart3, dark: false },
+  // Espelha o card real do /admin (P5.3): CPA-dinheiro só existe com OTG —
+  // instância OTG-free mostra o total depositado no 3º card.
+  OTG_ENABLED
+    ? { label: 'Total CPA', value: 'R$ 18.240,00', icon: BarChart3, dark: false }
+    : { label: 'Total depositado', value: 'R$ 97.100,00', icon: BarChart3, dark: false },
   { label: 'Total REV', value: 'R$ 6.591,90', icon: TrendingUp, dark: false },
 ];
 

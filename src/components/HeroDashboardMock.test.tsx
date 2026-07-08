@@ -25,6 +25,9 @@ describe('HeroDashboardMock', () => {
     render(<HeroDashboardMock />);
     expect(screen.getByText('Visão geral')).toBeInTheDocument();
     expect(screen.getByText('Total comissão')).toBeInTheDocument();
+    // Env de teste não define VITE_OTG_ENABLED → OTG ligada → card 'Total CPA'
+    // (instância OTG-free troca por 'Total depositado', espelhando o /admin).
+    expect(screen.getByText('Total CPA')).toBeInTheDocument();
     expect(screen.getByText('Top afiliados por comissão')).toBeInTheDocument();
     expect(screen.getByText('Funil da rede')).toBeInTheDocument();
     expect(screen.getByText('Convidar afiliado')).toBeInTheDocument();
