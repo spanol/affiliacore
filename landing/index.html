@@ -104,28 +104,75 @@ header{
   border-radius:7px;padding:4px 12px;color:var(--faint);font-size:11.5px;
 }
 .mock-body{display:grid;grid-template-columns:180px 1fr;min-height:340px}
-.mock-side{background:#170D10;border-right:1px solid var(--line);padding:16px 12px}
-.mock-brand{display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:800;font-size:13px;padding:4px 8px 16px}
+.mock-side{background:#170D10;border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column}
+.mock-brand{display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:800;font-size:13px;padding:4px 8px 14px}
 .mock-brand i{width:20px;height:20px;border-radius:6px;background:linear-gradient(135deg,var(--ember),#9F1239);display:inline-block}
+.mock-label{font-size:8.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);padding:0 10px 6px}
 .mock-nav div{padding:8px 10px;border-radius:8px;color:var(--faint);margin-bottom:2px}
-.mock-nav div.on{background:rgba(225,29,72,.14);color:var(--ember-l)}
+.mock-nav div.on{background:rgba(225,29,72,.14);color:var(--ember-l);font-weight:600}
+.mock-user{margin-top:auto;display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:10px;font-size:10.5px;color:var(--faint)}
+.mock-user i{flex:none;width:20px;height:20px;border-radius:50%;background:rgba(225,29,72,.2);color:var(--ember-l);font-style:normal;font-weight:700;font-size:8.5px;display:flex;align-items:center;justify-content:center}
 .mock-main{padding:18px;display:flex;flex-direction:column;gap:14px}
-.mock-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.mock-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.mock-head strong{display:block;font-family:var(--display);font-weight:800;font-size:17px;letter-spacing:-.02em;margin-top:6px}
+.mock-pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:rgba(255,255,255,.04);border-radius:999px;padding:4px 10px;font-size:9.5px;font-weight:600;color:var(--muted)}
+.mock-pill.live{text-transform:uppercase;letter-spacing:.1em;font-weight:700}
+.mock-pill.live i{width:5px;height:5px;border-radius:50%;background:#4ADE80}
+.mock-head-actions{display:flex;align-items:center;gap:8px;margin-top:4px}
+.mock-cta{display:inline-flex;background:var(--ember);color:#fff;border-radius:999px;padding:5px 12px;font-size:9.5px;font-weight:700}
+.mock-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .stat{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
-.stat b{display:block;font-family:var(--display);font-weight:800;font-size:19px;margin-top:2px}
-.stat span{color:var(--faint);font-size:11px}
-.stat .up{color:#4ADE80;font-size:11px;font-weight:600}
+.stat.dark{background:#211117}
+.stat b{display:block;font-family:var(--display);font-weight:800;font-size:16px;margin-top:3px;white-space:nowrap}
+.stat span{color:var(--faint);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
 .mock-cols{display:grid;grid-template-columns:1.25fr 1fr;gap:12px;flex:1}
 .panel{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:12px;padding:14px}
-.panel h4{font-family:var(--body);font-weight:600;font-size:12px;color:var(--muted);margin-bottom:12px}
-.hrow{display:grid;grid-template-columns:86px 1fr 60px;gap:10px;align-items:center;margin-bottom:10px;color:var(--faint);font-size:11.5px}
-.hbar{height:8px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden}
-.hbar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--ember),var(--ember-l))}
-.hrow b{text-align:right;color:var(--text);font-weight:600}
+.panel h4{font-family:var(--body);font-weight:700;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:12px}
+.vbars{display:flex;align-items:flex-end;gap:8px;height:96px}
+.vbars div{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+.vbars i{display:block;width:100%;border-radius:4px 4px 0 0;background:rgba(225,29,72,.55)}
+.vbars div:first-child i{background:linear-gradient(180deg,var(--ember-l),var(--ember))}
+.vbars span{font-size:9px;color:var(--faint)}
 .trow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);color:var(--muted);font-size:12px}
 .trow:last-child{border:none}
 .trow b{color:var(--text);font-weight:600}
-.medal{margin-right:8px}
+.up{color:var(--ember-l);font-size:10.5px;font-weight:600}
+.mock-sec{font-family:var(--body);font-weight:700;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:8px}
+.mock-houses{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.house{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.house i{flex:none;width:26px;height:26px;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid var(--line);font-style:normal;font-weight:700;font-size:11px;color:var(--muted);display:flex;align-items:center;justify-content:center}
+.house span{display:block;font-size:9.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.house b{display:block;font-family:var(--display);font-weight:800;font-size:12.5px;color:var(--text);white-space:nowrap}
+.house > div{min-width:0}
+
+/* ——— vinhetas (telas do produto) ——— */
+.shots{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.shot{border:1px solid var(--line);border-radius:14px;background:#1C1014;overflow:hidden;box-shadow:0 18px 44px rgba(0,0,0,.35)}
+.shot-bar{display:flex;align-items:center;gap:5px;padding:9px 12px;background:#241419;border-bottom:1px solid var(--line)}
+.shot-bar .dot{width:7px;height:7px}
+.shot-bar span:last-child{margin-left:8px;font-size:10px;color:var(--faint)}
+.shot-body{padding:14px;display:flex;flex-direction:column;gap:8px;font-size:12px}
+.shot-wrap h3{font-size:1.02rem;font-weight:800;margin:16px 0 6px}
+.shot-wrap > p{color:var(--muted);font-size:.92rem}
+.pod{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pod-card{border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.03);padding:10px 8px;text-align:center;min-width:0}
+.pod-card em{font-style:normal;display:inline-flex;width:22px;height:22px;border-radius:7px;align-items:center;justify-content:center;font-size:10px;font-weight:800;margin-bottom:6px}
+.pod-card.gold em{background:rgba(245,158,11,.16);color:#FBBF24}
+.pod-card.silver em{background:rgba(148,163,184,.16);color:#CBD5E1}
+.pod-card.bronze em{background:rgba(180,83,9,.2);color:#D97706}
+.pod-card span{display:block;font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.pod-card b{display:block;font-size:10.5px;margin:2px 0;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pod-card i{font-style:normal;font-family:var(--display);font-weight:800;font-size:12px;white-space:nowrap}
+.rank-row{display:flex;align-items:center;gap:10px;padding:6px 2px;border-bottom:1px solid rgba(255,255,255,.05);font-size:11px;color:var(--muted)}
+.rank-row:last-child{border:none}
+.rank-row em{font-style:normal;width:16px;text-align:center;color:var(--faint);font-weight:800}
+.rank-row b{margin-left:auto;color:var(--text);font-weight:600}
+.log-row{border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.03);padding:9px 11px}
+.log-row b{display:block;font-size:11px;color:var(--text)}
+.log-row span{font-size:10.5px;color:var(--muted)}
+.log-row .meta{display:block;font-size:9.5px;color:var(--faint);margin-top:2px}
+.chg{color:var(--ember-l);font-weight:600}
+.contract{display:inline-flex;gap:6px;align-items:center;border:1px solid rgba(225,29,72,.35);background:rgba(225,29,72,.08);color:var(--ember-l);border-radius:999px;padding:4px 10px;font-size:9.5px;font-weight:700;margin-top:4px;align-self:flex-start}
 
 /* ——— sections ——— */
 .sec-head{max-width:640px;margin-bottom:52px}
@@ -222,6 +269,8 @@ footer a:hover{color:var(--text)}
   .mock-side{display:none}
   .mock-stats{grid-template-columns:1fr 1fr}
   .mock-cols{grid-template-columns:1fr}
+  .mock-houses{grid-template-columns:1fr}
+  .shots{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -260,6 +309,7 @@ footer a:hover{color:var(--text)}
       <div class="mock-body">
         <div class="mock-side">
           <div class="mock-brand"><i></i> Sua Agência</div>
+          <div class="mock-label">Principal</div>
           <div class="mock-nav">
             <div class="on">Dashboard</div>
             <div>Afiliados</div>
@@ -267,25 +317,52 @@ footer a:hover{color:var(--text)}
             <div>Ranking</div>
             <div>Auditoria</div>
           </div>
+          <div class="mock-user"><i>AD</i> Admin · Sua Agência</div>
         </div>
         <div class="mock-main">
+          <div class="mock-head">
+            <div>
+              <span class="mock-pill live"><i></i>Visão geral</span>
+              <strong>Dashboard</strong>
+            </div>
+            <div class="mock-head-actions">
+              <span class="mock-pill">Últimos 30 dias</span>
+              <span class="mock-cta">Convidar afiliado</span>
+            </div>
+          </div>
           <div class="mock-stats">
-            <div class="stat"><span>Comissão do mês</span><b>R$ 48.230</b><span class="up">▲ 12% vs. mês anterior</span></div>
-            <div class="stat"><span>Afiliados ativos</span><b>62</b><span class="up">▲ 5 novos</span></div>
-            <div class="stat"><span>FTDs no mês</span><b>214</b><span class="up">▲ 9%</span></div>
+            <div class="stat dark"><span>Total de Afiliados</span><b>38</b></div>
+            <div class="stat"><span>Total comissão</span><b>R$ 24.831,90</b></div>
+            <div class="stat"><span>Total depositado</span><b>R$ 97.100,00</b></div>
+            <div class="stat"><span>Total REV</span><b>R$ 6.591,90</b></div>
           </div>
           <div class="mock-cols">
             <div class="panel">
-              <h4>Desempenho por casa</h4>
-              <div class="hrow"><span>Casa Alfa</span><span class="hbar"><i style="width:82%"></i></span><b>R$ 26,4k</b></div>
-              <div class="hrow"><span>Casa Bravo</span><span class="hbar"><i style="width:54%"></i></span><b>R$ 14,1k</b></div>
-              <div class="hrow"><span>Casa Cedro</span><span class="hbar"><i style="width:30%"></i></span><b>R$ 7,7k</b></div>
+              <h4>Top afiliados por comissão</h4>
+              <div class="vbars">
+                <div><i style="height:92%"></i><span>Yago</span></div>
+                <div><i style="height:74%"></i><span>Ana</span></div>
+                <div><i style="height:61%"></i><span>Lucas</span></div>
+                <div><i style="height:52%"></i><span>Bia</span></div>
+                <div><i style="height:40%"></i><span>Rafa</span></div>
+                <div><i style="height:31%"></i><span>Duda</span></div>
+                <div><i style="height:22%"></i><span>Igor</span></div>
+              </div>
             </div>
             <div class="panel">
-              <h4>Top afiliados — hoje</h4>
-              <div class="trow"><span><span class="medal">🥇</span>Yago M.</span><b>R$ 2.119</b></div>
-              <div class="trow"><span><span class="medal">🥈</span>Larissa P.</span><b>R$ 1.640</b></div>
-              <div class="trow"><span><span class="medal">🥉</span>Bruno C.</span><b>R$ 1.205</b></div>
+              <h4>Funil da rede</h4>
+              <div class="trow"><span>Cadastros</span><b>1.204</b></div>
+              <div class="trow"><span>Primeiros Depósitos</span><b>312</b></div>
+              <div class="trow"><span>CPA Qualificado</span><b>187</b></div>
+              <p class="up" style="margin-top:8px">+12,4% vs. período anterior</p>
+            </div>
+          </div>
+          <div>
+            <p class="mock-sec">Desempenho por casa</p>
+            <div class="mock-houses">
+              <div class="house"><i>S</i><div><span>Superbet · 178 FTDs</span><b>R$ 14.930,10</b></div></div>
+              <div class="house"><i>B</i><div><span>Betano · 89 FTDs</span><b>R$ 6.480,00</b></div></div>
+              <div class="house"><i>B</i><div><span>BetMGM · 45 FTDs</span><b>R$ 3.421,80</b></div></div>
             </div>
           </div>
         </div>
@@ -331,6 +408,61 @@ footer a:hover{color:var(--text)}
         <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
         <h3>Multi-casa consolidado</h3>
         <p>Resultados de várias casas de aposta consolidados por afiliado e por casa — o agregado sempre bate com o detalhamento.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="telas">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">Por dentro do produto</span>
+      <h2>As telas que a sua operação usa todo dia.</h2>
+      <p>Réplica fiel do painel: pódio diário, trilha de auditoria que ninguém edita e o portal onde cada afiliado vê só o que é dele. Números ilustrativos.</p>
+    </div>
+    <div class="shots">
+      <div class="shot-wrap">
+        <div class="shot" aria-hidden="true">
+          <div class="shot-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span>…/ranking</span></div>
+          <div class="shot-body">
+            <div class="pod">
+              <div class="pod-card gold"><em>1º</em><span>1º lugar</span><b>Yago Martins</b><i>R$ 2.119,34</i></div>
+              <div class="pod-card silver"><em>2º</em><span>2º lugar</span><b>Ana Souza</b><i>R$ 1.640,80</i></div>
+              <div class="pod-card bronze"><em>3º</em><span>3º lugar</span><b>Lucas Ferreira</b><i>R$ 1.238,00</i></div>
+            </div>
+            <div>
+              <div class="rank-row"><em>4</em>Bia Cardoso<b>R$ 990,10</b></div>
+              <div class="rank-row"><em>5</em>Rafa Almeida<b>R$ 742,60</b></div>
+            </div>
+          </div>
+        </div>
+        <h3>Ranking diário</h3>
+        <p>Pódio calculado automaticamente a partir da comissão do dia — gamificação que puxa produção sem trabalho manual.</p>
+      </div>
+      <div class="shot-wrap">
+        <div class="shot" aria-hidden="true">
+          <div class="shot-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span>…/auditoria</span></div>
+          <div class="shot-body">
+            <div class="log-row"><b>Alterou comissão (CPA/REV)</b><span>Yago Martins — CPA <span class="chg">R$ 60,00 → R$ 65,00</span></span><span class="meta">por Equipe · hoje, 14h32</span></div>
+            <div class="log-row"><b>Importou resultados</b><span>Superbet — 42 linhas, 14 afiliados</span><span class="meta">por Equipe · ontem, 09h15</span></div>
+            <div class="log-row"><b>Gerou convite</b><span>Ana Souza — link expira em 7 dias</span><span class="meta">por Equipe · há 3 dias</span></div>
+          </div>
+        </div>
+        <h3>Trilha de auditoria</h3>
+        <p>Quem mudou, quando e o antes → depois de cada taxa. Append-only: nem o admin edita ou apaga o histórico.</p>
+      </div>
+      <div class="shot-wrap">
+        <div class="shot" aria-hidden="true">
+          <div class="shot-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span>login do afiliado</span></div>
+          <div class="shot-body">
+            <div class="trow"><span>Comissão total</span><b>R$ 2.119,34</b></div>
+            <div class="trow"><span>CPA qualificado</span><b>12</b></div>
+            <div class="trow"><span>Cadastros</span><b>46</b></div>
+            <span class="contract">Seu contrato: CPA R$ 65 + REV 22%</span>
+          </div>
+        </div>
+        <h3>Portal do afiliado</h3>
+        <p>Cada afiliado entra com o próprio login e vê só os próprios números e o próprio contrato — nada da agência vaza.</p>
       </div>
     </div>
   </div>
