@@ -385,13 +385,28 @@ no `apphosting.<cliente>.yaml`, sem rebuild.
    - Gap de fidelidade CONHECIDO p/ o item (b): a LP mostra "Total CPA
      R$ 18.240" — na demo esse card é "Total depositado" (instância manual
      não tem CPA-dinheiro). Ao refinar os mocks da LP, espelhar o card novo.
-8. **PRÓXIMO (re-priorizado 2026-07-08, decisão do Vinicius: "montar a demo
-   não vale o esforço agora"):** (a) **refinar as demonstrações da LP p/
-   fidelidade com o produto** — mock do hero + vinhetas (ranking/pódio,
-   auditoria, portal do afiliado) espelhando as telas reais; trocar o card
-   "Total CPA" do mock pelo "Total depositado" (é o que uma instância
-   OTG-free mostra). A demo P5.3 fica ESTACIONADA com o lado de código
+8. ✅ **P5.3b · MOCKS DA LP FIÉIS — DEPLOYADO EM PROD (2026-07-08, decisão
+   do Vinicius: "montar a demo não vale o esforço agora; primeiro a
+   fidelidade da LP").** A demo P5.3 fica ESTACIONADA com o lado de código
    pronto (item 7) — executar o playbook do operador só quando houver lead
-   que justifique.
-9. P5 restante: jurídico c/ Carlos (P5.2); P5.5 (precificação publicada)
-   coberta em parte pela LP — falta formalizar os degraus.
+   que justifique. Entregue e verificado em https://affiliacore.com.br
+   (200 + conteúdo novo confirmado por curl e na tela via localhost):
+   - **Hero = réplica do /admin real**: sidebar com "Principal" + chip
+     "Admin · Sua Agência", header com badge "Visão geral" / preset
+     "Últimos 30 dias" / CTA "Convidar afiliado", 4 cards com os labels e
+     NÚMEROS do HeroDashboardMock do app (38 · R$ 24.831,90 · Total
+     depositado R$ 97.100,00 · REV R$ 6.591,90), gráfico "Top afiliados
+     por comissão" (Yago/Ana/Lucas/...), "Funil da rede" (1.204/312/187,
+     tendência em accent) e "Desempenho por casa" (Superbet/Betano/BetMGM
+     — mesmos valores do mock/seed da demo).
+   - **Seção nova "Por dentro do produto"**: 3 vinhetas fiéis — pódio do
+     /ranking (1º/2º/3º LUGAR), trilha da /auditoria (labels REAIS de
+     ação: "Alterou comissão (CPA/REV)" com antes→depois, "Importou
+     resultados", "Gerou convite"; copy do append-only) e portal do
+     afiliado ("Comissão total" + pill do contrato CPA+REV).
+   - **HeroDashboardMock do app** também ganhou o card por instância
+     (OTG on = Total CPA; OTG-free = Total depositado) — app, LP e futura
+     demo contam a MESMA história numérica.
+9. **PRÓXIMO:** typo-defense afiliacore.com.br + INPI/Instagram (link na
+   bio ainda pendente — operador); playbook no cliente 0; P5.2 jurídico;
+   formalizar degraus do P5.5; demo P5.3 quando houver lead quente.
