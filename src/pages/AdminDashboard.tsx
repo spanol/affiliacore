@@ -21,6 +21,7 @@ import AffiliatePerformanceChart from '../components/AffiliatePerformanceChart';
 import BrandFilter from '../components/BrandFilter';
 import BrandLogo from '../components/BrandLogo';
 import { getBrandName, uniqueBrands, ALL_BRANDS, getKnownBrandName, getBrandMeta, getKnownBrands } from '../lib/brand';
+import { OTG_ENABLED } from '../lib/instanceClient';
 import { withKnownBrandNames } from '../lib/knownHouses';
 import { StoredManualRow, aggregateByHouse, emptyMetrics, addMetrics } from '../lib/houseResults';
 import { fetchHouses, syncKnownBrandsFrom } from '../services/houseService';
@@ -303,7 +304,12 @@ export default function AdminDashboard() {
   const metrics = [
     { label: 'Total de Afiliados', value: affiliatesCount.toString(), icon: Users, color: 'brand' },
     { label: 'Total comissão', value: `R$ ${totals.commission.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: DollarSign, color: 'green' },
-    { label: 'Total CPA', value: `R$ ${totals.cpa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: BarChart3, color: 'blue' },
+    // 'Total CPA' (R$) é métrica que SÓ a OTG reporta — o import manual coleta a
+    // CONTAGEM de CPA, não o dinheiro (`cpa` manual = 0 no v1). Numa instância
+    // OTG-free o card seria um R$ 0,00 eterno; vira o total depositado (P5.3).
+    OTG_ENABLED
+      ? { label: 'Total CPA', value: `R$ ${totals.cpa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: BarChart3, color: 'blue' }
+      : { label: 'Total depositado', value: `R$ ${totals.deposit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: BarChart3, color: 'blue' },
     { label: 'Total REV', value: `R$ ${totals.rev.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: TrendingUp, color: 'purple' },
   ];
 
