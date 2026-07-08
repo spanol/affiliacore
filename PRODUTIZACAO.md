@@ -325,8 +325,24 @@ no `apphosting.<cliente>.yaml`, sem rebuild.
    REMOVER os 2 `A` do parking (13.248.243.5 / 76.223.105.230) e TROCAR o
    TXT p/ `hosting-site=affiliacore-br` (o antigo `hosting-site=affiliacore`
    sai); cert TLS provisiona em até ~24h. Link na bio do IG = app do celular
-   (web não edita o campo Site): usar https://affiliacore-br.web.app JÁ e
-   trocar pro .com.br quando o TLS subir. **Backend de leads = fase
-   seguinte** (CTA hoje é o direct) — hospedar no projeto `affiliacore`.
+   (web não edita o campo Site): apontar pro https://affiliacore.com.br.
+   ✅ **DOMÍNIO NO AR NO MESMO DIA** (DNS GoDaddy limpo pelo operador —
+   pegadinha: o parking era UM registro `A @ "Parked"`; cert emitido em
+   ~30min) + **www conectado como redirect 301 → apex** (CNAME www →
+   affiliacore-br.web.app). ✅ **BACKEND DE LEADS NO AR (mesmo dia):** form
+   "Receber contato" na seção final da LP grava DIRETO no **Firestore do
+   projeto `affiliacore`** (southamerica-east1, criado no console) via REST
+   sem SDK e sem API key; `firestore.affiliacore.rules` = **create-only com
+   whitelist** (nome/whatsapp obrigatórios, afiliados/origem opcionais;
+   read/update/delete negados — consulta de leads SÓ pelo console) +
+   honeypot no client. Config **separada por projeto**:
+   `firebase.affiliacore.json` (hosting + firestore do produto) — deploy:
+   `firebase deploy --config firebase.affiliacore.json --project www
+   --only hosting,firestore`; o `firebase.json` raiz voltou a ser só da
+   instância (NUNCA deployar o firestore.rules raiz no projeto
+   `affiliacore` — são bancos diferentes). E2E provado em prod (lead pelas
+   2 vias + negativos 403; teste limpo e confirmado no console). Leads
+   chegam SEM notificação (Spark) — consultar no console; e-mail/push =
+   futuro com Blaze.
 7. P5 restante: jurídico c/ Carlos (P5.2), demo (P5.3); P5.5 (precificação
    publicada) coberta em parte pela LP — falta formalizar os degraus.

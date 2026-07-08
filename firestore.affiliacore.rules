@@ -1,0 +1,33 @@
+rules_version = '2';
+
+// Projeto `affiliacore` (presença comercial do produto — landing + leads).
+// NÃO confundir com o firestore.rules do app (projeto da instância).
+//
+// `leads`: o form da landing grava via REST sem auth; ninguém lê/edita/apaga
+// pelo client (consulta é só pelo console / Admin SDK).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /leads/{leadId} {
+      allow read, update, delete: if false;
+      allow create: if
+        request.resource.data.keys().hasOnly(['nome', 'whatsapp', 'afiliados', 'origem'])
+        && request.resource.data.keys().hasAll(['nome', 'whatsapp'])
+        && request.resource.data.nome is string
+        && request.resource.data.nome.size() >= 2
+        && request.resource.data.nome.size() <= 80
+        && request.resource.data.whatsapp is string
+        && request.resource.data.whatsapp.size() >= 8
+        && request.resource.data.whatsapp.size() <= 25
+        && (!('afiliados' in request.resource.data)
+            || (request.resource.data.afiliados is string
+                && request.resource.data.afiliados.size() <= 20))
+        && (!('origem' in request.resource.data)
+            || (request.resource.data.origem is string
+                && request.resource.data.origem.size() <= 40));
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
