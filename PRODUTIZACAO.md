@@ -344,5 +344,15 @@ no `apphosting.<cliente>.yaml`, sem rebuild.
    2 vias + negativos 403; teste limpo e confirmado no console). Leads
    chegam SEM notificação (Spark) — consultar no console; e-mail/push =
    futuro com Blaze.
-7. P5 restante: jurídico c/ Carlos (P5.2), demo (P5.3); P5.5 (precificação
-   publicada) coberta em parte pela LP — falta formalizar os degraus.
+7. **PRÓXIMO (decidido 2026-07-07):** (a) **demo fim-de-funil (P5.3)** —
+   instância OTG-free marca "Demo" no projeto `affiliacore`, dados fictícios,
+   acesso controlado (SEM link na LP; Vinicius libera a leads quentes p/
+   fechamento; credenciais revogáveis + reset periódico); (b) **refinar as
+   demonstrações da LP p/ maior fidelidade com o produto** — o mock do hero
+   e novas vinhetas (ranking/pódio, auditoria, portal do afiliado) devem
+   espelhar as telas REAIS do app (referência: `HeroDashboardMock` do
+   `src/`, sidebar/da paleta reais); avaliar usar a demo semeada como fonte
+   de screenshots/estrutura. Sequência sugerida: demo primeiro → LP herda a
+   fidelidade.
+8. P5 restante: jurídico c/ Carlos (P5.2); P5.5 (precificação publicada)
+   coberta em parte pela LP — falta formalizar os degraus.
