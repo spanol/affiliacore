@@ -70,6 +70,7 @@ Express server that:
 ### Affiliate API response handling
 The external API has inconsistent response shapes, so `affiliateService.ts` is deliberately defensive:
 - `extractArray` probes many nested paths (`data.data`, `affiliates`, `results`, etc.) to find the payload array.
+- **`results` é PAGINADO (`pageSize=50` fixo; `pageSize`/`limit` maiores dão erro).** O shape é `{ data: { data: [...], meta: { totalPages } } }` — TODO consumidor tem que varrer `page=1..totalPages` (helper puro `src/lib/resultsPage.ts`; `fetchResultsGrouped` no client, `computeAndStoreRanking` e o partner-api no server já paginam). Ler só a 1ª página foi a causa da discrepância OTG×Boost de jun/2026 (72 afiliados no range → headline do /admin R$ 3.646,75 menor que o card por casa).
 - `extractApiError` / `isNoDataError` distinguish a real error from an empty "no data" result (e.g. code `040`) so the UI can show empty state instead of an error.
 - `fetchAffiliateById` falls back to scanning the full affiliate list when the by-id endpoint 404s or returns no data.
 

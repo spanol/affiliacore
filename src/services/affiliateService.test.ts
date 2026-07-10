@@ -13,6 +13,7 @@ import { authFetch } from '../lib/api';
 import { getDocs } from 'firebase/firestore';
 import {
   fetchAffiliates,
+  fetchAllResults,
   createBoostAffiliates,
   createEmailAlias,
   fetchEmailAliases,
@@ -75,6 +76,45 @@ describe('fetchAffiliates · une nativos Boost (Boost-first)', () => {
     vi.mocked(getDocs).mockRejectedValue(new Error('firestore down'));
     const list = await fetchAffiliates();
     expect(list.map((a: any) => a.id)).toEqual(['cl1']);
+  });
+});
+
+// Regressão da discrepância OTG×Boost (jun/2026): o results é PAGINADO (pageSize=50)
+// e o client lia SÓ a página 1 — com 72 afiliados no range, o headline do /admin
+// perdia 22 linhas (R$ 3.646,75 na Superbet) enquanto o card por casa (groupBy=brand,
+// 2 linhas) batia com a OTG. O fetch agora concatena todas as páginas (meta.totalPages).
+describe('fetchAllResults · pagina o results da OTG (pageSize=50)', () => {
+  const pageBody = (rows: any[], totalPages: number, currentPage: number) => ({
+    ok: true,
+    json: async () => ({ data: { data: rows, meta: { currentPage, totalPages, totalRows: 72, pageSize: 50 } } }),
+  });
+
+  it('concatena TODAS as páginas via meta.totalPages (antes truncava na p.1)', async () => {
+    vi.mocked(authFetch).mockReset();
+    vi.mocked(authFetch).mockImplementation(async (url: any) => {
+      const page = new URL(String(url), 'http://x').searchParams.get('page');
+      return (page === '2' ? pageBody([{ id: 'c' }], 2, 2) : pageBody([{ id: 'a' }, { id: 'b' }], 2, 1)) as any;
+    });
+    const rows = await fetchAllResults({ startDate: '2026-06-01', endDate: '2026-06-30' });
+    expect(rows.map((r: any) => r.id)).toEqual(['a', 'b', 'c']);
+    const urls = vi.mocked(authFetch).mock.calls.map(([u]) => String(u));
+    expect(urls).toHaveLength(2);
+    expect(urls[0]).toContain('page=1');
+    expect(urls[1]).toContain('page=2');
+  });
+
+  it('totalPages=1 → uma chamada só (sem loop extra)', async () => {
+    vi.mocked(authFetch).mockReset();
+    vi.mocked(authFetch).mockResolvedValue(pageBody([{ id: 'a' }], 1, 1) as any);
+    const rows = await fetchAllResults();
+    expect(rows.map((r: any) => r.id)).toEqual(['a']);
+    expect(vi.mocked(authFetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it('code 040 (sem dados) → lista vazia, sem erro', async () => {
+    vi.mocked(authFetch).mockReset();
+    vi.mocked(authFetch).mockResolvedValue({ ok: true, json: async () => ({ code: '040', message: 'No data found' }) } as any);
+    await expect(fetchAllResults()).resolves.toEqual([]);
   });
 });
 

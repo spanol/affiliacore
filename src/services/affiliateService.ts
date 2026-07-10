@@ -14,6 +14,7 @@ import { OTG_ENABLED } from '../lib/instanceClient';
 import { withKnownHouses } from '../lib/knownHouses';
 import { findAffiliateInList } from '../lib/affiliateLookup';
 import { getDefaultRange } from '../lib/dateRange';
+import { parseResultsPage, MAX_RESULT_PAGES } from '../lib/resultsPage';
 import { getKnownBrands } from '../lib/brand';
 import { eurToBrl, fetchEurBrlRate, getCachedEurBrlRate } from '../lib/currency';
 import { fetchHouseResults } from './houseService';
@@ -503,28 +504,41 @@ interface ResultsQuery {
 
 async function fetchResultsGrouped(groupBy: 'affiliate' | 'brand' | 'date' | 'campaign', opts: ResultsQuery = {}): Promise<any[]> {
   const defaults = getDefaultRange();
-  const params = new URLSearchParams({
-    startDate: opts.startDate || defaults.startDate,
-    endDate: opts.endDate || defaults.endDate,
-    groupBy
-  });
-  if (opts.affiliateIds) params.set('affiliateIds', opts.affiliateIds);
+  // A OTG PAGINA o results (pageSize=50): lemos todas as páginas via meta.totalPages,
+  // igual ao servidor (computeAndStoreRanking). Sem o loop, consulta com >50 linhas
+  // voltava truncada na página 1 e o headline do /admin divergia do card por casa
+  // (jun/2026: 72 afiliados → R$ 3.646,75 a menos na Superbet). [[resultsPage]]
+  const all: any[] = [];
+  let page = 1;
+  let totalPages = 1;
+  do {
+    const params = new URLSearchParams({
+      startDate: opts.startDate || defaults.startDate,
+      endDate: opts.endDate || defaults.endDate,
+      groupBy,
+      page: String(page)
+    });
+    if (opts.affiliateIds) params.set('affiliateIds', opts.affiliateIds);
 
-  const response = await fetchAffiliateApi('results', params);
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || errorData.message || `Erro na API: ${response.status}`);
-  }
+    const response = await fetchAffiliateApi('results', params);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || errorData.message || `Erro na API: ${response.status}`);
+    }
 
-  const data = await response.json();
-  const apiError = extractApiError(data);
-  if (apiError) {
-    if (apiError.noData) return [];
-    throw new Error(apiError.message);
-  }
+    const data = await response.json();
+    const apiError = extractApiError(data);
+    if (apiError) {
+      if (apiError.noData) break; // "040" — sem (mais) dados; mantém o que já veio
+      throw new Error(apiError.message);
+    }
 
-  if (data.data && Array.isArray(data.data.data)) return data.data.data;
-  return Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
+    const parsed = parseResultsPage(data);
+    all.push(...parsed.rows);
+    totalPages = parsed.totalPages;
+    page++;
+  } while (page <= totalPages && page <= MAX_RESULT_PAGES);
+  return all;
 }
 
 export interface DateRangeOpts {
