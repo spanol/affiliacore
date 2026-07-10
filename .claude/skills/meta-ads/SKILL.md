@@ -36,20 +36,28 @@ fatos e o estado DA CONTA AffiliaCore. Dentro do repo, esta vence.
   campanha 1 sobram **~R$84**. Impostos ISS+PIS/COFINS ≈ **13,8% POR CIMA** do
   orçamento — calcule o teto pelo "Total amount" do Payment summary.
 
-## BLOQUEIO ATIVO: vínculo Página↔IG (matou a campanha 1)
+## Vínculo Página↔IG (matou a campanha 1) — RESOLVIDO 2026-07-10
 
 **A campanha 1 FALHOU NA CRIAÇÃO** (Ad Center: "Unable to create", 10/jul) com
-motivo "Page Is Not Linked To A Professional Instagram Account". Lição: o
-vínculo Página "Affilia Core" ↔ @affiliacore.br profissional é PRÉ-REQUISITO
-do anúncio em si — **trocar o destino p/ Messenger NÃO contorna** (o publish
-até passa e fica In review, mas a criação falha na data de início). Nada foi
-cobrado (reprovação/falha não cobra). Contexto: o destino IG já era rejeitado
-no composer ("Account type is not valid — not a professional account"); a
-conversão do IG p/ profissional foi 2026-07-07 e o modal de vincular
-(Settings → Instagram accounts → Connected assets) travava em spinner.
-**Antes de QUALQUER campanha nova: consertar o vínculo** (retestar o modal;
-se seguir em spinner, tentar pelo app/Central de Contas) e só então publicar.
-Automatic destination NÃO contorna (inclui o chip IG e reprova igual).
+motivo "Page Is Not Linked To A Professional Instagram Account". Lições:
+- O vínculo Página↔IG profissional é PRÉ-REQUISITO do anúncio em si —
+  **destino Messenger NÃO contorna** (publish passa, fica In review, e a
+  criação falha em silêncio na data de início; nenhum e-mail avisa). Depois de
+  publicar, SEMPRE conferir o Ad Center na data de início.
+- Causa raiz: o portfólio NÃO TINHA Página nenhuma ("No Pages added") — a
+  "Affilia Core" do composer era página-sombra, não um ativo gerenciável.
+- **FIX executado:** Página **"AffiliaCore"** criada (categoria Software
+  Company, bio pt-BR, Page ID `1187806394420139`) via **Settings → Pages →
+  Add → "Create a new Facebook Page"** — o wizard RODA DENTRO do MBS (funciona
+  com a sessão SSO do IG). ⚠️ NÃO usar o link "Create a new Facebook Page" de
+  dentro do diálogo Connect assets: abre facebook.com/pages/creation
+  DESLOGADO (a conta não tem login de Facebook). Aceite dos Meta Commercial
+  Terms = Vinicius clicou. Depois: ativo IG → Connect assets → Facebook Page
+  → Next → selecionar AffiliaCore → conectado ("Instagram connected to Page",
+  verificado nos dois lados).
+- Destino IG direct: retestar na próxima campanha (agora com Página real o
+  erro "Account type is not valid" deve sumir; se não, Messenger cai no
+  Inbox do MBS igual).
 
 ## Campanha 1 (referência de config; falhou na criação — ver bloqueio acima)
 
