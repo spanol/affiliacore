@@ -36,24 +36,32 @@ fatos e o estado DA CONTA AffiliaCore. Dentro do repo, esta vence.
   campanha 1 sobram **~R$84**. Impostos ISS+PIS/COFINS ≈ **13,8% POR CIMA** do
   orçamento — calcule o teto pelo "Total amount" do Payment summary.
 
-## Pendência conhecida: destino "direct do Instagram"
+## BLOQUEIO ATIVO: vínculo Página↔IG (matou a campanha 1)
 
-O destino IG foi REJEITADO ("Account type is not valid — not a professional
-account"): a Página sombra "Affilia Core" não reconhece o @affiliacore.br como
-profissional (conversão de 2026-07-07 sem propagar) e o modal de vincular
-Página↔IG trava em spinner (Settings → Instagram accounts → Connected assets).
-A campanha 1 saiu com destino **Messenger** (leads caem no **Inbox do MBS**).
-**Em toda campanha nova: retestar o destino Instagram primeiro**; se validar,
-usar; se não, Messenger de novo. Automatic destination NÃO contorna (inclui o
-chip IG e reprova igual).
+**A campanha 1 FALHOU NA CRIAÇÃO** (Ad Center: "Unable to create", 10/jul) com
+motivo "Page Is Not Linked To A Professional Instagram Account". Lição: o
+vínculo Página "Affilia Core" ↔ @affiliacore.br profissional é PRÉ-REQUISITO
+do anúncio em si — **trocar o destino p/ Messenger NÃO contorna** (o publish
+até passa e fica In review, mas a criação falha na data de início). Nada foi
+cobrado (reprovação/falha não cobra). Contexto: o destino IG já era rejeitado
+no composer ("Account type is not valid — not a professional account"); a
+conversão do IG p/ profissional foi 2026-07-07 e o modal de vincular
+(Settings → Instagram accounts → Connected assets) travava em spinner.
+**Antes de QUALQUER campanha nova: consertar o vínculo** (retestar o modal;
+se seguir em spinner, tentar pelo app/Central de Contas) e só então publicar.
+Automatic destination NÃO contorna (inclui o chip IG e reprova igual).
 
-## Campanha 1 (referência)
+## Campanha 1 (referência de config; falhou na criação — ver bloqueio acima)
 
 Post-1 lançamento · objetivo Get more messages · público manual **BR · 25–44 ·
 interesses "Affiliate marketing" OU "Sports betting"** · R$10/dia × 4 dias
 (10–14/jul) = **R$45,53 total** · saudação do chat em pt-BR + 3 perguntas de IA
-(custo/personalização/suporte) · status In review. Próximos criativos: posts
-2–4 em `marketing/affiliacore/` (legendas em `CAMPANHA-LANCAMENTO.md`).
+(custo/personalização/suporte) · publicada 08/jul (In review) → "Unable to
+create" em 10/jul (data de início = liquidação do PIX, que levou 2 dias).
+Saldo pré-pago intacto: **R$129,99**. Há 3 rascunhos "Get more messages" no
+Ad Center (10/jul) reaproveitáveis p/ relançar com datas novas. Próximos
+criativos: posts 2–4 em `marketing/affiliacore/` (legendas em
+`CAMPANHA-LANCAMENTO.md`).
 
 ## Fluxo que funciona (resumo)
 
