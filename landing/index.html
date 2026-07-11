@@ -210,6 +210,33 @@ header{
 .wl-chip div b{display:block;font-family:var(--display);font-weight:800;font-size:.98rem}
 .wl-chip div span{font-size:.8rem;color:var(--faint)}
 
+/* ——— prova social ——— */
+.proof{padding:60px 0}
+.proof .kicker{margin-bottom:18px}
+.proof-card{
+  display:flex;align-items:center;gap:24px;flex-wrap:wrap;
+  background:rgba(63,29,43,.35);border:1px solid var(--line);border-radius:var(--radius);
+  padding:26px 28px;
+}
+.proof-mark{
+  display:inline-flex;align-items:center;gap:10px;flex:none;
+  font-family:var(--display);font-weight:800;font-size:1.05rem;letter-spacing:.1em;
+  background:#1C1014;border:1px solid var(--line);border-radius:12px;padding:14px 20px;
+}
+.proof-mark i{width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,#F59E0B,#B45309)}
+.proof-card > div{flex:1;min-width:240px}
+.proof-card > div b{display:block;font-family:var(--display);font-weight:800;font-size:1.02rem;margin-bottom:3px}
+.proof-card > div p{color:var(--muted);font-size:.92rem}
+.proof-side{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.proof-badge{
+  display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);
+  background:rgba(255,255,255,.04);border-radius:999px;padding:6px 13px;
+  font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+}
+.proof-badge i{width:6px;height:6px;border-radius:50%;background:#4ADE80}
+.proof-link{font-size:.9rem;color:var(--muted);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.18);transition:color .15s}
+.proof-link:hover{color:var(--text)}
+
 /* ——— pricing ——— */
 .price-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:760px}
 .price-card{background:rgba(63,29,43,.35);border:1px solid var(--line);border-radius:var(--radius);padding:30px}
@@ -483,6 +510,23 @@ footer a:hover{color:var(--text)}
       <div class="wl-chip"><i style="background:linear-gradient(135deg,#E11D48,#9F1239)"></i><div><b>Sua Agência</b><span>painel.suaagencia.com.br</span></div></div>
       <div class="wl-chip"><i style="background:linear-gradient(135deg,#F59E0B,#B45309)"></i><div><b>Agência Norte</b><span>afiliados.agencianorte.bet</span></div></div>
       <div class="wl-chip"><i style="background:linear-gradient(135deg,#0EA5E9,#0369A1)"></i><div><b>Padrino Partners</b><span>app.padrino.com.br</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="clientes" class="proof">
+  <div class="wrap">
+    <span class="kicker">Quem já roda com AffiliaCore</span>
+    <div class="proof-card">
+      <span class="proof-mark" aria-hidden="true"><i></i>BOOST</span>
+      <div>
+        <b>Agência Boost</b>
+        <p>Agência de afiliados de apostas que opera a plataforma white-label em produção — comissão por casa, portal do afiliado e trilha de auditoria no dia a dia real da operação.</p>
+      </div>
+      <div class="proof-side">
+        <span class="proof-badge"><i></i>Em produção</span>
+        <a class="proof-link" href="https://agencyboost.com.br" target="_blank" rel="noopener">agencyboost.com.br</a>
+      </div>
     </div>
   </div>
 </section>
