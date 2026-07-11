@@ -66,10 +66,25 @@ interesses "Affiliate marketing" OU "Sports betting"** · R$10/dia × 4 dias
 (10–14/jul) = **R$45,53 total** · saudação do chat em pt-BR + 3 perguntas de IA
 (custo/personalização/suporte) · publicada 08/jul (In review) → "Unable to
 create" em 10/jul (data de início = liquidação do PIX, que levou 2 dias).
-Saldo pré-pago intacto: **R$129,99**. Há 3 rascunhos "Get more messages" no
-Ad Center (10/jul) reaproveitáveis p/ relançar com datas novas. Próximos
-criativos: posts 2–4 em `marketing/affiliacore/` (legendas em
-`CAMPANHA-LANCAMENTO.md`).
+Saldo pré-pago intacto: **R$129,99**. Próximos criativos: posts 2–4 em
+`marketing/affiliacore/` (legendas em `CAMPANHA-LANCAMENTO.md`).
+
+## Campanha 2 (relançamento, 11/jul — In review)
+
+Publicada 11/jul ~13h (publish do Vinicius) após o fix do vínculo: mesma
+config da 1 (Get more messages · BR 25–44 · Affiliate marketing OU Sports
+betting · R$10/dia × 4 = R$45,53 · saudação pt-BR + perguntas IA), início
+11/jul → fim 15/jul. Diferenças: **destino Automatic com Messenger E
+Instagram validados** (Página real destravou o IG direct) e **criativo
+TEXTO-PURO** (bio + headline) — o post-1 do IG não indexava no "Use a post"
+nem ~14h pós-vínculo; o composer do Ad Center não tem upload de mídia; o
+Boost pela aba Content pede "Connect a Meta ad account" (login FB) = beco.
+GOTCHAS: sessão MBS pode cair p/ o FB pessoal → re-login "Continuar com o
+Instagram"; "Confirm Instagram message access" (Inbox) é pré-requisito do
+IG no contexto da Página; rascunho com start no passado = composer
+auto-corrige ao reabrir; drafts do contexto IG antigo ficam INACESSÍVEIS
+pós-vínculo. Lição da campanha 1 vale: In review NÃO garante criação —
+conferir o Ad Center na data de início.
 
 ## Fluxo que funciona (resumo)
 
