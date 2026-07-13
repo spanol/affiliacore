@@ -203,6 +203,80 @@ describe('requireAdmin (R13)', () => {
 });
 
 // =============================================================================
+// Premiações do ranking (ranking_prizes) — CRUD admin com saneamento puro
+// =============================================================================
+describe('premiações do ranking (/api/prizes)', () => {
+  const seed = {
+    users: { 'admin-uid': { role: 'admin' }, 'client-uid': { role: 'client' } },
+  };
+
+  it('sem token → 401; client → 403 (requireAdmin fail-closed)', async () => {
+    await request(buildApp({ seed })).post('/api/prizes').send({ position: 1, title: 'X' }).expect(401);
+    await request(buildApp({ seed }))
+      .post('/api/prizes')
+      .set('Authorization', 'Bearer client-uid')
+      .send({ position: 1, title: 'X' })
+      .expect(403);
+  });
+
+  it('POST válido → 201, grava saneado (trim, active default true)', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app)
+      .post('/api/prizes')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ position: '1', title: ' iPhone 16 Pro ', description: ' Top 1 de julho ' })
+      .expect(201);
+    expect(res.body).toMatchObject({ position: 1, title: 'iPhone 16 Pro', active: true });
+    const rows = [...(db.__store.get('ranking_prizes')?.values() ?? [])];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ position: 1, title: 'iPhone 16 Pro', description: 'Top 1 de julho', active: true });
+  });
+
+  it('POST com posição inválida ou sem título → 400 e NÃO grava', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/prizes')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ position: 0, title: 'X' })
+      .expect(400);
+    await request(app)
+      .post('/api/prizes')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ position: 1, title: '   ' })
+      .expect(400);
+    expect(db.__store.get('ranking_prizes')?.size ?? 0).toBe(0);
+  });
+
+  it('PATCH parcial (active:false) faz merge; body vazio → 400', async () => {
+    const db = makeFirestore({ ...seed, ranking_prizes: { P1: { position: 1, title: 'iPhone', active: true } } });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .patch('/api/prizes/P1')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ active: false })
+      .expect(200);
+    expect(db.__store.get('ranking_prizes')?.get('P1')).toMatchObject({ position: 1, title: 'iPhone', active: false });
+    await request(app)
+      .patch('/api/prizes/P1')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({})
+      .expect(400);
+  });
+
+  it('DELETE remove o prêmio', async () => {
+    const db = makeFirestore({ ...seed, ranking_prizes: { P1: { position: 1, title: 'iPhone' } } });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .delete('/api/prizes/P1')
+      .set('Authorization', 'Bearer admin-uid')
+      .expect(200);
+    expect(db.__store.get('ranking_prizes')?.has('P1')).toBe(false);
+  });
+});
+
+// =============================================================================
 // Auditoria (Fase 1) — o status do afiliado vira log SERVER-AUTHORITATIVE
 // =============================================================================
 describe('auditoria — status do afiliado grava audit_logs server-side', () => {

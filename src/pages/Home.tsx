@@ -21,6 +21,7 @@ import { createContactInquiry, type ContactInquiryInput } from '../services/cont
 import { useToast } from '../contexts/ToastContext';
 import { BRAND } from '../lib/brandingClient';
 import HeroDashboardMock from '../components/HeroDashboardMock';
+import HomePrizesSection from '../components/HomePrizesSection';
 
 const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`;
 
@@ -232,6 +233,9 @@ export default function Home() {
             />
           </div>
         </section>
+
+        {/* Premiações do ranking (chamariz) — só aparece com prêmio ativo cadastrado. */}
+        <HomePrizesSection />
 
         {/* Why migrate */}
         <section id="sobre" className="max-w-7xl mx-auto px-6 py-24 md:py-32">

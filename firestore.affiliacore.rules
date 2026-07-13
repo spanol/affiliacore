@@ -221,6 +221,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Premiações do ranking (chamariz de captação). Conteúdo de MARKETING da
+    // instância — leitura PÚBLICA de propósito: a Home DESLOGADA exibe os
+    // prêmios p/ atrair afiliados (nada sensível: posição/título/descrição).
+    // Escrita via servidor (requireAdmin, /api/prizes) — admin direto também
+    // é permitido, espelhando notices.
+    match /ranking_prizes/{prizeId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // Controle de versão da aplicação. O servidor (Admin SDK) publica app_meta/version
     // no boot de cada deploy; qualquer afiliado autenticado lê em tempo real p/ saber
     // se o bundle está desatualizado (banner de atualização + refresh). NÃO é dado

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Trophy, Crown, Loader2, RefreshCw, Medal } from 'lucide-react';
+import { Trophy, Crown, Loader2, RefreshCw, Medal, Gift } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { cn, humanizeName } from '../lib/utils';
 import { formatRangeLabel, resolveRankingDate } from '../lib/dateRange';
+import { activePrizes, positionLabel, prizeForPosition } from '../lib/prizes';
 import {
   DailyRanking,
   RankingEntry,
@@ -13,6 +14,8 @@ import {
   computeDailyRanking,
   yesterdayISO,
 } from '../services/rankingService';
+import { Prize, subscribeToPrizes } from '../services/prizeService';
+import PrizeManagerModal from '../components/PrizeManagerModal';
 
 const formatBRL = (v: number) =>
   `R$ ${(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -38,6 +41,11 @@ export default function Ranking() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [computing, setComputing] = useState(false);
+  // Premiações por posição (chamariz): pills no pódio/lista + gestão do admin.
+  const [prizes, setPrizes] = useState<Prize[]>([]);
+  const [showPrizeManager, setShowPrizeManager] = useState(false);
+
+  useEffect(() => subscribeToPrizes(setPrizes, () => setPrizes([])), []);
 
   useEffect(() => {
     setLoading(true);
@@ -101,14 +109,23 @@ export default function Ranking() {
           </p>
         </div>
         {isAdmin && (
-          <button
-            onClick={handleCompute}
-            disabled={computing}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-neutral-900 rounded-full text-xs font-bold hover:opacity-90 transition-all shadow-sm self-start shrink-0 disabled:opacity-50"
-          >
-            {computing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            {ranking ? 'Atualizar ranking' : 'Gerar ranking do dia'}
-          </button>
+          <div className="flex items-center gap-2 self-start shrink-0">
+            <button
+              onClick={() => setShowPrizeManager(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-slate-700 dark:text-neutral-200 rounded-full text-xs font-bold hover:border-slate-300 dark:hover:border-neutral-600 transition-all shadow-sm"
+            >
+              <Gift size={14} />
+              Premiações
+            </button>
+            <button
+              onClick={handleCompute}
+              disabled={computing}
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-neutral-900 rounded-full text-xs font-bold hover:opacity-90 transition-all shadow-sm disabled:opacity-50"
+            >
+              {computing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              {ranking ? 'Atualizar ranking' : 'Gerar ranking do dia'}
+            </button>
+          </div>
         )}
       </header>
 
@@ -148,6 +165,23 @@ export default function Ranking() {
                 ? 'Clique em "Gerar ranking do dia" para calcular a partir dos resultados.'
                 : 'Aguarde o ciclo de atualização — a plataforma calcula a partir dos resultados do dia.'}
           </p>
+          {/* Prêmios em jogo: mesmo sem ranking calculado, o chamariz aparece. */}
+          {activePrizes(prizes).length > 0 && (
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+              <span className="w-full text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500 mb-1">
+                Prêmios em jogo
+              </span>
+              {activePrizes(prizes).map((p) => (
+                <span
+                  key={p.id}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-600 dark:text-accent-400 text-[11px] font-bold"
+                >
+                  <Gift size={12} />
+                  {positionLabel(p.position)} · {p.title}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
         <>
@@ -156,6 +190,7 @@ export default function Ranking() {
             {podium.map((entry, i) => {
               const style = PODIUM[i];
               const Icon = style.icon;
+              const prize = prizeForPosition(prizes, entry.pos);
               const isMe = profile?.affiliateId && entry.affiliateId === String(profile.affiliateId);
               return (
                 <motion.div
@@ -175,6 +210,12 @@ export default function Ranking() {
                   <span className={cn('text-[11px] font-black uppercase tracking-widest mb-1', style.text)}>{entry.pos}º lugar</span>
                   <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight">{humanizeName(entry.name)}</p>
                   <p className="text-lg font-black text-slate-900 dark:text-white mt-2">{formatBRL(entry.commission)}</p>
+                  {prize && (
+                    <span className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-600 dark:text-accent-400 text-[11px] font-bold">
+                      <Gift size={12} />
+                      {prize.title}
+                    </span>
+                  )}
                 </motion.div>
               );
             })}
@@ -185,6 +226,7 @@ export default function Ranking() {
             <div className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-neutral-800">
               {rest.map((entry: RankingEntry) => {
                 const isMe = profile?.affiliateId && entry.affiliateId === String(profile.affiliateId);
+                const prize = prizeForPosition(prizes, entry.pos);
                 return (
                   <div
                     key={entry.affiliateId}
@@ -198,6 +240,12 @@ export default function Ranking() {
                       {humanizeName(entry.name)}
                       {isMe && <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-accent-600 dark:text-accent-400">você</span>}
                     </span>
+                    {prize && (
+                      <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-600 dark:text-accent-400 text-[10px] font-bold shrink-0">
+                        <Gift size={11} />
+                        {prize.title}
+                      </span>
+                    )}
                     <span className="text-sm font-bold text-slate-900 dark:text-white">{formatBRL(entry.commission)}</span>
                   </div>
                 );
@@ -205,6 +253,10 @@ export default function Ranking() {
             </div>
           )}
         </>
+      )}
+
+      {showPrizeManager && (
+        <PrizeManagerModal prizes={prizes} onClose={() => setShowPrizeManager(false)} />
       )}
     </div>
   );

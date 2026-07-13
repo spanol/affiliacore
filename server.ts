@@ -24,6 +24,7 @@ import { pullApprovedRoster, isOtgLinksConfigured } from './otgLinksPull';
 import { pullAnalytics, isOtgAnalyticsConfigured } from './otgAnalyticsPull';
 import { analyticsDocId, funnelKey, sanitizeFunnel, hasFunnelActivity } from './src/lib/analyticsDoc';
 import { buildVersionPayload, type AppVersion } from './src/lib/version';
+import { sanitizePrize, sanitizePrizePatch } from './src/lib/prizes';
 import { buildResultsNotification, type ResultsNotificationVariant } from './src/lib/resultsNotification';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1054,6 +1055,55 @@ export function createApp(deps: ServerDeps) {
     } catch (error: any) {
       console.error('Error deleting notice:', error);
       return res.status(500).json({ error: error.message || 'Erro interno removendo aviso.' });
+    }
+  });
+
+  // --- Premiações do ranking (ranking_prizes) --------------------------------
+  // Chamariz de captação: o admin cadastra prêmios por posição do ranking; a
+  // Home pública exibe (regra de leitura pública) e o /ranking mostra no pódio.
+  // Escrita só pelo servidor (requireAdmin), saneamento puro em src/lib/prizes.
+  app.post('/api/prizes', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const parsed = sanitizePrize(req.body);
+      if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+      const payload = {
+        ...parsed.value,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      const docRef = await adminDb.collection('ranking_prizes').add(payload);
+      return res.status(201).json({ id: docRef.id, ...parsed.value });
+    } catch (error: any) {
+      console.error('Error creating prize:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno criando premiação.' });
+    }
+  });
+
+  app.patch('/api/prizes/:id', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const parsed = sanitizePrizePatch(req.body);
+      if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+      await adminDb.collection('ranking_prizes').doc(String(req.params.id)).set(
+        { ...parsed.patch, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true },
+      );
+      return res.json({ id: String(req.params.id), updated: true });
+    } catch (error: any) {
+      console.error('Error updating prize:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno atualizando premiação.' });
+    }
+  });
+
+  app.delete('/api/prizes/:id', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      await adminDb.collection('ranking_prizes').doc(String(req.params.id)).delete();
+      return res.json({ deleted: true });
+    } catch (error: any) {
+      console.error('Error deleting prize:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno removendo premiação.' });
     }
   });
 

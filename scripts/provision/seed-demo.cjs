@@ -158,7 +158,7 @@ const SUB_INDICES = [6, 7, 8];
 const WIPE_COLLECTIONS = [
   'users', 'affiliates', 'affiliate_statuses', 'affiliate_email_aliases', 'affiliate_configs',
   'special_affiliates', 'houses', 'house_results', 'audit_logs', 'user_notifications',
-  'notices', 'direct_messages', 'daily_rankings', 'invites', 'contacts',
+  'notices', 'direct_messages', 'daily_rankings', 'ranking_prizes', 'invites', 'contacts',
   'affiliate_links', 'link_clicks', 'link_click_stats', 'affiliate_analytics',
   'payment_profiles', 'api_partners', 'pending_affiliates', 'app_meta', 'settings',
 ];
@@ -547,6 +547,22 @@ async function seed() {
     createdAt: daysAgo(1),
     updatedAt: daysAgo(1),
   }));
+  // 6.5) Premiações do ranking (chamariz): pills no pódio do /ranking + seção
+  // pública na Home — mesma história numérica do resto da demo.
+  const PRIZES = [
+    { id: 'demo-premio-1', position: 1, title: 'R$ 5.000', description: 'Melhor comissão do mês' },
+    { id: 'demo-premio-2', position: 2, title: 'R$ 2.000', description: 'Vice-campeão do mês' },
+    { id: 'demo-premio-3', position: 3, title: 'R$ 1.000', description: 'Terceiro lugar do mês' },
+  ];
+  PRIZES.forEach((p) => writes.push((b) => b.set(db.collection('ranking_prizes').doc(p.id), {
+    position: p.position,
+    title: p.title,
+    description: p.description,
+    active: true,
+    createdAt: daysAgo(10),
+    updatedAt: daysAgo(10),
+  })));
+
   writes.push((b) => b.set(db.collection('user_notifications').doc('demo-notif-1'), {
     recipientUid: LOGINS.afiliado.uid,
     affiliateId: affId(LOGINS.afiliado.name),

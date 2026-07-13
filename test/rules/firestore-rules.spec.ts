@@ -322,6 +322,36 @@ describe('coleções legíveis por signed-in (escrita só admin)', () => {
 });
 
 // =============================================================================
+// ranking_prizes — chamariz de captação: leitura PÚBLICA, escrita só admin
+// =============================================================================
+describe('ranking_prizes (leitura pública; escrita só admin)', () => {
+  beforeEach(async () => {
+    await seedDoc('ranking_prizes', 'P1', { position: 1, title: 'iPhone 16 Pro', active: true });
+  });
+
+  it('ANÔNIMO lê (Home deslogada exibe os prêmios) → OK', async () => {
+    await assertSucceeds(getDoc(doc(asAnon(), 'ranking_prizes', 'P1')));
+    await assertSucceeds(getDocs(collection(asAnon(), 'ranking_prizes')));
+  });
+
+  it('client logado lê → OK', async () => {
+    await assertSucceeds(getDoc(doc(asClient(), 'ranking_prizes', 'P1')));
+  });
+
+  it('anônimo e client NÃO escrevem → NEGADO', async () => {
+    await assertFails(setDoc(doc(asAnon(), 'ranking_prizes', 'P2'), { position: 2, title: 'X' }));
+    await assertFails(setDoc(doc(asClient(), 'ranking_prizes', 'P2'), { position: 2, title: 'X' }));
+    await assertFails(updateDoc(doc(asClient(), 'ranking_prizes', 'P1'), { title: 'hack' }));
+    await assertFails(deleteDoc(doc(asClient(), 'ranking_prizes', 'P1')));
+  });
+
+  it('admin escreve direto (espelha notices) → OK', async () => {
+    await seedAdmin();
+    await assertSucceeds(setDoc(doc(asAdmin(), 'ranking_prizes', 'P3'), { position: 3, title: 'R$ 500', active: true }));
+  });
+});
+
+// =============================================================================
 // direct_messages — leitura escopada ao destinatário (recipientUid == uid)
 // =============================================================================
 describe('direct_messages/{id} (escopo por destinatário)', () => {
