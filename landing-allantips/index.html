@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>A Maior Comunidade de Apostas Grátis do Brasil</title>
-<meta name="description" content="Entre na maior comunidade de apostas grátis do Brasil: entradas filtradas, análises dos jogos e comunidade ativa. 100% gratuito — sem cadastro, sem depósito.">
+<title>Allan Tips — A Maior Comunidade de Apostas Grátis do Brasil</title>
+<meta name="description" content="Entre na Allan Tips, a maior comunidade de apostas grátis do Brasil: entradas filtradas, análises dos jogos e comunidade ativa. 100% gratuito — sem cadastro, sem depósito.">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preload" as="font" type="font/woff2" href="/fonts/outfit-var.woff2" crossorigin>
-<meta property="og:title" content="A Maior Comunidade de Apostas Grátis do Brasil">
+<meta property="og:site_name" content="Allan Tips">
+<meta property="og:title" content="Allan Tips — A Maior Comunidade de Apostas Grátis do Brasil">
 <meta property="og:description" content="Entradas filtradas, análises dos jogos e comunidade ativa. 100% gratuito — sem cadastro, sem depósito.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://allantips.agencyboost.com.br/">
@@ -251,7 +252,7 @@
   .car-track {
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: min(320px, 78vw);
+    grid-auto-columns: min(360px, 80vw);
     gap: 24px;
     justify-content: safe center;
     overflow-x: auto;
@@ -300,6 +301,13 @@
     color: var(--ink-3);
     font-size: .72rem;
   }
+  .print-card.real {
+    border-style: solid;
+    border-color: rgba(0, 240, 255, .28);
+    min-height: 0;
+    gap: 14px;
+  }
+  .print-card.real img { width: 100%; border-radius: 12px; }
   .car-btn {
     position: absolute;
     top: 50%; transform: translateY(-50%);
@@ -466,6 +474,7 @@
   .foot-links a { text-decoration: none; }
   .foot-links a:hover { text-decoration: underline; }
   .foot-links .sep { color: var(--ink-3); }
+  .foot-copy { margin-top: 18px; text-align: center; font-size: .72rem; color: var(--ink-3); }
 
   /* ---------- reveal ---------- */
   .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
@@ -620,36 +629,29 @@
         <svg class="ic" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
       </button>
 
-      <!-- Placeholders do design: trocar cada .print-card por <img> com o print real quando o cliente enviar -->
       <div class="car-track">
-        <article class="print-card">
-          <span class="chip">Instagram Story</span>
+        <article class="print-card real">
+          <span class="chip">Bilhete Premiado</span>
           <div class="ph-body">
-            <svg class="ic" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-            <p class="ph-title">Print de story aqui</p>
-            <p class="ph-hint">Sugestão: print de resultado alto (ex: Odd 41!)</p>
+            <img src="/img/bilhete-1.png" loading="lazy" alt="Bilhete premiado: Brasil x Japão, odd 1.78, aposta R$ 15.000 e prêmio de R$ 26.700">
           </div>
-          <p class="ph-tag">Resultado Compartilhado</p>
+          <p class="ph-tag">Brasil × Japão · Odd 1.78 · Prêmio R$ 26.700</p>
         </article>
 
-        <article class="print-card">
-          <span class="chip">Instagram Direct</span>
+        <article class="print-card real">
+          <span class="chip">Bilhete Premiado</span>
           <div class="ph-body">
-            <svg class="ic" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-            <p class="ph-title">Print de mensagem aqui</p>
-            <p class="ph-hint">Sugestão: print do direct elogiando as tips</p>
+            <img src="/img/bilhete-2.png" loading="lazy" alt="Bilhete premiado: Alemanha x Paraguai, odd 2.86, aposta R$ 18.000 e prêmio de R$ 51.480">
           </div>
-          <p class="ph-tag">Mensagem de Aluno</p>
+          <p class="ph-tag">Alemanha × Paraguai · Odd 2.86 · Prêmio R$ 51.480</p>
         </article>
 
-        <article class="print-card">
-          <span class="chip">Telegram / WhatsApp</span>
+        <article class="print-card real">
+          <span class="chip">Bilhete Premiado</span>
           <div class="ph-body">
-            <svg class="ic" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-            <p class="ph-title">Print de bilhete aqui</p>
-            <p class="ph-hint">Sugestão: print de bilhete verde ganho (ex: Odd 35)</p>
+            <img src="/img/bilhete-3.png" loading="lazy" alt="Bilhete premiado: dupla do Brasil x Japão, odd total 3.12, aposta R$ 10.000 e prêmio de R$ 31.200">
           </div>
-          <p class="ph-tag">Bilhete Premiado</p>
+          <p class="ph-tag">Brasil × Japão (dupla) · Odd 3.12 · Prêmio R$ 31.200</p>
         </article>
       </div>
 
@@ -802,6 +804,7 @@
       <span class="sep">•</span>
       <a href="#">Jogo responsável</a>
     </div>
+    <p class="foot-copy">© 2026 Allan Tips. Todos os direitos reservados.</p>
   </div>
 </footer>
 
