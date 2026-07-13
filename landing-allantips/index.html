@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Maior Comunidade de Apostas Grátis do Brasil</title>
+<meta name="description" content="Entre na maior comunidade de apostas grátis do Brasil: entradas filtradas, análises dos jogos e comunidade ativa. 100% gratuito — sem cadastro, sem depósito.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="preload" as="font" type="font/woff2" href="/fonts/outfit-var.woff2" crossorigin>
+<meta property="og:title" content="A Maior Comunidade de Apostas Grátis do Brasil">
+<meta property="og:description" content="Entradas filtradas, análises dos jogos e comunidade ativa. 100% gratuito — sem cadastro, sem depósito.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://allantips.agencyboost.com.br/">
+<meta property="og:image" content="https://allantips.agencyboost.com.br/img/hero.png">
+<style>
+  @font-face {
+    font-family: 'Outfit';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('/fonts/outfit-var.woff2') format('woff2');
+  }
+
+  :root {
+    --orange: #FF8A00;
+    --blue: #1A56FF;
+    --green: #00FF66;
+    --cyan: #00F0FF;
+    --ink-1: #FFFFFF;
+    --ink-2: rgba(255, 255, 255, .72);
+    --ink-3: rgba(255, 255, 255, .55);
+    --card: #0D162A;
+    --card-line: rgba(0, 240, 255, .15);
+    --pill-dark: #081120;
+    --bg-deep-a: #060C18;
+    --bg-deep-b: #0C1B35;
+    --bg-royal-a: #1D3A74;
+    --bg-royal-b: #13264D;
+    --faq-bg: #0D1A36;
+    --footer-bg: #040811;
+    --container: 1200px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: var(--bg-deep-a);
+    color: var(--ink-1);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  img { max-width: 100%; display: block; }
+  a { color: inherit; }
+
+  .container { width: 100%; max-width: var(--container); margin: 0 auto; padding: 0 24px; }
+
+  .kicker {
+    color: var(--orange);
+    font-weight: 800;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    font-size: .85rem;
+  }
+  h1, h2 { text-transform: uppercase; font-weight: 900; line-height: 1.08; letter-spacing: -.01em; }
+  h2 { font-size: clamp(1.7rem, 3.4vw, 2.6rem); text-align: center; }
+  h2 .hl { color: var(--orange); }
+  .section-sub {
+    margin-top: .9rem;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    font-size: .8rem;
+    font-weight: 700;
+    color: var(--ink-2);
+  }
+  .section-sub .hl-o { color: var(--orange); }
+  .section-sub .hl-g { color: var(--green); }
+
+  /* ---------- CTA button ---------- */
+  .btn-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 20px;
+    background: var(--blue);
+    color: #fff;
+    border-radius: 50px;
+    padding: 16px 24px 16px 36px;
+    font-weight: 800;
+    font-size: 1rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    text-decoration: none;
+    box-shadow: 0 14px 34px rgba(26, 86, 255, .38);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .btn-cta:hover { transform: translateY(-2px); box-shadow: 0 18px 42px rgba(26, 86, 255, .5); }
+  .btn-cta .arrow {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255, 255, 255, .18);
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: none;
+  }
+  .btn-cta .arrow svg { width: 16px; height: 16px; }
+  .cta-note {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 14px;
+    color: var(--ink-2);
+    font-size: .82rem;
+  }
+  .cta-note svg { width: 14px; height: 14px; color: var(--orange); flex: none; }
+
+  /* ---------- icons ---------- */
+  .ic { width: 20px; height: 20px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---------- HERO ---------- */
+  .hero {
+    position: relative;
+    min-height: min(900px, 100svh);
+    display: flex;
+    align-items: center;
+    background:
+      linear-gradient(180deg, var(--bg-deep-a), var(--bg-deep-b));
+    isolation: isolate;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute; inset: 0; z-index: -2;
+    background-image: url('/img/hero.png');
+    background-size: cover;
+    background-position: 72% top;
+  }
+  .hero::after {
+    content: '';
+    position: absolute; inset: 0; z-index: -1;
+    background: linear-gradient(90deg, rgba(4, 9, 20, .82) 0%, rgba(4, 9, 20, .55) 34%, rgba(4, 9, 20, 0) 60%);
+  }
+  .hero-inner { padding: 96px 0; max-width: 560px; }
+  .hero h1 {
+    margin-top: 14px;
+    font-size: clamp(2.4rem, 5.2vw, 3.9rem);
+  }
+  .hero .tagline {
+    margin-top: 10px;
+    color: var(--orange);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: clamp(1.05rem, 2vw, 1.55rem);
+    letter-spacing: .02em;
+  }
+  .hero-benefits { margin-top: 40px; display: grid; gap: 20px; list-style: none; }
+  .hero-benefits li { display: flex; gap: 14px; align-items: center; }
+  .hero-benefits .ring {
+    width: 44px; height: 44px; flex: none;
+    border-radius: 50%;
+    border: 2px solid var(--orange);
+    color: var(--orange);
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(6, 12, 24, .55);
+  }
+  .hero-benefits strong { display: block; font-size: 1.02rem; font-weight: 700; }
+  .hero-benefits span { color: var(--ink-2); font-size: .88rem; }
+  .hero-cta { margin-top: 44px; }
+
+  /* ---------- generic section ---------- */
+  section { position: relative; }
+  .section-pad { padding: 84px 0 92px; }
+
+  /* ---------- DOBRA 1: benefícios ---------- */
+  .s-royal {
+    background: linear-gradient(180deg, var(--bg-royal-a), var(--bg-royal-b));
+    isolation: isolate;
+  }
+  .s-royal::before {
+    content: '';
+    position: absolute; inset: 0; z-index: -1;
+    background-image: url('/img/texture-sports.png');
+    background-size: cover;
+    background-position: center;
+  }
+  .cards-4 {
+    margin-top: 56px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 22px;
+  }
+  .card {
+    position: relative;
+    background: var(--card);
+    border: 1px solid var(--card-line);
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .3);
+    padding: 52px 24px 26px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 18px;
+  }
+  .card .badge-ic {
+    position: absolute;
+    top: -24px; left: 50%; transform: translateX(-50%);
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    border: 3px solid var(--orange);
+    background: var(--bg-deep-a);
+    color: var(--orange);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .card h3 {
+    color: var(--orange);
+    text-transform: uppercase;
+    font-weight: 800;
+    font-size: 1.02rem;
+    line-height: 1.25;
+  }
+  .card p { color: var(--ink-2); font-size: .88rem; margin-top: 10px; }
+  .card .card-pill {
+    margin: 4px auto 0;
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--pill-dark);
+    border: 1px solid rgba(255, 255, 255, .06);
+    border-radius: 999px;
+    padding: 9px 16px;
+    font-size: .64rem;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .card .card-pill svg { width: 13px; height: 13px; color: var(--green); flex: none; }
+  .strip-pill {
+    margin: 56px auto 0;
+    width: fit-content;
+    display: flex; align-items: center; gap: 10px;
+    background: var(--pill-dark);
+    border: 1px solid rgba(255, 255, 255, .07);
+    border-radius: 999px;
+    padding: 12px 26px;
+    font-size: .78rem;
+    font-weight: 800;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+  }
+  .strip-pill svg { width: 16px; height: 16px; color: var(--orange); flex: none; }
+
+  /* ---------- DOBRA 2: resultados ---------- */
+  .s-deep { background: linear-gradient(180deg, var(--bg-deep-a), var(--bg-deep-b)); }
+  .carousel { margin-top: 56px; position: relative; }
+  .car-track {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: min(320px, 78vw);
+    gap: 24px;
+    justify-content: safe center;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    padding: 4px;
+  }
+  .car-track::-webkit-scrollbar { display: none; }
+  .print-card {
+    scroll-snap-align: center;
+    border: 1.5px dashed rgba(0, 240, 255, .45);
+    border-radius: 18px;
+    background: rgba(10, 20, 40, .55);
+    min-height: 380px;
+    padding: 20px 18px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .print-card .chip {
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    border-radius: 999px;
+    padding: 5px 14px;
+    font-size: .66rem;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .print-card .ph-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .print-card .ph-body svg { width: 40px; height: 40px; color: rgba(255, 255, 255, .35); }
+  .print-card .ph-title { font-weight: 800; text-transform: uppercase; font-size: .92rem; }
+  .print-card .ph-hint { color: var(--ink-3); font-size: .8rem; max-width: 220px; }
+  .print-card .ph-tag {
+    border-top: 1px solid rgba(255, 255, 255, .08);
+    width: 100%;
+    padding-top: 12px;
+    color: var(--ink-3);
+    font-size: .72rem;
+  }
+  .car-btn {
+    position: absolute;
+    top: 50%; transform: translateY(-50%);
+    width: 40px; height: 40px;
+    border: 0; border-radius: 10px;
+    background: var(--orange);
+    color: #0B1222;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: filter .15s ease;
+    z-index: 2;
+  }
+  .car-btn:hover { filter: brightness(1.1); }
+  .car-btn svg { width: 18px; height: 18px; }
+  .car-btn.prev { left: -8px; }
+  .car-btn.next { right: -8px; }
+  .car-dots { display: flex; gap: 8px; justify-content: center; margin-top: 26px; }
+  .car-dots button {
+    width: 8px; height: 8px; border-radius: 50%;
+    border: 0; padding: 0; cursor: pointer;
+    background: rgba(255, 255, 255, .25);
+  }
+  .car-dots button.on { background: var(--orange); }
+  .carousel.no-overflow .car-btn, .carousel.no-overflow .car-dots { display: none; }
+
+  /* ---------- DOBRA 3: passos ---------- */
+  .steps {
+    margin-top: 56px;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .step {
+    position: relative;
+    background: var(--card);
+    border: 1px solid rgba(255, 255, 255, .05);
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .3);
+    padding: 46px 26px 26px;
+    text-align: center;
+    width: min(300px, 100%);
+  }
+  .step .badge-ic {
+    position: absolute;
+    top: -22px; left: 50%; transform: translateX(-50%);
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--orange);
+    color: #0B1222;
+    display: flex; align-items: center; justify-content: center;
+    border: 0;
+  }
+  .step h3 { color: var(--orange); text-transform: uppercase; font-size: .95rem; font-weight: 800; }
+  .step p { color: var(--ink-2); font-size: .85rem; margin-top: 8px; }
+  .step-sep {
+    align-self: center;
+    color: var(--orange);
+    display: flex; align-items: center;
+  }
+  .step-sep svg { width: 22px; height: 22px; }
+
+  /* ---------- CTA final ---------- */
+  .s-cta {
+    background: radial-gradient(120% 130% at 50% 0%, #0D1E3D 0%, var(--bg-deep-a) 78%);
+  }
+  .cta-grid {
+    display: grid;
+    grid-template-columns: 1.05fr .95fr;
+    gap: 48px;
+    align-items: center;
+  }
+  .cta-grid h2 { text-align: left; font-size: clamp(2rem, 4vw, 3.1rem); }
+  .cta-grid .lead { margin-top: 18px; color: var(--ink-2); font-size: 1.02rem; max-width: 420px; }
+  .lead .hl-g { color: var(--green); font-weight: 700; }
+  .check-card {
+    background: rgba(10, 20, 40, .6);
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 16px;
+    padding: 26px 28px;
+    display: grid;
+    gap: 18px;
+  }
+  .check-card .row { display: flex; gap: 12px; align-items: flex-start; }
+  .check-card .dot {
+    width: 30px; height: 30px; flex: none;
+    border-radius: 50%;
+    background: rgba(0, 255, 102, .12);
+    color: var(--green);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .check-card .dot svg { width: 15px; height: 15px; }
+  .check-card strong { display: block; font-size: .84rem; text-transform: uppercase; letter-spacing: .06em; }
+  .check-card span { color: var(--ink-3); font-size: .8rem; }
+  .cta-actions { margin-top: 30px; }
+
+  /* ---------- FAQ ---------- */
+  .s-faq { background: var(--faq-bg); }
+  .faq-card {
+    margin: 48px auto 0;
+    max-width: 900px;
+    background: #0A1426;
+    border: 1px solid rgba(255, 255, 255, .05);
+    border-radius: 18px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .35);
+    padding: 12px 40px;
+  }
+  .faq-item { padding: 30px 0; }
+  .faq-item + .faq-item { border-top: 1px solid rgba(255, 255, 255, .08); }
+  .faq-item h3 { text-transform: uppercase; font-size: .95rem; font-weight: 800; letter-spacing: .04em; }
+  .faq-item p { margin-top: 10px; color: var(--ink-2); font-size: .9rem; }
+  .faq-item .hl-g { color: var(--green); font-weight: 700; }
+  .faq-item .hl-o { color: var(--orange); font-weight: 700; }
+
+  /* ---------- footer ---------- */
+  footer {
+    background: var(--footer-bg);
+    border-top: 1px solid rgba(255, 255, 255, .06);
+    padding: 60px 0 40px;
+  }
+  .foot-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 48px;
+    align-items: center;
+  }
+  .age-row { display: flex; gap: 18px; align-items: center; }
+  .age-badge {
+    width: 52px; height: 52px; flex: none;
+    border-radius: 50%;
+    border: 2px solid var(--orange);
+    color: var(--orange);
+    font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .95rem;
+  }
+  .age-row p { color: var(--ink-3); font-size: .82rem; max-width: 420px; }
+  .foot-points { display: grid; gap: 16px; }
+  .foot-points .row { display: flex; gap: 12px; align-items: flex-start; }
+  .foot-points .dot {
+    width: 30px; height: 30px; flex: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .06);
+    color: var(--orange);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .foot-points .dot svg { width: 14px; height: 14px; }
+  .foot-points .dot.green { color: var(--green); }
+  .foot-points strong { display: block; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; }
+  .foot-points span { color: var(--ink-3); font-size: .76rem; }
+  .foot-links {
+    margin-top: 48px;
+    padding-top: 28px;
+    border-top: 1px solid rgba(255, 255, 255, .06);
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: .8rem;
+    font-weight: 700;
+    color: var(--orange);
+  }
+  .foot-links a { text-decoration: none; }
+  .foot-links a:hover { text-decoration: underline; }
+  .foot-links .sep { color: var(--ink-3); }
+
+  /* ---------- reveal ---------- */
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .reveal { opacity: 1; transform: none; transition: none; }
+  }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 900px) {
+    .hero::before { background-position: 68% top; }
+    .hero::after { background: linear-gradient(180deg, rgba(4, 9, 20, .55) 0%, rgba(4, 9, 20, .82) 70%); }
+    .hero-inner { padding: 72px 0; }
+    .cta-grid { grid-template-columns: 1fr; gap: 36px; }
+    .cta-grid h2 { text-align: center; }
+    .cta-grid .lead { margin-inline: auto; text-align: center; }
+    .cta-left { display: flex; flex-direction: column; align-items: center; }
+    .faq-card { padding: 8px 22px; }
+    .foot-grid { grid-template-columns: 1fr; gap: 36px; }
+    .step-sep { transform: rotate(90deg); }
+    .car-btn.prev { left: 4px; }
+    .car-btn.next { right: 4px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="container">
+    <div class="hero-inner">
+      <p class="kicker">Entre na</p>
+      <h1>Maior<br>Comunidade</h1>
+      <p class="tagline">de apostas grátis do Brasil</p>
+
+      <ul class="hero-benefits">
+        <li>
+          <span class="ring" aria-hidden="true">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M2 9a3 3 0 0 1 0 6v3a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-3a3 3 0 0 1 0-6V6a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
+          </span>
+          <div><strong>Oportunidades diárias</strong><span>bilhetes filtrados e analisados</span></div>
+        </li>
+        <li>
+          <span class="ring" aria-hidden="true">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
+          <div><strong>Comunidade ativa</strong><span>troque ideias e receba insights</span></div>
+        </li>
+        <li>
+          <span class="ring" aria-hidden="true">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+          </span>
+          <div><strong>100% gratuito</strong><span>sem pagar nada, sem pegadinhas</span></div>
+        </li>
+      </ul>
+
+      <div class="hero-cta">
+        <a class="btn-cta" href="https://bit.ly/4b1lB5o" target="_blank" rel="noopener">
+          Entrar no grupo
+          <span class="arrow" aria-hidden="true">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          </span>
+        </a>
+        <p class="cta-note">
+          <svg class="ic" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Sem cadastro. Sem depósito. É só entrar e aproveitar.
+        </p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ DOBRA 1: o que você recebe ============ -->
+<section class="s-royal section-pad" id="beneficios">
+  <div class="container">
+    <h2 class="reveal">Tudo o que você <span class="hl">recebe ao entrar</span></h2>
+
+    <div class="cards-4">
+      <article class="card reveal">
+        <span class="badge-ic" aria-hidden="true">
+          <svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6"/><path d="M8 11h6"/></svg>
+        </span>
+        <div>
+          <h3>Entradas<br>filtradas</h3>
+          <p>Receba apenas as melhores oportunidades do dia, analisadas antes de chegar até você.</p>
+        </div>
+        <span class="card-pill">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+          Qualidade que faz diferença
+        </span>
+      </article>
+
+      <article class="card reveal">
+        <span class="badge-ic" aria-hidden="true">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16v-3"/><path d="M12 16V8"/><path d="M17 16v-5"/></svg>
+        </span>
+        <div>
+          <h3>Análises dos<br>jogos</h3>
+          <p>Entenda o motivo por trás de cada entrada e aposte com muito mais confiança.</p>
+        </div>
+        <span class="card-pill">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+          Mais conhecimento, melhores decisões
+        </span>
+      </article>
+
+      <article class="card reveal">
+        <span class="badge-ic" aria-hidden="true">
+          <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
+        </span>
+        <div>
+          <h3>Comunidade ativa</h3>
+          <p>Troque ideias, tire dúvidas e acompanhe os jogos junto com quem vive apostas diariamente.</p>
+        </div>
+        <span class="card-pill">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+          Junto com você em tempo real
+        </span>
+      </article>
+
+      <article class="card reveal">
+        <span class="badge-ic" aria-hidden="true">
+          <svg class="ic" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+        </span>
+        <div>
+          <h3>Acesso 100%<br>gratuito</h3>
+          <p>Entre sem pagar nada e tenha acesso a conteúdos, oportunidades e novidades do grupo.</p>
+        </div>
+        <span class="card-pill">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+          Sem custo, sem compromisso.
+        </span>
+      </article>
+    </div>
+
+    <div class="strip-pill reveal">
+      <svg class="ic" viewBox="0 0 24 24"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.735H5.81a1 1 0 0 1-.957-.735L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/></svg>
+      Grátis. Confiável. Feito para quem ama apostar.
+    </div>
+  </div>
+</section>
+
+<!-- ============ DOBRA 2: bilhetes green ============ -->
+<section class="s-deep section-pad" id="resultados">
+  <div class="container">
+    <h2 class="reveal">Bilhetes que <span class="hl">viraram green.</span></h2>
+    <p class="section-sub reveal">Alguns dos resultados compartilhados pelos <span class="hl-o">membros da comunidade.</span></p>
+
+    <div class="carousel reveal">
+      <button class="car-btn prev" type="button" aria-label="Anterior">
+        <svg class="ic" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+
+      <!-- Placeholders do design: trocar cada .print-card por <img> com o print real quando o cliente enviar -->
+      <div class="car-track">
+        <article class="print-card">
+          <span class="chip">Instagram Story</span>
+          <div class="ph-body">
+            <svg class="ic" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+            <p class="ph-title">Print de story aqui</p>
+            <p class="ph-hint">Sugestão: print de resultado alto (ex: Odd 41!)</p>
+          </div>
+          <p class="ph-tag">Resultado Compartilhado</p>
+        </article>
+
+        <article class="print-card">
+          <span class="chip">Instagram Direct</span>
+          <div class="ph-body">
+            <svg class="ic" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+            <p class="ph-title">Print de mensagem aqui</p>
+            <p class="ph-hint">Sugestão: print do direct elogiando as tips</p>
+          </div>
+          <p class="ph-tag">Mensagem de Aluno</p>
+        </article>
+
+        <article class="print-card">
+          <span class="chip">Telegram / WhatsApp</span>
+          <div class="ph-body">
+            <svg class="ic" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+            <p class="ph-title">Print de bilhete aqui</p>
+            <p class="ph-hint">Sugestão: print de bilhete verde ganho (ex: Odd 35)</p>
+          </div>
+          <p class="ph-tag">Bilhete Premiado</p>
+        </article>
+      </div>
+
+      <button class="car-btn next" type="button" aria-label="Próximo">
+        <svg class="ic" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+
+      <div class="car-dots" role="tablist" aria-label="Slides"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DOBRA 3: como funciona ============ -->
+<section class="s-royal section-pad" id="como-funciona">
+  <div class="container">
+    <h2 class="reveal">Aqui é assim: <span class="hl">fácil, rápido e gratuito</span></h2>
+
+    <div class="steps reveal">
+      <article class="step">
+        <span class="badge-ic" aria-hidden="true">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M2 21a8 8 0 0 1 13.292-6"/><circle cx="10" cy="8" r="5"/><path d="M19 16v6"/><path d="M22 19h-6"/></svg>
+        </span>
+        <h3>Entre no grupo</h3>
+        <p>Clique no botão e entre sem cadastro, sem complicação.</p>
+      </article>
+
+      <span class="step-sep" aria-hidden="true">
+        <svg class="ic" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+      </span>
+
+      <article class="step">
+        <span class="badge-ic" aria-hidden="true">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16v-3"/><path d="M12 16V8"/><path d="M17 16v-5"/></svg>
+        </span>
+        <h3>Acompanhe tudo</h3>
+        <p>Receba entradas filtradas, análises e conteúdos exclusivos todos os dias.</p>
+      </article>
+
+      <span class="step-sep" aria-hidden="true">
+        <svg class="ic" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+      </span>
+
+      <article class="step">
+        <span class="badge-ic" aria-hidden="true">
+          <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+        </span>
+        <h3>Aposte com inteligência</h3>
+        <p>Use as oportunidades, faça suas apostas e viva o jogo com a comunidade.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CTA final ============ -->
+<section class="s-cta section-pad" id="entrar">
+  <div class="container">
+    <div class="cta-grid">
+      <div class="cta-left reveal">
+        <h2>Pronto pra<br><span class="hl">fazer parte?</span></h2>
+        <p class="lead">O grupo é 100% gratuito e te conecta com o que realmente importa: <span class="hl-g">oportunidades reais.</span></p>
+        <div class="cta-actions">
+          <a class="btn-cta" href="https://bit.ly/4b1lB5o" target="_blank" rel="noopener">
+            Entrar no grupo grátis
+            <span class="arrow" aria-hidden="true">
+              <svg class="ic" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </span>
+          </a>
+          <p class="cta-note">
+            <svg class="ic" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Gratuito para sempre. Sem pegadinhas.
+          </p>
+        </div>
+      </div>
+
+      <div class="check-card reveal">
+        <div class="row">
+          <span class="dot" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <div><strong>Grátis</strong><span>Sem pagar nada.</span></div>
+        </div>
+        <div class="row">
+          <span class="dot" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg></span>
+          <div><strong>Sem cadastro</strong><span>Só clicar e entrar.</span></div>
+        </div>
+        <div class="row">
+          <span class="dot" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+          <div><strong>Comunidade ativa</strong><span>Gente que vive apostas.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="s-faq section-pad" id="faq">
+  <div class="container">
+    <h2 class="reveal">Dúvidas <span class="hl">frequentes</span></h2>
+    <p class="section-sub reveal">Tudo que você precisa saber <span class="hl-g">antes de entrar.</span></p>
+
+    <div class="faq-card reveal">
+      <div class="faq-item">
+        <h3>É pago?</h3>
+        <p>Não. Entrar no grupo é <span class="hl-g">100% gratuito</span>. As apostas você faz por conta, com o valor que estiver disposto a perder.</p>
+      </div>
+      <div class="faq-item">
+        <h3>As odds são garantidas?</h3>
+        <p>Não existe aposta garantida. Odd alta significa <span class="hl-o">maior risco</span>. Entre só com o que pode perder.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Preciso entender de apostas?</h3>
+        <p>Não. As entradas vêm <span class="hl-g">prontas e analisadas</span>; você só copia e acompanha.</p>
+      </div>
+      <div class="faq-item">
+        <h3>É só durante o torneio das seleções?</h3>
+        <p>Esta edição é focada nos jogos das <span class="hl-g">seleções em 2026</span>. As Odds Altas padrão rodam o ano todo.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ rodapé legal ============ -->
+<footer>
+  <div class="container">
+    <div class="foot-grid">
+      <div class="age-row">
+        <span class="age-badge">18+</span>
+        <p>Conteúdo destinado a maiores de 18 anos. Aposte com responsabilidade. Apostas são uma forma de entretenimento e envolvem risco — aposte apenas o valor que você está disposto a perder.</p>
+      </div>
+
+      <div class="foot-points">
+        <div class="row">
+          <span class="dot green" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <div><strong>Sem promessas</strong><span>Só análise. Sem ilusão.</span></div>
+        </div>
+        <div class="row">
+          <span class="dot" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg></span>
+          <div><strong>Sem pegadinhas</strong><span>Grupo transparente e direto.</span></div>
+        </div>
+        <div class="row">
+          <span class="dot" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></span>
+          <div><strong>Comunidade ativa</strong><span>Gente que troca ideia e vive apostas.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TODO: apontar para as páginas legais quando existirem -->
+    <div class="foot-links">
+      <a href="#">Termos de uso</a>
+      <span class="sep">•</span>
+      <a href="#">Política de privacidade</a>
+      <span class="sep">•</span>
+      <a href="#">Jogo responsável</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Reveal on scroll
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+  }, { threshold: .12 });
+  document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+
+  // Carousel (esconde controles quando os cards cabem inteiros na tela)
+  const car = document.querySelector('.carousel');
+  const track = car.querySelector('.car-track');
+  const dotsBox = car.querySelector('.car-dots');
+  const slides = [...track.children];
+
+  slides.forEach((_, i) => {
+    const b = document.createElement('button');
+    b.setAttribute('aria-label', 'Ir para o slide ' + (i + 1));
+    b.addEventListener('click', () => slides[i].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }));
+    dotsBox.appendChild(b);
+  });
+  const dots = [...dotsBox.children];
+
+  function syncCar() {
+    const overflow = track.scrollWidth > track.clientWidth + 8;
+    car.classList.toggle('no-overflow', !overflow);
+    const mid = track.scrollLeft + track.clientWidth / 2;
+    let active = 0, best = Infinity;
+    slides.forEach((s, i) => {
+      const c = s.offsetLeft + s.offsetWidth / 2;
+      const d = Math.abs(c - mid);
+      if (d < best) { best = d; active = i; }
+    });
+    dots.forEach((d, i) => d.classList.toggle('on', i === active));
+  }
+  track.addEventListener('scroll', () => requestAnimationFrame(syncCar), { passive: true });
+  window.addEventListener('resize', syncCar);
+  syncCar();
+
+  car.querySelector('.prev').addEventListener('click', () => track.scrollBy({ left: -track.clientWidth * .8, behavior: 'smooth' }));
+  car.querySelector('.next').addEventListener('click', () => track.scrollBy({ left: track.clientWidth * .8, behavior: 'smooth' }));
+</script>
+
+</body>
+</html>
