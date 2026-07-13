@@ -145,35 +145,16 @@ header{
 .house b{display:block;font-family:var(--display);font-weight:800;font-size:12.5px;color:var(--text);white-space:nowrap}
 .house > div{min-width:0}
 
-/* ——— vinhetas (telas do produto) ——— */
+/* ——— vinhetas (telas do produto — prints reais) ——— */
 .shots{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
 .shot{border:1px solid var(--line);border-radius:14px;background:#1C1014;overflow:hidden;box-shadow:0 18px 44px rgba(0,0,0,.35)}
 .shot-bar{display:flex;align-items:center;gap:5px;padding:9px 12px;background:#241419;border-bottom:1px solid var(--line)}
 .shot-bar .dot{width:7px;height:7px}
 .shot-bar span:last-child{margin-left:8px;font-size:10px;color:var(--faint)}
-.shot-body{padding:14px;display:flex;flex-direction:column;gap:8px;font-size:12px}
+.shot img{display:block;width:100%;height:auto}
+.shot-feature{margin-bottom:30px}
 .shot-wrap h3{font-size:1.02rem;font-weight:800;margin:16px 0 6px}
 .shot-wrap > p{color:var(--muted);font-size:.92rem}
-.pod{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.pod-card{border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.03);padding:10px 8px;text-align:center;min-width:0}
-.pod-card em{font-style:normal;display:inline-flex;width:22px;height:22px;border-radius:7px;align-items:center;justify-content:center;font-size:10px;font-weight:800;margin-bottom:6px}
-.pod-card.gold em{background:rgba(245,158,11,.16);color:#FBBF24}
-.pod-card.silver em{background:rgba(148,163,184,.16);color:#CBD5E1}
-.pod-card.bronze em{background:rgba(180,83,9,.2);color:#D97706}
-.pod-card span{display:block;font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
-.pod-card b{display:block;font-size:10.5px;margin:2px 0;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pod-card i{font-style:normal;font-family:var(--display);font-weight:800;font-size:12px;white-space:nowrap}
-.rank-row{display:flex;align-items:center;gap:10px;padding:6px 2px;border-bottom:1px solid rgba(255,255,255,.05);font-size:11px;color:var(--muted)}
-.rank-row:last-child{border:none}
-.rank-row em{font-style:normal;width:16px;text-align:center;color:var(--faint);font-weight:800}
-.rank-row b{margin-left:auto;color:var(--text);font-weight:600}
-.log-row{border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.03);padding:9px 11px}
-.log-row b{display:block;font-size:11px;color:var(--text)}
-.log-row span{font-size:10.5px;color:var(--muted)}
-.log-row .meta{display:block;font-size:9.5px;color:var(--faint);margin-top:2px}
-.chg{color:var(--ember-l);font-weight:600}
-.contract{display:inline-flex;gap:6px;align-items:center;border:1px solid rgba(225,29,72,.35);background:rgba(225,29,72,.08);color:var(--ember-l);border-radius:999px;padding:4px 10px;font-size:9.5px;font-weight:700;margin-top:4px;align-self:flex-start}
-
 /* ——— sections ——— */
 .sec-head{max-width:640px;margin-bottom:52px}
 .sec-head h2{font-size:clamp(1.7rem,3.6vw,2.5rem);margin-bottom:14px}
@@ -236,6 +217,11 @@ header{
 .proof-badge i{width:6px;height:6px;border-radius:50%;background:#4ADE80}
 .proof-link{font-size:.9rem;color:var(--muted);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.18);transition:color .15s}
 .proof-link:hover{color:var(--text)}
+.proof-nums{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
+.proof-num{border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.03);padding:16px 18px}
+.proof-num b{display:block;font-family:var(--display);font-weight:800;font-size:1.35rem;white-space:nowrap}
+.proof-num span{font-size:.82rem;color:var(--faint)}
+@media (max-width:880px){.proof-nums{grid-template-columns:1fr}}
 
 /* ——— pricing ——— */
 .price-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:760px}
@@ -423,8 +409,8 @@ footer a:hover{color:var(--text)}
       </div>
       <div class="card">
         <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4v11h2zM13 4h-2v16h2zM20 13h-2v7h2z"/><path d="M4 20h16"/></svg></div>
-        <h3>Ranking diário</h3>
-        <p>Pódio dos afiliados gerado automaticamente todo dia. Gamificação que puxa produção sem você montar nada.</p>
+        <h3>Ranking premiado</h3>
+        <p>Pódio gerado automaticamente todo dia — e você cadastra premiações por posição (dinheiro, iPhone, viagem) que viram vitrine pública para atrair afiliados novos.</p>
       </div>
       <div class="card">
         <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></div>
@@ -445,48 +431,33 @@ footer a:hover{color:var(--text)}
     <div class="sec-head">
       <span class="kicker">Por dentro do produto</span>
       <h2>As telas que a sua operação usa todo dia.</h2>
-      <p>Réplica fiel do painel: pódio diário, trilha de auditoria que ninguém edita e o portal onde cada afiliado vê só o que é dele. Números ilustrativos.</p>
+      <p>Prints reais do painel rodando com dados de demonstração — é exatamente este produto que a sua agência recebe, com a sua marca e as suas cores.</p>
+    </div>
+    <div class="shot shot-feature">
+      <div class="shot-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span>…/admin — visão geral da agência</span></div>
+      <img src="/screens/admin.jpg" alt="Print real do painel administrativo: totais de comissão, funil da rede, lucro líquido e desempenho por casa" loading="lazy" width="3200" height="1800">
     </div>
     <div class="shots">
       <div class="shot-wrap">
-        <div class="shot" aria-hidden="true">
+        <div class="shot">
           <div class="shot-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span>…/ranking</span></div>
-          <div class="shot-body">
-            <div class="pod">
-              <div class="pod-card gold"><em>1º</em><span>1º lugar</span><b>Yago Martins</b><i>R$ 2.119,34</i></div>
-              <div class="pod-card silver"><em>2º</em><span>2º lugar</span><b>Ana Souza</b><i>R$ 1.640,80</i></div>
-              <div class="pod-card bronze"><em>3º</em><span>3º lugar</span><b>Lucas Ferreira</b><i>R$ 1.238,00</i></div>
-            </div>
-            <div>
-              <div class="rank-row"><em>4</em>Bia Cardoso<b>R$ 990,10</b></div>
-              <div class="rank-row"><em>5</em>Rafa Almeida<b>R$ 742,60</b></div>
-            </div>
-          </div>
+          <img src="/screens/ranking.jpg" alt="Print real do ranking diário: pódio com premiações por posição" loading="lazy" width="3200" height="1800">
         </div>
-        <h3>Ranking diário</h3>
-        <p>Pódio calculado automaticamente a partir da comissão do dia — gamificação que puxa produção sem trabalho manual.</p>
+        <h3>Ranking premiado</h3>
+        <p>Pódio calculado automaticamente a partir da comissão do dia — com as premiações que você cadastrou penduradas em cada posição.</p>
       </div>
       <div class="shot-wrap">
-        <div class="shot" aria-hidden="true">
+        <div class="shot">
           <div class="shot-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span>…/auditoria</span></div>
-          <div class="shot-body">
-            <div class="log-row"><b>Alterou comissão (CPA/REV)</b><span>Yago Martins — CPA <span class="chg">R$ 60,00 → R$ 65,00</span></span><span class="meta">por Equipe · hoje, 14h32</span></div>
-            <div class="log-row"><b>Importou resultados</b><span>Superbet — 42 linhas, 14 afiliados</span><span class="meta">por Equipe · ontem, 09h15</span></div>
-            <div class="log-row"><b>Gerou convite</b><span>Ana Souza — link expira em 7 dias</span><span class="meta">por Equipe · há 3 dias</span></div>
-          </div>
+          <img src="/screens/auditoria.jpg" alt="Print real da trilha de auditoria: quem mudou taxa, quando e o antes e depois" loading="lazy" width="3200" height="1800">
         </div>
         <h3>Trilha de auditoria</h3>
         <p>Quem mudou, quando e o antes → depois de cada taxa. Append-only: nem o admin edita ou apaga o histórico.</p>
       </div>
       <div class="shot-wrap">
-        <div class="shot" aria-hidden="true">
+        <div class="shot">
           <div class="shot-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span>login do afiliado</span></div>
-          <div class="shot-body">
-            <div class="trow"><span>Comissão total</span><b>R$ 2.119,34</b></div>
-            <div class="trow"><span>CPA qualificado</span><b>12</b></div>
-            <div class="trow"><span>Cadastros</span><b>46</b></div>
-            <span class="contract">Seu contrato: CPA R$ 65 + REV 22%</span>
-          </div>
+          <img src="/screens/portal.jpg" alt="Print real do portal do afiliado: comissão total, contrato CPA + REV e resultados por casa" loading="lazy" width="3200" height="1800">
         </div>
         <h3>Portal do afiliado</h3>
         <p>Cada afiliado entra com o próprio login e vê só os próprios números e o próprio contrato — nada da agência vaza.</p>
@@ -504,6 +475,7 @@ footer a:hover{color:var(--text)}
         <li><span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span><b>Seu domínio, seu logo, suas cores.</b> O painel roda em painel.suaagencia.com.br com a sua identidade — a AffiliaCore não aparece.</span></li>
         <li><span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span><b>Instância própria, dados isolados.</b> Cada agência tem a sua instalação — nada de banco compartilhado com concorrente.</span></li>
         <li><span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span><b>Setup em dias, não meses.</b> Implantação, marca e onboarding dos primeiros afiliados incluídos no setup.</span></li>
+        <li><span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span><b>Landing e captação do seu jeito.</b> Liberdade total para criar a landing page da sua label — e a página pública do painel já exibe as premiações do seu ranking como chamariz para afiliados pedirem acesso.</span></li>
       </ul>
     </div>
     <div class="wl-visual" aria-hidden="true">
@@ -527,6 +499,11 @@ footer a:hover{color:var(--text)}
         <span class="proof-badge"><i></i>Em produção</span>
         <a class="proof-link" href="https://agencyboost.com.br" target="_blank" rel="noopener">agencyboost.com.br</a>
       </div>
+    </div>
+    <div class="proof-nums">
+      <div class="proof-num"><b>70+</b><span>afiliados geridos na plataforma</span></div>
+      <div class="proof-num"><b>R$ 100 mil+</b><span>em comissões processadas e conferidas</span></div>
+      <div class="proof-num"><b>0 planilhas</b><span>no fechamento do mês da agência</span></div>
     </div>
   </div>
 </section>
