@@ -69,6 +69,20 @@ create" em 10/jul (data de início = liquidação do PIX, que levou 2 dias).
 Saldo pré-pago intacto: **R$129,99**. Próximos criativos: posts 2–4 em
 `marketing/affiliacore/` (legendas em `CAMPANHA-LANCAMENTO.md`).
 
+## ❌ Campanha 2 FALHOU NA CRIAÇÃO (13/jul): "Missing media"
+
+Ad Center em 13/jul: **"Unable to create" (Jul 11)** — o "In review" de novo
+NÃO virou anúncio. Motivo (modal Learn more): **"Missing media: Please
+specify the media to run with this ad."** ⇒ **anúncio TEXTO-PURO não existe
+na Meta — mídia é OBRIGATÓRIA.** Nada foi cobrado (R$0,00 em 0 ads; saldo
+pré-pago intacto). Ficaram 2 drafts "Get more messages" (expiram ~6/ago).
+Caminho p/ a campanha 3: **anexar mídia** — (a) retestar "Use a post" (o
+post-1 pode ter indexado agora que o vínculo Página↔IG está estável há
+dias) ou (b) publicar um post NOVO no IG e usá-lo, ou (c) achar composer
+com upload de imagem (Ads Manager completo, não o Ad Center simplificado).
+Regra permanente: **In review não garante criação — conferir o Ad Center
+na data de início** (2ª vez que a lição vale).
+
 ## Campanha 2 (relançamento, 11/jul — In review)
 
 Publicada 11/jul ~13h (publish do Vinicius) após o fix do vínculo: mesma
