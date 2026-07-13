@@ -1,0 +1,95 @@
+# Instância CLIENTE 0 · Previsão (previsao.com.br) — projeto Firebase
+# `previsao-affiliacore`. Primeira white-label vendida (indicação do Carlos).
+#
+# Ativação (one-time, console do projeto previsao-affiliacore): App Hosting →
+# backend → Settings → Environment → nome `previsao` → Save. Playbook completo
+# em scripts/provision/README.md. Admin inicial: viniciusspanol@gmail.com
+# (provisório, até o cliente indicar o e-mail definitivo).
+env:
+  # OTG-free: padrão de venda white-label; roda 100% em casas manuais.
+  - variable: VITE_OTG_ENABLED
+    value: 'false'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Marca do cliente. Logo/favicon ficam nos defaults do produto até o cliente
+  # entregar os assets (trocar por URL própria — env, zero rebuild).
+  - variable: VITE_BRAND_NAME
+    value: 'Previsão'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: VITE_BRAND_SHORT
+    value: 'Previsão'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Verde da marca (#00B919, passado pelo cliente); a engine gera a escala
+  # accent-* + contraste WCAG em runtime. Tema inicial escuro (o site do
+  # cliente é dark). Canvas/surface seguem o neutro default por ora.
+  - variable: VITE_BRAND_ACCENT
+    value: '#00B919'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: VITE_BRAND_THEME
+    value: 'dark'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: FIREBASE_STORAGE_BUCKET
+    value: 'previsao-affiliacore.firebasestorage.app'
+    availability:
+      - RUNTIME
+
+  # --- Neutralização dos secrets OTG do apphosting.yaml base -----------------
+  # O base referencia secrets que SÓ existem no projeto da instância 0 (Carlos).
+  # Instância OTG-free sobrepõe com plain 'unused' (NUNCA string vazia — env
+  # vazio reprova na validação do rollout). Ver apphosting.demo.yaml.
+  - variable: AFFILIATE_API_KEY
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_LINKS_SUPABASE_URL
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_LINKS_SUPABASE_ANON_KEY
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_LINKS_EMAIL
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_LINKS_PASSWORD
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_DASH_EMAIL
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_DASH_PASSWORD
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_DASH_DEVICE_TOKEN
+    value: 'unused'
+    availability:
+      - RUNTIME
+
+  # Lembrete do ranking (o base referencia o secret master-admin-email, que não
+  # existe neste projeto — override plain com o admin da instância).
+  - variable: MASTER_ADMIN_EMAIL
+    value: 'viniciusspanol@gmail.com'
+    availability:
+      - RUNTIME
+
+  # FIREBASE_SERVICE_ACCOUNT_KEY e RANKING_CRON_SECRET seguem como SECRETS do
+  # base — criar os dois no projeto previsao-affiliacore (playbook §3).
