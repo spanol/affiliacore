@@ -15,8 +15,23 @@
 <meta property="og:locale" content="pt_BR">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#26181C">
+<link rel="preload" href="/fonts/bricolage-grotesque-800.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"Organization","name":"AffiliaCore","url":"https://affiliacore.com.br","logo":"https://affiliacore.com.br/logo.svg","sameAs":["https://www.instagram.com/affiliacore.br/"]}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"AffiliaCore","applicationCategory":"BusinessApplication","operatingSystem":"Web","url":"https://affiliacore.com.br","image":"https://affiliacore.com.br/og.png","description":"Plataforma white-label de gestão de afiliados para agências de apostas: comissão CPA/REV por casa, portal do afiliado, ranking com premiações e trilha de auditoria.","offers":{"@type":"AggregateOffer","priceCurrency":"BRL","lowPrice":"600","highPrice":"3000","offerCount":2,"offers":[{"@type":"Offer","name":"Implantação (pagamento único, a partir de)","price":"3000","priceCurrency":"BRL"},{"@type":"Offer","name":"Mensalidade (a partir de)","price":"600","priceCurrency":"BRL"}]},"provider":{"@type":"Organization","name":"AffiliaCore","url":"https://affiliacore.com.br"}}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
+{"@type":"Question","name":"O que é a AffiliaCore?","acceptedAnswer":{"@type":"Answer","text":"Uma plataforma white-label de gestão de afiliados para agências de apostas: calcula a comissão CPA/REV por casa, dá um portal próprio a cada afiliado, tem ranking com premiações e trilha de auditoria — tudo com a marca e o domínio da sua agência."}},
+{"@type":"Question","name":"Quanto custa?","acceptedAnswer":{"@type":"Answer","text":"Preço publicado: implantação a partir de R$ 3.000 (pagamento único) e mensalidade a partir de R$ 600/mês, em degraus pelo número de afiliados ativos. As 3 primeiras agências entram com preço de fundador, travado enquanto forem clientes."}},
+{"@type":"Question","name":"O que significa white-label na prática?","acceptedAnswer":{"@type":"Answer","text":"A plataforma roda no seu domínio, com o seu logo e as suas cores, numa instância própria com dados isolados por agência. Para os seus afiliados, é o sistema da sua agência."}},
+{"@type":"Question","name":"Como os resultados das casas entram na plataforma?","acceptedAnswer":{"@type":"Answer","text":"Por importação de planilha (Excel/CSV) com modelo guiado, ou por integração direta quando a casa disponibiliza os dados. O fechamento por afiliado e por casa sai automático, com trilha de auditoria."}},
+{"@type":"Question","name":"Quanto tempo leva a implantação?","acceptedAnswer":{"@type":"Answer","text":"Dias, não meses: criação da instância com a sua marca, migração das taxas por afiliado e onboarding da equipe e dos primeiros afiliados."}},
+{"@type":"Question","name":"Cada afiliado vê os resultados dos outros?","acceptedAnswer":{"@type":"Answer","text":"Não. Cada afiliado tem login próprio e enxerga só os próprios números. A visão completa da operação é exclusiva da agência."}}
+]}
 </script>
 <style>
 @font-face{font-family:'Bricolage Grotesque';font-weight:500;font-style:normal;font-display:swap;src:url('/fonts/bricolage-grotesque-500.woff2') format('woff2')}
@@ -285,6 +300,14 @@ footer a:hover{color:var(--text)}
   .mock-houses{grid-template-columns:1fr}
   .shots{grid-template-columns:1fr}
 }
+/* ——— faq ——— */
+.faq-list{display:grid;gap:12px;max-width:820px;margin:0 auto}
+.faq-item{border:1px solid var(--line);border-radius:var(--radius);background:rgba(255,255,255,.02)}
+.faq-item summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px 22px;font-family:var(--display);font-weight:800;font-size:1.02rem}
+.faq-item summary::-webkit-details-marker{display:none}
+.faq-item summary::after{content:'+';font-family:var(--body);font-weight:400;font-size:1.4rem;color:var(--ember-l);transition:transform .15s;line-height:1;flex-shrink:0}
+.faq-item[open] summary::after{transform:rotate(45deg)}
+.faq-item p{padding:0 22px 18px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -535,6 +558,23 @@ footer a:hover{color:var(--text)}
         <p>As 3 primeiras agências entram com condição travada enquanto forem clientes — em troca de feedback de perto durante a implantação.</p>
       </div>
       <a class="btn btn-primary" href="https://ig.me/m/affiliacore.br" target="_blank" rel="noopener">Quero ser fundador</a>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">Perguntas frequentes</span>
+      <h2>O que toda agência pergunta.</h2>
+    </div>
+    <div class="faq-list">
+      <details class="faq-item"><summary>O que é a AffiliaCore?</summary><p>Uma plataforma white-label de gestão de afiliados para agências de apostas: calcula a comissão CPA/REV por casa, dá um portal próprio a cada afiliado, tem ranking com premiações e trilha de auditoria — tudo com a marca e o domínio da sua agência.</p></details>
+      <details class="faq-item"><summary>Quanto custa?</summary><p>Preço publicado: implantação a partir de R$ 3.000 (pagamento único) e mensalidade a partir de R$ 600/mês, em degraus pelo número de afiliados ativos. As 3 primeiras agências entram com preço de fundador, travado enquanto forem clientes.</p></details>
+      <details class="faq-item"><summary>O que significa white-label na prática?</summary><p>A plataforma roda no seu domínio, com o seu logo e as suas cores, numa instância própria com dados isolados por agência. Para os seus afiliados, é o sistema da sua agência.</p></details>
+      <details class="faq-item"><summary>Como os resultados das casas entram na plataforma?</summary><p>Por importação de planilha (Excel/CSV) com modelo guiado, ou por integração direta quando a casa disponibiliza os dados. O fechamento por afiliado e por casa sai automático, com trilha de auditoria.</p></details>
+      <details class="faq-item"><summary>Quanto tempo leva a implantação?</summary><p>Dias, não meses: criação da instância com a sua marca, migração das taxas por afiliado e onboarding da equipe e dos primeiros afiliados.</p></details>
+      <details class="faq-item"><summary>Cada afiliado vê os resultados dos outros?</summary><p>Não. Cada afiliado tem login próprio e enxerga só os próprios números. A visão completa da operação é exclusiva da agência.</p></details>
     </div>
   </div>
 </section>
