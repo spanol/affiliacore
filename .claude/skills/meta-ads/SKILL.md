@@ -96,8 +96,9 @@ Config da campanha 3 (referência): criativo = post-1 lançamento da Página
 Affiliate marketing OU Sports betting · destino Automatic (chips Messenger E
 Instagram OK) · saudação pt-BR + 3 perguntas IA pt-BR (vieram certas
 sozinhas) · R$10/dia × 4 dias (13→17/jul) = **R$45,53 c/ impostos** · saldo
-no publish R$129,99. Status: In review — **CONFERIR o Ad Center no início
-(regra das campanhas 1–2: In review não garante criação).**
+no publish R$129,99. **✅ CONFIRMADA ATIVA em 14/jul: Ad Center "Active",
+13 views, R$0,37 gastos — 1º anúncio da conta que VEICULA de fato.** Leads
+(conversas) caem no Inbox do MBS — conferir e responder rápido.
 
 ### Como subir imagem no composer de POSTS do MBS (provado 2026-07-13)
 
