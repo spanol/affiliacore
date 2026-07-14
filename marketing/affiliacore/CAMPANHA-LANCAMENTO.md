@@ -93,6 +93,57 @@ planilha, chama no direct. 🎯
 > segmentação sugerida: interesses "marketing de afiliados/apostas esportivas",
 > lookalike de seguidores, BR, 25–45.
 
+## Pitch de resposta a leads (Inbox MBS / direct)
+
+Regras: responder RÁPIDO (custo por conversa cai), 1ª resposta SEM preço
+(o preço é público na landing; primeiro qualificar), fechar sempre com UMA
+pergunta de qualificação + oferta de call/WhatsApp. Demo (P5.3) só para lead
+quente, como ferramenta de FECHAMENTO — nunca link público.
+
+### Template genérico ("como funciona?")
+
+> Opa, [nome]! 👊 Que bom te ver por aqui.
+>
+> A AffiliaCore é uma plataforma white-label de gestão de afiliados para
+> agências de apostas: você define taxa CPA e/ou REV por afiliado e POR casa,
+> a comissão fecha sozinha (chega de planilha), cada afiliado tem o próprio
+> portal e vê só os resultados dele, e toda alteração fica registrada numa
+> trilha de auditoria. Tem ranking com premiações pra engajar a rede — e roda
+> com a SUA marca, no seu domínio.
+>
+> Pra te mostrar do jeito certo: hoje você fecha as comissões como (planilha?)
+> e com quantos afiliados/casas você opera?
+>
+> Mais detalhes e preço: affiliacore.com.br — e se preferir, marcamos 15min
+> e te mostro o painel funcionando.
+
+### Perguntas de qualificação (usar 1 por mensagem)
+
+1. Como você fecha comissão hoje — planilha, sistema próprio, plataforma da casa?
+2. Quantos afiliados ativos e em quais casas?
+3. Modelo predominante: CPA, REV ou híbrido?
+4. Quem opera o dia a dia — você ou tem equipe/gerente?
+
+### Versão sob medida — César (@cesardecarvalhopereira, lead 14/jul)
+
+Contexto: Linktree = "iGaming Traffic / Agency or RevShare models"; perguntou
+"Quero saber como funciona a plataforma".
+
+> Opa César, tudo bem? 👊 Vi que você trabalha com tráfego iGaming nos modelos
+> agency/revshare — a AffiliaCore foi feita exatamente pra essa operação.
+>
+> Funciona assim: é um painel white-label (sua marca, seu domínio) onde você
+> gerencia a rede inteira num lugar só — taxa CPA e/ou REV configurada por
+> afiliado e por casa, comissão calculada automaticamente, cada afiliado com
+> o próprio portal vendo só os resultados dele, ranking com premiações pra
+> engajar e trilha de auditoria de toda alteração (quem mudou o quê).
+>
+> Hoje você fecha as comissões da rede como — planilha? E com quantos
+> afiliados/casas você roda? Com isso já te mostro o painel num cenário
+> parecido com o seu.
+>
+> Site com detalhes: affiliacore.com.br 🎯
+
 ## Regenerar os assets
 
 Gerador em `generator/` (SVG + fontes reais → PNG via resvg). As fontes woff2
