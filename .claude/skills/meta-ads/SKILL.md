@@ -81,9 +81,45 @@ post-1 pode ter indexado agora que o vínculo Página↔IG está estável há
 dias) ou (b) publicar um post NOVO no IG e usá-lo, ou (c) achar composer
 com upload de imagem (Ads Manager completo, não o Ad Center simplificado).
 Regra permanente: **In review não garante criação — conferir o Ad Center
-na data de início** (2ª vez que a lição vale).
+na data de início** (2ª vez que a lição vale). **RESOLVIDO na campanha 3
+(13/jul): ver seção acima — criativo via post da Página.**
 
-## Campanha 2 (relançamento, 11/jul — In review)
+## ✅ Campanha 3 PUBLICADA (13/jul ~22h45) — mídia RESOLVIDA via post na Página
+
+**A solução do "Missing media": publicar o criativo como POST DA PÁGINA do
+Facebook (via composer de posts do MBS) e usar "Use a post" → aba Facebook
+posts.** Posts do Facebook indexam NA HORA no Browse posts; **posts do
+Instagram NUNCA indexaram** (nem com a aba "Instagram posts" nova que
+apareceu pós-vínculo — "No posts to show" mesmo com 2 posts no perfil).
+Config da campanha 3 (referência): criativo = post-1 lançamento da Página
+(texto do post vira Ad text) · Get more messages · BR 25–44 · interesses
+Affiliate marketing OU Sports betting · destino Automatic (chips Messenger E
+Instagram OK) · saudação pt-BR + 3 perguntas IA pt-BR (vieram certas
+sozinhas) · R$10/dia × 4 dias (13→17/jul) = **R$45,53 c/ impostos** · saldo
+no publish R$129,99. Status: In review — **CONFERIR o Ad Center no início
+(regra das campanhas 1–2: In review não garante criação).**
+
+### Como subir imagem no composer de POSTS do MBS (provado 2026-07-13)
+
+- ⚠️ **"Add photo/video" abre o file picker NATIVO direto** (congela a
+  automação; não há menu). NUNCA clique nele via mouse.
+- Drop simulado (DragEvent) e paste (ClipboardEvent) no editor NÃO anexam.
+- O que FUNCIONA — patch do click + captura do input (1 javascript_exec):
+  desenhe o canvas (técnica das curvas da skill /instagram), depois:
+  `HTMLInputElement.prototype.click = function(){ if(this.type==='file'){window.__capturedInput=this;return;} return orig.apply(this,arguments); }`
+  → `btn.click()` (o botão Add photo/video, PROGRAMÁTICO) → aguardar ~300ms →
+  `input.files = dt.files` → **disparar `input` E `change`** (só `change` às
+  vezes não anexa; com os dois eventos pega de primeira). Thumbnail
+  "1080 x 1080" aparece em ~4-6s.
+- O composer de posts publica **FB + IG juntos** (Post to já vem com os dois;
+  dá p/ desmarcar um) e **AGENDA de graça** (Schedule → Set date and time).
+  Legenda: editor Draft.js — form_input no campo achado pelo `find`; Escape
+  no typeahead de hashtag APAGA a hashtag (feche clicando em área neutra).
+- Posts 2 (planilha) e 1 (lançamento, só-FB) publicados 13/jul; posts 3
+  (painel) e 4 (fundador) agendados FB+IG p/ 15/jul e 17/jul 11:00.
+  Gerador dos criativos em curvas: `generator/gen-posts234-canvas.mjs`.
+
+## Campanha 2 (relançamento, 11/jul — falhou: Missing media)
 
 Publicada 11/jul ~13h (publish do Vinicius) após o fix do vínculo: mesma
 config da 1 (Get more messages · BR 25–44 · Affiliate marketing OU Sports
