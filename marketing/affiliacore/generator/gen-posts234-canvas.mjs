@@ -253,3 +253,58 @@ console.log('pronto: out/');
   ];
   emit('post1', geomJs, geomSvg, fills, 'post-1-lancamento.png');
 }
+
+// ═══ CAPA FB 1640×624 — lockup centrado (safe p/ crop mobile ~centro 1200px) ═══
+{
+  const W = 1640, H = 624, CX = W / 2;
+  const SZ = 120, TR = -0.02;
+  const wA = width(b800, 'Affilia', SZ, TR);
+  const R = SZ * 0.36;
+  const lockW = wA + SZ * 0.09 + R + (R - SZ * 0.04) + width(b500, 'ore', SZ, TR);
+  const LX = CX - lockW / 2, LB = 300;
+  const affilia = shape(b800, 'Affilia', SZ, LX, LB, TR);
+  const GX = LX + wA + SZ * 0.09 + R, GY = LB - SZ * 0.34;
+  const ore = shape(b500, 'ore', SZ, GX + R - SZ * 0.04, LB, TR);
+  const G2 = glyph(GX, GY, R);
+  const tag = 'Gestão de afiliados para agências de apostas — white-label';
+  const tagS = shape(i400, tag, 38, CX - width(i400, tag, 38) / 2, 392);
+  const dom = 'affiliacore.com.br';
+  const domS = shape(i600, dom, 34, CX - width(i600, dom, 34) / 2, 496);
+  const seg1Extra = `
+const c=document.createElement('canvas');c.width=${W};c.height=${H};
+const x=c.getContext('2d');
+const g=x.createRadialGradient(${W * 0.72},${-H * 0.15},0,${W * 0.72},${-H * 0.15},${W * 1.2});
+g.addColorStop(0,'#6c0e23');g.addColorStop(.34,'#4a0a18');g.addColorStop(.75,'#11070a');
+x.fillStyle=g;x.fillRect(0,0,${W},${H});
+const A=(cx,cy,rm,sw,dot,ring,dc)=>{x.strokeStyle=ring;x.lineWidth=sw;x.lineCap='round';
+x.beginPath();x.arc(cx,cy,rm,40*Math.PI/180,320*Math.PI/180);x.stroke();
+x.fillStyle=dc;x.beginPath();x.arc(cx,cy,dot,0,7);x.fill();};
+${arcJs(G2, EMBER_L, '#ffffff')}
+x.strokeStyle='#34262a';x.lineWidth=2;x.beginPath();x.moveTo(${CX - 260},440);x.lineTo(${CX + 260},440);x.stroke();
+window.__pc=c;window.__px=x;
+JSON.stringify({seg:1,ok:!!window.__px});`.trim();
+  // emit manual: reaproveita o chunking do emit() via fills, mas com seg1 custom
+  const fills = [
+    { color: '#ffffff', ...affilia },
+    { color: EMBER_L, ...ore },
+    { color: '#d8c8cc', ...tagS },
+    { color: EMBER_L, ...domS },
+  ];
+  // gera com emit() e depois substitui o seg1 (o emit assume 1080²)
+  emit('coverfb', arcJs(G2, EMBER_L, '#ffffff'), `${arcSvg(G2, EMBER_L, '#ffffff')}
+<line x1="${CX - 260}" y1="440" x2="${CX + 260}" y2="440" stroke="#34262a" stroke-width="2"/>`, fills, 'cover-fb.png');
+  writeFileSync(join(OUT, 'coverfb-seg1.js'), seg1Extra);
+  // SVG de validação no tamanho certo
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}">
+<defs><radialGradient id="g" cx="0.72" cy="-0.15" r="1.2">
+<stop offset="0" stop-color="#6c0e23"/><stop offset="0.34" stop-color="#4a0a18"/><stop offset="0.75" stop-color="#11070a"/>
+</radialGradient></defs><rect width="${W}" height="${H}" fill="url(#g)"/>
+${arcSvg(G2, EMBER_L, '#ffffff')}
+<line x1="${CX - 260}" y1="440" x2="${CX + 260}" y2="440" stroke="#34262a" stroke-width="2"/>
+<path d="${affilia.d}" fill="#ffffff"/><path d="${ore.d}" fill="${EMBER_L}"/>
+<path d="${tagS.d}" fill="#d8c8cc"/><path d="${domS.d}" fill="${EMBER_L}"/>
+</svg>`;
+  const { Resvg } = await import('@resvg/resvg-js');
+  writeFileSync(join(OUT, 'coverfb-check.png'), new Resvg(svg, { fitTo: { mode: 'width', value: W } }).render().asPng());
+  console.log('coverfb ok');
+}

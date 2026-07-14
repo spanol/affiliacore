@@ -161,3 +161,23 @@ conferir o Ad Center na data de início.
 - Calendário do end date flutua sobre a página; feche clicando FORA dele.
 - "Done editing?" ao mexer no público = clique **Cancel** para continuar
   editando (Confirm fecha o editor).
+
+## Página FB — perfil/capa/link (sessão 2026-07-14)
+
+- **Capa da Página**: MBS home → "Add cover photo" → dropdown "Upload photo"
+  com CLICK-PATCH (o botão abre picker nativo) → File de canvas → `input`+
+  `change` → o MBS RESETA o input (files=0) = sinal de SUCESSO, a confirmação
+  é o cropper abrir → Save changes. ⚠️ Salvar capa PUBLICA post automático
+  "updated their cover photo" no feed (ocultar = operador). Capa 1640×624 em
+  curvas: gerador `marketing/affiliacore/generator/gen-posts234-canvas.mjs`.
+- **Foto de perfil da Página: NÃO EXISTE no MBS desktop com sessão IG-SSO** —
+  todo affordance (Manage Page, avatar, engrenagem) deep-linka pro
+  facebook.com DESLOGADO. Fazer pelo APP MOBILE do Meta Business Suite
+  (operador). Varrido: hover, Business settings→Pages, All tools, dropdown
+  da capa, aria-labels no DOM.
+- **✅ LINK NA BIO DO IG dá pelo MBS web!** (resolvida a pendência "só pelo
+  app"): MBS home → "Edit Instagram Profile" → seção Links → Add External
+  Link → URL+Title → Save (usar find+form_input por REF — o modal re-renderiza
+  e desloca coordenadas). Feito: https://affiliacore.com.br "Site AffiliaCore".
+- Rotas MBS reais: `/latest/posts/published_posts` e `/latest/posts/
+  scheduled_posts` (`/latest/content` e `/latest/settings/page_*` = redirect).
