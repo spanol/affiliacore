@@ -100,6 +100,23 @@ Regras: responder RÁPIDO (custo por conversa cai), 1ª resposta SEM preço
 pergunta de qualificação + oferta de call/WhatsApp. Demo (P5.3) só para lead
 quente, como ferramenta de FECHAMENTO — nunca link público.
 
+> ⚠️ **Automação responde a pergunta sugerida do anúncio** (Inbox → Automations
+> → "Questions and responses", canal Instagram, limite 500 chars): o texto lá
+> tem que ser SEMPRE genérico. Em 15/jul estava salvo com a versão do César e
+> um lead novo (CARAUARI FOFOQUEI) foi chamado de "César" — corrigido no mesmo
+> dia (desculpa enviada + texto genérico abaixo salvo na automação). Versão
+> personalizada com nome é SÓ para envio manual.
+
+### Texto da resposta automática (salvo na automação em 2026-07-15)
+
+> Opa, tudo bem? 👊 A AffiliaCore é um painel white-label de gestão de
+> afiliados para agências de apostas: taxa CPA e/ou REV por afiliado e POR
+> casa, comissão calculada automaticamente (chega de planilha), cada afiliado
+> com o próprio portal vendo só os resultados dele, ranking e trilha de
+> auditoria — tudo com a SUA marca, no seu domínio. Me conta da sua operação:
+> hoje você fecha as comissões como (planilha?) e com quantos afiliados/casas?
+> Mais detalhes: affiliacore.com.br 🎯
+
 ### Template genérico ("como funciona?")
 
 > Opa, [nome]! 👊 Que bom te ver por aqui.

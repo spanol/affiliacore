@@ -162,6 +162,24 @@ conferir o Ad Center na data de início.
 - "Done editing?" ao mexer no público = clique **Cancel** para continuar
   editando (Confirm fecha o editor).
 
+## Inbox: automação de perguntas — lição do "César" (2026-07-15)
+
+- Automation ativa **"Questions and responses"** (`automation_id
+  1195136973687081`, Inbox → ícone Automations no topo): pergunta sugerida do
+  anúncio "Quero saber como funciona a plataforma" com resposta automática POR
+  CANAL (aba Messenger sem pergunta; a que dispara é a do Instagram). "Send
+  responses to similar questions" ON — dispara até p/ texto digitado parecido.
+- **NUNCA salvar texto personalizado (nome de lead) na resposta automática** —
+  estava salva com o pitch do César e o lead novo (CARAUARI FOFOQUEI, 15/jul)
+  foi chamado de "César". Corrigido: desculpa enviada + texto genérico salvo
+  (vive em `marketing/affiliacore/CAMPANHA-LANCAMENTO.md`). Personalizado =
+  só envio manual.
+- Gotchas do editor: resposta tem limite **500 chars**; o campo é DIV
+  contenteditable — `form_input` FALHA ("not a supported form input"); usar
+  click + ctrl+a + `type`. Toast "Saved. Changes may take some time to apply."
+  = salvo. As "saved replies" do composer (balão) estavam VAZIAS — o texto
+  errado vivia na automation, não em saved reply.
+
 ## Página FB — perfil/capa/link (sessão 2026-07-14)
 
 - **Capa da Página**: MBS home → "Add cover photo" → dropdown "Upload photo"
