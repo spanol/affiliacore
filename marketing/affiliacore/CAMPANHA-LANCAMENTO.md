@@ -184,6 +184,30 @@ Checklist de qualificação (mínimo p/ precificar o setup R$3–8k):
 NÃO fazer: mandar proposta/contrato antes da demo; falar valor sem ancorar no
 que inclui; deixar lead quente >24h sem resposta; prometer feature sem checar.
 
+### Objeção-chave: "qual a vantagem vs subafiliação (o clássico 10%)?"
+
+Perfil que pergunta isso: gerente de afiliados/sub-afiliador que opera DENTRO
+do programa da casa e recebe % fixa da produção da rede. O argumento não é
+feature — é MUDANÇA DE PATAMAR (de % na rede dos outros → dono da operação):
+
+1. **Margem sua, não fixa.** Na subafiliação a casa define o corte (10%).
+   Como agência com painel próprio, o deal é direto com a casa (CPA e/ou REV)
+   e VOCÊ define o que repassa a cada afiliado — a margem vira o spread, por
+   afiliado e por casa.
+2. **A rede vira SUA.** Na subafiliação os afiliados são cadastrados no
+   programa da casa: ela enxerga todo mundo, muda regra quando quiser e pode
+   te atropelar. No white-label a marca, o domínio e os dados são seus.
+3. **Multi-casa num painel só.** Sub prende a rede num programa; o painel
+   consolida várias casas com taxa por casa e comissão automática.
+4. **Retenção de afiliado bom.** Portal individual com números em tempo real,
+   ranking com premiações, auditoria de mudança de taxa — afiliado que enxerga
+   o próprio resultado não foge pro gestor do lado.
+
+HONESTIDADE OBRIGATÓRIA no pitch: o painel NÃO melhora o contrato com a casa
+por si — ele é a INFRAESTRUTURA pra operar como agência (deals diretos) em vez
+de sub. Se o lead ainda não tem deal direto, a venda é "o passo de gerente →
+dono": painel + marca prontos pra quando fechar as primeiras casas.
+
 ### Versão sob medida — César (@cesardecarvalhopereira, lead 14/jul)
 
 Contexto: Linktree = "iGaming Traffic / Agency or RevShare models"; perguntou
