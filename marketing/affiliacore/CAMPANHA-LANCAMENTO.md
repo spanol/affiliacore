@@ -141,6 +141,49 @@ quente, como ferramenta de FECHAMENTO — nunca link público.
 3. Modelo predominante: CPA, REV ou híbrido?
 4. Quem opera o dia a dia — você ou tem equipe/gerente?
 
+### Lead QUENTE (pediu preço / ligou) — fluxo de fechamento
+
+Sinais de quente: pergunta valor, LIGA, pede demo, responde na hora. Regra de
+ouro: quente não pode esfriar esperando — **cada contato termina agendando o
+próximo passo** (nunca "qualquer coisa me chama").
+
+1. **Tirar do direct → WhatsApp, SEMPRE.** Direct é péssimo pra fechar
+   (notificação, arquivo, histórico) e o contato se perde se o IG sumir.
+   Pedir oferecendo algo em troca — nunca "me passa teu contato" seco:
+   > Perfeito! Te mando o resumo com os valores certinhos e o material por
+   > WhatsApp — qual é o teu número?
+2. **Ligação recebida = ouro.** Na própria ligação: qualificar (checklist
+   abaixo) e desligar já com dia/hora da demo marcada. Pegou de surpresa e
+   não deu? Sem problema — o WhatsApp na sequência resolve.
+3. **Msg 1 no WhatsApp na mesma hora** (recap + valores + fundador + demo
+   com DUAS opções de horário):
+   > Opa [nome], Vinicius da AffiliaCore 👊 Como falamos: painel white-label
+   > pra tua operação de [X afiliados / casas Y]. Valores: setup a partir de
+   > R$ 3 mil (implantação + tua marca + onboarding dos primeiros afiliados)
+   > e mensalidade a partir de R$ 600 — e nas 3 primeiras agências vale o
+   > preço de fundador, condição travada enquanto for cliente. Próximo passo:
+   > te mostro o painel rodando num cenário igual ao teu, 15–20min por vídeo.
+   > Consegue [amanhã às 15h] ou [quinta às 11h]?
+4. **Demo ao vivo (15–20min, vídeo) = a ferramenta de fechamento (P5.3).**
+   Mostrar o /admin num cenário parecido com o do lead (nº de afiliados,
+   casas dele, CPA/REV). A demo LOCAL nos emuladores já serve p/ screen-share
+   hoje (receita no README § demo); instância cloud com credenciais é só p/
+   o lead mexer sozinho depois (gates do operador no playbook §demo).
+5. **Proposta por escrito no WhatsApp no MESMO dia da demo**: o que o setup
+   inclui (implantação, domínio/marca, onboarding), mensalidade, condição de
+   fundador e VALIDADE (ex.: 7 dias). Pedir o "fechado?" explícito.
+6. **Follow-up disciplinado**: 24h e 72h (1 linha: "ficou alguma dúvida da
+   proposta?"); 2 sem resposta → pausa de 1 semana → último toque.
+
+Checklist de qualificação (mínimo p/ precificar o setup R$3–8k):
+- nº de afiliados ativos + em quais casas opera
+- como fecha comissão hoje (planilha/sistema) e com que frequência
+- modelo CPA / REV / híbrido; quem vai operar o painel no dia a dia
+- tem domínio/marca próprios? (white-label completo ou subdomínio)
+
+NÃO fazer: mandar proposta/contrato antes da demo; falar valor sem ancorar no
+que inclui; deixar lead quente >24h sem resposta; prometer feature sem checar.
+
 ### Versão sob medida — César (@cesardecarvalhopereira, lead 14/jul)
 
 Contexto: Linktree = "iGaming Traffic / Agency or RevShare models"; perguntou
