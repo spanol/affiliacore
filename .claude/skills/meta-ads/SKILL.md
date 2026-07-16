@@ -24,6 +24,11 @@ fatos e o estado DA CONTA AffiliaCore. Dentro do repo, esta vence.
 - Login no MBS: **business.facebook.com → "Continuar com o Instagram"** (sessão
   do @affiliacore.br já logada no Chrome; NÃO há login de Facebook). O SSO às
   vezes pede re-auth ao abrir o composer — repetir o mesmo botão.
+- ⚠️ **16/jul: a sessão IG do @affiliacore.br EXPIROU no Chrome** — MBS e
+  instagram.com caem no seletor de perfis salvos e o clique no perfil NÃO loga
+  (exige senha = operador). Enquanto não relogar, Inbox/Ad Center inacessíveis
+  à automação. Após relogar, conferir se o MBS voltou (senão "Entrar com o
+  Instagram" de novo).
 - IDs: business portfolio "Affilia Core" `1550870196394283` · ad account
   `1038808991862700` · asset IG `1195342246993840` · IG user `17841449515192489`.
 - Composer direto (pré-carrega post/objetivo/orçamento via param `so` base64):
