@@ -131,21 +131,30 @@ JSON.stringify({seg:1,ok:!!window.__px});`.trim();
   zChunks.forEach((ch, i) => segs.push(
     `window.__z=${i === 0 ? "''" : 'window.__z'}+'${ch}';JSON.stringify({z:${i + 1},len:window.__z.length});`
   ));
+  // SEM new Response(): o MBS instrumenta fetch/Response ("Failed to fetch");
+  // descompressão via writer/reader direto (lição 2026-07-18, série 2).
   segs.push(`
 const bin=Uint8Array.from(atob(window.__z),ch=>ch.charCodeAt(0));
-const txt=await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('deflate'))).text();
-const fills=JSON.parse(txt);const x=window.__px;
+const ds=new DecompressionStream('deflate');
+const w=ds.writable.getWriter();w.write(bin);w.close();
+const rd=ds.readable.getReader();const parts=[];let tot=0;
+for(;;){const{done,value}=await rd.read();if(done)break;parts.push(value);tot+=value.length;}
+const buf=new Uint8Array(tot);let off=0;for(const p of parts){buf.set(p,off);off+=p.length;}
+const fills=JSON.parse(new TextDecoder().decode(buf));const x=window.__px;
 for(const f of fills){x.fillStyle=f.c;x.fill(new Path2D(f.d));}
 delete window.__z;
 JSON.stringify({drawn:fills.length});`.trim());
+  // input do MBS é desanexado do DOM — usar o capturado pelo click-patch.
   segs.push(`
 const c=window.__pc;
 const blob=await new Promise(r=>c.toBlob(r,'image/png'));
 const file=new File([blob],'${fileName}',{type:'image/png'});
 const dt=new DataTransfer();dt.items.add(file);
-const input=[...document.querySelectorAll('input[type=file]')].find(i=>(i.accept||'').includes('image'));
+const input=window.__capturedInput||[...document.querySelectorAll('input[type=file]')].find(i=>(i.accept||'').includes('image'));
 input.files=dt.files;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
 JSON.stringify({blob:blob.size,accept:input&&input.accept});`.trim());
+  // base64 inteiro p/ a ponte de clipboard (Set-Clipboard→textarea→ctrl+v)
+  writeFileSync(join(OUT, `${name}-z.txt`), b64);
 
   segs.forEach((s, i) => writeFileSync(join(OUT, `${name}-seg${i + 1}.js`), s));
 
