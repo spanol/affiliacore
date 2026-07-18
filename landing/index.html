@@ -38,6 +38,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 {"@type":"Question","name":"Como contrato a AffiliaCore?","acceptedAnswer":{"@type":"Answer","text":"Chama no direct do @affiliacore.br ou deixa seu contato no formulário do fim da página. A gente responde com o preço fechado para o seu tamanho de operação, mostra o painel rodando ao vivo (15–20 minutos por vídeo) e, fechando, a implantação começa na sequência — as 3 primeiras agências entram no preço de fundador."}},
 {"@type":"Question","name":"O que significa white-label na prática?","acceptedAnswer":{"@type":"Answer","text":"A plataforma roda no seu domínio, com o seu logo e as suas cores, numa instância própria com dados isolados por agência. Para os seus afiliados, é o sistema da sua agência."}},
 {"@type":"Question","name":"Já ganho por subafiliação — qual a vantagem do painel próprio?","acceptedAnswer":{"@type":"Answer","text":"Na subafiliação você recebe um percentual fixo dentro do programa da casa, e a rede fica cadastrada no nome dela. Como agência com painel próprio, o deal é direto com a casa e você define o que repassa a cada afiliado — a margem vira o seu spread, por afiliado e por casa; a marca, o domínio e os dados da rede são seus; e o portal, o ranking premiado e a auditoria seguram os afiliados bons."}},
+{"@type":"Question","name":"Dá para montar uma agência de afiliados do zero?","acceptedAnswer":{"@type":"Answer","text":"Dá. O caminho: fechar deals diretos com as casas (CPA e/ou REV — o contato é seu), receber o painel com a sua marca em dias e convidar os primeiros afiliados por link, definindo o repasse de cada um. A margem da agência é o spread entre o que a casa paga e o que você repassa — o simulador da página mostra essa conta com os seus números."}},
 {"@type":"Question","name":"A AffiliaCore muda meu contrato com as casas de aposta?","acceptedAnswer":{"@type":"Answer","text":"Não. O painel não altera o seu deal com casa nenhuma — ele é a infraestrutura para operar como agência: calcular comissão sem planilha, dar portal e ranking aos afiliados e auditar toda mudança de taxa. Os deals com as casas seguem sendo seus."}},
 {"@type":"Question","name":"Como os resultados das casas entram na plataforma?","acceptedAnswer":{"@type":"Answer","text":"Por importação de planilha (Excel/CSV) com modelo guiado, ou por integração direta quando a casa disponibiliza os dados. O fechamento por afiliado e por casa sai automático, com trilha de auditoria."}},
 {"@type":"Question","name":"Quanto tempo leva a implantação?","acceptedAnswer":{"@type":"Answer","text":"Dias, não meses: criação da instância com a sua marca, migração das taxas por afiliado e onboarding da equipe e dos primeiros afiliados."}},
@@ -294,6 +295,32 @@ html.light .theme-toggle .ic-moon{display:block}
 .proof-num span{font-size:.82rem;color:var(--faint)}
 @media (max-width:880px){.proof-nums{grid-template-columns:1fr}}
 
+/* ——— do zero + simulador ——— */
+.sim-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:40px}
+.sim-step{background:var(--card-bg);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px}
+.sim-step i{font-style:normal;font-family:var(--display);font-weight:800;font-size:.82rem;color:var(--ember-l);display:block;margin-bottom:8px}
+.sim-step b{display:block;font-size:.98rem;margin-bottom:4px}
+.sim-step p{color:var(--muted);font-size:.88rem}
+.sim-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:18px;align-items:stretch}
+.sim-card{background:var(--card-bg);border:1px solid var(--line);border-radius:var(--radius);padding:26px}
+.sim-field{margin-bottom:20px}
+.sim-field:last-child{margin-bottom:0}
+.sim-field label{display:flex;justify-content:space-between;align-items:baseline;font-size:.9rem;color:var(--muted);margin-bottom:8px;gap:12px}
+.sim-field output{font-family:var(--display);font-weight:800;font-size:1.05rem;color:var(--text);white-space:nowrap}
+input[type=range].sim-range{width:100%;-webkit-appearance:none;appearance:none;height:6px;border-radius:999px;background:var(--fill-2);outline:none;cursor:pointer}
+input[type=range].sim-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:var(--ember);border:none;cursor:pointer;box-shadow:0 2px 8px rgba(225,29,72,.4)}
+input[type=range].sim-range::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--ember);border:none;cursor:pointer}
+.sim-out{display:flex;flex-direction:column}
+.sim-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 0;border-bottom:1px solid var(--line-soft);color:var(--muted);font-size:.92rem}
+.sim-row b{font-family:var(--display);font-weight:800;font-size:1.05rem;color:var(--text);white-space:nowrap}
+.sim-hero{margin-top:16px;background:linear-gradient(135deg,rgba(225,29,72,.16),rgba(225,29,72,.05));border:1px solid rgba(225,29,72,.45);border-radius:12px;padding:16px 18px}
+.sim-hero span{font-size:.78rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ember-l)}
+.sim-hero b{display:block;font-family:var(--display);font-weight:800;font-size:1.9rem;white-space:nowrap}
+.sim-payback{margin-top:12px;font-size:.9rem;color:var(--muted)}
+.sim-payback b{color:var(--text)}
+.sim-note{margin-top:auto;padding-top:14px;font-size:.8rem;color:var(--faint)}
+@media (max-width:880px){.sim-grid{grid-template-columns:1fr}.sim-steps{grid-template-columns:1fr}}
+
 /* ——— pricing ——— */
 .price-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:760px}
 .price-card{background:var(--card-bg);border:1px solid var(--line);border-radius:var(--radius);padding:30px}
@@ -382,6 +409,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <nav class="nav-links">
       <a href="#produto">O produto</a>
       <a href="#whitelabel">White-label</a>
+      <a href="#simulador">Simulador</a>
       <a href="#preco">Preço</a>
       <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema">
         <svg class="ic-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
@@ -599,6 +627,55 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   </div>
 </section>
 
+<section id="simulador">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">Do zero à agência</span>
+      <h2>Quanto rende uma operação dessas?</h2>
+      <p>A conta de agência é o <em style="font-style:normal;color:var(--ember-l)">spread</em>: a casa te paga por jogador indicado, e você define o que repassa a cada afiliado. Ajuste os números pro seu cenário e veja a margem.</p>
+    </div>
+    <div class="sim-steps">
+      <div class="sim-step"><i>PASSO 01</i><b>Feche deals diretos com as casas</b><p>CPA e/ou REV — o contato e o contrato são seus. A AffiliaCore não intermedia deals.</p></div>
+      <div class="sim-step"><i>PASSO 02</i><b>Receba o painel com a sua marca</b><p>Instância própria em dias: seu domínio, seu logo, suas cores — pronta pra operar.</p></div>
+      <div class="sim-step"><i>PASSO 03</i><b>Convide afiliados e defina o repasse</b><p>Cada um entra por link, com portal próprio. A diferença entre o que a casa paga e o que você repassa é a sua margem.</p></div>
+    </div>
+    <div class="sim-grid">
+      <div class="sim-card">
+        <div class="sim-field">
+          <label for="sim-a">Afiliados ativos <output id="sim-a-v">15</output></label>
+          <input class="sim-range" type="range" id="sim-a" min="1" max="100" step="1" value="15">
+        </div>
+        <div class="sim-field">
+          <label for="sim-f">FTDs por afiliado / mês <output id="sim-f-v">8</output></label>
+          <input class="sim-range" type="range" id="sim-f" min="1" max="60" step="1" value="8">
+        </div>
+        <div class="sim-field">
+          <label for="sim-cpa">CPA que a casa te paga <output id="sim-cpa-v">R$ 600</output></label>
+          <input class="sim-range" type="range" id="sim-cpa" min="100" max="1500" step="25" value="600">
+        </div>
+        <div class="sim-field">
+          <label for="sim-rep">CPA que você repassa ao afiliado <output id="sim-rep-v">R$ 400</output></label>
+          <input class="sim-range" type="range" id="sim-rep" min="0" max="1400" step="25" value="400">
+        </div>
+      </div>
+      <div class="sim-card sim-out">
+        <div class="sim-row"><span>FTDs da rede no mês</span><b id="sim-ftds">120</b></div>
+        <div class="sim-row"><span>A casa paga à agência</span><b id="sim-bruto">R$ 72.000</b></div>
+        <div class="sim-row"><span>Você repassa aos afiliados</span><b id="sim-repasse">R$ 48.000</b></div>
+        <div class="sim-hero"><span>Margem da agência / mês</span><b id="sim-margem">R$ 24.000</b></div>
+        <p class="sim-payback" id="sim-payback">No preço de fundador (R$ 300/mês), a plataforma se paga com os primeiros <b>2 FTDs</b> do mês.</p>
+        <p class="sim-note">Estimativa aritmética com os seus números — sem contar o REV, a porcentagem recorrente sobre a receita dos jogadores, que entra por cima disso todo mês. Os deals com as casas são seus; a AffiliaCore é a infraestrutura que calcula, audita e dá portal à rede.</p>
+      </div>
+    </div>
+    <div class="cta-row" style="margin-top:28px">
+      <a class="btn btn-primary" href="https://ig.me/m/affiliacore.br" target="_blank" rel="noopener">Quero montar minha agência
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <a class="btn btn-ghost" href="#preco">Ver o preço</a>
+    </div>
+  </div>
+</section>
+
 <section id="preco">
   <div class="wrap">
     <div class="sec-head">
@@ -644,6 +721,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <details class="faq-item"><summary>Como contrato a AffiliaCore?</summary><p>Chama no direct do <a href="https://ig.me/m/affiliacore.br" target="_blank" rel="noopener">@affiliacore.br</a> ou deixa seu contato no <a href="#contato">formulário do fim da página</a>. A gente responde com o preço fechado para o seu tamanho de operação, mostra o painel rodando ao vivo (15–20 minutos por vídeo) e, fechando, a implantação começa na sequência — as 3 primeiras agências entram no preço de fundador.</p></details>
       <details class="faq-item"><summary>O que significa white-label na prática?</summary><p>A plataforma roda no seu domínio, com o seu logo e as suas cores, numa instância própria com dados isolados por agência. Para os seus afiliados, é o sistema da sua agência.</p></details>
       <details class="faq-item"><summary>Já ganho por subafiliação — qual a vantagem do painel próprio?</summary><p>Na subafiliação você recebe um percentual fixo dentro do programa da casa, e a rede fica cadastrada no nome dela. Como agência com painel próprio, o deal é direto com a casa e você define o que repassa a cada afiliado — a margem vira o seu spread, por afiliado e por casa; a marca, o domínio e os dados da rede são seus; e o portal, o ranking premiado e a auditoria seguram os afiliados bons.</p></details>
+      <details class="faq-item"><summary>Dá para montar uma agência de afiliados do zero?</summary><p>Dá. O caminho: fechar deals diretos com as casas (CPA e/ou REV — o contato é seu), receber o painel com a sua marca em dias e convidar os primeiros afiliados por link, definindo o repasse de cada um. A margem da agência é o spread entre o que a casa paga e o que você repassa — o <a href="#simulador">simulador</a> mostra essa conta com os seus números.</p></details>
       <details class="faq-item"><summary>A AffiliaCore muda meu contrato com as casas de aposta?</summary><p>Não. O painel não altera o seu deal com casa nenhuma — ele é a infraestrutura para operar como agência: calcular comissão sem planilha, dar portal e ranking aos afiliados e auditar toda mudança de taxa. Os deals com as casas seguem sendo seus.</p></details>
       <details class="faq-item"><summary>Como os resultados das casas entram na plataforma?</summary><p>Por importação de planilha (Excel/CSV) com modelo guiado, ou por integração direta quando a casa disponibiliza os dados. O fechamento por afiliado e por casa sai automático, com trilha de auditoria.</p></details>
       <details class="faq-item"><summary>Quanto tempo leva a implantação?</summary><p>Dias, não meses: criação da instância com a sua marca, migração das taxas por afiliado e onboarding da equipe e dos primeiros afiliados.</p></details>
@@ -724,6 +802,40 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       msg.className = 'form-msg err';
     });
   });
+})();
+(function () {
+  var fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+  var a = document.getElementById('sim-a'), f = document.getElementById('sim-f'),
+      cpa = document.getElementById('sim-cpa'), rep = document.getElementById('sim-rep');
+  var touched = false;
+  function calc() {
+    if (+rep.value > +cpa.value) rep.value = cpa.value; // repasse não passa do CPA da casa
+    var A = +a.value, F = +f.value, C = +cpa.value, R = +rep.value;
+    var ftds = A * F, spread = C - R;
+    document.getElementById('sim-a-v').textContent = A;
+    document.getElementById('sim-f-v').textContent = F;
+    document.getElementById('sim-cpa-v').textContent = fmt.format(C);
+    document.getElementById('sim-rep-v').textContent = fmt.format(R);
+    document.getElementById('sim-ftds').textContent = ftds.toLocaleString('pt-BR');
+    document.getElementById('sim-bruto').textContent = fmt.format(ftds * C);
+    document.getElementById('sim-repasse').textContent = fmt.format(ftds * R);
+    document.getElementById('sim-margem').textContent = fmt.format(ftds * spread);
+    var pb = document.getElementById('sim-payback');
+    if (spread > 0) {
+      var n = Math.max(1, Math.ceil(300 / spread));
+      pb.innerHTML = 'No preço de fundador (R$ 300/mês), a plataforma se paga com ' +
+        (n === 1 ? 'o <b>primeiro FTD</b>' : 'os primeiros <b>' + n + ' FTDs</b>') + ' do mês.';
+    } else {
+      pb.textContent = 'Com repasse igual ao CPA da casa, a margem de CPA é zero — o ganho da agência fica todo no REV.';
+    }
+  }
+  [a, f, cpa, rep].forEach(function (el) {
+    el.addEventListener('input', function () {
+      if (!touched) { touched = true; window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: 'sim_interact' }); }
+      calc();
+    });
+  });
+  calc();
 })();
 (function () {
   var meta = document.querySelector('meta[name="theme-color"]');
