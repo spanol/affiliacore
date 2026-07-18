@@ -161,7 +161,8 @@ próximo passo** (nunca "qualquer coisa me chama").
    > pra tua operação de [X afiliados / casas Y]. Valores: setup a partir de
    > R$ 3 mil (implantação + tua marca + onboarding dos primeiros afiliados)
    > e mensalidade a partir de R$ 600 — e nas 3 primeiras agências vale o
-   > preço de fundador, condição travada enquanto for cliente. Próximo passo:
+   > preço de fundador: R$ 1.500 de implantação + R$ 300/mês, condição
+   > travada enquanto for cliente. Próximo passo:
    > te mostro o painel rodando num cenário igual ao teu, 15–20min por vídeo.
    > Consegue [amanhã às 15h] ou [quinta às 11h]?
 4. **Demo ao vivo (15–20min, vídeo) = a ferramenta de fechamento (P5.3).**

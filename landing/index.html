@@ -28,12 +28,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 {"@context":"https://schema.org","@type":"Organization","name":"AffiliaCore","url":"https://affiliacore.com.br","logo":"https://affiliacore.com.br/logo.svg","sameAs":["https://www.instagram.com/affiliacore.br/"]}
 </script>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"AffiliaCore","applicationCategory":"BusinessApplication","operatingSystem":"Web","url":"https://affiliacore.com.br","image":"https://affiliacore.com.br/og.png","description":"Plataforma white-label de gestão de afiliados para agências de apostas: comissão CPA/REV por casa, portal do afiliado, ranking com premiações e trilha de auditoria.","offers":{"@type":"AggregateOffer","priceCurrency":"BRL","lowPrice":"600","highPrice":"3000","offerCount":2,"offers":[{"@type":"Offer","name":"Implantação (pagamento único, a partir de)","price":"3000","priceCurrency":"BRL"},{"@type":"Offer","name":"Mensalidade (a partir de)","price":"600","priceCurrency":"BRL"}]},"provider":{"@type":"Organization","name":"AffiliaCore","url":"https://affiliacore.com.br"}}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"AffiliaCore","applicationCategory":"BusinessApplication","operatingSystem":"Web","url":"https://affiliacore.com.br","image":"https://affiliacore.com.br/og.png","description":"Plataforma white-label de gestão de afiliados para agências de apostas: comissão CPA/REV por casa, portal do afiliado, ranking com premiações e trilha de auditoria.","offers":{"@type":"AggregateOffer","priceCurrency":"BRL","lowPrice":"300","highPrice":"3000","offerCount":4,"offers":[{"@type":"Offer","name":"Implantação (pagamento único, a partir de)","price":"3000","priceCurrency":"BRL"},{"@type":"Offer","name":"Mensalidade (a partir de)","price":"600","priceCurrency":"BRL"},{"@type":"Offer","name":"Implantação — preço de fundador (3 primeiras agências)","price":"1500","priceCurrency":"BRL"},{"@type":"Offer","name":"Mensalidade — preço de fundador (3 primeiras agências)","price":"300","priceCurrency":"BRL"}]},"provider":{"@type":"Organization","name":"AffiliaCore","url":"https://affiliacore.com.br"}}
 </script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
 {"@type":"Question","name":"O que é a AffiliaCore?","acceptedAnswer":{"@type":"Answer","text":"Uma plataforma white-label de gestão de afiliados para agências de apostas: calcula a comissão CPA/REV por casa, dá um portal próprio a cada afiliado, tem ranking com premiações e trilha de auditoria — tudo com a marca e o domínio da sua agência."}},
-{"@type":"Question","name":"Quanto custa?","acceptedAnswer":{"@type":"Answer","text":"Preço publicado: implantação a partir de R$ 3.000 (pagamento único) e mensalidade a partir de R$ 600/mês, em degraus pelo número de afiliados ativos. As 3 primeiras agências entram com preço de fundador, travado enquanto forem clientes."}},
+{"@type":"Question","name":"Quanto custa?","acceptedAnswer":{"@type":"Answer","text":"Preço publicado: implantação a partir de R$ 3.000 (pagamento único) e mensalidade a partir de R$ 600/mês, em degraus pelo número de afiliados ativos. As 3 primeiras agências entram com preço de fundador — R$ 1.500 de implantação e R$ 300/mês — travado enquanto forem clientes."}},
 {"@type":"Question","name":"O que significa white-label na prática?","acceptedAnswer":{"@type":"Answer","text":"A plataforma roda no seu domínio, com o seu logo e as suas cores, numa instância própria com dados isolados por agência. Para os seus afiliados, é o sistema da sua agência."}},
 {"@type":"Question","name":"Como os resultados das casas entram na plataforma?","acceptedAnswer":{"@type":"Answer","text":"Por importação de planilha (Excel/CSV) com modelo guiado, ou por integração direta quando a casa disponibiliza os dados. O fechamento por afiliado e por casa sai automático, com trilha de auditoria."}},
 {"@type":"Question","name":"Quanto tempo leva a implantação?","acceptedAnswer":{"@type":"Answer","text":"Dias, não meses: criação da instância com a sua marca, migração das taxas por afiliado e onboarding da equipe e dos primeiros afiliados."}},
@@ -50,16 +50,52 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   --ink:#11070A; --plum:#26181C; --surface:#3F1D2B;
   --ember:#E11D48; --ember-l:#E45B79;
   --text:#FFF6F8; --muted:#AF9DA2; --faint:#816E74;
-  --line:rgba(255,255,255,.09);
+  --line:rgba(255,255,255,.09); --line-soft:rgba(255,255,255,.05);
   --radius:16px;
+  --html-bg:#150A0D;
+  --bg-grad:linear-gradient(180deg,#150A0D 0%,var(--plum) 42%,#1B0F13 100%);
+  --header-bg:rgba(23,11,15,.97);
+  --card-bg:rgba(63,29,43,.35);
+  --band-bg:rgba(63,29,43,.22);
+  --faq-bg:rgba(255,255,255,.02);
+  --fill-1:rgba(255,255,255,.035);
+  --fill-2:rgba(255,255,255,.06);
+  --chip-bg:#1C1014;
+  --input-bg:rgba(255,255,255,.05);
+  --err:#FCA5A5;
+  --ember-glow:rgba(225,29,72,.16);
+  --mock-bg:#1C1014; --mock-bar:#241419; --mock-side:#170D10; --dot:#4A3038;
+  --shadow-mock:0 40px 90px rgba(0,0,0,.5);
+  --shadow-shot:0 18px 44px rgba(0,0,0,.35);
   --display:'Bricolage Grotesque',system-ui,sans-serif;
   --body:'Inter',system-ui,sans-serif;
 }
+/* tema claro — mesma linguagem do light mode da plataforma (canvas claro derivado do plum, accent ember) */
+html.light{
+  --ember-l:#BE123C;
+  --text:#1C1014; --muted:#6E5A60; --faint:#9A878D;
+  --line:rgba(28,16,20,.12); --line-soft:rgba(28,16,20,.07);
+  --html-bg:#FBF7F8;
+  --bg-grad:linear-gradient(180deg,#FFFFFF 0%,#FBF5F7 42%,#FDFAFB 100%);
+  --header-bg:rgba(255,255,255,.97);
+  --card-bg:#FFFFFF;
+  --band-bg:rgba(63,29,43,.05);
+  --faq-bg:#FFFFFF;
+  --fill-1:rgba(38,24,28,.045);
+  --fill-2:rgba(38,24,28,.07);
+  --chip-bg:#FFFFFF;
+  --input-bg:#FFFFFF;
+  --err:#B91C1C;
+  --ember-glow:rgba(225,29,72,.09);
+  --mock-bg:#FFFFFF; --mock-bar:#F5EFF1; --mock-side:#FBF7F8; --dot:#DCCFD3;
+  --shadow-mock:0 40px 90px rgba(38,24,28,.16);
+  --shadow-shot:0 18px 44px rgba(38,24,28,.13);
+}
 *{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth;background:#150A0D}
+html{scroll-behavior:smooth;background:var(--html-bg)}
 body{
   font-family:var(--body);color:var(--text);background:var(--ink);
-  background:linear-gradient(180deg,#150A0D 0%,var(--plum) 42%,#1B0F13 100%);
+  background:var(--bg-grad);
   -webkit-font-smoothing:antialiased;line-height:1.6;overflow-x:hidden;
 }
 .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
@@ -70,11 +106,19 @@ section{padding:88px 0}
 /* ——— header ——— */
 header{
   position:sticky;top:0;z-index:50;
-  background:rgba(23,11,15,.97);
+  background:var(--header-bg);
   border-bottom:1px solid var(--line);
 }
 .nav{display:flex;align-items:center;justify-content:space-between;height:64px}
 .nav img{height:22px;display:block}
+.logo-l{display:none}
+html.light .logo-d{display:none}
+html.light .logo-l{display:block}
+.theme-toggle{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--fill-1);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:color .15s,background .15s}
+.theme-toggle:hover{color:var(--text);background:var(--fill-2)}
+.theme-toggle .ic-moon{display:none}
+html.light .theme-toggle .ic-sun{display:none}
+html.light .theme-toggle .ic-moon{display:block}
 .nav-links{display:flex;gap:28px;align-items:center;font-size:.92rem;color:var(--muted)}
 .nav-links a{text-decoration:none;transition:color .15s}
 .nav-links a:hover{color:var(--text)}
@@ -90,15 +134,15 @@ header{
   box-shadow:0 8px 28px rgba(225,29,72,.35);
 }
 .btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 34px rgba(225,29,72,.45)}
-.btn-ghost{border:1px solid var(--line);color:var(--text);background:rgba(255,255,255,.03)}
-.btn-ghost:hover{background:rgba(255,255,255,.07)}
+.btn-ghost{border:1px solid var(--line);color:var(--text);background:var(--fill-1)}
+.btn-ghost:hover{background:var(--fill-2)}
 .btn-sm{padding:9px 18px;font-size:.9rem}
 
 /* ——— hero ——— */
 .hero{padding:96px 0 72px;position:relative}
 .hero::before{
   content:'';position:absolute;inset:-180px 0 auto;height:640px;pointer-events:none;
-  background:radial-gradient(ellipse 60% 50% at 70% 20%,rgba(225,29,72,.16),transparent 70%);
+  background:radial-gradient(ellipse 60% 50% at 70% 20%,var(--ember-glow),transparent 70%);
 }
 .hero .wrap{position:relative}
 .eyebrow{
@@ -116,63 +160,65 @@ header{
 /* ——— dashboard mock ——— */
 .mock{
   margin-top:64px;border-radius:18px;border:1px solid var(--line);overflow:hidden;
-  background:#1C1014;box-shadow:0 40px 90px rgba(0,0,0,.5);
+  background:var(--mock-bg);box-shadow:var(--shadow-mock);
   font-size:12.5px;
 }
-.mock-bar{display:flex;align-items:center;gap:8px;padding:11px 16px;background:#241419;border-bottom:1px solid var(--line)}
-.dot{width:10px;height:10px;border-radius:50%;background:#4A3038}
+.mock-bar{display:flex;align-items:center;gap:8px;padding:11px 16px;background:var(--mock-bar);border-bottom:1px solid var(--line)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--dot)}
 .mock-url{
-  margin-left:12px;flex:1;max-width:340px;background:rgba(255,255,255,.05);
+  margin-left:12px;flex:1;max-width:340px;background:var(--fill-2);
   border-radius:7px;padding:4px 12px;color:var(--faint);font-size:11.5px;
 }
 .mock-body{display:grid;grid-template-columns:180px 1fr;min-height:340px}
-.mock-side{background:#170D10;border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column}
+.mock-side{background:var(--mock-side);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column}
 .mock-brand{display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:800;font-size:13px;padding:4px 8px 14px}
 .mock-brand i{width:20px;height:20px;border-radius:6px;background:linear-gradient(135deg,var(--ember),#9F1239);display:inline-block}
 .mock-label{font-size:8.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);padding:0 10px 6px}
 .mock-nav div{padding:8px 10px;border-radius:8px;color:var(--faint);margin-bottom:2px}
 .mock-nav div.on{background:rgba(225,29,72,.14);color:var(--ember-l);font-weight:600}
-.mock-user{margin-top:auto;display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:10px;font-size:10.5px;color:var(--faint)}
+.mock-user{margin-top:auto;display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--fill-1);border:1px solid var(--line);border-radius:10px;font-size:10.5px;color:var(--faint)}
 .mock-user i{flex:none;width:20px;height:20px;border-radius:50%;background:rgba(225,29,72,.2);color:var(--ember-l);font-style:normal;font-weight:700;font-size:8.5px;display:flex;align-items:center;justify-content:center}
 .mock-main{padding:18px;display:flex;flex-direction:column;gap:14px}
 .mock-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .mock-head strong{display:block;font-family:var(--display);font-weight:800;font-size:17px;letter-spacing:-.02em;margin-top:6px}
-.mock-pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:rgba(255,255,255,.04);border-radius:999px;padding:4px 10px;font-size:9.5px;font-weight:600;color:var(--muted)}
+.mock-pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--fill-1);border-radius:999px;padding:4px 10px;font-size:9.5px;font-weight:600;color:var(--muted)}
 .mock-pill.live{text-transform:uppercase;letter-spacing:.1em;font-weight:700}
 .mock-pill.live i{width:5px;height:5px;border-radius:50%;background:#4ADE80}
 .mock-head-actions{display:flex;align-items:center;gap:8px;margin-top:4px}
 .mock-cta{display:inline-flex;background:var(--ember);color:#fff;border-radius:999px;padding:5px 12px;font-size:9.5px;font-weight:700}
 .mock-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.stat{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.stat{background:var(--fill-1);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
 .stat.dark{background:#211117}
+.stat.dark b{color:#FFF6F8}
+.stat.dark span{color:#816E74}
 .stat b{display:block;font-family:var(--display);font-weight:800;font-size:16px;margin-top:3px;white-space:nowrap}
 .stat span{color:var(--faint);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
 .mock-cols{display:grid;grid-template-columns:1.25fr 1fr;gap:12px;flex:1}
-.panel{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:12px;padding:14px}
+.panel{background:var(--fill-1);border:1px solid var(--line);border-radius:12px;padding:14px}
 .panel h4{font-family:var(--body);font-weight:700;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:12px}
 .vbars{display:flex;align-items:flex-end;gap:8px;height:96px}
 .vbars div{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
 .vbars i{display:block;width:100%;border-radius:4px 4px 0 0;background:rgba(225,29,72,.55)}
 .vbars div:first-child i{background:linear-gradient(180deg,var(--ember-l),var(--ember))}
 .vbars span{font-size:9px;color:var(--faint)}
-.trow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);color:var(--muted);font-size:12px}
+.trow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line-soft);color:var(--muted);font-size:12px}
 .trow:last-child{border:none}
 .trow b{color:var(--text);font-weight:600}
 .up{color:var(--ember-l);font-size:10.5px;font-weight:600}
 .mock-sec{font-family:var(--body);font-weight:700;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:8px}
 .mock-houses{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.house{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
-.house i{flex:none;width:26px;height:26px;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid var(--line);font-style:normal;font-weight:700;font-size:11px;color:var(--muted);display:flex;align-items:center;justify-content:center}
+.house{display:flex;align-items:center;gap:10px;background:var(--fill-1);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.house i{flex:none;width:26px;height:26px;border-radius:8px;background:var(--fill-2);border:1px solid var(--line);font-style:normal;font-weight:700;font-size:11px;color:var(--muted);display:flex;align-items:center;justify-content:center}
 .house span{display:block;font-size:9.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .house b{display:block;font-family:var(--display);font-weight:800;font-size:12.5px;color:var(--text);white-space:nowrap}
 .house > div{min-width:0}
 
 /* ——— vinhetas (telas do produto — prints reais) ——— */
 .shots{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-.shot{border:1px solid var(--line);border-radius:14px;background:#1C1014;overflow:hidden;box-shadow:0 18px 44px rgba(0,0,0,.35)}
-.shot-bar{display:flex;align-items:center;gap:5px;padding:9px 12px;background:#241419;border-bottom:1px solid var(--line)}
-.shot-bar .dot{width:7px;height:7px}
-.shot-bar span:last-child{margin-left:8px;font-size:10px;color:var(--faint)}
+.shot{border:1px solid var(--line);border-radius:14px;background:#1C1014;overflow:hidden;box-shadow:var(--shadow-shot)}
+.shot-bar{display:flex;align-items:center;gap:5px;padding:9px 12px;background:#241419;border-bottom:1px solid rgba(255,255,255,.09)}
+.shot-bar .dot{width:7px;height:7px;background:#4A3038}
+.shot-bar span:last-child{margin-left:8px;font-size:10px;color:#816E74}
 .shot img{display:block;width:100%;height:auto}
 .shot-feature{margin-bottom:30px}
 .shot-wrap h3{font-size:1.02rem;font-weight:800;margin:16px 0 6px}
@@ -185,7 +231,7 @@ header{
 
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
 .card{
-  background:rgba(63,29,43,.35);border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--card-bg);border:1px solid var(--line);border-radius:var(--radius);
   padding:26px;transition:border-color .2s,transform .2s;
 }
 .card:hover{border-color:rgba(225,29,72,.4);transform:translateY(-3px)}
@@ -197,7 +243,7 @@ header{
 .card p{color:var(--muted);font-size:.94rem}
 
 /* ——— white-label ——— */
-.wl{background:rgba(63,29,43,.22);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.wl{background:var(--band-bg);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .wl-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
 .wl-list{list-style:none;display:flex;flex-direction:column;gap:16px;margin-top:26px}
 .wl-list li{display:flex;gap:14px;color:var(--muted)}
@@ -207,7 +253,7 @@ header{
 .wl-visual{display:flex;flex-direction:column;gap:14px}
 .wl-chip{
   display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:14px;
-  padding:16px 20px;background:#1C1014;
+  padding:16px 20px;background:var(--chip-bg);
 }
 .wl-chip i{width:34px;height:34px;border-radius:9px;flex:none}
 .wl-chip div b{display:block;font-family:var(--display);font-weight:800;font-size:.98rem}
@@ -218,7 +264,7 @@ header{
 .proof .kicker{margin-bottom:18px}
 .proof-card{
   display:flex;align-items:center;gap:24px;flex-wrap:wrap;
-  background:rgba(63,29,43,.35);border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--card-bg);border:1px solid var(--line);border-radius:var(--radius);
   padding:26px 28px;
 }
 .proof-mark{
@@ -232,21 +278,21 @@ header{
 .proof-side{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
 .proof-badge{
   display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);
-  background:rgba(255,255,255,.04);border-radius:999px;padding:6px 13px;
+  background:var(--fill-1);border-radius:999px;padding:6px 13px;
   font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
 }
 .proof-badge i{width:6px;height:6px;border-radius:50%;background:#4ADE80}
-.proof-link{font-size:.9rem;color:var(--muted);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.18);transition:color .15s}
+.proof-link{font-size:.9rem;color:var(--muted);text-decoration:none;border-bottom:1px solid var(--line);transition:color .15s}
 .proof-link:hover{color:var(--text)}
 .proof-nums{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
-.proof-num{border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.03);padding:16px 18px}
+.proof-num{border:1px solid var(--line);border-radius:12px;background:var(--fill-1);padding:16px 18px}
 .proof-num b{display:block;font-family:var(--display);font-weight:800;font-size:1.35rem;white-space:nowrap}
 .proof-num span{font-size:.82rem;color:var(--faint)}
 @media (max-width:880px){.proof-nums{grid-template-columns:1fr}}
 
 /* ——— pricing ——— */
 .price-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:760px}
-.price-card{background:rgba(63,29,43,.35);border:1px solid var(--line);border-radius:var(--radius);padding:30px}
+.price-card{background:var(--card-bg);border:1px solid var(--line);border-radius:var(--radius);padding:30px}
 .price-card .tag{font-size:.8rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
 .price-card .pre{display:block;font-size:.88rem;color:var(--muted);margin-top:14px}
 .price-card .val{font-family:var(--display);font-weight:800;font-size:2rem;margin:2px 0 4px;white-space:nowrap}
@@ -260,29 +306,32 @@ header{
 }
 .founder h3{font-size:1.25rem;margin-bottom:6px}
 .founder p{color:var(--muted);font-size:.95rem;max-width:46ch}
+.founder-vals{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font-family:var(--display);font-weight:800;font-size:1.7rem;margin:2px 0 8px}
+.founder-vals small{font-size:.95rem;color:var(--muted);font-weight:500}
+.founder-vals i{font-style:normal;font-weight:400;font-size:1.15rem;color:var(--muted)}
 
 /* ——— final cta ——— */
 .final{text-align:center;padding:100px 0}
 .final h2{font-size:clamp(1.9rem,4.2vw,2.9rem);max-width:20ch;margin:0 auto 16px}
 .final > .wrap > p{color:var(--muted);max-width:44ch;margin:0 auto 44px}
 .paths{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:820px;margin:0 auto;text-align:left}
-.path-card{background:rgba(63,29,43,.35);border:1px solid var(--line);border-radius:var(--radius);padding:30px;display:flex;flex-direction:column}
+.path-card{background:var(--card-bg);border:1px solid var(--line);border-radius:var(--radius);padding:30px;display:flex;flex-direction:column}
 .path-card h3{font-size:1.15rem;margin-bottom:8px}
 .path-card > p{color:var(--muted);font-size:.93rem;margin-bottom:22px}
 .path-card .btn{margin-top:auto;justify-content:center}
 .lead-form{display:flex;flex-direction:column;gap:12px}
 .lead-form input,.lead-form select{
-  width:100%;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:10px;
+  width:100%;background:var(--input-bg);border:1px solid var(--line);border-radius:10px;
   padding:12px 14px;color:var(--text);font-family:var(--body);font-size:.95rem;outline:none;
   transition:border-color .15s;
 }
 .lead-form input::placeholder{color:var(--faint)}
 .lead-form select:invalid,.lead-form select option[value=""]{color:var(--faint)}
-.lead-form select option{background:var(--plum);color:var(--text)}
+.lead-form select option{background:var(--chip-bg);color:var(--text)}
 .lead-form input:focus,.lead-form select:focus{border-color:var(--ember-l)}
 .lead-form .hp{position:absolute;left:-5000px;opacity:0;height:0;padding:0;border:0}
 .form-msg{font-size:.85rem;min-height:1.2em;margin:0}
-.form-msg.err{color:#FCA5A5}
+.form-msg.err{color:var(--err)}
 .form-ok{color:var(--text);font-weight:600;text-align:center;padding:34px 0;font-size:1.05rem}
 
 /* ——— footer ——— */
@@ -308,13 +357,14 @@ footer a:hover{color:var(--text)}
 }
 /* ——— faq ——— */
 .faq-list{display:grid;gap:12px;max-width:820px;margin:0 auto}
-.faq-item{border:1px solid var(--line);border-radius:var(--radius);background:rgba(255,255,255,.02)}
+.faq-item{border:1px solid var(--line);border-radius:var(--radius);background:var(--faq-bg)}
 .faq-item summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px 22px;font-family:var(--display);font-weight:800;font-size:1.02rem}
 .faq-item summary::-webkit-details-marker{display:none}
 .faq-item summary::after{content:'+';font-family:var(--body);font-weight:400;font-size:1.4rem;color:var(--ember-l);transition:transform .15s;line-height:1;flex-shrink:0}
 .faq-item[open] summary::after{transform:rotate(45deg)}
 .faq-item p{padding:0 22px 18px;color:var(--muted)}
 </style>
+<script>(function(){try{if(localStorage.getItem('ac-theme')==='light')document.documentElement.classList.add('light')}catch(e){}})()</script>
 </head>
 <body>
 <!-- Google Tag Manager (noscript) -->
@@ -324,11 +374,15 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
 <header>
   <div class="wrap nav">
-    <a href="#"><img src="/logo.svg" alt="AffiliaCore"></a>
+    <a href="#"><img class="logo-d" src="/logo.svg" alt="AffiliaCore"><img class="logo-l" src="/logo-light.svg" alt="AffiliaCore"></a>
     <nav class="nav-links">
       <a href="#produto">O produto</a>
       <a href="#whitelabel">White-label</a>
       <a href="#preco">Preço</a>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema">
+        <svg class="ic-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <svg class="ic-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
       <a class="btn btn-primary btn-sm" href="https://ig.me/m/affiliacore.br" target="_blank" rel="noopener">Falar com a gente</a>
     </nav>
   </div>
@@ -350,7 +404,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <div class="mock" aria-hidden="true">
       <div class="mock-bar">
         <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-        <span class="mock-url">painel.<b style="color:#AF9DA2">suaagencia</b>.com.br</span>
+        <span class="mock-url">painel.<b style="color:var(--muted)">suaagencia</b>.com.br</span>
       </div>
       <div class="mock-body">
         <div class="mock-side">
@@ -565,7 +619,8 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <div class="founder">
       <div>
         <h3>🎯 Preço de fundador</h3>
-        <p>As 3 primeiras agências entram com condição travada enquanto forem clientes — em troca de feedback de perto durante a implantação.</p>
+        <div class="founder-vals"><span>R$ 1.500 <small>· único</small></span><i>+</i><span>R$ 300 <small>/mês</small></span></div>
+        <p>Metade do preço publicado para as 3 primeiras agências — condição travada enquanto forem clientes, em troca de feedback de perto durante a implantação.</p>
       </div>
       <a class="btn btn-primary" href="https://ig.me/m/affiliacore.br" target="_blank" rel="noopener">Quero ser fundador</a>
     </div>
@@ -580,7 +635,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </div>
     <div class="faq-list">
       <details class="faq-item"><summary>O que é a AffiliaCore?</summary><p>Uma plataforma white-label de gestão de afiliados para agências de apostas: calcula a comissão CPA/REV por casa, dá um portal próprio a cada afiliado, tem ranking com premiações e trilha de auditoria — tudo com a marca e o domínio da sua agência.</p></details>
-      <details class="faq-item"><summary>Quanto custa?</summary><p>Preço publicado: implantação a partir de R$ 3.000 (pagamento único) e mensalidade a partir de R$ 600/mês, em degraus pelo número de afiliados ativos. As 3 primeiras agências entram com preço de fundador, travado enquanto forem clientes.</p></details>
+      <details class="faq-item"><summary>Quanto custa?</summary><p>Preço publicado: implantação a partir de R$ 3.000 (pagamento único) e mensalidade a partir de R$ 600/mês, em degraus pelo número de afiliados ativos. As 3 primeiras agências entram com preço de fundador — R$ 1.500 de implantação e R$ 300/mês — travado enquanto forem clientes.</p></details>
       <details class="faq-item"><summary>O que significa white-label na prática?</summary><p>A plataforma roda no seu domínio, com o seu logo e as suas cores, numa instância própria com dados isolados por agência. Para os seus afiliados, é o sistema da sua agência.</p></details>
       <details class="faq-item"><summary>Como os resultados das casas entram na plataforma?</summary><p>Por importação de planilha (Excel/CSV) com modelo guiado, ou por integração direta quando a casa disponibiliza os dados. O fechamento por afiliado e por casa sai automático, com trilha de auditoria.</p></details>
       <details class="faq-item"><summary>Quanto tempo leva a implantação?</summary><p>Dias, não meses: criação da instância com a sua marca, migração das taxas por afiliado e onboarding da equipe e dos primeiros afiliados.</p></details>
@@ -662,11 +717,23 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     });
   });
 })();
+(function () {
+  var meta = document.querySelector('meta[name="theme-color"]');
+  function sync() {
+    if (meta) meta.content = document.documentElement.classList.contains('light') ? '#FBF7F8' : '#26181C';
+  }
+  sync();
+  document.getElementById('theme-toggle').addEventListener('click', function () {
+    var light = document.documentElement.classList.toggle('light');
+    try { localStorage.setItem('ac-theme', light ? 'light' : 'dark'); } catch (e) {}
+    sync();
+  });
+})();
 </script>
 
 <footer>
   <div class="wrap">
-    <a href="#"><img src="/logo.svg" alt="AffiliaCore"></a>
+    <a href="#"><img class="logo-d" src="/logo.svg" alt="AffiliaCore"><img class="logo-l" src="/logo-light.svg" alt="AffiliaCore"></a>
     <span>Gestão de afiliados para agências de apostas · Brasil</span>
     <a href="https://www.instagram.com/affiliacore.br/" target="_blank" rel="noopener">@affiliacore.br</a>
   </div>
