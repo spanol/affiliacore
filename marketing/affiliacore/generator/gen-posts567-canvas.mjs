@@ -5,6 +5,7 @@
 // Layout = gen-posts567.mjs. Fontes: ../fonts (woff2).
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { deflateSync } from 'node:zlib';
 import * as fontkit from 'fontkit';
 import { Resvg } from '@resvg/resvg-js';
 
@@ -119,27 +120,24 @@ ${geomJs}
 window.__pc=c;window.__px=x;
 JSON.stringify({seg:1,ok:!!window.__px});`.trim();
 
+  // fills → JSON compacto → deflate → base64 → chunks acumuladores ≤9.3KB.
+  // Na página: DecompressionStream('deflate') reidrata e desenha (1 chamada).
+  const payload = JSON.stringify(fills.map((f) => ({ c: f.color, d: f.d })));
+  const b64 = deflateSync(Buffer.from(payload, 'utf8')).toString('base64');
+  const CH = 9300;
+  const zChunks = [];
+  for (let i = 0; i < b64.length; i += CH) zChunks.push(b64.slice(i, i + CH));
   const segs = [seg1];
-  let cur = [];
-  let curLen = 0;
-  const pushStmt = (stmt) => {
-    if (curLen + stmt.length > 10000 && cur.length) {
-      segs.push(`const x=window.__px;\n${cur.join('\n')}\nJSON.stringify({seg:${segs.length + 1},ok:true});`);
-      cur = []; curLen = 0;
-    }
-    cur.push(stmt); curLen += stmt.length;
-  };
-  for (const f of fills) {
-    const chunks = [];
-    let acc = '';
-    for (const gd of f.glyphDs || [f.d]) {
-      if (acc.length + gd.length > 9000 && acc) { chunks.push(acc); acc = ''; }
-      acc += gd;
-    }
-    if (acc) chunks.push(acc);
-    for (const ch of chunks) pushStmt(`x.fillStyle='${f.color}';x.fill(new Path2D(${jstr(ch)}));`);
-  }
-  if (cur.length) segs.push(`const x=window.__px;\n${cur.join('\n')}\nJSON.stringify({seg:${segs.length + 1},ok:true});`);
+  zChunks.forEach((ch, i) => segs.push(
+    `window.__z=${i === 0 ? "''" : 'window.__z'}+'${ch}';JSON.stringify({z:${i + 1},len:window.__z.length});`
+  ));
+  segs.push(`
+const bin=Uint8Array.from(atob(window.__z),ch=>ch.charCodeAt(0));
+const txt=await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('deflate'))).text();
+const fills=JSON.parse(txt);const x=window.__px;
+for(const f of fills){x.fillStyle=f.c;x.fill(new Path2D(f.d));}
+delete window.__z;
+JSON.stringify({drawn:fills.length});`.trim());
   segs.push(`
 const c=window.__pc;
 const blob=await new Promise(r=>c.toBlob(r,'image/png'));
