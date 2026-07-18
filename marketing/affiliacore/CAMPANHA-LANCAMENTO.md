@@ -25,6 +25,9 @@
 - `avatar.png` — foto de perfil (1024², glifo centrado, seguro p/ crop circular)
 - `capa-linkedin.png` — capa da página (1584×396)
 - `post-1-lancamento.png` … `post-4-fundador.png` — feed 1080×1080
+- `post-5-conta.png` (tema CLARO) · `post-6-dozero.png` (dark) ·
+  `post-7-simulador.png` (tema CLARO) — série 2 "lucratividade" (2026-07-18);
+  gerador `generator/gen-posts567.mjs`
 
 ## Campanha de lançamento — 4 posts (cadência sugerida: dias 1 · 3 · 5 · 7)
 
@@ -74,6 +77,60 @@ Se a sua agência gerencia afiliados de casas de aposta e quer sair da
 planilha, chama no direct. 🎯
 
 `#afiliados #igaming #gestaodeafiliados #apostas`
+
+## Série 2 — chamariz de lucratividade (posts 5–7, 2026-07-18)
+
+Posts 5 e 7 estreiam o TEMA CLARO da marca (espelho do light da landing);
+post 6 segue dark p/ alternar o feed. Cadência sugerida: **20 · 22 · 24/jul,
+11h, FB+IG via MBS**. Âncora de todos: o simulador de margem da landing
+(affiliacore.com.br/#simulador). Guardrail: números sempre ILUSTRATIVOS +
+honestidade (a AffiliaCore não intermedia deals) — sem promessa de renda.
+
+### Post 5 — A conta da agência (light)
+
+A conta que todo gestor de afiliados deveria fazer: 🧮
+
+A casa te paga um CPA por jogador indicado. Você define o que repassa a cada
+afiliado. A diferença — o spread — é a margem da agência, multiplicada pela
+rede inteira.
+
+No exemplo: CPA de R$ 600, repasse de R$ 400 e 120 FTDs no mês = R$ 24.000 de
+margem. Números ilustrativos — a conta que vale é com os SEUS: tem um
+simulador grátis no nosso site.
+
+affiliacore.com.br
+
+`#afiliados #gestaodeafiliados #igaming #agenciadeafiliados #apostasesportivas`
+
+### Post 6 — Do zero à agência
+
+Dá pra montar uma agência de afiliados do zero? Dá — e o caminho é mais curto
+do que parece. 🚀
+
+01 · Feche deals diretos com as casas (CPA e/ou REV — o contato e o contrato
+são seus).
+02 · Receba o painel com a sua marca: instância própria, pronta em dias.
+03 · Convide afiliados por link e defina o repasse de cada um.
+
+Transparência: a AffiliaCore não intermedia deals com as casas — ela é a
+infraestrutura pra você operar como agência: comissão calculada por casa,
+portal do afiliado, ranking premiado e trilha de auditoria.
+
+Quer entrar no jogo? Chama no direct. 🎯
+
+`#agenciadeafiliados #afiliados #igaming #gestaodeafiliados`
+
+### Post 7 — Simulador (light)
+
+Ferramenta grátis: o simulador de margem da AffiliaCore. 🧮
+
+Ajusta afiliados ativos, FTDs por mês, CPA da casa e repasse ao afiliado — e
+a margem mensal da operação aparece na hora, sem cadastro.
+
+Faz a conta com os seus números: affiliacore.com.br (link na bio), seção
+Simulador.
+
+`#afiliados #gestaodeafiliados #igaming #agenciadeafiliados`
 
 ## Checklist de cadastro (ações do operador — contas/pagamento)
 
