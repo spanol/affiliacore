@@ -18,6 +18,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import TwoFactorCard from '../components/TwoFactorCard';
 
 export default function Profile() {
   const { profile, user } = useAuth();
@@ -261,6 +262,8 @@ export default function Profile() {
                 <p className="text-[9px] text-slate-400 dark:text-neutral-500 mt-1 italic">Mínimo 6 caracteres para alteração.</p>
               </div>
             </div>
+
+            <TwoFactorCard user={user} />
 
             <div className="flex justify-end pt-2">
               <button
