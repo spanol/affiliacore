@@ -20,10 +20,23 @@ export default function LeadDiagnostic() {
   const update = <K extends keyof ContactInquiryInput>(key: K, value: ContactInquiryInput[K]) => setForm((current) => ({ ...current, [key]: value }));
   const next = () => { setDirection(1); setStep((current) => Math.min(current + 1, totalSteps - 1)); };
   const back = () => { setDirection(-1); setStep((current) => Math.max(current - 1, 0)); };
+  const canProceedCurrentStep = () => {
+    if (step === 0) return !!form.name.trim();
+    if (step === 3) return !!form.socialMedia.trim();
+    if (step === 4) return !!form.phone.trim();
+    if (step === totalSteps - 1) return !!form.email.trim();
+    return true;
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (status === 'submitting') return;
+
+    if (step < totalSteps - 1) {
+      if (canProceedCurrentStep()) next();
+      return;
+    }
+
     setStatus('submitting');
     try {
       await createContactInquiry(Object.fromEntries(Object.entries(form).map(([key, value]) => [key, typeof value === 'string' ? value.trim() : value])) as unknown as ContactInquiryInput);
@@ -71,7 +84,7 @@ export default function LeadDiagnostic() {
             </div>
             <div className="mt-6 flex items-center justify-between gap-4 border-t border-white/8 pt-6">
               <button type="button" onClick={back} disabled={step === 0} className="flex items-center gap-2 px-2 py-3 text-sm font-semibold text-neutral-400 transition hover:text-white disabled:invisible"><ArrowLeft className="h-4 w-4" /> Voltar</button>
-              {step !== 1 && step !== 2 && (step < totalSteps - 1 ? <button type="button" onClick={next} disabled={(step === 0 && !form.name.trim()) || (step === 3 && !form.socialMedia.trim()) || (step === 4 && !form.phone.trim())} className="flex items-center gap-2 rounded-xl bg-white px-6 py-3 font-bold text-neutral-950 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-40">Continuar <ArrowRight className="h-4 w-4" /></button> : <button type="submit" disabled={!form.email.trim() || status === 'submitting'} className="flex items-center gap-2 rounded-xl bg-accent-500 px-6 py-3 font-bold text-[var(--color-accent-contrast)] transition hover:bg-accent-400 disabled:opacity-50">{status === 'submitting' ? <><Loader2 className="h-4 w-4 animate-spin" /> Enviando</> : <>Enviar diagnóstico <ArrowRight className="h-4 w-4" /></>}</button>)}
+              {step !== 1 && step !== 2 && (step < totalSteps - 1 ? <button type="button" onClick={next} disabled={!canProceedCurrentStep()} className="flex items-center gap-2 rounded-xl bg-white px-6 py-3 font-bold text-neutral-950 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-40">Continuar <ArrowRight className="h-4 w-4" /></button> : <button type="submit" disabled={!form.email.trim() || status === 'submitting'} className="flex items-center gap-2 rounded-xl bg-accent-500 px-6 py-3 font-bold text-[var(--color-accent-contrast)] transition hover:bg-accent-400 disabled:opacity-50">{status === 'submitting' ? <><Loader2 className="h-4 w-4 animate-spin" /> Enviando</> : <>Enviar diagnóstico <ArrowRight className="h-4 w-4" /></>}</button>)}
             </div>
           </form>
         )}
