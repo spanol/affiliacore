@@ -1,0 +1,87 @@
+# Instância CLIENTE · Infinity — projeto Firebase `infinity-affiliacore`.
+#
+# Ativação (one-time, console do projeto infinity-affiliacore): App Hosting →
+# backend → Settings → Environment → nome `infinity` → Save. Playbook completo
+# em scripts/provision/README.md. Admin inicial provisório: viniciusspanol@gmail.com
+# (trocar assim que o cliente indicar o e-mail definitivo).
+env:
+  # OTG-free: padrão de venda white-label; roda 100% em casas manuais.
+  - variable: VITE_OTG_ENABLED
+    value: 'false'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Marca do cliente. Logo/favicon ficam nos defaults do produto até o cliente
+  # entregar os assets (trocar por URL própria — env, zero rebuild).
+  - variable: VITE_BRAND_NAME
+    value: 'Infinity'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: VITE_BRAND_SHORT
+    value: 'Infinity'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Roxo principal passado pelo cliente. A engine gera a escala accent-* +
+  # contraste WCAG em runtime. Canvas/surface seguem o tema base por enquanto.
+  - variable: VITE_BRAND_ACCENT
+    value: '#8332B9'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: FIREBASE_STORAGE_BUCKET
+    value: 'infinity-affiliacore.firebasestorage.app'
+    availability:
+      - RUNTIME
+
+  # --- Neutralização dos secrets OTG do apphosting.yaml base -----------------
+  # O base referencia secrets que SÓ existem no projeto da instância 0 (Carlos).
+  # Instância OTG-free sobrepõe com plain 'unused' (NUNCA string vazia — env
+  # vazio reprova na validação do rollout). Ver apphosting.demo.yaml.
+  - variable: AFFILIATE_API_KEY
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_LINKS_SUPABASE_URL
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_LINKS_SUPABASE_ANON_KEY
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_LINKS_EMAIL
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_LINKS_PASSWORD
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_DASH_EMAIL
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_DASH_PASSWORD
+    value: 'unused'
+    availability:
+      - RUNTIME
+  - variable: OTG_DASH_DEVICE_TOKEN
+    value: 'unused'
+    availability:
+      - RUNTIME
+
+  # Lembrete do ranking (o base referencia o secret master-admin-email, que não
+  # existe neste projeto — override plain com o admin provisório da instância).
+  - variable: MASTER_ADMIN_EMAIL
+    value: 'viniciusspanol@gmail.com'
+    availability:
+      - RUNTIME
+
+  # FIREBASE_SERVICE_ACCOUNT_KEY e RANKING_CRON_SECRET seguem como SECRETS do
+  # base — criar os dois no projeto infinity-affiliacore (playbook §3).
