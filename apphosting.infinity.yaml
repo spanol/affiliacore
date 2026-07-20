@@ -39,6 +39,14 @@ env:
     availability:
       - RUNTIME
 
+  # FIREBASE_SERVICE_ACCOUNT_KEY: override plain para cair em ADC no runtime da
+  # App Hosting sem depender da geração manual da chave JSON neste 1º rollout.
+  # O server.ts trata valor não-JSON como placeholder e volta para ADC.
+  - variable: FIREBASE_SERVICE_ACCOUNT_KEY
+    value: 'unused'
+    availability:
+      - RUNTIME
+
   # --- Neutralização dos secrets OTG do apphosting.yaml base -----------------
   # O base referencia secrets que SÓ existem no projeto da instância 0 (Carlos).
   # Instância OTG-free sobrepõe com plain 'unused' (NUNCA string vazia — env

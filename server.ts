@@ -39,9 +39,18 @@ const STORAGE_BUCKET = process.env.FIREBASE_STORAGE_BUCKET || 'agencia-boost-app
 function initAdmin(): { adminApp: admin.app.App | null; adminDb: admin.firestore.Firestore | null } {
   try {
     let adminApp: admin.app.App;
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-      adminApp = admin.initializeApp({ credential: admin.credential.cert(serviceAccount), storageBucket: STORAGE_BUCKET });
+    const rawServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.trim();
+    if (rawServiceAccount) {
+      try {
+        const serviceAccount = JSON.parse(rawServiceAccount);
+        adminApp = admin.initializeApp({ credential: admin.credential.cert(serviceAccount), storageBucket: STORAGE_BUCKET });
+      } catch {
+        // Em App Hosting/Cloud Run o ADC do runtime costuma bastar para acessar os
+        // recursos do PRÓPRIO projeto. Se a env existir só como placeholder/override
+        // (ex.: 'unused' em instâncias white-label), caímos para ADC em vez de matar
+        // a inicialização inteira.
+        adminApp = admin.initializeApp({ storageBucket: STORAGE_BUCKET });
+      }
     } else {
       adminApp = admin.initializeApp({ storageBucket: STORAGE_BUCKET });
     }
