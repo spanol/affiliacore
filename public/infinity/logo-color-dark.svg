@@ -1,20 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 376 110" role="img" aria-label="Infinity">
-  <!-- Logo Infinity — MONO BRANCO DE PROPÓSITO. O app aplica `invert dark:invert-0`
-       (DashboardLayout, Login, Register, InviteAccept, Forgot/ResetPassword): branco
-       vira preto no tema claro e segue branco no escuro. NÃO colorir este arquivo —
-       invert sobre o roxo #8332B9 devolve verde-amarelado. Versões coloridas em
-       logo-color-dark.svg / logo-color-light.svg (marketing, social, documento).
-       Marca: lemniscata de duas alças fechadas (r=26, centros 34/86) com a fita
-       ramificando no topo da alça direita numa seta de crescimento a 45°.
-       Wordmark desenhado em curvas — INFINITY só tem hastes retas, então sai
-       exato sem depender de fonte instalada. -->
+  <!-- Logo Infinity COLORIDO para fundo ESCURO (social, deck, avatar, capa).
+       NÃO usar como BRAND.logoUrl: o app aplica `invert` no tema claro e o roxo
+       vira verde-amarelado. Para o app use logo.svg (mono branco). -->
+  <defs>
+    <linearGradient id="infD" x1="6%" y1="92%" x2="94%" y2="6%">
+      <stop offset="0%"   stop-color="#7A2FB0" />
+      <stop offset="48%"  stop-color="#A855F7" />
+      <stop offset="100%" stop-color="#D8B4FE" />
+    </linearGradient>
+  </defs>
 
-  <g transform="translate(6.68, 10.61) scale(0.88)" fill="none" stroke="#ffffff" stroke-width="13" stroke-linecap="round">
+  <g transform="translate(6.68, 10.61) scale(0.88)" fill="none" stroke="url(#infD)" stroke-width="13" stroke-linecap="round">
     <path d="M60 60 C60 47, 47 34, 34 34 C21 34, 8 47, 8 60 C8 73, 21 86, 34 86
              C47 86, 60 73, 60 60 C60 47, 73 34, 86 34 C99 34, 112 47, 112 60
              C112 73, 99 86, 86 86 C73 86, 60 73, 60 60 Z" />
     <path d="M84 34 C96 32, 100 29, 106 24" />
-    <path d="M121.6 8.4 L116.6 34.6 L95.4 13.4 Z" fill="#ffffff" stroke="none" />
+    <path d="M121.6 8.4 L116.6 34.6 L95.4 13.4 Z" fill="#D8B4FE" stroke="none" />
   </g>
 
   <g transform="translate(132, 35)" fill="#ffffff">

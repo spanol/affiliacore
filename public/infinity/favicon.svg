@@ -1,4 +1,21 @@
-<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="128" height="128" rx="28" fill="#1A0F16"/>
-  <text x="64" y="80" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="60" font-weight="800" fill="#8332B9">I</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 110" role="img" aria-label="Infinity">
+  <!-- Favicon Infinity — só o símbolo (o wordmark seria ilegível a 16px), colorido
+       sobre o canvas escuro da marca. Favicon NÃO sofre `invert`, então pode ter cor. -->
+  <defs>
+    <linearGradient id="infF" x1="8%" y1="90%" x2="92%" y2="8%">
+      <stop offset="0%"   stop-color="#7A2FB0" />
+      <stop offset="48%"  stop-color="#A855F7" />
+      <stop offset="100%" stop-color="#D8B4FE" />
+    </linearGradient>
+  </defs>
+
+  <rect width="110" height="110" rx="26" fill="#120B18" />
+
+  <g transform="translate(8.88, 17.21) scale(0.749)" fill="none" stroke="url(#infF)" stroke-width="13" stroke-linecap="round">
+    <path d="M60 60 C60 47, 47 34, 34 34 C21 34, 8 47, 8 60 C8 73, 21 86, 34 86
+             C47 86, 60 73, 60 60 C60 47, 73 34, 86 34 C99 34, 112 47, 112 60
+             C112 73, 99 86, 86 86 C73 86, 60 73, 60 60 Z" />
+    <path d="M84 34 C96 32, 100 29, 106 24" />
+    <path d="M121.6 8.4 L116.6 34.6 L95.4 13.4 Z" fill="#D8B4FE" stroke="none" />
+  </g>
 </svg>

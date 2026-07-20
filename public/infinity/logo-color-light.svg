@@ -1,23 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 376 110" role="img" aria-label="Infinity">
-  <!-- Logo Infinity — MONO BRANCO DE PROPÓSITO. O app aplica `invert dark:invert-0`
-       (DashboardLayout, Login, Register, InviteAccept, Forgot/ResetPassword): branco
-       vira preto no tema claro e segue branco no escuro. NÃO colorir este arquivo —
-       invert sobre o roxo #8332B9 devolve verde-amarelado. Versões coloridas em
-       logo-color-dark.svg / logo-color-light.svg (marketing, social, documento).
-       Marca: lemniscata de duas alças fechadas (r=26, centros 34/86) com a fita
-       ramificando no topo da alça direita numa seta de crescimento a 45°.
-       Wordmark desenhado em curvas — INFINITY só tem hastes retas, então sai
-       exato sem depender de fonte instalada. -->
+  <!-- Logo Infinity COLORIDO para fundo CLARO (contrato, proposta, apresentação).
+       Roxo mais fechado que a versão dark (o lavanda claro sumiria no branco) e
+       wordmark em ameixa escura. NÃO usar como BRAND.logoUrl — ver logo.svg. -->
+  <defs>
+    <linearGradient id="infL" x1="6%" y1="92%" x2="94%" y2="6%">
+      <stop offset="0%"   stop-color="#5B1E86" />
+      <stop offset="50%"  stop-color="#8332B9" />
+      <stop offset="100%" stop-color="#A855F7" />
+    </linearGradient>
+  </defs>
 
-  <g transform="translate(6.68, 10.61) scale(0.88)" fill="none" stroke="#ffffff" stroke-width="13" stroke-linecap="round">
+  <g transform="translate(6.68, 10.61) scale(0.88)" fill="none" stroke="url(#infL)" stroke-width="13" stroke-linecap="round">
     <path d="M60 60 C60 47, 47 34, 34 34 C21 34, 8 47, 8 60 C8 73, 21 86, 34 86
              C47 86, 60 73, 60 60 C60 47, 73 34, 86 34 C99 34, 112 47, 112 60
              C112 73, 99 86, 86 86 C73 86, 60 73, 60 60 Z" />
     <path d="M84 34 C96 32, 100 29, 106 24" />
-    <path d="M121.6 8.4 L116.6 34.6 L95.4 13.4 Z" fill="#ffffff" stroke="none" />
+    <path d="M121.6 8.4 L116.6 34.6 L95.4 13.4 Z" fill="#8332B9" stroke="none" />
   </g>
 
-  <g transform="translate(132, 35)" fill="#ffffff">
+  <g transform="translate(132, 35)" fill="#1A1024">
     <path transform="translate(0,0)"   d="M0 0 H11 V40 H0 Z" />
     <path transform="translate(18,0)"  d="M0 0 H11 L23 24.5 V0 H34 V40 H23 L11 15.5 V40 H0 Z" />
     <path transform="translate(59,0)"  d="M0 0 H28 V11 H11 V16.5 H24 V27.5 H11 V40 H0 Z" />

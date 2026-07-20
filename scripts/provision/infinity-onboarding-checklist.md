@@ -58,12 +58,16 @@ GOOGLE_APPLICATION_CREDENTIALS=./service-account.infinity.json \
 ## 3. Branding / assets
 - [x] Nome da marca aplicado
 - [x] Accent `#8332B9` aplicado no YAML
-- [x] Placeholders roxos em `public/infinity/` apontados pelas envs
+- [x] Assets em `public/infinity/` apontados pelas envs
       (`VITE_BRAND_LOGO_URL` / `VITE_BRAND_FAVICON_URL`) — sem isso a instância
       subia com o logo da AffiliaCore
-- [ ] Logo oficial entregue pelo cliente
-- [ ] Favicon oficial entregue pelo cliente
-- [ ] Trocar as duas envs pelas URLs oficiais quando os assets chegarem
+- [x] Logo desenhado a partir da referência do cliente (avatar do IG
+      `@infinity.affiliates`): lemniscata + seta de crescimento e wordmark em
+      curvas. `logo.svg` é **mono branco** (o app aplica `invert` no tema claro);
+      cor em `logo-color-dark.svg` / `logo-color-light.svg`; `favicon.svg` colorido
+- [ ] Validar o logo com o cliente (foi derivado do avatar do IG, não entregue
+      por ele — confirmar antes de usar em material impresso/contrato)
+- [ ] Se o cliente tiver o vetor original, substituir os 4 arquivos
 - [ ] Revisar canvas/surface: o base herda o plum ember (`#26181C`/`#3F1D2B`)
       da AffiliaCore, que briga com o roxo `#8332B9` do cliente
 
