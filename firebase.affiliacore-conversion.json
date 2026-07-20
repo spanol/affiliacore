@@ -1,0 +1,30 @@
+{
+  "hosting": {
+    "site": "affiliacore-1764b",
+    "public": "dist",
+    "cleanUrls": true,
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(woff2|svg|png|jpg|jpeg|webp)",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800, immutable" }]
+      },
+      {
+        "source": "**/*.@(js|css)",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      },
+      {
+        "source": "**/*.html",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      }
+    ]
+  },
+  "firestore": {
+    "rules": "firestore.affiliacore.rules"
+  }
+}
