@@ -45,6 +45,33 @@ firebase apphosting:backends:create --project <project-id>
 # conectar o repo GitHub spanol/affiliacore, branch main, região us-east4
 ```
 
+> **GOTCHA de IAM (custou 3 builds na Infinity, 2026-07-20).** Um backend pode ser
+> criado SEM o bootstrap de IAM da service account `firebase-app-hosting-compute@`.
+> Quando isso acontece o build falha em cascata e o erro muda a cada tentativa:
+> 1º `roles/logging.logWriter` ausente (morre em ~18s), 2º `developerconnect.
+> gitRepositoryLinks.get` negado no FETCHSOURCE (~11s), e o runtime quebraria
+> depois no ADC (sem acesso a Firestore).
+>
+> **Diagnóstico:** console → IAM → **marque "Incluir concessões de papel fornecidas
+> pelo Google"** (sem isso a lista MENTE) e olhe a SA `firebase-app-hosting-compute@`.
+> O saudável tem `Executor do Compute no Firebase App Hosting` (= `roles/
+> firebaseapphosting.computeRunner`) + Developer Connect + Admin SDK + Storage.
+> Se só aparecer 1 papel (ou nenhum), o bootstrap não rodou.
+>
+> **Correção:** NÃO saia concedendo papel por papel. Apague e recrie o backend —
+> a criação refaz o IAM inteiro de uma vez, e o ID/URL são reaproveitáveis:
+> ```bash
+> firebase apphosting:backends:delete <backend> --project <project-id> --force
+> firebase apphosting:backends:create --project <project-id> \
+>   --backend <backend> --primary-region us-east4 --app <webAppId> --non-interactive
+> ```
+> Recriar **zera o ambiente e a conexão do repo** (reconfigure os dois no console)
+> e **perde o acesso aos secrets** — rode de novo:
+> ```bash
+> firebase apphosting:secrets:grantaccess <secret> --backend <backend> \
+>   --location us-east4 --project <project-id>
+> ```
+
 Config por instância: criar `apphosting.<ambiente>.yaml` no repo (override que o
 App Hosting MESCLA sobre o `apphosting.yaml` base, específico vence) e associar o
 nome do ambiente ao backend no console: **App Hosting → backend → Settings →

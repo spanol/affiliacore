@@ -1,15 +1,20 @@
 # Infinity — checklist de onboarding
 
-> **Auditoria 2026-07-20** — estado verificado contra a nuvem, não declarado:
-> backend `infinity-server` existe mas **sem repositório conectado** e a URL
-> responde **404 (nenhum rollout concluído)**. `Authentication` responde
-> `CONFIGURATION_NOT_FOUND` = **nunca inicializado** (bloqueia qualquer login).
-> Verificado OK: projeto no Blaze, Firestore `(default)` criado, app Web
-> registrado, `ranking-cron-secret` ENABLED e legível, e os **11 secrets** do
-> `apphosting.yaml` base todos resolvidos no override (10 neutralizados +
-> `ranking-cron-secret` real) — a validação de env do rollout deve passar.
-> NÃO foi possível confirmar o deploy das rules (checagem exigia credencial);
-> como o deploy é idempotente, rode de novo por segurança.
+> **2026-07-20 — INSTÂNCIA NO AR.** `https://infinity-server--infinity-affiliacore.us-east4.hosted.app`
+> responde **HTTP 200** e o Admin SDK funciona por ADC (rota pública consultou o
+> Firestore e devolveu 404 de negócio, não 500). Auth inicializado + e-mail/senha
+> ativo (sonda saiu de `CONFIGURATION_NOT_FOUND` para `INVALID_LOGIN_CREDENTIALS`).
+> Env overrides confirmados no log do build (12 aplicados, `--environment_name infinity`).
+>
+> **Custou 3 builds:** o backend original tinha sido criado sem o bootstrap de IAM
+> da SA `firebase-app-hosting-compute@` (só tinha 1 papel). Resolvido apagando e
+> recriando o backend — ver o GOTCHA de IAM no `README.md` §4.
+>
+> **Pendente:** (a) as rules do Firestore não foram deployadas nem verificadas
+> nesta instância — rode `firebase deploy --only firestore:rules --project
+> infinity-affiliacore` (idempotente); (b) 1º admin; (c) a instância ainda roda o
+> commit `bdbd55c`, ANTERIOR aos fixes de logo (`58ad7a4`) e da landing (`7bf3824`)
+> — precisa de um rollout novo depois do push.
 
 Projeto alvo:
 - `infinity-affiliacore`
@@ -24,16 +29,18 @@ Marca:
 - [x] Projeto Firebase criado
 - [x] App Web criado
 - [x] Firestore criado
-- [x] Rules deployadas
+- [ ] Rules deployadas — **NÃO confirmado** (marcado como feito antes, mas a
+      verificação de 2026-07-20 não conseguiu comprovar; deploy é idempotente,
+      rode de novo)
 - [x] Backend App Hosting criado
 - [x] `apphosting.infinity.yaml` criado e commitado
 - [x] `ranking-cron-secret` criado
-- [ ] Repositório GitHub conectado ao backend (`spanol/affiliacore`, branch `main`)
-- [ ] Environment `infinity` associado ao backend
-- [ ] Primeiro rollout concluído
+- [x] Repositório GitHub conectado ao backend (`spanol/affiliacore`, branch `main`)
+- [x] Environment `infinity` associado ao backend
+- [x] Primeiro rollout concluído (build-2026-07-20-001, HTTP 200)
 
 ## 2. Credenciais / admin
-- [ ] Authentication > Email/senha habilitado
+- [x] Authentication > Email/senha habilitado
 - [ ] Gerar `service-account.infinity.json`
 - [ ] Rodar bootstrap do 1º admin
 - [ ] Admin inicial confirmado no login
