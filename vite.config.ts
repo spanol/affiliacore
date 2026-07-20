@@ -45,6 +45,9 @@ export default defineConfig(() => {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
+      // Permite abrir a instância dev por domínios do Tailscale durante demos
+      // privadas sem depender só de localhost.
+      allowedHosts: ['spanol-1.tail82f788.ts.net'],
       watch: {
         // Reference PDFs (design assets) can be locked open in a viewer; a locked
         // file makes the FS watcher throw EBUSY and crash the dev server. They are

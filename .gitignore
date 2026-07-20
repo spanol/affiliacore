@@ -21,3 +21,7 @@ scripts/otg-approved/snapshot-*.json
 
 # Firebase Hosting deploy cache
 .firebase/
+
+# Runtime local da demo mockada (credenciais, logs e metadados gerados pelo
+# script 1-clique). Nunca versionar.
+.demo-runtime/
