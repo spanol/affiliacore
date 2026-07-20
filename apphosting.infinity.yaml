@@ -12,8 +12,7 @@ env:
       - BUILD
       - RUNTIME
 
-  # Marca do cliente. Logo/favicon ficam nos defaults do produto até o cliente
-  # entregar os assets (trocar por URL própria — env, zero rebuild).
+  # Marca do cliente.
   - variable: VITE_BRAND_NAME
     value: 'Infinity'
     availability:
@@ -22,6 +21,22 @@ env:
 
   - variable: VITE_BRAND_SHORT
     value: 'Infinity'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Placeholders servidos pelo próprio bundle (public/infinity/* → dist/). SEM
+  # estas envs o resolver de branding cai no fallback do produto e a instância
+  # do cliente sobe exibindo o logo da AffiliaCore. Trocar pela URL dos assets
+  # oficiais quando o cliente entregar (env, zero rebuild).
+  - variable: VITE_BRAND_LOGO_URL
+    value: '/infinity/logo.svg'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: VITE_BRAND_FAVICON_URL
+    value: '/infinity/favicon.svg'
     availability:
       - BUILD
       - RUNTIME
