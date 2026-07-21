@@ -28,7 +28,8 @@ import {
   Eye,
   EyeOff,
   Users,
-  MousePointerClick
+  MousePointerClick,
+  Download
 } from 'lucide-react';
 import {
   fetchAffiliateById,
@@ -73,6 +74,9 @@ import { withKnownBrandNames } from '../lib/knownHouses';
 import { canViewAffiliateNetProfit } from '../lib/affiliateView';
 import { cn, humanizeName } from '../lib/utils';
 import { sumFunnelForAffiliate } from '../lib/analyticsDoc';
+import { buildDailyExtractCsv } from '../lib/exportExtract';
+import { buildCsvFilename } from '../lib/csv';
+import { downloadCsvFile } from '../lib/browserDownload';
 import { motion } from 'motion/react';
 
 // B4 · mascara dados sensíveis (PIX, documento) — só os últimos dígitos.
@@ -501,6 +505,14 @@ export default function AffiliateDetails() {
   const isAllBrands = selectedBrand === ALL_BRANDS;
   const selectedBrandRow = isAllBrands ? null : brandResults.find((r) => brandNameOf(r) === selectedBrand);
 
+  // Export CSV do extrato diário do afiliado em tela (convergente Affility+NovaEra).
+  // Reusa a MESMA taxa/casa dos cards acima — nunca reimplementa o cálculo.
+  const handleExportCsv = () => {
+    const brandId = isAllBrands ? undefined : String(selectedBrandRow?.id ?? '');
+    const csv = buildDailyExtractCsv(dailyResults, config, brandId);
+    downloadCsvFile(buildCsvFilename(`extrato-${affiliate?.name || affiliate?.id || 'afiliado'}`, `${range.startDate}_a_${range.endDate}`), csv);
+  };
+
   return (
     <div className="space-y-8 pb-20">
       {/* Header */}
@@ -561,6 +573,14 @@ export default function AffiliateDetails() {
         <div className="flex flex-wrap items-center gap-3">
           <DateRangePicker value={range} onChange={setRange} />
           <BrandFilter brands={availableBrands} value={selectedBrand} onChange={setSelectedBrand} />
+          <button
+            onClick={handleExportCsv}
+            disabled={dailyResults.length === 0}
+            title="Exportar extrato diário do período em CSV"
+            className="flex items-center gap-1.5 px-3 py-2.5 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-xl text-slate-500 hover:text-brand dark:hover:text-white transition-all shadow-sm text-xs font-bold disabled:opacity-40 disabled:pointer-events-none"
+          >
+            <Download size={14} /> CSV
+          </button>
           {isAdmin && (
             <>
               <button

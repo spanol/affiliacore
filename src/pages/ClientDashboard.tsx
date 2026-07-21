@@ -4,6 +4,7 @@ import {
   AlertCircle,
   Building,
   Clock,
+  Download,
   Loader2,
   Shield,
   TrendingUp,
@@ -32,6 +33,9 @@ import { DateRange, getDefaultRange, getPreviousRange, percentChange } from '../
 import { ALL_BRANDS, getKnownBrandName } from '../lib/brand';
 import { withKnownBrandNames } from '../lib/knownHouses';
 import { cn } from '../lib/utils';
+import { buildDailyExtractCsv } from '../lib/exportExtract';
+import { buildCsvFilename } from '../lib/csv';
+import { downloadCsvFile } from '../lib/browserDownload';
 
 export default function ClientDashboard() {
   const { profile } = useAuth();
@@ -168,6 +172,14 @@ export default function ClientDashboard() {
   const isAllBrands = selectedBrand === ALL_BRANDS;
   const selectedBrandRow = isAllBrands ? null : brandResults.find((r) => brandNameOf(r) === selectedBrand);
 
+  // Export CSV do extrato diário do período (convergente Affility+NovaEra). Reusa a
+  // MESMA taxa/casa do card "Comissão total" acima — nunca reimplementa o cálculo.
+  const handleExportCsv = () => {
+    const brandId = isAllBrands ? undefined : String(selectedBrandRow?.id ?? '');
+    const csv = buildDailyExtractCsv(dailyResults, config, brandId);
+    downloadCsvFile(buildCsvFilename('extrato', `${range.startDate}_a_${range.endDate}`), csv);
+  };
+
   return (
     <div className="space-y-8 pb-20">
       <header className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
@@ -196,7 +208,17 @@ export default function ClientDashboard() {
         </div>
         <div className="flex flex-col items-start md:items-end gap-3">
           <DateRangePicker value={range} onChange={setRange} />
-          <BrandFilter brands={availableBrands} value={selectedBrand} onChange={setSelectedBrand} />
+          <div className="flex items-center gap-2">
+            <BrandFilter brands={availableBrands} value={selectedBrand} onChange={setSelectedBrand} />
+            <button
+              onClick={handleExportCsv}
+              disabled={dailyResults.length === 0}
+              title="Exportar extrato diário do período em CSV"
+              className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-full text-xs font-bold text-slate-600 dark:text-neutral-300 hover:border-accent-500/40 hover:text-accent-500 transition-all shadow-sm disabled:opacity-40 disabled:pointer-events-none"
+            >
+              <Download size={14} /> CSV
+            </button>
+          </div>
         </div>
       </header>
 
