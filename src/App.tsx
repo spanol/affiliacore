@@ -29,6 +29,8 @@ import Houses from './pages/Houses';
 import Deals from './pages/Deals';
 import Partnerships from './pages/Partnerships';
 import MyLinks from './pages/MyLinks';
+import LegalAdmin from './pages/LegalAdmin';
+import Terms from './pages/Terms';
 import Auditoria from './pages/Auditoria';
 import NotFound from './pages/NotFound';
 import DashboardLayout from './components/DashboardLayout';
@@ -120,6 +122,9 @@ export default function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/avisos" element={<Avisos />} />
             <Route path="/ranking" element={<Ranking />} />
+            {/* Jurídico versionado (Tier 1, modo soft): /termos é visível a qualquer
+                papel logado — não bloqueia nada, só visualiza/aceita. */}
+            <Route path="/termos" element={<Terms />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/contacts" element={
               <ProtectedRoute role="admin">
@@ -180,6 +185,11 @@ export default function App() {
             <Route path="/auditoria" element={
               <ProtectedRoute role="admin">
                 <Auditoria />
+              </ProtectedRoute>
+            } />
+            <Route path="/juridico" element={
+              <ProtectedRoute role="admin">
+                <LegalAdmin />
               </ProtectedRoute>
             } />
             <Route path="/affiliates/:id" element={<AffiliateDetailsRoute />} />

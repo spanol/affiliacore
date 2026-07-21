@@ -28,6 +28,7 @@ import { sanitizePrize, sanitizePrizePatch } from './src/lib/prizes';
 import { buildResultsNotification, type ResultsNotificationVariant } from './src/lib/resultsNotification';
 import { normalizeDealInput, buildDealLabel, dealBrandKey, dealToBrandRates } from './src/lib/deal';
 import { canTransition, type PartnershipStatus } from './src/lib/partnership';
+import { normalizeLegalDocInput, computeNextVersion } from './src/lib/legal';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2842,6 +2843,144 @@ export function createApp(deps: ServerDeps) {
     } catch (e: any) {
       console.error('[partnerships] erro ao decidir:', e);
       return res.status(500).json({ error: e?.message || 'Erro ao decidir parceria' });
+    }
+  });
+
+  // === Jurídico versionado (Tier 1, modo SOFT) ===============================
+  // Documentos (Acordo de Afiliação, Código de Conduta, Pagamentos) com versão
+  // DERIVADA (computeNextVersion — nunca digitada) + registro de aceite carimbado
+  // pelo servidor. NADA aqui bloqueia login/uso (modo soft até revisão jurídica do
+  // conteúdo) — ver PLANO-INTEGRACAO-AFFILITY.md. Conteúdo NÃO é seedado
+  // automaticamente: só existe o que o admin escrever.
+  const legalDocFromDoc = (d: admin.firestore.DocumentSnapshot) => {
+    const x = (d.data() as any) || {};
+    return {
+      id: d.id,
+      slug: x.slug ?? d.id,
+      title: x.title ?? '',
+      content: x.content ?? '',
+      version: Number.isFinite(Number(x.version)) ? Number(x.version) : 1,
+      active: x.active !== false,
+    };
+  };
+
+  // Lista documentos jurídicos. Requer login (qualquer papel — não-admin vê só os
+  // ATIVOS; admin vê rascunhos/inativos também p/ revisar antes de publicar).
+  // Conteúdo não é sensível; exigir login aqui é só p/ simplificar o middleware —
+  // se no futuro precisar linkar de fora (ex.: rodapé do /register), isso vira um
+  // endpoint público separado, não uma mudança neste.
+  app.get('/api/legal-documents', requireAuth, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const snap = await adminDb.collection('legal_documents').get();
+      const isAdmin = (req as any).user?.role === 'admin'; // pode ser undefined (rota pública) — ok
+      const docs = snap.docs.map(legalDocFromDoc).filter((d) => isAdmin || d.active);
+      return res.json({ documents: docs });
+    } catch (e: any) {
+      console.error('[legal-documents] erro ao listar:', e);
+      return res.status(500).json({ error: 'Erro ao listar documentos' });
+    }
+  });
+
+  // Cria um documento jurídico (admin). Versão inicial = 1 (computeNextVersion sem "before").
+  app.post('/api/legal-documents', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const { doc, error } = normalizeLegalDocInput(req.body || {});
+      if (error || !doc) return res.status(400).json({ error: error || 'Dados do documento inválidos.' });
+      const ref = adminDb.collection('legal_documents').doc();
+      const version = computeNextVersion(null, doc.content);
+      await ref.set({ ...doc, version, updatedByUid: (req as any).user?.uid ?? null, createdAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+      await writeAuditLog(req, { entityType: 'legal_document', entityId: ref.id, entityLabel: doc.title, action: 'legal_document.create', metadata: { slug: doc.slug, version } });
+      return res.status(201).json(legalDocFromDoc(await ref.get()));
+    } catch (e: any) {
+      console.error('[legal-documents] erro ao criar:', e);
+      return res.status(500).json({ error: e?.message || 'Erro ao criar documento' });
+    }
+  });
+
+  // Atualiza um documento (admin). A versão é RECALCULADA aqui (nunca aceita do
+  // body) — se o conteúdo mudou, bumpa e os aceites antigos ficam obsoletos
+  // (hasAcceptedLatest compara a versão exata).
+  app.patch('/api/legal-documents/:id', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const id = String(req.params.id || '').trim();
+      const ref = adminDb.collection('legal_documents').doc(id);
+      const before = await ref.get();
+      if (!before.exists) return res.status(404).json({ error: 'Documento não encontrado.' });
+      const beforeData = before.data() as any;
+      const merged = { ...beforeData, ...(req.body || {}) };
+      const { doc, error } = normalizeLegalDocInput(merged);
+      if (error || !doc) return res.status(400).json({ error: error || 'Dados do documento inválidos.' });
+
+      const version = computeNextVersion({ content: beforeData?.content, version: beforeData?.version }, doc.content);
+      const patch = { ...doc, version, updatedByUid: (req as any).user?.uid ?? null, updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+      const changes = diffChanges(beforeData, patch, ['title', 'content', 'active', 'version']);
+      await ref.set(patch, { merge: true });
+      if (changes.length) {
+        await writeAuditLog(req, { entityType: 'legal_document', entityId: id, entityLabel: doc.title, action: 'legal_document.update', changes, metadata: { versionBumped: version !== (beforeData?.version ?? 1) } });
+      }
+      return res.json(legalDocFromDoc(await ref.get()));
+    } catch (e: any) {
+      console.error('[legal-documents] erro ao atualizar:', e);
+      return res.status(500).json({ error: e?.message || 'Erro ao atualizar documento' });
+    }
+  });
+
+  // Remove um documento (admin). Aceites antigos ficam órfãos mas inofensivos (só
+  // guardam slug/versão — não referenciam o doc por id).
+  app.delete('/api/legal-documents/:id', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const ref = adminDb.collection('legal_documents').doc(String(req.params.id));
+      const snap = await ref.get();
+      await ref.delete();
+      await writeAuditLog(req, { entityType: 'legal_document', entityId: String(req.params.id), entityLabel: (snap.data() as any)?.title ?? null, action: 'legal_document.delete' });
+      return res.json({ ok: true });
+    } catch (e) {
+      console.error('[legal-documents] erro ao remover:', e);
+      return res.status(500).json({ error: 'Erro ao remover documento' });
+    }
+  });
+
+  // Aceites do usuário logado (server-only — o cliente nunca lê/escreve a coleção
+  // direto; rules bloqueiam mesmo admin). GET devolve os do PRÓPRIO uid.
+  app.get('/api/legal-acceptances', requireAuth, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const uid = (req as any).user?.uid;
+      const snap = await adminDb.collection('legal_acceptances').where('uid', '==', uid).get();
+      const acceptances = snap.docs.map((d) => d.data());
+      return res.json({ acceptances });
+    } catch (e: any) {
+      console.error('[legal-acceptances] erro ao listar:', e);
+      return res.status(500).json({ error: 'Erro ao listar aceites' });
+    }
+  });
+
+  // Registra o aceite do usuário logado para o documento ATIVO de um slug. uid e
+  // acceptedAt são carimbados pelo servidor a partir do token — o cliente não pode
+  // forjar aceite de outra pessoa nem a data. Idempotente por (uid, slug): reaceitar
+  // a MESMA versão é no-op-ish (sobrescreve com o mesmo valor); versão nova = novo aceite.
+  app.post('/api/legal-acceptances', requireAuth, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const uid = (req as any).user?.uid;
+      const slug = String(req.body?.slug ?? '').trim();
+      if (!slug) return res.status(400).json({ error: 'slug é obrigatório.' });
+      const docSnap = await adminDb.collection('legal_documents').where('slug', '==', slug).where('active', '==', true).limit(1).get();
+      if (docSnap.empty) return res.status(404).json({ error: 'Documento não encontrado ou inativo.' });
+      const doc = legalDocFromDoc(docSnap.docs[0]);
+      const id = `${uid}_${slug}`;
+      await adminDb.collection('legal_acceptances').doc(id).set({
+        uid, slug, version: doc.version, acceptedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      await writeAuditLog(req, { entityType: 'legal_document', entityId: doc.id, entityLabel: doc.title, action: 'legal_document.accept', metadata: { slug, version: doc.version, uid } });
+      return res.status(201).json({ uid, slug, version: doc.version });
+    } catch (e: any) {
+      console.error('[legal-acceptances] erro ao registrar aceite:', e);
+      return res.status(500).json({ error: e?.message || 'Erro ao registrar aceite' });
     }
   });
 

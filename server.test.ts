@@ -1494,6 +1494,76 @@ describe('deals + parcerias (P2)', () => {
   });
 });
 
+// =============================================================================
+// Jurídico versionado (Tier 1, modo soft). Foco: a versão é DERIVADA no servidor
+// (nunca aceita do body) e o aceite é carimbado pelo token — o cliente não pode
+// forjar uid/versão/data.
+// =============================================================================
+describe('jurídico versionado (/api/legal-documents, /api/legal-acceptances)', () => {
+  const seed = {
+    users: { 'admin-uid': { role: 'admin' }, 'aff-uid': { role: 'client', affiliateId: 'affX' } },
+  };
+
+  it('GET sem token → 401 (requireAuth)', async () => {
+    await request(buildApp({ seed })).get('/api/legal-documents').expect(401);
+  });
+
+  it('não-admin vê só documentos ATIVOS; admin vê todos (incl. rascunho)', async () => {
+    const s: any = { ...seed, legal_documents: {
+      d1: { slug: 'acordo', title: 'Acordo', content: 'v1', version: 1, active: true },
+      d2: { slug: 'rascunho', title: 'Rascunho', content: 'x', version: 1, active: false },
+    } };
+    const aff = await request(buildApp({ seed: s })).get('/api/legal-documents').set('Authorization', 'Bearer aff-uid').expect(200);
+    expect(aff.body.documents.map((d: any) => d.slug)).toEqual(['acordo']);
+    const adm = await request(buildApp({ seed: s })).get('/api/legal-documents').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(adm.body.documents.map((d: any) => d.slug).sort()).toEqual(['acordo', 'rascunho']);
+  });
+
+  it('POST: client → 403; admin cria com versão 1 (nunca aceita do body)', async () => {
+    await request(buildApp({ seed })).post('/api/legal-documents').set('Authorization', 'Bearer aff-uid').send({ slug: 'x', title: 'X', content: 'c' }).expect(403);
+    const res = await request(buildApp({ seed })).post('/api/legal-documents').set('Authorization', 'Bearer admin-uid')
+      .send({ slug: 'acordo', title: 'Acordo de Afiliação', content: 'texto v1', version: 999 }).expect(201);
+    expect(res.body).toMatchObject({ slug: 'acordo', version: 1 }); // version:999 do body é IGNORADO
+  });
+
+  it('PATCH: conteúdo mudou → versão +1; só título mudou → versão mantém', async () => {
+    const seed1: any = { ...seed, legal_documents: { d1: { slug: 'acordo', title: 'Acordo', content: 'texto v1', version: 1, active: true } } };
+    const db = makeFirestore(seed1);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    // só título → mantém v1
+    const r1 = await request(app).patch('/api/legal-documents/d1').set('Authorization', 'Bearer admin-uid').send({ title: 'Acordo de Afiliação' }).expect(200);
+    expect(r1.body.version).toBe(1);
+    // conteúdo mudou → v2
+    const r2 = await request(app).patch('/api/legal-documents/d1').set('Authorization', 'Bearer admin-uid').send({ content: 'texto v2' }).expect(200);
+    expect(r2.body.version).toBe(2);
+  });
+
+  it('aceite: uid/versão/data carimbados pelo servidor; GET devolve só os do PRÓPRIO uid', async () => {
+    const seed1: any = { ...seed, legal_documents: { d1: { slug: 'acordo', title: 'Acordo', content: 'v1', version: 3, active: true } } };
+    const db = makeFirestore(seed1);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app).post('/api/legal-acceptances').set('Authorization', 'Bearer aff-uid').send({ slug: 'acordo' }).expect(201);
+    expect(res.body).toMatchObject({ uid: 'aff-uid', slug: 'acordo', version: 3 }); // versão do DOC ATIVO, não do body
+    const mine = await request(app).get('/api/legal-acceptances').set('Authorization', 'Bearer aff-uid').expect(200);
+    expect(mine.body.acceptances).toHaveLength(1);
+    expect(mine.body.acceptances[0]).toMatchObject({ uid: 'aff-uid', slug: 'acordo', version: 3 });
+  });
+
+  it('aceitar slug inexistente/inativo → 404', async () => {
+    const seed1: any = { ...seed, legal_documents: { d1: { slug: 'rascunho', title: 'X', content: 'c', version: 1, active: false } } };
+    await request(buildApp({ seed: seed1 })).post('/api/legal-acceptances').set('Authorization', 'Bearer aff-uid').send({ slug: 'rascunho' }).expect(404);
+    await request(buildApp({ seed: seed1 })).post('/api/legal-acceptances').set('Authorization', 'Bearer aff-uid').send({ slug: 'inexistente' }).expect(404);
+  });
+
+  it('DELETE (admin): remove o documento', async () => {
+    const seed1: any = { ...seed, legal_documents: { d1: { slug: 'acordo', title: 'Acordo', content: 'v1', version: 1, active: true } } };
+    const db = makeFirestore(seed1);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).delete('/api/legal-documents/d1').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(db.__store.get('legal_documents')?.has('d1')).toBe(false);
+  });
+});
+
 // Marketplace é opt-in por instância (default OFF): sem VITE_MARKETPLACE_ENABLED as
 // rotas respondem 404 → zero side effect na Boost/instância nº 0. [[marketplaceEnabled]]
 describe('marketplace desligado por instância (default OFF)', () => {

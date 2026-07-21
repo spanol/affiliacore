@@ -24,7 +24,8 @@ import {
   Trophy,
   ScrollText,
   Handshake,
-  Link2 as LinkIcon
+  Link2 as LinkIcon,
+  Scale
 } from 'lucide-react';
 import { cn, humanizeName } from '../lib/utils';
 import { OTG_ENABLED, MARKETPLACE_ENABLED } from '../lib/instanceClient';
@@ -145,15 +146,19 @@ export default function DashboardLayout() {
             { label: 'API Parceiros', path: '/parceiros-api', icon: Plug },
           ] : []),
           { label: 'Auditoria', path: '/auditoria', icon: ScrollText },
+          // Jurídico versionado (Tier 1, modo soft): admin gere os documentos.
+          { label: 'Jurídico', path: '/juridico', icon: Scale },
           { label: 'Configurações', path: '/settings', icon: Settings }
         ] : [])
       ] 
     },
-    { 
-      label: 'Conta', 
+    {
+      label: 'Conta',
       items: [
         { label: 'Meu Perfil', path: '/profile', icon: User },
-      ] 
+        // Jurídico versionado (Tier 1, modo soft) — visível a qualquer papel logado.
+        { label: 'Termos', path: '/termos', icon: Scale },
+      ]
     }
   ];
 

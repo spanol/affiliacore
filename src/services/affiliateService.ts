@@ -56,6 +56,11 @@ export {
 };
 export type { Deal, DealModel, PaymentCycle, DealCurrency, PartnershipRequest, PartnershipStatus };
 
+// Jurídico versionado (Tier 1, modo soft). Re-exporta os puros.
+import { hasAcceptedLatest, type LegalDocument, type LegalAcceptance } from '../lib/legal';
+export { hasAcceptedLatest };
+export type { LegalDocument, LegalAcceptance };
+
 interface Affiliate {
   id: string;
   name: string;
@@ -1193,6 +1198,77 @@ export async function decidePartnership(id: string, status: 'approved' | 'reject
     throw new Error(e.error || e.message || `Erro na API: ${resp.status}`);
   }
   return resp.json();
+}
+
+// --- Jurídico versionado (Tier 1, modo soft) ----------------------------------
+export async function fetchLegalDocuments(): Promise<LegalDocument[]> {
+  try {
+    const resp = await authFetch('/api/legal-documents', { headers: { Accept: 'application/json' } });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return Array.isArray(data?.documents) ? data.documents : [];
+  } catch (error) {
+    console.error('Error fetching legal documents:', error);
+    return [];
+  }
+}
+
+export async function createLegalDocument(input: { slug: string; title: string; content: string; active?: boolean }): Promise<LegalDocument> {
+  const resp = await authFetch('/api/legal-documents', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro na API: ${resp.status}`);
+  }
+  return resp.json();
+}
+
+export async function updateLegalDocument(id: string, patch: Partial<{ title: string; content: string; active: boolean }>): Promise<LegalDocument> {
+  const resp = await authFetch(`/api/legal-documents/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro na API: ${resp.status}`);
+  }
+  return resp.json();
+}
+
+export async function deleteLegalDocument(id: string): Promise<void> {
+  const resp = await authFetch(`/api/legal-documents/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro na API: ${resp.status}`);
+  }
+}
+
+export async function fetchMyLegalAcceptances(): Promise<LegalAcceptance[]> {
+  try {
+    const resp = await authFetch('/api/legal-acceptances', { headers: { Accept: 'application/json' } });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return Array.isArray(data?.acceptances) ? data.acceptances : [];
+  } catch (error) {
+    console.error('Error fetching legal acceptances:', error);
+    return [];
+  }
+}
+
+export async function acceptLegalDocument(slug: string): Promise<void> {
+  const resp = await authFetch('/api/legal-acceptances', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ slug }),
+  });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro na API: ${resp.status}`);
+  }
 }
 
 // `reason` é opcional e vai junto p/ o servidor REGISTRAR a auditoria server-side

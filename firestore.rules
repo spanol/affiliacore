@@ -156,6 +156,21 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Jurídico versionado (Tier 1, modo SOFT — Acordo de Afiliação, Código de
+    // Conduta, Pagamentos). Conteúdo escrito pelo admin via servidor (versão
+    // DERIVADA, nunca digitada — computeNextVersion); NADA aqui bloqueia login/uso
+    // ainda. Cliente lê pelo GET autenticado (/api/legal-documents, escopa ativos
+    // p/ não-admin); admin pode ler/gerir direto. Espelha houses/ranking_prizes.
+    match /legal_documents/{docId} {
+      allow read, write: if isAdmin();
+    }
+    // Registro de aceite — uid/versão/data carimbados pelo servidor a partir do
+    // token (POST /api/legal-acceptances); cliente NUNCA escreve/lê direto (evita
+    // forjar aceite de outra pessoa ou a data). Admin pode ler direto p/ auditoria.
+    match /legal_acceptances/{id} {
+      allow read, write: if isAdmin();
+    }
+
     // Backoffice de casas (betting houses). Registro próprio das casas (nome/logo/
     // brandId/registerUrlTemplate), gerido pelo admin via /casas. Escrito/lido pelo
     // servidor (Admin SDK, que ignora estas regras); o afiliado lê pelo GET
