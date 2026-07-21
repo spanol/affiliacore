@@ -22,7 +22,9 @@ import {
   Building2,
   Megaphone,
   Trophy,
-  ScrollText
+  ScrollText,
+  Handshake,
+  Link2 as LinkIcon
 } from 'lucide-react';
 import { cn, humanizeName } from '../lib/utils';
 import { OTG_ENABLED } from '../lib/instanceClient';
@@ -115,6 +117,15 @@ export default function DashboardLayout() {
           : profile?.isSpecial
             ? [{ label: 'Afiliados', path: '/network/afiliados', icon: Users }]
             : []),
+        // Marketplace (P2): o afiliado navega ofertas/solicita parcerias e pega os
+        // links por acordo aprovado. Só pro afiliado com affiliateId (o servidor
+        // força o escopo pelo token; sem affiliateId não há o que solicitar).
+        ...(profile?.role !== 'admin' && profile?.affiliateId
+          ? [
+              { label: 'Parcerias', path: '/parcerias', icon: Handshake },
+              { label: 'Meus Links', path: '/meus-links', icon: LinkIcon },
+            ]
+          : []),
         // Financeiro (B4): coleta de PIX + dados de NF. Só pro afiliado (tem affiliateId).
         ...(profile?.role !== 'admin' && profile?.affiliateId
           ? [{ label: 'Financeiro', path: '/financeiro', icon: Wallet }]
@@ -122,6 +133,8 @@ export default function DashboardLayout() {
         ...(profile?.role === 'admin' ? [
           { label: 'Afiliados Especiais', path: '/special-affiliates', icon: Crown },
           { label: 'Casas', path: '/casas', icon: Building2 },
+          // Marketplace de acordos (P2): admin cria as ofertas + aprova as parcerias.
+          { label: 'Acordos', path: '/acordos', icon: Handshake },
           // P2: módulos OTG/Boost — somem na instância OTG-free (white-label). O
           // Roster consome o provisionamento OTG; a API de Parceiros hoje expõe a
           // rede/aprovados (dado OTG) a um parceiro externo. Ambos gated pela flag.
