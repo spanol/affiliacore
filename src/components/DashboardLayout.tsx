@@ -122,9 +122,13 @@ export default function DashboardLayout() {
         ...(profile?.role === 'admin' ? [
           { label: 'Afiliados Especiais', path: '/special-affiliates', icon: Crown },
           { label: 'Casas', path: '/casas', icon: Building2 },
-          // P2: instância OTG-free não tem roster da OTG (módulo desligado).
-          ...(OTG_ENABLED ? [{ label: 'Roster OTG', path: '/roster-otg', icon: Database }] : []),
-          { label: 'API Parceiros', path: '/parceiros-api', icon: Plug },
+          // P2: módulos OTG/Boost — somem na instância OTG-free (white-label). O
+          // Roster consome o provisionamento OTG; a API de Parceiros hoje expõe a
+          // rede/aprovados (dado OTG) a um parceiro externo. Ambos gated pela flag.
+          ...(OTG_ENABLED ? [
+            { label: 'Roster OTG', path: '/roster-otg', icon: Database },
+            { label: 'API Parceiros', path: '/parceiros-api', icon: Plug },
+          ] : []),
           { label: 'Auditoria', path: '/auditoria', icon: ScrollText },
           { label: 'Configurações', path: '/settings', icon: Settings }
         ] : [])

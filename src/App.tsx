@@ -129,12 +129,15 @@ export default function App() {
                 <SpecialAffiliatesList />
               </ProtectedRoute>
             } />
-            <Route path="/parceiros-api" element={
-              <ProtectedRoute role="admin">
-                <PartnerApiExplorer />
-              </ProtectedRoute>
-            } />
-            {/* P2: rota do roster só existe com o módulo OTG ligado nesta instância. */}
+            {/* P2: rotas OTG/Boost só existem com o módulo OTG ligado (white-label
+                OTG-free não expõe roster nem a API de parceiros — dado OTG). */}
+            {OTG_ENABLED && (
+              <Route path="/parceiros-api" element={
+                <ProtectedRoute role="admin">
+                  <PartnerApiExplorer />
+                </ProtectedRoute>
+              } />
+            )}
             {OTG_ENABLED && (
               <Route path="/roster-otg" element={
                 <ProtectedRoute role="admin">
