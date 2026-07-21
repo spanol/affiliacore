@@ -5,10 +5,17 @@
 // Importante: aqui só ZERAMOS casas faltantes; nunca inventamos produção falsa —
 // as casas reais da API entram com seus números, as demais entram zeradas.
 import { getKnownBrands } from './brand';
+import { OTG_ENABLED } from './instanceClient';
 
 // Só casas ATIVAS aparecem "acesas e vazias" (uma casa desativada no backoffice
 // some das visões por casa, mas getBrandMeta ainda a resolve p/ dados históricos).
-const activeKnownBrands = () => getKnownBrands().filter((b) => b.active !== false);
+// P2 (produtização): numa instância OTG-free NÃO espelhamos o portal OTG — as
+// casas-semente Superbet/SportingBet são `dataSource:'otg'` e apareceriam
+// "fantasma" no dashboard/filtro mesmo sem estar em /casas (o auto-seed de /casas
+// já é OTG-gated no server, server.ts). Com OTG desligada, só entram casas
+// conhecidas NÃO-otg (ex.: casas manuais promovidas a conhecidas via setKnownBrands).
+const activeKnownBrands = () =>
+  getKnownBrands().filter((b) => b.active !== false && (OTG_ENABLED || b.dataSource !== 'otg'));
 
 // Linha de marca ZERADA (casa vazia) no shape do groupBy=brand da API.
 const emptyBrandRow = (b: { id?: string; name: string }) => ({
