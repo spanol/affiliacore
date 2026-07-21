@@ -10,11 +10,15 @@
 > da SA `firebase-app-hosting-compute@` (só tinha 1 papel). Resolvido apagando e
 > recriando o backend — ver o GOTCHA de IAM no `README.md` §4.
 >
-> **Pendente:** (a) as rules do Firestore não foram deployadas nem verificadas
-> nesta instância — rode `firebase deploy --only firestore:rules --project
-> infinity-affiliacore` (idempotente); (b) 1º admin; (c) a instância ainda roda o
-> commit `bdbd55c`, ANTERIOR aos fixes de logo (`58ad7a4`) e da landing (`7bf3824`)
-> — precisa de um rollout novo depois do push.
+> **Feito depois disso (2026-07-20):** push da `main` (logo + landing restaurada),
+> rollout novo no ar e verificado na tela (logo Infinity + landing "O PADRÃO
+> INFINITY"; Boost intacta), e 1º admin criado (`admin@infinity.com`, login
+> provado).
+>
+> **Pendente:** as rules do Firestore não foram deployadas nem verificadas nesta
+> instância — rode `firebase deploy --only firestore:rules --project
+> infinity-affiliacore` (idempotente). É o único item que ainda trava o cliente
+> logado (sem as rules certas, o admin loga mas o app não lê nem o próprio perfil).
 
 Projeto alvo:
 - `infinity-affiliacore`
@@ -41,9 +45,11 @@ Marca:
 
 ## 2. Credenciais / admin
 - [x] Authentication > Email/senha habilitado
-- [ ] Gerar `service-account.infinity.json`
-- [ ] Rodar bootstrap do 1º admin
-- [ ] Admin inicial confirmado no login
+- [x] Gerar `service-account.infinity.json` (gerada pelo operador, usada no
+      bootstrap e **apagada em seguida** — produção usa ADC, não precisa da chave)
+- [x] Rodar bootstrap do 1º admin (`admin@infinity.com`, uid
+      `5KUuALshUGNL48d7jTrjvrwHZXq2`, `mustChangePassword`)
+- [x] Admin inicial confirmado no login (signInWithPassword OK, ponta a ponta)
 
 ### Login sugerido para o 1º admin
 - e-mail: `infinity@affiliacore.com.br`
