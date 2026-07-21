@@ -142,6 +142,20 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Acordos (deals) + Parcerias (marketplace, P2). O deal é a OFERTA da operadora
+    // (termos de comissão); a parceria liga afiliado→deal com status. Lidos/escritos
+    // pelo servidor (Admin SDK, que ignora estas regras): o afiliado navega ofertas e
+    // solicita/acompanha pelos GET/POST autenticados (/api/deals, /api/partnerships),
+    // que escopam por papel. Cliente direto é bloqueado; admin pode ler/gerir direto.
+    // Espelha houses/affiliate_statuses. A APROVAÇÃO grava a taxa no affiliate_configs
+    // pelo mesmo caminho auditado (config.update). Ver server.ts + src/lib/deal.ts.
+    match /deals/{dealId} {
+      allow read, write: if isAdmin();
+    }
+    match /partnership_requests/{reqId} {
+      allow read, write: if isAdmin();
+    }
+
     // Backoffice de casas (betting houses). Registro próprio das casas (nome/logo/
     // brandId/registerUrlTemplate), gerido pelo admin via /casas. Escrito/lido pelo
     // servidor (Admin SDK, que ignora estas regras); o afiliado lê pelo GET

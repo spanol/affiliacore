@@ -26,6 +26,8 @@ import { analyticsDocId, funnelKey, sanitizeFunnel, hasFunnelActivity } from './
 import { buildVersionPayload, type AppVersion } from './src/lib/version';
 import { sanitizePrize, sanitizePrizePatch } from './src/lib/prizes';
 import { buildResultsNotification, type ResultsNotificationVariant } from './src/lib/resultsNotification';
+import { normalizeDealInput, buildDealLabel, dealBrandKey, dealToBrandRates } from './src/lib/deal';
+import { canTransition, type PartnershipStatus } from './src/lib/partnership';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2547,6 +2549,288 @@ export function createApp(deps: ServerDeps) {
     } catch (e) {
       console.error('[houses] erro ao remover:', e);
       return res.status(500).json({ error: 'Erro ao remover a casa' });
+    }
+  });
+
+  // === Acordos (deals) + Parcerias (marketplace, P2) =======================
+  // Um DEAL é uma oferta de uma operadora (casa) com termos de comissão. Uma
+  // PARCERIA liga afiliado→deal com status (solicitada→aprovada/recusada/encerrada).
+  // Ao APROVAR, a taxa do deal é gravada no affiliate_configs.byBrand[chave-da-casa]
+  // (mesmo caminho auditado do PATCH de config — o núcleo commission.ts não muda) e
+  // um affiliate_links é emitido p/ o /go. Ver PESQUISA-AFFILITY.md e src/lib/deal.ts.
+  const dealFromDoc = (d: admin.firestore.DocumentSnapshot) => {
+    const x = (d.data() as any) || {};
+    return {
+      id: d.id,
+      houseId: x.houseId ?? null,
+      operatorName: x.operatorName ?? '',
+      model: x.model ?? 'cpa',
+      cpaValue: Number.isFinite(Number(x.cpaValue)) ? Number(x.cpaValue) : 0,
+      revPercentage: Number.isFinite(Number(x.revPercentage)) ? Number(x.revPercentage) : 0,
+      cycle: x.cycle ?? 'mensal',
+      currency: x.currency ?? 'BRL',
+      geo: x.geo ?? '',
+      active: x.active !== false,
+      order: Number.isFinite(Number(x.order)) ? Number(x.order) : 0,
+    };
+  };
+  const partnershipFromDoc = (d: admin.firestore.DocumentSnapshot) => {
+    const x = (d.data() as any) || {};
+    return {
+      id: d.id,
+      affiliateId: x.affiliateId ?? null,
+      dealId: x.dealId ?? null,
+      status: (x.status ?? 'requested') as PartnershipStatus,
+      code: x.code ?? null,
+      operatorName: x.operatorName ?? '',
+      dealLabel: x.dealLabel ?? '',
+      houseId: x.houseId ?? null,
+      requestedAt: x.requestedAt ?? null,
+      decidedAt: x.decidedAt ?? null,
+    };
+  };
+
+  // Lista deals. Admin vê todos; afiliado vê só os ATIVOS (ofertas do marketplace).
+  app.get('/api/deals', requireAuth, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const snap = await adminDb.collection('deals').get();
+      const isAdmin = (req as any).user?.role === 'admin';
+      const deals = snap.docs
+        .map(dealFromDoc)
+        .filter((d) => isAdmin || d.active)
+        .sort((a, b) => a.order - b.order || a.operatorName.localeCompare(b.operatorName, 'pt-BR'));
+      return res.json({ deals });
+    } catch (e: any) {
+      console.error('[deals] erro ao listar:', e);
+      return res.status(500).json({ error: 'Erro ao listar acordos' });
+    }
+  });
+
+  // Cria um deal (admin). Valida pelo núcleo puro; operatorName vem do form (ou é
+  // derivado da casa no client). Label armazenado p/ exibir sem re-montar.
+  app.post('/api/deals', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const { deal, error } = normalizeDealInput(req.body || {});
+      if (error || !deal) return res.status(400).json({ error: error || 'Dados do acordo inválidos.' });
+      const ref = adminDb.collection('deals').doc();
+      await ref.set({
+        ...deal,
+        label: buildDealLabel(deal),
+        createdByUid: (req as any).user?.uid ?? null,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      await writeAuditLog(req, {
+        entityType: 'deal', entityId: ref.id, entityLabel: buildDealLabel(deal),
+        action: 'deal.create', metadata: { houseId: deal.houseId, model: deal.model, cpaValue: deal.cpaValue, revPercentage: deal.revPercentage },
+      });
+      return res.status(201).json(dealFromDoc(await ref.get()));
+    } catch (e: any) {
+      console.error('[deals] erro ao criar:', e);
+      return res.status(500).json({ error: e?.message || 'Erro ao criar acordo' });
+    }
+  });
+
+  // Atualiza um deal (admin). Ao DESATIVAR, encerra em cascata as parcerias vivas
+  // daquele deal (espelha "descontinuada pela operadora" do Affility) e desativa os
+  // links emitidos — o afiliado deixa de divulgar um acordo que não existe mais.
+  app.patch('/api/deals/:id', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const id = String(req.params.id || '').trim();
+      const ref = adminDb.collection('deals').doc(id);
+      const before = await ref.get();
+      if (!before.exists) return res.status(404).json({ error: 'Acordo não encontrado.' });
+      const merged = { ...(before.data() as any), ...(req.body || {}) };
+      const { deal, error } = normalizeDealInput(merged);
+      if (error || !deal) return res.status(400).json({ error: error || 'Dados do acordo inválidos.' });
+
+      const patch = { ...deal, label: buildDealLabel(deal), updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+      const changes = diffChanges(before.data() as any, patch,
+        ['operatorName', 'model', 'cpaValue', 'revPercentage', 'cycle', 'currency', 'geo', 'active', 'houseId']);
+      await ref.set(patch, { merge: true });
+      if (changes.length) {
+        await writeAuditLog(req, { entityType: 'deal', entityId: id, entityLabel: patch.label, action: 'deal.update', changes });
+      }
+
+      // Cascata de encerramento quando o deal é desativado.
+      const wasActive = (before.data() as any)?.active !== false;
+      if (wasActive && deal.active === false) {
+        const parts = await adminDb.collection('partnership_requests').where('dealId', '==', id).get();
+        const batch = adminDb.batch();
+        let touched = 0;
+        for (const p of parts.docs) {
+          const st = (p.data() as any)?.status;
+          if (st === 'requested' || st === 'approved') {
+            batch.set(p.ref, { status: 'discontinued', decidedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+            const code = (p.data() as any)?.code;
+            if (code) batch.set(adminDb.collection('affiliate_links').doc(String(code)), { active: false }, { merge: true });
+            touched++;
+          }
+        }
+        if (touched) await batch.commit();
+      }
+      return res.json(dealFromDoc(await ref.get()));
+    } catch (e: any) {
+      console.error('[deals] erro ao atualizar:', e);
+      return res.status(500).json({ error: e?.message || 'Erro ao atualizar acordo' });
+    }
+  });
+
+  // Lista parcerias. Admin vê todas (filtro opcional ?status); afiliado vê só as
+  // dele (escopo forçado pelo token — nunca confia em affiliateId do cliente).
+  app.get('/api/partnerships', requireAuth, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const user = (req as any).user;
+      let q: admin.firestore.Query = adminDb.collection('partnership_requests');
+      if (user?.role !== 'admin') {
+        if (!user?.affiliateId) return res.json({ partnerships: [] });
+        q = q.where('affiliateId', '==', String(user.affiliateId));
+      }
+      const snap = await q.get();
+      const wantStatus = typeof req.query.status === 'string' ? req.query.status : null;
+      const partnerships = snap.docs
+        .map(partnershipFromDoc)
+        .filter((p) => !wantStatus || p.status === wantStatus);
+      return res.json({ partnerships });
+    } catch (e: any) {
+      console.error('[partnerships] erro ao listar:', e);
+      return res.status(500).json({ error: 'Erro ao listar parcerias' });
+    }
+  });
+
+  // Solicita uma parceria. O afiliado só pede p/ si (affiliateId do token); admin pode
+  // pedir por outro (body.affiliateId). Idempotente por (afiliado × deal) enquanto a
+  // parceria estiver VIVA (solicitada/aprovada) — recusada/encerrada libera novo pedido.
+  app.post('/api/partnerships', requireAuth, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const user = (req as any).user;
+      const isAdmin = user?.role === 'admin';
+      const affiliateId = isAdmin && req.body?.affiliateId ? String(req.body.affiliateId) : (user?.affiliateId ? String(user.affiliateId) : '');
+      if (!affiliateId) return res.status(403).json({ error: 'Sua conta não está vinculada a um afiliado.' });
+      const dealId = String(req.body?.dealId ?? '').trim();
+      if (!dealId) return res.status(400).json({ error: 'dealId é obrigatório.' });
+
+      const dealSnap = await adminDb.collection('deals').doc(dealId).get();
+      if (!dealSnap.exists) return res.status(404).json({ error: 'Acordo não encontrado.' });
+      const deal = dealFromDoc(dealSnap);
+      if (!deal.active) return res.status(409).json({ error: 'Este acordo não está mais disponível.' });
+
+      // Idempotência: já existe parceria viva p/ este afiliado×deal? Reusa.
+      const existing = await adminDb.collection('partnership_requests').where('affiliateId', '==', affiliateId).get();
+      const alive = existing.docs.find((d) => {
+        const x = d.data() as any;
+        return String(x.dealId) === dealId && (x.status === 'requested' || x.status === 'approved');
+      });
+      if (alive) return res.status(200).json(partnershipFromDoc(alive));
+
+      const ref = adminDb.collection('partnership_requests').doc();
+      await ref.set({
+        affiliateId, dealId,
+        status: 'requested',
+        code: null,
+        operatorName: deal.operatorName,
+        dealLabel: buildDealLabel(deal),
+        houseId: deal.houseId,
+        requestedByUid: user?.uid ?? null,
+        requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      await writeAuditLog(req, {
+        entityType: 'partnership', entityId: ref.id, entityLabel: buildDealLabel(deal),
+        action: 'partnership.request', metadata: { affiliateId, dealId },
+      });
+      return res.status(201).json(partnershipFromDoc(await ref.get()));
+    } catch (e: any) {
+      console.error('[partnerships] erro ao solicitar:', e);
+      return res.status(500).json({ error: e?.message || 'Erro ao solicitar parceria' });
+    }
+  });
+
+  // Decide uma parceria (admin): approve | reject | discontinue. canTransition barra
+  // pulos inválidos. Na APROVAÇÃO: aplica a taxa do deal no byBrand do afiliado (mesmo
+  // batch auditado do config.update) e emite o affiliate_links (código do /go).
+  app.patch('/api/partnerships/:id', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const id = String(req.params.id || '').trim();
+      const ref = adminDb.collection('partnership_requests').doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: 'Parceria não encontrada.' });
+      const cur = snap.data() as any;
+      const from = (cur.status ?? 'requested') as PartnershipStatus;
+      const to = String(req.body?.status ?? '') as PartnershipStatus;
+      if (!['approved', 'rejected', 'discontinued'].includes(to)) {
+        return res.status(400).json({ error: 'status deve ser approved, rejected ou discontinued.' });
+      }
+      if (!canTransition(from, to)) {
+        return res.status(409).json({ error: `Transição inválida (${from} → ${to}).` });
+      }
+
+      const affiliateId = String(cur.affiliateId);
+      const dealSnap = await adminDb.collection('deals').doc(String(cur.dealId)).get();
+      if (!dealSnap.exists) return res.status(404).json({ error: 'Acordo da parceria não existe mais.' });
+      const deal = dealFromDoc(dealSnap);
+
+      if (to === 'approved') {
+        // Resolve a chave do byBrand pela CASA do deal (brandId OTG ou slug manual).
+        const houseSnap = await adminDb.collection('houses').doc(String(deal.houseId)).get();
+        const house = houseSnap.exists ? houseFromDoc(houseSnap) : { id: String(deal.houseId), slug: String(deal.houseId), brandId: null, registerUrlTemplate: null } as any;
+        const brandKey = dealBrandKey(house);
+        const rates = dealToBrandRates(deal);
+
+        // Aplica a taxa no affiliate_configs.byBrand[brandKey] preservando as outras
+        // casas (merge do mapa) — MESMO caminho auditado do PATCH de config.
+        const cfgRef = adminDb.collection('affiliate_configs').doc(affiliateId);
+        const cfgBefore = await cfgRef.get();
+        const curByBrand = (cfgBefore.exists ? (cfgBefore.data() as any)?.byBrand : null) || {};
+        const nextByBrand = { ...curByBrand, [brandKey]: { cpaValue: rates.cpaValue, revPercentage: rates.revPercentage } };
+        const cfgChanges = diffChanges(cfgBefore.data() as any, { byBrand: nextByBrand }, ['byBrand']);
+
+        // Emite (idempotente por afiliado×brandKey) o link de divulgação p/ o /go.
+        let code: string | null = cur.code ?? null;
+        const registerUrl = (house as any).registerUrlTemplate || null;
+        if (!code) {
+          const existingLink = await adminDb.collection('affiliate_links')
+            .where('affiliateId', '==', affiliateId).where('brandId', '==', brandKey).limit(1).get();
+          if (!existingLink.empty) code = existingLink.docs[0].id;
+          else code = crypto.randomBytes(6).toString('base64url');
+        }
+
+        const batch = adminDb.batch();
+        batch.set(cfgRef, { byBrand: { [brandKey]: { cpaValue: rates.cpaValue, revPercentage: rates.revPercentage } }, affiliateId, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        batch.set(adminDb.collection('affiliate_links').doc(code), {
+          code, affiliateId, brandId: brandKey,
+          registerUrl: registerUrl ? String(registerUrl) : null,
+          dealId: String(cur.dealId),
+          active: !!registerUrl,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        batch.set(ref, { status: 'approved', code, decidedByUid: (req as any).user?.uid ?? null, decidedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        // Auditoria: a mudança de taxa (config.update — honra a invariante de dinheiro)
+        // E a decisão da parceria.
+        if (cfgChanges.length) {
+          appendAuditLog(batch, req, { entityType: 'affiliate_config', entityId: affiliateId, entityLabel: await affiliateNameOf(affiliateId), action: 'config.update', changes: cfgChanges });
+        }
+        appendAuditLog(batch, req, { entityType: 'partnership', entityId: id, entityLabel: buildDealLabel(deal), action: 'partnership.approve', metadata: { affiliateId, dealId: cur.dealId, brandKey, cpaValue: rates.cpaValue, revPercentage: rates.revPercentage, linkIssued: !!registerUrl } });
+        await batch.commit();
+        return res.json(partnershipFromDoc(await ref.get()));
+      }
+
+      // reject | discontinue: muda status e desativa o link (se houver). Não mexe na
+      // taxa já aplicada (encerrar não estorna comissão histórica).
+      const batch = adminDb.batch();
+      batch.set(ref, { status: to, decidedByUid: (req as any).user?.uid ?? null, decidedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      if (cur.code) batch.set(adminDb.collection('affiliate_links').doc(String(cur.code)), { active: false }, { merge: true });
+      appendAuditLog(batch, req, { entityType: 'partnership', entityId: id, entityLabel: buildDealLabel(deal), action: `partnership.${to === 'rejected' ? 'reject' : 'discontinue'}`, metadata: { affiliateId, dealId: cur.dealId } });
+      await batch.commit();
+      return res.json(partnershipFromDoc(await ref.get()));
+    } catch (e: any) {
+      console.error('[partnerships] erro ao decidir:', e);
+      return res.status(500).json({ error: e?.message || 'Erro ao decidir parceria' });
     }
   });
 

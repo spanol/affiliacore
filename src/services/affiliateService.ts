@@ -38,6 +38,24 @@ import {
 export { resolveBrandRates, rateStatus, calcAffiliatePayout, calcNetProfit, houseCommissionForRow };
 export type { BrandRates, AffiliateConfig };
 
+// Acordos (deals) + parcerias (marketplace, P2). Re-exporta os puros p/ as páginas
+// importarem tudo do service (mesmo padrão do núcleo de comissão acima).
+import {
+  buildDealLabel, DEAL_MODELS, PAYMENT_CYCLES, DEAL_CURRENCIES,
+  DEAL_MODEL_LABEL, PAYMENT_CYCLE_LABEL,
+  type Deal, type DealModel, type PaymentCycle, type DealCurrency,
+} from '../lib/deal';
+import {
+  PARTNERSHIP_STATUS_LABEL, selectAvailableDeals, joinPartnerships,
+  type PartnershipRequest, type PartnershipStatus,
+} from '../lib/partnership';
+export {
+  buildDealLabel, DEAL_MODELS, PAYMENT_CYCLES, DEAL_CURRENCIES,
+  DEAL_MODEL_LABEL, PAYMENT_CYCLE_LABEL,
+  PARTNERSHIP_STATUS_LABEL, selectAvailableDeals, joinPartnerships,
+};
+export type { Deal, DealModel, PaymentCycle, DealCurrency, PartnershipRequest, PartnershipStatus };
+
 interface Affiliate {
   id: string;
   name: string;
@@ -1091,6 +1109,90 @@ export async function fetchAffiliateLinks(): Promise<AffiliateLink[]> {
     console.error('Error fetching affiliate links:', error);
     return [];
   }
+}
+
+// --- Acordos (deals) + Parcerias (marketplace, P2) ---------------------------
+// Tudo mediado pelo servidor (Admin SDK + rules admin-only). O afiliado navega
+// ofertas e solicita/acompanha; o admin cria deals e aprova. Ver src/lib/deal.ts.
+
+export async function fetchDeals(): Promise<Deal[]> {
+  try {
+    const resp = await authFetch('/api/deals', { headers: { Accept: 'application/json' } });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return Array.isArray(data?.deals) ? data.deals : [];
+  } catch (error) {
+    console.error('Error fetching deals:', error);
+    return [];
+  }
+}
+
+export async function createDeal(input: Partial<Deal>): Promise<Deal> {
+  const resp = await authFetch('/api/deals', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro na API: ${resp.status}`);
+  }
+  return resp.json();
+}
+
+export async function updateDeal(id: string, patch: Partial<Deal>): Promise<Deal> {
+  const resp = await authFetch(`/api/deals/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro na API: ${resp.status}`);
+  }
+  return resp.json();
+}
+
+export async function fetchPartnerships(status?: PartnershipStatus): Promise<PartnershipRequest[]> {
+  try {
+    const q = status ? `?status=${encodeURIComponent(status)}` : '';
+    const resp = await authFetch(`/api/partnerships${q}`, { headers: { Accept: 'application/json' } });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return Array.isArray(data?.partnerships) ? data.partnerships : [];
+  } catch (error) {
+    console.error('Error fetching partnerships:', error);
+    return [];
+  }
+}
+
+// Afiliado solicita um acordo (o servidor força o affiliateId pelo token). Admin pode
+// passar affiliateId p/ solicitar por outro.
+export async function requestPartnership(dealId: string, affiliateId?: string): Promise<PartnershipRequest> {
+  const resp = await authFetch('/api/partnerships', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ dealId, ...(affiliateId ? { affiliateId } : {}) }),
+  });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro na API: ${resp.status}`);
+  }
+  return resp.json();
+}
+
+// Admin decide a parceria: 'approved' aplica a taxa do deal no byBrand + emite o link.
+export async function decidePartnership(id: string, status: 'approved' | 'rejected' | 'discontinued'): Promise<PartnershipRequest> {
+  const resp = await authFetch(`/api/partnerships/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro na API: ${resp.status}`);
+  }
+  return resp.json();
 }
 
 // `reason` é opcional e vai junto p/ o servidor REGISTRAR a auditoria server-side

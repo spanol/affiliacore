@@ -1379,3 +1379,113 @@ describe('GET /api/affiliate-analytics (escopo por papel)', () => {
     expect(res.body.analytics[0].affiliateId).toBe('AFF-1');
   });
 });
+
+// =============================================================================
+// Acordos (deals) + Parcerias (marketplace, P2). Foco no caminho de dinheiro: a
+// APROVAÇÃO grava a taxa do deal no affiliate_configs.byBrand[chave-da-casa] (slug
+// nas casas manuais — instância OTG-free) e emite o affiliate_links. Escopo por papel
+// (afiliado só a própria parceria) + guarda de transição (canTransition).
+// =============================================================================
+describe('deals + parcerias (P2)', () => {
+  const baseSeed = () => ({
+    users: { 'admin-uid': { role: 'admin' }, 'aff-uid': { role: 'client', affiliateId: 'affX' }, 'other-uid': { role: 'client', affiliateId: 'affY' } },
+    houses: {
+      betano: { slug: 'betano', name: 'Betano', brandId: null, registerUrlTemplate: 'https://betano.example/aff', dataSource: 'manual' },
+      superbet: { slug: 'superbet', name: 'Superbet', brandId: 'sb-brand', registerUrlTemplate: null, dataSource: 'otg' },
+    },
+    deals: {
+      d1: { houseId: 'betano', operatorName: 'Betano', model: 'cpa', cpaValue: 120, revPercentage: 0, cycle: 'quinzenal', currency: 'BRL', geo: 'Brasil', active: true },
+      d2: { houseId: 'superbet', operatorName: 'Superbet', model: 'revshare', cpaValue: 0, revPercentage: 30, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: false },
+    },
+  });
+
+  it('GET /api/deals: afiliado vê só os ATIVOS; admin vê todos', async () => {
+    const seed = baseSeed();
+    const affRes = await request(buildApp({ seed })).get('/api/deals').set('Authorization', 'Bearer aff-uid').expect(200);
+    expect(affRes.body.deals.map((d: any) => d.id)).toEqual(['d1']); // d2 inativo escondido
+    const admRes = await request(buildApp({ seed })).get('/api/deals').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(admRes.body.deals.map((d: any) => d.id).sort()).toEqual(['d1', 'd2']);
+  });
+
+  it('POST /api/deals: client → 403; admin válido → 201 com label montado', async () => {
+    await request(buildApp({ seed: baseSeed() })).post('/api/deals').set('Authorization', 'Bearer aff-uid').send({ houseId: 'x', operatorName: 'X', model: 'cpa', cpaValue: 10 }).expect(403);
+    const res = await request(buildApp({ seed: baseSeed() })).post('/api/deals').set('Authorization', 'Bearer admin-uid')
+      .send({ houseId: 'betano', operatorName: 'Betano', model: 'cpa', cpaValue: 80, cycle: 'quinzenal', currency: 'crypto', geo: 'México' }).expect(201);
+    expect(res.body).toMatchObject({ operatorName: 'Betano', cpaValue: 80, model: 'cpa' });
+  });
+
+  it('POST /api/partnerships: afiliado solicita p/ SI (ignora affiliateId do body) e é idempotente', async () => {
+    const db = makeFirestore(baseSeed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    // tenta forjar affiliateId de outro → servidor força o do token (affX)
+    const res = await request(app).post('/api/partnerships').set('Authorization', 'Bearer aff-uid').send({ dealId: 'd1', affiliateId: 'affY' }).expect(201);
+    expect(res.body).toMatchObject({ affiliateId: 'affX', dealId: 'd1', status: 'requested' });
+    // repetir → reusa a mesma (idempotente, 200)
+    const again = await request(app).post('/api/partnerships').set('Authorization', 'Bearer aff-uid').send({ dealId: 'd1' }).expect(200);
+    expect(again.body.id).toBe(res.body.id);
+  });
+
+  it('GET /api/partnerships: afiliado vê só as dele (não vaza a do outro)', async () => {
+    const seed: any = baseSeed();
+    seed.partnership_requests = {
+      p1: { affiliateId: 'affX', dealId: 'd1', status: 'requested' },
+      p2: { affiliateId: 'affY', dealId: 'd1', status: 'approved' },
+    };
+    const res = await request(buildApp({ seed })).get('/api/partnerships').set('Authorization', 'Bearer aff-uid').expect(200);
+    expect(res.body.partnerships.map((p: any) => p.id)).toEqual(['p1']);
+  });
+
+  it('APROVAÇÃO (casa MANUAL): grava byBrand[slug] no affiliate_configs + emite affiliate_links + audita', async () => {
+    const seed: any = baseSeed();
+    seed.partnership_requests = { p1: { affiliateId: 'affX', dealId: 'd1', status: 'requested', code: null } };
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).patch('/api/partnerships/p1').set('Authorization', 'Bearer admin-uid').send({ status: 'approved' }).expect(200);
+
+    // byBrand keyed pelo SLUG da casa manual (betano), com a taxa do deal (120/0)
+    const cfg = db.__store.get('affiliate_configs')?.get('affX');
+    expect(cfg.byBrand.betano).toEqual({ cpaValue: 120, revPercentage: 0 });
+    // affiliate_links emitido (afiliado×betano, registerUrl da casa, ativo)
+    const links = [...(db.__store.get('affiliate_links')?.values() ?? [])];
+    expect(links).toHaveLength(1);
+    expect(links[0]).toMatchObject({ affiliateId: 'affX', brandId: 'betano', registerUrl: 'https://betano.example/aff', active: true, dealId: 'd1' });
+    // parceria aprovada + code setado
+    const p = db.__store.get('partnership_requests')?.get('p1');
+    expect(p.status).toBe('approved');
+    expect(p.code).toBeTruthy();
+    // trilha: config.update (dinheiro) + partnership.approve
+    const audits = [...(db.__store.get('audit_logs')?.values() ?? [])].map((a: any) => a.action);
+    expect(audits).toContain('config.update');
+    expect(audits).toContain('partnership.approve');
+  });
+
+  it('APROVAÇÃO (casa OTG): byBrand keyed pelo brandId; link inativo quando não há registerUrlTemplate', async () => {
+    const seed: any = baseSeed();
+    seed.deals.d2.active = true; // ativa o deal OTG p/ aprovar
+    seed.partnership_requests = { p2: { affiliateId: 'affX', dealId: 'd2', status: 'requested', code: null } };
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).patch('/api/partnerships/p2').set('Authorization', 'Bearer admin-uid').send({ status: 'approved' }).expect(200);
+    const cfg = db.__store.get('affiliate_configs')?.get('affX');
+    expect(cfg.byBrand['sb-brand']).toEqual({ cpaValue: 0, revPercentage: 30 }); // revshare
+    const links = [...(db.__store.get('affiliate_links')?.values() ?? [])];
+    expect(links[0]).toMatchObject({ brandId: 'sb-brand', active: false }); // sem template → link inativo
+  });
+
+  it('guarda de transição: aprovar uma parceria já RECUSADA → 409', async () => {
+    const seed: any = baseSeed();
+    seed.partnership_requests = { p1: { affiliateId: 'affX', dealId: 'd1', status: 'rejected' } };
+    await request(buildApp({ seed })).patch('/api/partnerships/p1').set('Authorization', 'Bearer admin-uid').send({ status: 'approved' }).expect(409);
+  });
+
+  it('desativar um deal encerra em cascata as parcerias vivas + desativa o link', async () => {
+    const seed: any = baseSeed();
+    seed.partnership_requests = { p1: { affiliateId: 'affX', dealId: 'd1', status: 'approved', code: 'LINK1' } };
+    seed.affiliate_links = { LINK1: { code: 'LINK1', affiliateId: 'affX', brandId: 'betano', active: true } };
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).patch('/api/deals/d1').set('Authorization', 'Bearer admin-uid').send({ active: false }).expect(200);
+    expect(db.__store.get('partnership_requests')?.get('p1').status).toBe('discontinued');
+    expect(db.__store.get('affiliate_links')?.get('LINK1').active).toBe(false);
+  });
+});
