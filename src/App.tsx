@@ -24,7 +24,7 @@ import SpecialAffiliatesList from './pages/SpecialAffiliatesList';
 import Financeiro from './pages/Financeiro';
 import PartnerApiExplorer from './pages/PartnerApiExplorer';
 import OtgRoster from './pages/OtgRoster';
-import { OTG_ENABLED } from './lib/instanceClient';
+import { OTG_ENABLED, MARKETPLACE_ENABLED } from './lib/instanceClient';
 import Houses from './pages/Houses';
 import Deals from './pages/Deals';
 import Partnerships from './pages/Partnerships';
@@ -153,23 +153,30 @@ export default function App() {
                 <Houses />
               </ProtectedRoute>
             } />
-            {/* Marketplace de acordos (P2): admin gere os acordos + aprova parcerias;
-                o afiliado navega ofertas, solicita e pega os links por acordo. */}
-            <Route path="/acordos" element={
-              <ProtectedRoute role="admin">
-                <Deals />
-              </ProtectedRoute>
-            } />
-            <Route path="/parcerias" element={
-              <ProtectedRoute role="client">
-                <Partnerships />
-              </ProtectedRoute>
-            } />
-            <Route path="/meus-links" element={
-              <ProtectedRoute role="client">
-                <MyLinks />
-              </ProtectedRoute>
-            } />
+            {/* Marketplace de acordos (P2/P3): módulo opt-in por instância (default OFF
+                → não existe na Boost/instância nº 0). Admin gere os acordos + aprova
+                parcerias; o afiliado navega ofertas, solicita e pega os links por acordo. */}
+            {MARKETPLACE_ENABLED && (
+              <Route path="/acordos" element={
+                <ProtectedRoute role="admin">
+                  <Deals />
+                </ProtectedRoute>
+              } />
+            )}
+            {MARKETPLACE_ENABLED && (
+              <Route path="/parcerias" element={
+                <ProtectedRoute role="client">
+                  <Partnerships />
+                </ProtectedRoute>
+              } />
+            )}
+            {MARKETPLACE_ENABLED && (
+              <Route path="/meus-links" element={
+                <ProtectedRoute role="client">
+                  <MyLinks />
+                </ProtectedRoute>
+              } />
+            )}
             <Route path="/auditoria" element={
               <ProtectedRoute role="admin">
                 <Auditoria />

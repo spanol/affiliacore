@@ -12,6 +12,15 @@ env:
       - BUILD
       - RUNTIME
 
+  # Marketplace de acordos/parcerias (P2/P3): módulo opt-in (default OFF no repo →
+  # a Boost/instância nº 0 NÃO ganha as telas). A Infinity pediu, então liga aqui.
+  # Reverter = trocar p/ 'false' (ou remover) e re-rollout. Ver src/lib/instance.ts.
+  - variable: VITE_MARKETPLACE_ENABLED
+    value: 'true'
+    availability:
+      - BUILD
+      - RUNTIME
+
   # Marca do cliente.
   - variable: VITE_BRAND_NAME
     value: 'Infinity'

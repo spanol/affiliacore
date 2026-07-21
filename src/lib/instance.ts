@@ -11,3 +11,13 @@
 export function otgEnabled(raw: string | boolean | undefined | null): boolean {
   return String(raw ?? '').trim().toLowerCase() !== 'false';
 }
+
+// Marketplace de acordos/parcerias (P2/P3) como MÓDULO opt-in por instância. Ao
+// contrário do OTG (default LIGADO), o marketplace é default DESLIGADO: ausente/qualquer
+// valor ≠ 'true' → off. Assim a instância nº 0 (Boost/Carlos) e qualquer instância
+// existente NÃO ganham as telas novas sem pedir — zero side effect. A instância que
+// quer (ex.: Infinity) liga com VITE_MARKETPLACE_ENABLED='true'. Mesma env vale no
+// bundle do cliente e no server (process.env). Não é credencial — só um interruptor.
+export function marketplaceEnabled(raw: string | boolean | undefined | null): boolean {
+  return String(raw ?? '').trim().toLowerCase() === 'true';
+}

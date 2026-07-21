@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 import { renderErrorPage } from './errorPage';
 import { isBotUserAgent, appendSubid, clickStatDay } from './src/lib/tracking';
 import { resolveIsSpecial, resolveServerToday, resolveServerYesterday, resolveScopedAffiliateIds } from './src/lib/scope';
-import { otgEnabled } from './src/lib/instance';
+import { otgEnabled, marketplaceEnabled } from './src/lib/instance';
 import { resolveBrand } from './src/lib/branding';
 import { computeRankingEntries } from './src/lib/ranking';
 import { expandAffiliateIdsParam } from './src/lib/affiliateIdsParam';
@@ -179,6 +179,17 @@ export function createApp(deps: ServerDeps) {
   const requireOtg: express.RequestHandler = (_req, res, next) => {
     if (!OTG_ENABLED) {
       return res.status(503).json({ error: 'Integração OTG desativada nesta instância.', code: 'OTG_DISABLED' });
+    }
+    next();
+  };
+
+  // Marketplace de acordos/parcerias (P2/P3): módulo opt-in por instância (default
+  // OFF). Na Boost/instância nº 0 as rotas /api/deals e /api/partnerships respondem
+  // 404 (feature inexistente) — zero side effect. Liga com VITE_MARKETPLACE_ENABLED.
+  const MARKETPLACE_ENABLED = marketplaceEnabled(process.env.VITE_MARKETPLACE_ENABLED);
+  const requireMarketplace: express.RequestHandler = (_req, res, next) => {
+    if (!MARKETPLACE_ENABLED) {
+      return res.status(404).json({ error: 'Módulo de marketplace desativado nesta instância.', code: 'MARKETPLACE_DISABLED' });
     }
     next();
   };
@@ -2591,7 +2602,7 @@ export function createApp(deps: ServerDeps) {
   };
 
   // Lista deals. Admin vê todos; afiliado vê só os ATIVOS (ofertas do marketplace).
-  app.get('/api/deals', requireAuth, async (req, res) => {
+  app.get('/api/deals', requireAuth, requireMarketplace, async (req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
     try {
       const snap = await adminDb.collection('deals').get();
@@ -2609,7 +2620,7 @@ export function createApp(deps: ServerDeps) {
 
   // Cria um deal (admin). Valida pelo núcleo puro; operatorName vem do form (ou é
   // derivado da casa no client). Label armazenado p/ exibir sem re-montar.
-  app.post('/api/deals', requireAdmin, async (req, res) => {
+  app.post('/api/deals', requireAdmin, requireMarketplace, async (req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
     try {
       const { deal, error } = normalizeDealInput(req.body || {});
@@ -2636,7 +2647,7 @@ export function createApp(deps: ServerDeps) {
   // Atualiza um deal (admin). Ao DESATIVAR, encerra em cascata as parcerias vivas
   // daquele deal (espelha "descontinuada pela operadora" do Affility) e desativa os
   // links emitidos — o afiliado deixa de divulgar um acordo que não existe mais.
-  app.patch('/api/deals/:id', requireAdmin, async (req, res) => {
+  app.patch('/api/deals/:id', requireAdmin, requireMarketplace, async (req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
     try {
       const id = String(req.params.id || '').trim();
@@ -2681,7 +2692,7 @@ export function createApp(deps: ServerDeps) {
 
   // Lista parcerias. Admin vê todas (filtro opcional ?status); afiliado vê só as
   // dele (escopo forçado pelo token — nunca confia em affiliateId do cliente).
-  app.get('/api/partnerships', requireAuth, async (req, res) => {
+  app.get('/api/partnerships', requireAuth, requireMarketplace, async (req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
     try {
       const user = (req as any).user;
@@ -2705,7 +2716,7 @@ export function createApp(deps: ServerDeps) {
   // Solicita uma parceria. O afiliado só pede p/ si (affiliateId do token); admin pode
   // pedir por outro (body.affiliateId). Idempotente por (afiliado × deal) enquanto a
   // parceria estiver VIVA (solicitada/aprovada) — recusada/encerrada libera novo pedido.
-  app.post('/api/partnerships', requireAuth, async (req, res) => {
+  app.post('/api/partnerships', requireAuth, requireMarketplace, async (req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
     try {
       const user = (req as any).user;
@@ -2753,7 +2764,7 @@ export function createApp(deps: ServerDeps) {
   // Decide uma parceria (admin): approve | reject | discontinue. canTransition barra
   // pulos inválidos. Na APROVAÇÃO: aplica a taxa do deal no byBrand do afiliado (mesmo
   // batch auditado do config.update) e emite o affiliate_links (código do /go).
-  app.patch('/api/partnerships/:id', requireAdmin, async (req, res) => {
+  app.patch('/api/partnerships/:id', requireAdmin, requireMarketplace, async (req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
     try {
       const id = String(req.params.id || '').trim();

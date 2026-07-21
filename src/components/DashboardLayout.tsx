@@ -27,7 +27,7 @@ import {
   Link2 as LinkIcon
 } from 'lucide-react';
 import { cn, humanizeName } from '../lib/utils';
-import { OTG_ENABLED } from '../lib/instanceClient';
+import { OTG_ENABLED, MARKETPLACE_ENABLED } from '../lib/instanceClient';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from '../contexts/ThemeContext';
 import NotificationBell from './NotificationBell';
@@ -117,10 +117,11 @@ export default function DashboardLayout() {
           : profile?.isSpecial
             ? [{ label: 'Afiliados', path: '/network/afiliados', icon: Users }]
             : []),
-        // Marketplace (P2): o afiliado navega ofertas/solicita parcerias e pega os
-        // links por acordo aprovado. Só pro afiliado com affiliateId (o servidor
-        // força o escopo pelo token; sem affiliateId não há o que solicitar).
-        ...(profile?.role !== 'admin' && profile?.affiliateId
+        // Marketplace (P2): opt-in por instância (default OFF → some na Boost). O
+        // afiliado navega ofertas/solicita parcerias e pega os links por acordo
+        // aprovado. Só pro afiliado com affiliateId (o servidor força o escopo pelo
+        // token; sem affiliateId não há o que solicitar).
+        ...(MARKETPLACE_ENABLED && profile?.role !== 'admin' && profile?.affiliateId
           ? [
               { label: 'Parcerias', path: '/parcerias', icon: Handshake },
               { label: 'Meus Links', path: '/meus-links', icon: LinkIcon },
@@ -133,8 +134,9 @@ export default function DashboardLayout() {
         ...(profile?.role === 'admin' ? [
           { label: 'Afiliados Especiais', path: '/special-affiliates', icon: Crown },
           { label: 'Casas', path: '/casas', icon: Building2 },
-          // Marketplace de acordos (P2): admin cria as ofertas + aprova as parcerias.
-          { label: 'Acordos', path: '/acordos', icon: Handshake },
+          // Marketplace de acordos (P2): opt-in por instância (default OFF → some na
+          // Boost). Admin cria as ofertas + aprova as parcerias.
+          ...(MARKETPLACE_ENABLED ? [{ label: 'Acordos', path: '/acordos', icon: Handshake }] : []),
           // P2: módulos OTG/Boost — somem na instância OTG-free (white-label). O
           // Roster consome o provisionamento OTG; a API de Parceiros hoje expõe a
           // rede/aprovados (dado OTG) a um parceiro externo. Ambos gated pela flag.

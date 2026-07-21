@@ -1387,6 +1387,10 @@ describe('GET /api/affiliate-analytics (escopo por papel)', () => {
 // (afiliado só a própria parceria) + guarda de transição (canTransition).
 // =============================================================================
 describe('deals + parcerias (P2)', () => {
+  // Marketplace é opt-in por instância — ligado só nestes testes.
+  beforeAll(() => { process.env.VITE_MARKETPLACE_ENABLED = 'true'; });
+  afterAll(() => { delete process.env.VITE_MARKETPLACE_ENABLED; });
+
   const baseSeed = () => ({
     users: { 'admin-uid': { role: 'admin' }, 'aff-uid': { role: 'client', affiliateId: 'affX' }, 'other-uid': { role: 'client', affiliateId: 'affY' } },
     houses: {
@@ -1487,5 +1491,23 @@ describe('deals + parcerias (P2)', () => {
     await request(app).patch('/api/deals/d1').set('Authorization', 'Bearer admin-uid').send({ active: false }).expect(200);
     expect(db.__store.get('partnership_requests')?.get('p1').status).toBe('discontinued');
     expect(db.__store.get('affiliate_links')?.get('LINK1').active).toBe(false);
+  });
+});
+
+// Marketplace é opt-in por instância (default OFF): sem VITE_MARKETPLACE_ENABLED as
+// rotas respondem 404 → zero side effect na Boost/instância nº 0. [[marketplaceEnabled]]
+describe('marketplace desligado por instância (default OFF)', () => {
+  const seed = { users: { 'admin-uid': { role: 'admin' }, 'aff-uid': { role: 'client', affiliateId: 'affX' } } };
+  // NÃO seta VITE_MARKETPLACE_ENABLED → default off.
+  it('rotas de deals/partnerships respondem 404 MARKETPLACE_DISABLED', async () => {
+    const app = buildApp({ seed });
+    const expect404 = async (req: request.Test) => {
+      const res = await req.set('Authorization', 'Bearer admin-uid').expect(404);
+      expect(res.body.code).toBe('MARKETPLACE_DISABLED');
+    };
+    await expect404(request(app).get('/api/deals'));
+    await expect404(request(app).post('/api/deals').send({ houseId: 'x', operatorName: 'X', model: 'cpa', cpaValue: 10 }));
+    await expect404(request(app).get('/api/partnerships'));
+    await expect404(request(app).post('/api/partnerships').send({ dealId: 'd1' }));
   });
 });
