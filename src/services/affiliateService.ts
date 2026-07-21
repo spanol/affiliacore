@@ -12,7 +12,7 @@ import { db } from '../lib/firebase';
 import { authFetch } from '../lib/api';
 import { OTG_ENABLED } from '../lib/instanceClient';
 import { withKnownHouses } from '../lib/knownHouses';
-import { findAffiliateInList } from '../lib/affiliateLookup';
+import { findAffiliateInList, userDocToAffiliate } from '../lib/affiliateLookup';
 import { getDefaultRange } from '../lib/dateRange';
 import { parseResultsPage, MAX_RESULT_PAGES } from '../lib/resultsPage';
 import { getKnownBrands } from '../lib/brand';
@@ -492,6 +492,44 @@ export async function fetchAffiliateById(id: string): Promise<any> {
   } catch (error) {
     console.error(`Fallback list lookup failed for affiliate ${normalizedId}:`, error);
   }
+
+  // Fallback final: afiliado que existe SÓ como login (`users/{uid}`), sem mirror nem
+  // produção externa — quem se auto-cadastrou pelo /register ("Solicite sua afiliação").
+  // O admin já vê a linha na lista (AffiliatesList sintetiza do `users`, id = uid), logo
+  // a ficha TEM que abrir; sem isto o /affiliates/:id dava "Afiliado não encontrado"
+  // (garantido numa instância OTG-free, sem roster/funil de fallback). [[fetchAffiliateFromUser]]
+  try {
+    const asUser = await fetchAffiliateFromUser(normalizedId);
+    if (asUser) return asUser;
+  } catch (error) {
+    console.error(`User-record lookup failed for affiliate ${normalizedId}:`, error);
+  }
+
+  return null;
+}
+
+// Resolve o afiliado a partir do doc de login quando não há mirror/produção. O id da
+// rota pode ser o próprio uid (auto-cadastro sem affiliateId — a lista usa u.uid) OU um
+// affiliateId já vinculado; cobrimos os dois. Segurança: `users/{uid}` é legível pelo
+// dono (próprio uid) ou por admin (rules); a query por affiliateId exige admin (list).
+// Para não-admin de terceiro a leitura é NEGADA → cai no catch → null (comportamento
+// de hoje). Papel 'admin' não é afiliado → ignora. Best-effort, nunca lança pra fora.
+async function fetchAffiliateFromUser(id: string): Promise<any | null> {
+  // 1) id == uid (caso do auto-cadastro: a lista do admin usa u.uid como id)
+  try {
+    const snap = await getDoc(doc(db, 'users', id));
+    if (snap.exists()) {
+      const data = snap.data() as any;
+      if (data?.role !== 'admin') return userDocToAffiliate(id, data);
+    }
+  } catch { /* leitura de doc de terceiro negada p/ não-admin → segue */ }
+
+  // 2) id == affiliateId já vinculado a um login (query em `users` exige admin)
+  try {
+    const qs = await getDocs(query(collection(db, 'users'), where('affiliateId', '==', id)));
+    const match = qs.docs.find((d) => (d.data() as any)?.role !== 'admin');
+    if (match) return userDocToAffiliate(id, match.data() as any);
+  } catch { /* list negada p/ não-admin → segue */ }
 
   return null;
 }

@@ -10,9 +10,10 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import { authFetch } from '../lib/api';
-import { getDocs } from 'firebase/firestore';
+import { getDoc, getDocs } from 'firebase/firestore';
 import {
   fetchAffiliates,
+  fetchAffiliateById,
   fetchAllResults,
   createBoostAffiliates,
   createEmailAlias,
@@ -76,6 +77,57 @@ describe('fetchAffiliates · une nativos Boost (Boost-first)', () => {
     vi.mocked(getDocs).mockRejectedValue(new Error('firestore down'));
     const list = await fetchAffiliates();
     expect(list.map((a: any) => a.id)).toEqual(['cl1']);
+  });
+});
+
+// Regressão da Infinity (2026-07-21): afiliado que se auto-cadastrou pelo /register
+// aparece na lista do admin (sintetizado do `users`, id = uid), mas a ficha dava
+// "Afiliado não encontrado" — não havia mirror `affiliates` nem produção OTG. Agora
+// o fetchAffiliateById cai no doc de login como último fallback. [[fetchAffiliateFromUser]]
+describe('fetchAffiliateById · fallback p/ afiliado só-login (auto-cadastro /register)', () => {
+  const okJson = (body: any) => ({ ok: true, json: async () => body });
+
+  it('sem mirror e sem OTG → sintetiza do doc users/{uid} (id da rota = uid)', async () => {
+    vi.mocked(getDoc).mockReset();
+    vi.mocked(getDoc)
+      .mockResolvedValueOnce({ exists: () => false } as any) // affiliates/{id}: não existe
+      .mockResolvedValueOnce({ exists: () => true, data: () => ({ name: 'Teste 01', email: 't01@x.com', phone: '(11) 90000-0000', role: 'client' }) } as any); // users/{id}
+    vi.mocked(authFetch).mockResolvedValue(okJson([]) as any); // OTG /affiliates vazia
+    vi.mocked(getDocs).mockResolvedValue({ docs: [] } as any); // mirror boost vazio
+    const aff = await fetchAffiliateById('i81KeHG5RqXJVscIoKtbhGRxN0g1');
+    expect(aff).toMatchObject({ id: 'i81KeHG5RqXJVscIoKtbhGRxN0g1', name: 'Teste 01', email: 't01@x.com', source: 'user' });
+  });
+
+  it('mirror existe → usa o mirror e NEM consulta o users (fallback só quando falta)', async () => {
+    vi.mocked(getDoc).mockReset();
+    vi.mocked(getDoc).mockResolvedValueOnce({ exists: () => true, data: () => ({ id: 'boost_x', name: 'Vanesa', source: 'boost' }) } as any);
+    const aff = await fetchAffiliateById('boost_x');
+    expect(aff).toMatchObject({ id: 'boost_x', name: 'Vanesa' });
+    expect(vi.mocked(getDoc)).toHaveBeenCalledTimes(1); // só o mirror, sem fallback
+  });
+
+  it('doc de login é de admin → ignora (admin não é afiliado) e não acha por affiliateId → null', async () => {
+    vi.mocked(getDoc).mockReset();
+    vi.mocked(getDoc)
+      .mockResolvedValueOnce({ exists: () => false } as any) // affiliates/{id}
+      .mockResolvedValueOnce({ exists: () => true, data: () => ({ name: 'Boss', role: 'admin' }) } as any); // users/{id} é admin
+    vi.mocked(authFetch).mockResolvedValue(okJson([]) as any);
+    vi.mocked(getDocs).mockResolvedValue({ docs: [] } as any); // mirror boost + query por affiliateId vazios
+    const aff = await fetchAffiliateById('admin_uid');
+    expect(aff).toBeNull();
+  });
+
+  it('id == affiliateId vinculado a um login → sintetiza pela query em users', async () => {
+    vi.mocked(getDoc).mockReset();
+    vi.mocked(getDoc)
+      .mockResolvedValueOnce({ exists: () => false } as any)  // affiliates/{id}
+      .mockResolvedValueOnce({ exists: () => false } as any); // users/{id} (id não é uid)
+    vi.mocked(authFetch).mockResolvedValue(okJson([]) as any);
+    vi.mocked(getDocs)
+      .mockResolvedValueOnce({ docs: [] } as any) // mirror boost (dentro do fetchAffiliates)
+      .mockResolvedValueOnce({ docs: [{ data: () => ({ uid: 'u9', name: 'Ana', email: 'ana@x.com', role: 'client' }) }] } as any); // query users where affiliateId==id
+    const aff = await fetchAffiliateById('aff_123');
+    expect(aff).toMatchObject({ id: 'aff_123', name: 'Ana', email: 'ana@x.com', source: 'user' });
   });
 });
 

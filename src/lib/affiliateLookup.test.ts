@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findAffiliateInList } from './affiliateLookup';
+import { findAffiliateInList, userDocToAffiliate } from './affiliateLookup';
 
 // Scan PURO do fallback de fetchAffiliateById: varre a lista completa da API
 // quando o mirror local 404a. Casa por `id` ou `_id`, coage number→string e
@@ -32,5 +32,32 @@ describe('findAffiliateInList', () => {
 
   it('retorna null para lista vazia', () => {
     expect(findAffiliateInList([], 'x')).toBeNull();
+  });
+});
+
+// Fallback do afiliado que existe SÓ como login (auto-cadastro pelo /register): sem
+// mirror `affiliates` nem produção OTG, a ficha do admin sintetiza do doc `users`.
+describe('userDocToAffiliate', () => {
+  it('sintetiza id da rota + nome/e-mail/contato do doc de login', () => {
+    const doc = { uid: 'u1', name: 'Teste 01', email: 'teste01@x.com', phone: '(11) 90000-0000', socialMedia: '@t01', cpf: '000', avatarUrl: 'http://a', role: 'client' };
+    expect(userDocToAffiliate('u1', doc)).toEqual({
+      id: 'u1', name: 'Teste 01', email: 'teste01@x.com', phone: '(11) 90000-0000',
+      socialMedia: '@t01', cpf: '000', avatarUrl: 'http://a', source: 'user',
+    });
+  });
+
+  it('mantém o id da ROTA mesmo quando difere do uid (affiliateId já vinculado)', () => {
+    expect(userDocToAffiliate('aff_123', { uid: 'u9', name: 'Ana' }).id).toBe('aff_123');
+  });
+
+  it('sem nome cai no e-mail; sem e-mail nem nome → "Sem Nome"', () => {
+    expect(userDocToAffiliate('u1', { email: 'só@email.com' }).name).toBe('só@email.com');
+    expect(userDocToAffiliate('u1', {}).name).toBe('Sem Nome');
+  });
+
+  it('coage tudo a string e nunca lança p/ data inválida (null/não-objeto)', () => {
+    expect(userDocToAffiliate('u1', null)).toMatchObject({ id: 'u1', name: 'Sem Nome', email: '', source: 'user' });
+    expect(userDocToAffiliate('u1', 'lixo' as any)).toMatchObject({ name: 'Sem Nome', email: '' });
+    expect(userDocToAffiliate(123 as any, { name: 42 }).name).toBe('42');
   });
 });
