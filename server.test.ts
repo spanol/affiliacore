@@ -1564,6 +1564,82 @@ describe('jurídico versionado (/api/legal-documents, /api/legal-acceptances)', 
   });
 });
 
+// =============================================================================
+// Carteira + Saque (Tier 1, sem gateway). Foco: escopo por papel, exigência de
+// PIX cadastrado, snapshot do PIX na solicitação, e a máquina de estados
+// (canTransitionWithdrawal) barrando pulos inválidos.
+// =============================================================================
+describe('carteira + saque (/api/withdrawals)', () => {
+  const baseSeed = () => ({
+    users: { 'admin-uid': { role: 'admin' }, 'aff-uid': { role: 'client', affiliateId: 'affX' }, 'nopix-uid': { role: 'client', affiliateId: 'affY' } },
+    payment_profiles: { affX: { pixKeyType: 'cpf', pixKey: '123.456.789-00', documentType: 'cpf', document: '123.456.789-00', legalName: 'Fulano' } },
+  });
+
+  it('GET sem token → 401; afiliado vê só os PRÓPRIOS saques', async () => {
+    await request(buildApp({ seed: baseSeed() })).get('/api/withdrawals').expect(401);
+    const seed: any = baseSeed();
+    seed.withdrawal_requests = {
+      w1: { affiliateId: 'affX', amount: 100, status: 'requested' },
+      w2: { affiliateId: 'affY', amount: 200, status: 'requested' },
+    };
+    const res = await request(buildApp({ seed })).get('/api/withdrawals').set('Authorization', 'Bearer aff-uid').expect(200);
+    expect(res.body.withdrawals.map((w: any) => w.id)).toEqual(['w1']);
+  });
+
+  it('POST: sem chave PIX cadastrada → 400 (não sabe pra onde pagar)', async () => {
+    const res = await request(buildApp({ seed: baseSeed() })).post('/api/withdrawals').set('Authorization', 'Bearer nopix-uid').send({ amount: 50 }).expect(400);
+    expect(res.body.error).toMatch(/pix/i);
+  });
+
+  it('POST: valor inválido (0/negativo/não-numérico) → 400', async () => {
+    await request(buildApp({ seed: baseSeed() })).post('/api/withdrawals').set('Authorization', 'Bearer aff-uid').send({ amount: 0 }).expect(400);
+    await request(buildApp({ seed: baseSeed() })).post('/api/withdrawals').set('Authorization', 'Bearer aff-uid').send({ amount: -10 }).expect(400);
+    await request(buildApp({ seed: baseSeed() })).post('/api/withdrawals').set('Authorization', 'Bearer aff-uid').send({ amount: 'lixo' }).expect(400);
+  });
+
+  it('POST válido: 201, snapshot do PIX capturado, ignora affiliateId forjado do body', async () => {
+    const db = makeFirestore(baseSeed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app).post('/api/withdrawals').set('Authorization', 'Bearer aff-uid').send({ amount: 150.5, affiliateId: 'affY' }).expect(201);
+    expect(res.body).toMatchObject({ affiliateId: 'affX', amount: 150.5, status: 'requested' });
+    expect(res.body.pixSnapshot).toMatchObject({ pixKey: '123.456.789-00', pixKeyType: 'cpf' });
+    const audits = [...(db.__store.get('audit_logs')?.values() ?? [])].map((a: any) => a.action);
+    expect(audits).toContain('withdrawal.request');
+  });
+
+  it('PATCH: client → 403; guarda de transição barra requested→paid direto (409)', async () => {
+    const seed: any = baseSeed();
+    seed.withdrawal_requests = { w1: { affiliateId: 'affX', amount: 100, status: 'requested' } };
+    await request(buildApp({ seed })).patch('/api/withdrawals/w1').set('Authorization', 'Bearer aff-uid').send({ status: 'approved' }).expect(403);
+    await request(buildApp({ seed })).patch('/api/withdrawals/w1').set('Authorization', 'Bearer admin-uid').send({ status: 'paid' }).expect(409);
+  });
+
+  it('fluxo completo: requested → approved → paid; paid é TERMINAL', async () => {
+    const seed: any = baseSeed();
+    seed.withdrawal_requests = { w1: { affiliateId: 'affX', amount: 100, status: 'requested' } };
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const r1 = await request(app).patch('/api/withdrawals/w1').set('Authorization', 'Bearer admin-uid').send({ status: 'approved' }).expect(200);
+    expect(r1.body.status).toBe('approved');
+    const r2 = await request(app).patch('/api/withdrawals/w1').set('Authorization', 'Bearer admin-uid').send({ status: 'paid' }).expect(200);
+    expect(r2.body.status).toBe('paid');
+    await request(app).patch('/api/withdrawals/w1').set('Authorization', 'Bearer admin-uid').send({ status: 'rejected' }).expect(409);
+  });
+
+  it('admin filtra por affiliateId e por status via query', async () => {
+    const seed: any = baseSeed();
+    seed.withdrawal_requests = {
+      w1: { affiliateId: 'affX', amount: 100, status: 'requested' },
+      w2: { affiliateId: 'affX', amount: 50, status: 'paid' },
+      w3: { affiliateId: 'affY', amount: 30, status: 'requested' },
+    };
+    const byAff = await request(buildApp({ seed })).get('/api/withdrawals?affiliateId=affX').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(byAff.body.withdrawals.map((w: any) => w.id).sort()).toEqual(['w1', 'w2']);
+    const byStatus = await request(buildApp({ seed })).get('/api/withdrawals?status=paid').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(byStatus.body.withdrawals.map((w: any) => w.id)).toEqual(['w2']);
+  });
+});
+
 // Marketplace é opt-in por instância (default OFF): sem VITE_MARKETPLACE_ENABLED as
 // rotas respondem 404 → zero side effect na Boost/instância nº 0. [[marketplaceEnabled]]
 describe('marketplace desligado por instância (default OFF)', () => {

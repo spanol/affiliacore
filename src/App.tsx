@@ -31,6 +31,7 @@ import Partnerships from './pages/Partnerships';
 import MyLinks from './pages/MyLinks';
 import LegalAdmin from './pages/LegalAdmin';
 import Terms from './pages/Terms';
+import WithdrawalsAdmin from './pages/WithdrawalsAdmin';
 import Auditoria from './pages/Auditoria';
 import NotFound from './pages/NotFound';
 import DashboardLayout from './components/DashboardLayout';
@@ -190,6 +191,11 @@ export default function App() {
             <Route path="/juridico" element={
               <ProtectedRoute role="admin">
                 <LegalAdmin />
+              </ProtectedRoute>
+            } />
+            <Route path="/saques" element={
+              <ProtectedRoute role="admin">
+                <WithdrawalsAdmin />
               </ProtectedRoute>
             } />
             <Route path="/affiliates/:id" element={<AffiliateDetailsRoute />} />

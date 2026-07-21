@@ -156,6 +156,15 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Carteira + Saque (Tier 1, sem gateway — o admin transfere manualmente fora
+    // do sistema). Afiliado solicita, admin aprova/rejeita/marca pago; tudo
+    // mediado pelo servidor (Admin SDK, que ignora estas regras + audita
+    // withdrawal.*) via /api/withdrawals. Cliente direto é bloqueado (mesmo o
+    // próprio afiliado); admin pode ler direto p/ gestão. Espelha payment_profiles.
+    match /withdrawal_requests/{id} {
+      allow read, write: if isAdmin();
+    }
+
     // Jurídico versionado (Tier 1, modo SOFT — Acordo de Afiliação, Código de
     // Conduta, Pagamentos). Conteúdo escrito pelo admin via servidor (versão
     // DERIVADA, nunca digitada — computeNextVersion); NADA aqui bloqueia login/uso

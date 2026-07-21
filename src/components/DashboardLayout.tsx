@@ -145,6 +145,8 @@ export default function DashboardLayout() {
             { label: 'Roster OTG', path: '/roster-otg', icon: Database },
             { label: 'API Parceiros', path: '/parceiros-api', icon: Plug },
           ] : []),
+          // Carteira + Saque (Tier 1): fila de aprovação dos saques solicitados.
+          { label: 'Saques', path: '/saques', icon: Wallet },
           { label: 'Auditoria', path: '/auditoria', icon: ScrollText },
           // Jurídico versionado (Tier 1, modo soft): admin gere os documentos.
           { label: 'Jurídico', path: '/juridico', icon: Scale },

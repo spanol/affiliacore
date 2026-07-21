@@ -61,6 +61,14 @@ import { hasAcceptedLatest, type LegalDocument, type LegalAcceptance } from '../
 export { hasAcceptedLatest };
 export type { LegalDocument, LegalAcceptance };
 
+// Carteira + Saque (Tier 1, sem gateway). Re-exporta os puros.
+import {
+  WITHDRAWAL_STATUSES, WITHDRAWAL_STATUS_LABEL, sumWithdrawalsByStatus,
+  type WithdrawalRequest, type WithdrawalStatus,
+} from '../lib/withdrawal';
+export { WITHDRAWAL_STATUSES, WITHDRAWAL_STATUS_LABEL, sumWithdrawalsByStatus };
+export type { WithdrawalRequest, WithdrawalStatus };
+
 interface Affiliate {
   id: string;
   name: string;
@@ -1269,6 +1277,49 @@ export async function acceptLegalDocument(slug: string): Promise<void> {
     const e = await resp.json().catch(() => ({}));
     throw new Error(e.error || e.message || `Erro na API: ${resp.status}`);
   }
+}
+
+// --- Carteira + Saque (Tier 1, sem gateway) -----------------------------------
+export async function fetchWithdrawals(opts?: { affiliateId?: string; status?: WithdrawalStatus }): Promise<WithdrawalRequest[]> {
+  try {
+    const q = new URLSearchParams();
+    if (opts?.affiliateId) q.set('affiliateId', opts.affiliateId);
+    if (opts?.status) q.set('status', opts.status);
+    const qs = q.toString();
+    const resp = await authFetch(`/api/withdrawals${qs ? `?${qs}` : ''}`, { headers: { Accept: 'application/json' } });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return Array.isArray(data?.withdrawals) ? data.withdrawals : [];
+  } catch (error) {
+    console.error('Error fetching withdrawals:', error);
+    return [];
+  }
+}
+
+export async function requestWithdrawal(amount: number, note?: string): Promise<WithdrawalRequest> {
+  const resp = await authFetch('/api/withdrawals', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ amount, note }),
+  });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro na API: ${resp.status}`);
+  }
+  return resp.json();
+}
+
+export async function decideWithdrawal(id: string, status: 'approved' | 'rejected' | 'paid', note?: string): Promise<WithdrawalRequest> {
+  const resp = await authFetch(`/api/withdrawals/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ status, note }),
+  });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro na API: ${resp.status}`);
+  }
+  return resp.json();
 }
 
 // `reason` é opcional e vai junto p/ o servidor REGISTRAR a auditoria server-side

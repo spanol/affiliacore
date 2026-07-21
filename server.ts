@@ -29,6 +29,7 @@ import { buildResultsNotification, type ResultsNotificationVariant } from './src
 import { normalizeDealInput, buildDealLabel, dealBrandKey, dealToBrandRates } from './src/lib/deal';
 import { canTransition, type PartnershipStatus } from './src/lib/partnership';
 import { normalizeLegalDocInput, computeNextVersion } from './src/lib/legal';
+import { canTransitionWithdrawal, normalizeWithdrawalAmount, type WithdrawalStatus } from './src/lib/withdrawal';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2981,6 +2982,122 @@ export function createApp(deps: ServerDeps) {
     } catch (e: any) {
       console.error('[legal-acceptances] erro ao registrar aceite:', e);
       return res.status(500).json({ error: e?.message || 'Erro ao registrar aceite' });
+    }
+  });
+
+  // === Carteira + Saque (Tier 1, sem gateway) ================================
+  // O afiliado SOLICITA um saque (valor que ele mesmo informa, vendo os dashboards
+  // já existentes); o admin APROVA/REJEITA e depois marca PAGO quando transferir
+  // manualmente fora do sistema (não há integração PIX no repo). O servidor NÃO
+  // recalcula/valida o "saldo apurado" de forma independente nesta entrega — isso
+  // ficaria pra uma v2 com ledger; o admin decide olhando os números que já vê no
+  // /admin ou na ficha do afiliado antes de aprovar. Auditado (withdrawal.*).
+  const withdrawalFromDoc = (d: admin.firestore.DocumentSnapshot) => {
+    const x = (d.data() as any) || {};
+    return {
+      id: d.id,
+      affiliateId: x.affiliateId ?? null,
+      amount: Number.isFinite(Number(x.amount)) ? Number(x.amount) : 0,
+      status: (x.status ?? 'requested') as WithdrawalStatus,
+      note: x.note ?? null,
+      pixSnapshot: x.pixSnapshot ?? null,
+      requestedAt: x.requestedAt ?? null,
+      decidedAt: x.decidedAt ?? null,
+    };
+  };
+
+  // Lista saques. Admin vê todos (filtro opcional ?affiliateId/?status); afiliado
+  // vê só os dele (escopo forçado pelo token).
+  app.get('/api/withdrawals', requireAuth, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const user = (req as any).user;
+      let q: admin.firestore.Query = adminDb.collection('withdrawal_requests');
+      if (user?.role !== 'admin') {
+        if (!user?.affiliateId) return res.json({ withdrawals: [] });
+        q = q.where('affiliateId', '==', String(user.affiliateId));
+      } else if (typeof req.query.affiliateId === 'string' && req.query.affiliateId) {
+        q = q.where('affiliateId', '==', req.query.affiliateId);
+      }
+      const snap = await q.get();
+      const wantStatus = typeof req.query.status === 'string' ? req.query.status : null;
+      const withdrawals = snap.docs.map(withdrawalFromDoc).filter((w) => !wantStatus || w.status === wantStatus);
+      return res.json({ withdrawals });
+    } catch (e: any) {
+      console.error('[withdrawals] erro ao listar:', e);
+      return res.status(500).json({ error: 'Erro ao listar saques' });
+    }
+  });
+
+  // Solicita um saque. O afiliado só pede p/ si (affiliateId do token); admin pode
+  // pedir por outro (body.affiliateId, ex.: registrar um saque combinado por fora).
+  // Exige payment_profile com chave PIX cadastrada (senão pra onde pagar?).
+  app.post('/api/withdrawals', requireAuth, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const user = (req as any).user;
+      const isAdmin = user?.role === 'admin';
+      const affiliateId = isAdmin && req.body?.affiliateId ? String(req.body.affiliateId) : (user?.affiliateId ? String(user.affiliateId) : '');
+      if (!affiliateId) return res.status(403).json({ error: 'Sua conta não está vinculada a um afiliado.' });
+
+      const amount = normalizeWithdrawalAmount(req.body?.amount);
+      if (amount === null) return res.status(400).json({ error: 'Valor inválido (número positivo em R$).' });
+
+      const profileSnap = await adminDb.collection('payment_profiles').doc(affiliateId).get();
+      const profile = profileSnap.exists ? (profileSnap.data() as any) : null;
+      if (!profile?.pixKey) {
+        return res.status(400).json({ error: 'Cadastre sua chave PIX em Financeiro antes de solicitar um saque.' });
+      }
+
+      const ref = adminDb.collection('withdrawal_requests').doc();
+      await ref.set({
+        affiliateId, amount, status: 'requested',
+        note: req.body?.note ? String(req.body.note).slice(0, 500) : null,
+        // Snapshot do PIX no momento da solicitação — a chave pode mudar depois; a
+        // trilha tem que mostrar pra ONDE foi (ou seria) pago.
+        pixSnapshot: { pixKeyType: profile.pixKeyType ?? null, pixKey: profile.pixKey ?? null, documentType: profile.documentType ?? null, document: profile.document ?? null, legalName: profile.legalName ?? null },
+        requestedByUid: user?.uid ?? null,
+        requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      await writeAuditLog(req, {
+        entityType: 'withdrawal', entityId: ref.id, entityLabel: await affiliateNameOf(affiliateId),
+        action: 'withdrawal.request', metadata: { affiliateId, amount },
+      });
+      return res.status(201).json(withdrawalFromDoc(await ref.get()));
+    } catch (e: any) {
+      console.error('[withdrawals] erro ao solicitar:', e);
+      return res.status(500).json({ error: e?.message || 'Erro ao solicitar saque' });
+    }
+  });
+
+  // Decide um saque (admin): approved | rejected | paid. canTransitionWithdrawal
+  // barra pulos inválidos (ex.: requested→paid direto, ou mexer num terminal).
+  app.patch('/api/withdrawals/:id', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const id = String(req.params.id || '').trim();
+      const ref = adminDb.collection('withdrawal_requests').doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+      const cur = snap.data() as any;
+      const from = (cur.status ?? 'requested') as WithdrawalStatus;
+      const to = String(req.body?.status ?? '') as WithdrawalStatus;
+      if (!['approved', 'rejected', 'paid'].includes(to)) {
+        return res.status(400).json({ error: 'status deve ser approved, rejected ou paid.' });
+      }
+      if (!canTransitionWithdrawal(from, to)) {
+        return res.status(409).json({ error: `Transição inválida (${from} → ${to}).` });
+      }
+      const note = req.body?.note ? String(req.body.note).slice(0, 500) : (cur.note ?? null);
+      await ref.set({ status: to, note, decidedByUid: (req as any).user?.uid ?? null, decidedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      await writeAuditLog(req, {
+        entityType: 'withdrawal', entityId: id, entityLabel: await affiliateNameOf(String(cur.affiliateId)),
+        action: `withdrawal.${to}`, metadata: { affiliateId: cur.affiliateId, amount: cur.amount },
+      });
+      return res.json(withdrawalFromDoc(await ref.get()));
+    } catch (e: any) {
+      console.error('[withdrawals] erro ao decidir:', e);
+      return res.status(500).json({ error: e?.message || 'Erro ao decidir saque' });
     }
   });
 
