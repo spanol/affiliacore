@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Handshake, Loader2, Search, CheckCircle, Clock, XCircle, Ban, Copy, Check, ExternalLink } from 'lucide-react';
 import {
-  fetchDeals, fetchPartnerships, requestPartnership,
+  fetchDeals, fetchPartnerships, requestPartnership, fetchAffiliateLinks,
   buildDealLabel, selectAvailableDeals, PARTNERSHIP_STATUS_LABEL,
   buildGoUrl, DEAL_MODEL_LABEL, PAYMENT_CYCLE_LABEL,
-  type Deal, type PartnershipRequest,
+  type Deal, type PartnershipRequest, type AffiliateLink,
 } from '../services/affiliateService';
 import { fetchHouses } from '../services/houseService';
 import { useToast } from '../contexts/ToastContext';
@@ -31,6 +31,7 @@ export default function Partnerships() {
   const [tab, setTab] = useState<Tab>('available');
   const [deals, setDeals] = useState<Deal[]>([]);
   const [requests, setRequests] = useState<PartnershipRequest[]>([]);
+  const [links, setLinks] = useState<Record<string, AffiliateLink>>({});
   const [logos, setLogos] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -40,9 +41,12 @@ export default function Partnerships() {
   const load = async () => {
     setLoading(true);
     try {
-      const [d, r, houses] = await Promise.all([fetchDeals(), fetchPartnerships(), fetchHouses().catch(() => [])]);
+      const [d, r, allLinks, houses] = await Promise.all([fetchDeals(), fetchPartnerships(), fetchAffiliateLinks(), fetchHouses().catch(() => [])]);
       setDeals(d);
       setRequests(r);
+      const lmap: Record<string, AffiliateLink> = {};
+      allLinks.forEach((l) => { lmap[l.code] = l; });
+      setLinks(lmap);
       const map: Record<string, string | null> = {};
       (houses as any[]).forEach((h) => { map[String(h.id)] = h.logo ?? null; });
       setLogos(map);
@@ -194,13 +198,23 @@ export default function Partnerships() {
                   {r.status === 'approved' && r.code && (
                     <div className="mt-4 pt-4 border-t border-slate-100 dark:border-neutral-800">
                       <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">Link de divulgação</label>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <code className="flex-1 px-3 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs text-slate-700 dark:text-neutral-200 truncate">{buildGoUrl(r.code)}</code>
-                        <button onClick={() => copyLink(r.code!)} className="px-3 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-bold hover:opacity-90 flex items-center gap-1.5">
-                          {copied === r.code ? <Check size={14} /> : <Copy size={14} />} {copied === r.code ? 'Copiado' : 'Copiar'}
-                        </button>
-                        <a href={buildGoUrl(r.code)} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-xl border border-slate-200 dark:border-neutral-700 text-slate-500 hover:text-accent-500"><ExternalLink size={14} /></a>
-                      </div>
+                      {(() => {
+                        const link = links[r.code!];
+                        // Só oferece o link quando ele de fato resolve (a casa tem URL de
+                        // cadastro); senão o /go cairia no fallback. Mesma regra do /meus-links.
+                        const ready = link && link.active !== false && !!link.registerUrl;
+                        return ready ? (
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <code className="flex-1 px-3 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs text-slate-700 dark:text-neutral-200 truncate">{buildGoUrl(r.code!)}</code>
+                            <button onClick={() => copyLink(r.code!)} className="px-3 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-bold hover:opacity-90 flex items-center gap-1.5">
+                              {copied === r.code ? <Check size={14} /> : <Copy size={14} />} {copied === r.code ? 'Copiado' : 'Copiar'}
+                            </button>
+                            <a href={buildGoUrl(r.code!)} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-xl border border-slate-200 dark:border-neutral-700 text-slate-500 hover:text-accent-500"><ExternalLink size={14} /></a>
+                          </div>
+                        ) : (
+                          <p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">Link em preparação — a casa ainda não tem URL de cadastro configurada. Fale com o administrador.</p>
+                        );
+                      })()}
                     </div>
                   )}
                   {r.status === 'discontinued' && (
