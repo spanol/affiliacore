@@ -12,7 +12,9 @@ public/version.json
 !.env.example
 
 # Firebase Admin service account key (NEVER commit)
-service-account.json
+# Padrão amplo: cobre a chave da instância 0 (service-account.json) E as chaves
+# por instância do provisionamento white-label (service-account.<instancia>.json).
+service-account*.json
 *-firebase-adminsdk-*.json
 
 # OTG approved-affiliates snapshots — contêm PII (e-mail/telefone). Manter local;
