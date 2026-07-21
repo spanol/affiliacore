@@ -15,10 +15,10 @@
 > INFINITY"; Boost intacta), e 1º admin criado (`admin@infinity.com`, login
 > provado).
 >
-> **Pendente:** as rules do Firestore não foram deployadas nem verificadas nesta
-> instância — rode `firebase deploy --only firestore:rules --project
-> infinity-affiliacore` (idempotente). É o único item que ainda trava o cliente
-> logado (sem as rules certas, o admin loga mas o app não lê nem o próprio perfil).
+> **Rules deployadas e verificadas (2026-07-20).** Instância 100% funcional: admin
+> `admin@infinity.com` loga e o app lê o perfil (destrava tudo). Pronta p/ o cliente.
+> Só falta trocar o logo pelo vetor oficial se o cliente entregar (o atual foi
+> reconstruído do avatar do IG) e, se quiser, admin num e-mail real dele.
 
 Projeto alvo:
 - `infinity-affiliacore`
@@ -33,9 +33,8 @@ Marca:
 - [x] Projeto Firebase criado
 - [x] App Web criado
 - [x] Firestore criado
-- [ ] Rules deployadas — **NÃO confirmado** (marcado como feito antes, mas a
-      verificação de 2026-07-20 não conseguiu comprovar; deploy é idempotente,
-      rode de novo)
+- [x] Rules deployadas E verificadas (deploy 2026-07-20; comprovado por REST com
+      token do admin: lê o próprio perfil + coleção admin-only sob as rules reais)
 - [x] Backend App Hosting criado
 - [x] `apphosting.infinity.yaml` criado e commitado
 - [x] `ranking-cron-secret` criado
