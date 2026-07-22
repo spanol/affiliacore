@@ -5,6 +5,10 @@
 > por instância via envs (`VITE_OTG_ENABLED`, `VITE_BRAND_*`) + secrets.
 > Pré-requisitos na máquina do operador: Node 20+, `firebase-tools` (global),
 > acesso de Owner ao novo projeto. Tempo alvo: ~2h de trabalho + esperas de build.
+>
+> **Runbook orquestrado (ordem enxuta + fronteiras de credencial):** skill
+> `provision-instance` (`.claude/skills/provision-instance/SKILL.md`). Este README é
+> a referência exaustiva; a skill é o passo-a-passo que o agente dirige.
 
 ## 1 · Projeto Firebase (console)
 
@@ -21,10 +25,17 @@
 firebase use <project-id>
 firebase deploy --only firestore:rules
 
-# 1º admin da instância (senha temporária forte + troca forçada no 1º login)
+# Admin do cliente (senha forte + troca no 1º login) — e, opcional, um 2º admin de
+# TESTE da AffiliaCore (entra direto, sem troca) no MESMO comando via --test-user.
+# Cada conta imprime a senha UMA vez. Idempotente (login existente = só promove).
 GOOGLE_APPLICATION_CREDENTIALS=./service-account.json \
-  node scripts/provision/bootstrap-admin.cjs --email admin@cliente.com --name "Nome do Admin"
+  node scripts/provision/bootstrap-admin.cjs \
+    --email admin@cliente.com --name "Nome do Admin" \
+    --test-user voce@cliente.com --test-name "AffiliaCore (teste)"
 ```
+
+> Rode o bootstrap com a service account DA INSTÂNCIA e **apague-a depois**
+> (`rm service-account*.json` + confirmar) — a produção usa ADC, não precisa da chave.
 
 ## 3 · Secrets do App Hosting
 
