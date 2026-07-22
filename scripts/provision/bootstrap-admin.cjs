@@ -1,19 +1,27 @@
 #!/usr/bin/env node
 /**
- * P4 (produtização) · Bootstrap do 1º ADMIN de uma instância nova.
+ * P4 (produtização) · Bootstrap dos ADMINS de uma instância nova.
  *
  * As rules travam `role` no client (R6) e o /api/create-user exige um admin — numa
  * instância recém-provisionada não existe nenhum. Este script roda com o Admin SDK
- * (service account DA INSTÂNCIA) e cria/promove o primeiro admin com segurança:
- * senha temporária forte + mustChangePassword (o app força a troca no 1º login).
+ * (service account DA INSTÂNCIA) e cria/promove admins com segurança: a senha é
+ * GERADA forte pelo script (ninguém digita), impressa UMA vez no final.
  *
  * Uso (na raiz do repo, com o service-account.json DA INSTÂNCIA):
  *   GOOGLE_APPLICATION_CREDENTIALS=./service-account.json \
- *     node scripts/provision/bootstrap-admin.cjs --email admin@agencia.com --name "Nome do Admin"
+ *     node scripts/provision/bootstrap-admin.cjs \
+ *       --email admin@cliente.com --name "Admin do Cliente" \
+ *       --test-user voce@cliente.com          # opcional: 2º admin p/ smoke test
  *
- * Flags: --email (obrigatório) · --name (obrigatório) · --password (opcional;
- *        default = senha aleatória forte, impressa UMA vez no final)
- * Idempotente: se o e-mail já tem login, só PROMOVE (users/{uid}.role='admin').
+ * Duas contas:
+ *   - PRIMÁRIA (--email/--name): admin do CLIENTE. mustChangePassword=true → troca
+ *     no 1º login.
+ *   - TESTE (--test-user, opcional): admin da AffiliaCore p/ smoke test.
+ *     mustChangePassword=FALSE → entra direto, sem tela de troca. --test-name e
+ *     --test-password são opcionais (nome default "AffiliaCore (teste)").
+ *
+ * Flags: --email* --name* [--password] [--test-user [--test-name] [--test-password]]
+ * Idempotente: e-mail com login já existente é só PROMOVIDO (mantém a senha atual).
  */
 const admin = require('firebase-admin');
 const crypto = require('crypto');
@@ -23,13 +31,19 @@ function arg(name) {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : null;
 }
+const genPassword = () => `Ac-${crypto.randomBytes(12).toString('base64url')}`;
 
 const email = (arg('email') || '').trim().toLowerCase();
 const name = (arg('name') || '').trim();
-const password = arg('password') || `Bt-${crypto.randomBytes(12).toString('base64url')}`;
+const testEmail = (arg('test-user') || '').trim().toLowerCase();
+const testName = (arg('test-name') || 'AffiliaCore (teste)').trim();
 
 if (!email || !email.includes('@') || !name) {
-  console.error('Uso: node scripts/provision/bootstrap-admin.cjs --email <email> --name "<nome>" [--password <senha>]');
+  console.error('Uso: node scripts/provision/bootstrap-admin.cjs --email <email> --name "<nome>" [--password <senha>] [--test-user <email> [--test-name "<nome>"] [--test-password <senha>]]');
+  process.exit(1);
+}
+if (testEmail && !testEmail.includes('@')) {
+  console.error('--test-user precisa ser um e-mail válido.');
   process.exit(1);
 }
 
@@ -50,9 +64,10 @@ function resolveProjectId() {
   return process.env.GOOGLE_CLOUD_PROJECT || '(desconhecido)';
 }
 
-async function main() {
-  console.log(`Projeto alvo: ${resolveProjectId()}`);
-
+// Cria ou PROMOVE um admin. forceChange=true grava mustChangePassword (troca no 1º
+// login). Idempotente: login existente é só promovido (mantém a senha — nunca força).
+// Devolve { uid, created } (a senha só vale quando created=true).
+async function ensureAdmin({ email, name, password, forceChange }) {
   let user;
   let created = false;
   try {
@@ -69,19 +84,44 @@ async function main() {
     email,
     name,
     role: 'admin',
-    mustChangePassword: created, // login pré-existente mantém a senha atual
+    mustChangePassword: created ? forceChange : false, // login pré-existente nunca é forçado aqui
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     ...(created ? { createdAt: admin.firestore.FieldValue.serverTimestamp() } : {}),
   }, { merge: true });
 
   const check = await db.collection('users').doc(user.uid).get();
-  if ((check.data() || {}).role !== 'admin') throw new Error('Verificação falhou: role não é admin após o set.');
+  if ((check.data() || {}).role !== 'admin') throw new Error(`Verificação falhou: ${email} não ficou admin após o set.`);
+  return { uid: user.uid, created };
+}
+
+async function main() {
+  console.log(`Projeto alvo: ${resolveProjectId()}`);
+
+  const clientPass = arg('password') || genPassword();
+  const client = await ensureAdmin({ email, name, password: clientPass, forceChange: true });
+
+  let test = null;
+  let testPass = null;
+  if (testEmail) {
+    testPass = arg('test-password') || genPassword();
+    test = await ensureAdmin({ email: testEmail, name: testName, password: testPass, forceChange: false });
+  }
 
   console.log('');
-  console.log(`✔ ${email} é ADMIN (users/${user.uid}.role=admin).`);
-  if (created) {
-    console.log(`  Senha temporária (entregue por canal seguro; o app força a troca no 1º login):`);
-    console.log(`  ${password}`);
+  console.log(`✔ ADMIN DO CLIENTE: ${email} (users/${client.uid}.role=admin — troca a senha no 1º login)`);
+  if (client.created) {
+    console.log(`  Senha temporária (entregue por canal seguro): ${clientPass}`);
+  } else {
+    console.log('  (login já existia — senha mantida)');
+  }
+  if (test) {
+    console.log('');
+    console.log(`✔ TESTE AFFILIACORE: ${testEmail} (users/${test.uid}.role=admin — entra direto, sem troca)`);
+    if (test.created) {
+      console.log(`  Senha (entregue por canal seguro): ${testPass}`);
+    } else {
+      console.log('  (login já existia — senha mantida)');
+    }
   }
 }
 
