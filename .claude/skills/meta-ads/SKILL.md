@@ -20,10 +20,19 @@ fatos e o estado DA CONTA AffiliaCore. Dentro do repo, esta vence.
   do Instagram >> Facebook — priorizar IG.** Saldo estava só R$39,99 → ele
   adicionou fundos. Técnica de IG-only + pixel na skill genérica `/meta-ads`.
 - **Meta Pixel `1394540769198863`** (dataset "AffiliaCore") criado no **Business
-  Settings → Data Sources → Datasets & pixels** (Events Manager dá 404),
-  conectado à ad account `1038808991862700`. Instalado na `/ebook` (base +
-  InitiateCheckout) e na **Kiwify** (produto ebook → Pixels de conversão →
-  Facebook). Fatos completos na skill de projeto `web-analytics`.
+  Settings → Data Sources → Datasets & pixels** (o Events Manager dá 404 só p/
+  CRIAR o pixel), conectado à ad account `1038808991862700`. Instalado na
+  `/ebook` (base + InitiateCheckout) e na **Kiwify** (produto ebook → Pixels de
+  conversão → Facebook). Fatos completos na skill de projeto `web-analytics`.
+- **Ver eventos do pixel (2026-07-23):** o Events Manager ABRE por
+  `business.facebook.com/events_manager2/list/dataset/<id>/overview?business_id=<biz>`
+  (redireciona p/ `eventsmanager.facebook.com` e carrega — não dá 404 aqui).
+  Trocar o date-picker p/ "Today" (o range default exclui hoje). ⚠️ O **Overview
+  agrega com atraso de horas** — recém-instalado mostra "0 events / No websites
+  found" mesmo com tráfego real. Confirmação DEFINITIVA de que dispara = abrir a
+  landing e ler o network: `read_network_requests` filtrando `facebook` deve
+  trazer `fbevents.js` + `signals/config/<id>` + `www.facebook.com/tr/?id=<id>&ev=PageView`
+  (200). Em 23/jul o PageView da `/ebook` foi confirmado assim (BRL, item_price 47).
 - **Kiwify:** dashboard.kiwify.com.br logado como Vinicius; produtos "Construindo
   sua agencia de afiliados" (R$47, id `a055f6a0-862b-11f1-af15-5b281dc87e68`) +
   "Kit de Operação da Agência" (R$27). Pixel por produto em Configurações →
@@ -144,6 +153,37 @@ no publish R$129,99. **✅ CONFIRMADA ATIVA em 14/jul: Ad Center "Active",
 - Posts 2 (planilha) e 1 (lançamento, só-FB) publicados 13/jul; posts 3
   (painel) e 4 (fundador) agendados FB+IG p/ 15/jul e 17/jul 11:00.
   Gerador dos criativos em curvas: `generator/gen-posts234-canvas.mjs`.
+
+### Agendar post no composer — gotchas (provado 2026-07-23, E4 saler do ebook)
+
+Agendamento do E4 (oferta do ebook) p/ 25/jul 11h FB+IG via mbs-publisher.
+Achados que economizam tempo na próxima rodada:
+- **Legenda em Draft.js: DIGITAR corrompe.** `type` em pedaços + um `read`
+  intermediário RESETA o cursor p/ posição 0 → a linha de hashtag sobe pro topo
+  e come chars (ex.: "(link na bio)" virou "(link na"). Fix confiável: clicar o
+  campo → **Ctrl+A → Delete → COLAR a legenda inteira via Ctrl+V real** (paste é
+  atômico no Draft.js; sem typeahead, sem reset). Montar o clipboard via
+  PowerShell com `[char]::ConvertFromUtf32(0x1F680)` (🚀) e `[char]0x2014` (—) p/
+  não depender do encoding do console.
+- **Campo de HORA = `role="spinbutton"`**, não input de texto: o valor vive em
+  `aria-valuenow`/`aria-valuetext`, o `.value` fica SEMPRE vazio (NÃO verifique
+  por `.value`). `type "11"` (dois dígitos JUNTOS, rápido) fixa; dígitos
+  separados resetam (a janela de acumulação expira entre chamadas). Meridiem:
+  `type "A"` = AM. Conferir foco pelo `aria-label` do activeElement.
+- **FB e IG NÃO sincronizam a data** no composer — setar as DUAS linhas
+  (Facebook e Instagram) separadamente, senão só uma agenda.
+- **Escala do screenshot ≠ viewport** (screenshot 1568 vs viewport real 1920;
+  fator ≈0,8167, dpr=1). Alvos pequenos (dias do calendário, segmentos de hora):
+  clicar por **`ref`** (find→left_click by ref) ou `getBoundingClientRect×0,8167`
+  — mapeamento por coord crua erra.
+- **Planner (vista semana) tem TILES-FANTASMA** de "melhor horário" que reusam o
+  thumb do criativo — NÃO são posts reais (clicar abre composer VAZIO; não
+  aparecem em Agendados/Rascunhos). Fonte da verdade = a lista **Agendados**.
+- **Achar data livre:** varrer a partir de amanhã na lista Agendados. Em
+  23/jul o feed já tinha 24 (×4) · 26 (×2) · 28 (×2) ocupados → E4 caiu em 25.
+- Se o grupo de abas MCP cair no meio ("No tab group exists" / "Couldn't
+  determine which page"), a aba órfã do composer NÃO vira post se não foi
+  submetida — reiniciar do seg1 em aba nova (verificar Agendados/Drafts depois).
 
 ## Campanha 2 (relançamento, 11/jul — falhou: Missing media)
 
