@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-TDL8RHWQ');</script>
+<!-- End Google Tag Manager -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Construindo sua agência de afiliados — Guia AffiliaCore (Edição 2026)</title>
+<meta name="description" content="O guia institucional para estruturar e operar uma agência de afiliados no mercado regulamentado brasileiro: modelos de comissão com contratos reais, a lei de julho/2026 explicada para quem divulga, e o caso real da agência que deu origem à AffiliaCore. R$ 47, acesso imediato, 7 dias de garantia.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="canonical" href="https://affiliacore.com.br/ebook">
+<meta property="og:type" content="book">
+<meta property="og:title" content="Construindo sua agência de afiliados — Guia AffiliaCore">
+<meta property="og:description" content="Estrutura, contratos, compliance e o caso real da agência que deu origem à AffiliaCore. Guia institucional, edição 2026. R$ 47.">
+<meta property="og:url" content="https://affiliacore.com.br/ebook">
+<meta property="og:image" content="https://affiliacore.com.br/ebook/og.png">
+<meta property="og:locale" content="pt_BR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#26181C">
+<link rel="preload" href="/fonts/bricolage-grotesque-800.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Book","name":"Construindo sua agência de afiliados","bookFormat":"https://schema.org/EBook","inLanguage":"pt-BR","numberOfPages":60,"author":{"@type":"Organization","name":"AffiliaCore"},"publisher":{"@type":"Organization","name":"AffiliaCore","url":"https://affiliacore.com.br"},"image":"https://affiliacore.com.br/ebook/og.png","url":"https://affiliacore.com.br/ebook","offers":{"@type":"Offer","price":"47.00","priceCurrency":"BRL","availability":"https://schema.org/InStock","url":"https://affiliacore.com.br/ebook"}}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
+{"@type":"Question","name":"Isso é curso de aposta?","acceptedAnswer":{"@type":"Answer","text":"Não. É um guia de negócio sobre a estrutura de AGÊNCIA de afiliados — marketing de performance para operadores licenciados. Não ensinamos, recomendamos nem incentivamos apostar."}},
+{"@type":"Question","name":"Preciso já ser afiliado?","acceptedAnswer":{"@type":"Answer","text":"Não. O guia começa do zero (mercado, modelo de receita, empresa, rede). Quem já é afiliado pula direto para os capítulos 2 a 4."}},
+{"@type":"Question","name":"Promete quanto vou ganhar?","acceptedAnswer":{"@type":"Answer","text":"Não — e desconfie de quem promete. O guia mostra os modelos de comissão praticados no mercado (com fontes) e a conta de margem de uma agência; o resultado depende da sua execução."}},
+{"@type":"Question","name":"Vale se eu não usar a AffiliaCore?","acceptedAnswer":{"@type":"Answer","text":"Sim. O guia é agnóstico de ferramenta. O capítulo 7 tem um trecho institucional assumido; o resto vale para qualquer stack, até planilha."}},
+{"@type":"Question","name":"Como recebo?","acceptedAnswer":{"@type":"Answer","text":"Acesso imediato após o pagamento: PDF na área de membros. PIX ou cartão."}},
+{"@type":"Question","name":"Está atualizado?","acceptedAnswer":{"@type":"Answer","text":"Edição 2026, incluindo as portarias de julho de 2026 (SPA/MF 1.964 e Interministerial 73) — provavelmente a regra mais recente que você vai ver citada em qualquer material do nicho."}}
+]}
+</script>
+<style>
+@font-face{font-family:'Bricolage Grotesque';font-weight:500;font-style:normal;font-display:swap;src:url('/fonts/bricolage-grotesque-500.woff2') format('woff2')}
+@font-face{font-family:'Bricolage Grotesque';font-weight:800;font-style:normal;font-display:swap;src:url('/fonts/bricolage-grotesque-800.woff2') format('woff2')}
+@font-face{font-family:'Inter';font-weight:400;font-style:normal;font-display:swap;src:url('/fonts/inter-400.woff2') format('woff2')}
+@font-face{font-family:'Inter';font-weight:600;font-style:normal;font-display:swap;src:url('/fonts/inter-600.woff2') format('woff2')}
+
+:root{
+  --ink:#11070A; --plum:#26181C; --surface:#3F1D2B;
+  --ember:#E11D48; --ember-l:#E45B79;
+  --text:#FFF6F8; --muted:#AF9DA2; --faint:#816E74;
+  --line:rgba(255,255,255,.09); --line-soft:rgba(255,255,255,.05);
+  --radius:16px;
+  --html-bg:#150A0D;
+  --bg-grad:linear-gradient(180deg,#150A0D 0%,var(--plum) 42%,#1B0F13 100%);
+  --header-bg:rgba(23,11,15,.97);
+  --card-bg:rgba(63,29,43,.35);
+  --band-bg:rgba(63,29,43,.22);
+  --faq-bg:rgba(255,255,255,.02);
+  --fill-1:rgba(255,255,255,.035);
+  --fill-2:rgba(255,255,255,.06);
+  --chip-bg:#1C1014;
+  --err:#FCA5A5;
+  --ember-glow:rgba(225,29,72,.16);
+  --shadow-book:0 40px 90px rgba(0,0,0,.55);
+  --display:'Bricolage Grotesque',system-ui,sans-serif;
+  --body:'Inter',system-ui,sans-serif;
+}
+html.light{
+  --ember-l:#BE123C;
+  --text:#1C1014; --muted:#6E5A60; --faint:#9A878D;
+  --line:rgba(28,16,20,.12); --line-soft:rgba(28,16,20,.07);
+  --html-bg:#FBF7F8;
+  --bg-grad:linear-gradient(180deg,#FFFFFF 0%,#FBF5F7 42%,#FDFAFB 100%);
+  --header-bg:rgba(255,255,255,.97);
+  --card-bg:#FFFFFF;
+  --band-bg:rgba(63,29,43,.05);
+  --faq-bg:#FFFFFF;
+  --fill-1:rgba(38,24,28,.045);
+  --fill-2:rgba(38,24,28,.07);
+  --chip-bg:#FFFFFF;
+  --err:#B91C1C;
+  --ember-glow:rgba(225,29,72,.09);
+  --shadow-book:0 40px 90px rgba(38,24,28,.2);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;background:var(--html-bg)}
+body{
+  font-family:var(--body);color:var(--text);background:var(--ink);
+  background:var(--bg-grad);
+  -webkit-font-smoothing:antialiased;line-height:1.6;overflow-x:hidden;
+}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+.wrap-narrow{max-width:820px;margin:0 auto;padding:0 24px}
+h1,h2,h3{font-family:var(--display);font-weight:800;line-height:1.12;letter-spacing:-.02em}
+a{color:inherit}
+section{padding:80px 0}
+
+/* header */
+header{position:sticky;top:0;z-index:50;background:var(--header-bg);border-bottom:1px solid var(--line)}
+.nav{display:flex;align-items:center;justify-content:space-between;height:64px;gap:16px}
+.nav img{height:22px;display:block}
+img.logo-l{display:none}
+html.light img.logo-d{display:none}
+html.light img.logo-l{display:block}
+.theme-toggle{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--fill-1);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:color .15s,background .15s;flex:none}
+.theme-toggle:hover{color:var(--text);background:var(--fill-2)}
+.theme-toggle .ic-moon{display:none}
+html.light .theme-toggle .ic-sun{display:none}
+html.light .theme-toggle .ic-moon{display:block}
+.nav-links{display:flex;gap:24px;align-items:center;font-size:.92rem;color:var(--muted)}
+.nav-links a:not(.btn){text-decoration:none;transition:color .15s}
+.nav-links a:not(.btn):hover{color:var(--text)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:10px;text-decoration:none;font-family:var(--body);font-weight:600;font-size:1rem;border-radius:12px;padding:14px 26px;transition:transform .15s,box-shadow .15s,background .15s;cursor:pointer;border:none}
+.btn-primary{background:linear-gradient(135deg,var(--ember) 0%,#C4123B 100%);color:#fff;box-shadow:0 8px 28px rgba(225,29,72,.35)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 34px rgba(225,29,72,.45)}
+.btn-ghost{border:1px solid var(--line);color:var(--text);background:var(--fill-1)}
+.btn-ghost:hover{background:var(--fill-2)}
+.btn-sm{padding:9px 18px;font-size:.9rem}
+.btn-lg{padding:17px 32px;font-size:1.08rem}
+
+/* hero */
+.hero{padding:80px 0 64px;position:relative}
+.hero::before{content:'';position:absolute;inset:-160px 0 auto;height:620px;pointer-events:none;background:radial-gradient(ellipse 60% 50% at 30% 20%,var(--ember-glow),transparent 70%)}
+.hero .wrap{position:relative}
+.hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:56px;align-items:center}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:.8rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ember-l);border:1px solid rgba(225,29,72,.35);background:rgba(225,29,72,.08);padding:7px 14px;border-radius:999px;margin-bottom:24px}
+.hero h1{font-size:clamp(2.1rem,4.6vw,3.2rem);max-width:16ch}
+.hero h1 em{font-style:normal;color:var(--ember-l)}
+.hero p.lead{font-size:1.12rem;color:var(--muted);max-width:52ch;margin:22px 0 30px}
+.cta-note{font-size:.85rem;color:var(--faint);margin-top:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cta-note svg{color:var(--ember-l);flex:none}
+.book{position:relative;justify-self:center;max-width:340px;width:100%}
+.book img{display:block;width:100%;height:auto;border-radius:14px;box-shadow:var(--shadow-book);border:1px solid var(--line)}
+.book::after{content:'';position:absolute;inset:0;border-radius:14px;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.04)}
+.book-tag{position:absolute;bottom:-14px;right:-10px;background:var(--chip-bg);border:1px solid rgba(225,29,72,.4);border-radius:999px;padding:8px 16px;font-family:var(--display);font-weight:800;font-size:1rem;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.book-tag s{color:var(--faint);font-weight:500;font-size:.8rem;margin-right:6px}
+
+/* generic section head */
+.sec-head{max-width:680px;margin-bottom:44px}
+.sec-head.center{margin-left:auto;margin-right:auto;text-align:center}
+.sec-head h2{font-size:clamp(1.6rem,3.4vw,2.35rem);margin-bottom:14px}
+.sec-head p{color:var(--muted);font-size:1.06rem}
+.kicker{font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ember-l);display:block;margin-bottom:12px}
+
+/* "isto não é" band */
+.notthis{background:var(--band-bg);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.notthis h2{font-size:clamp(1.5rem,3.2vw,2.1rem);max-width:20ch;margin-bottom:20px}
+.notthis h2 em{font-style:normal;color:var(--ember-l)}
+.notthis p{color:var(--muted);font-size:1.05rem;max-width:66ch;margin-bottom:16px}
+.notthis p:last-child{margin-bottom:0}
+.notthis strong{color:var(--text);font-weight:600}
+
+/* audience two columns */
+.aud-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.aud-card{background:var(--card-bg);border:1px solid var(--line);border-radius:var(--radius);padding:28px}
+.aud-card.no{border-color:var(--line)}
+.aud-card h3{font-size:1.12rem;margin-bottom:18px;display:flex;align-items:center;gap:10px}
+.aud-card ul{list-style:none;display:flex;flex-direction:column;gap:14px}
+.aud-card li{display:flex;gap:12px;color:var(--muted);font-size:.98rem}
+.mk{flex:none;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.mk.yes{background:rgba(225,29,72,.14);border:1px solid rgba(225,29,72,.4)}
+.mk.no{background:var(--fill-2);border:1px solid var(--line)}
+.mk svg{width:12px;height:12px}
+
+/* chapters */
+.chapters{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.chap{display:flex;gap:16px;background:var(--card-bg);border:1px solid var(--line);border-radius:14px;padding:20px 22px;transition:border-color .2s,transform .2s}
+.chap:hover{border-color:rgba(225,29,72,.4);transform:translateY(-2px)}
+.chap i{font-style:normal;font-family:var(--display);font-weight:800;font-size:1.2rem;color:var(--ember-l);flex:none;line-height:1.1}
+.chap b{display:block;font-family:var(--display);font-weight:800;font-size:1.02rem;margin-bottom:5px}
+.chap span{color:var(--muted);font-size:.92rem}
+.chap.bonus{grid-column:1/-1;border-style:dashed;border-color:rgba(225,29,72,.4);background:linear-gradient(135deg,rgba(225,29,72,.08),transparent)}
+.chap-meta{text-align:center;margin-top:28px;color:var(--faint);font-size:.95rem}
+
+/* authority */
+.authority{background:var(--band-bg);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.auth-card{max-width:760px;margin:0 auto;text-align:center}
+.auth-card h2{font-size:clamp(1.5rem,3.2vw,2.1rem);margin-bottom:18px}
+.auth-card h2 em{font-style:normal;color:var(--ember-l)}
+.auth-card p{color:var(--muted);font-size:1.08rem;max-width:62ch;margin:0 auto}
+.auth-mark{display:inline-flex;align-items:center;background:var(--chip-bg);border:1px solid var(--line);border-radius:12px;padding:15px 22px;margin-bottom:26px}
+.auth-mark svg{height:20px;width:auto;display:block}
+
+/* buybox */
+.buybox{max-width:760px;margin:0 auto;background:var(--card-bg);border:1px solid rgba(225,29,72,.35);border-radius:20px;padding:38px;text-align:center;position:relative;overflow:hidden}
+.buybox::before{content:'';position:absolute;inset:-60px 0 auto;height:200px;pointer-events:none;background:radial-gradient(ellipse 50% 60% at 50% 0,var(--ember-glow),transparent 70%)}
+.buybox .price{position:relative;font-family:var(--display);font-weight:800;font-size:3.4rem;line-height:1;letter-spacing:-.03em}
+.buybox .price s{font-size:1.3rem;color:var(--faint);font-weight:500;margin-right:12px;letter-spacing:0}
+.buybox .price small{font-size:1.1rem;color:var(--muted);font-weight:500}
+.buybox .plabel{position:relative;color:var(--muted);font-size:1rem;margin:14px 0 24px}
+.buybox .btn{position:relative}
+.buymeta{position:relative;display:flex;justify-content:center;gap:10px 22px;flex-wrap:wrap;margin-top:20px;color:var(--faint);font-size:.86rem}
+.buymeta span{display:inline-flex;align-items:center;gap:7px}
+.buymeta svg{color:var(--ember-l);flex:none}
+
+/* bump */
+.bump{max-width:760px;margin:18px auto 0;display:flex;gap:18px;align-items:flex-start;background:var(--fill-1);border:1px dashed var(--line);border-radius:14px;padding:20px 22px;text-align:left}
+.bump .ico{flex:none;width:42px;height:42px;border-radius:11px;background:rgba(225,29,72,.12);border:1px solid rgba(225,29,72,.28);display:flex;align-items:center;justify-content:center}
+.bump b{font-family:var(--display);font-weight:800;font-size:1rem;display:block;margin-bottom:4px}
+.bump p{color:var(--muted);font-size:.9rem}
+.bump b .plus{color:var(--ember-l)}
+
+/* guarantee */
+.guarantee{max-width:760px;margin:0 auto;display:flex;gap:22px;align-items:center;background:var(--band-bg);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px}
+.gseal{flex:none;width:66px;height:66px;border-radius:50%;background:rgba(225,29,72,.12);border:1px solid rgba(225,29,72,.4);display:flex;align-items:center;justify-content:center}
+.guarantee h3{font-size:1.2rem;margin-bottom:6px}
+.guarantee p{color:var(--muted);font-size:.96rem}
+
+/* faq */
+.faq-list{display:grid;gap:12px;max-width:820px;margin:0 auto}
+.faq-item{border:1px solid var(--line);border-radius:var(--radius);background:var(--faq-bg)}
+.faq-item summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px 22px;font-family:var(--display);font-weight:800;font-size:1.02rem}
+.faq-item summary::-webkit-details-marker{display:none}
+.faq-item summary::after{content:'+';font-family:var(--body);font-weight:400;font-size:1.4rem;color:var(--ember-l);transition:transform .15s;line-height:1;flex-shrink:0}
+.faq-item[open] summary::after{transform:rotate(45deg)}
+.faq-item p{padding:0 22px 18px;color:var(--muted)}
+
+/* final */
+.final{text-align:center;padding:90px 0}
+.final h2{font-size:clamp(1.8rem,4vw,2.7rem);max-width:18ch;margin:0 auto 16px}
+.final > .wrap > p{color:var(--muted);max-width:46ch;margin:0 auto 36px}
+
+/* footer + legal */
+.legal{border-top:1px solid var(--line);padding:40px 0}
+.legal p{color:var(--faint);font-size:.82rem;max-width:860px;margin:0 auto;text-align:center;line-height:1.7}
+.legal strong{color:var(--muted)}
+footer{border-top:1px solid var(--line);padding:30px 0;font-size:.88rem;color:var(--faint)}
+footer .wrap{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
+footer img{height:16px;opacity:.85}
+footer a{color:var(--muted);text-decoration:none}
+footer a:hover{color:var(--text)}
+
+@media (max-width:880px){
+  section{padding:60px 0}
+  .nav-links a:not(.btn){display:none}
+  .hero{padding:56px 0 48px}
+  .hero-grid{grid-template-columns:1fr;gap:44px}
+  .book{order:-1;max-width:280px}
+  .aud-grid{grid-template-columns:1fr}
+  .chapters{grid-template-columns:1fr}
+  .guarantee{flex-direction:column;text-align:center}
+  .buybox{padding:30px 22px}
+  .buybox .price{font-size:2.8rem}
+}
+</style>
+<script>(function(){try{if(localStorage.getItem('ac-theme')==='light')document.documentElement.classList.add('light')}catch(e){}})()</script>
+</head>
+<body>
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-TDL8RHWQ"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+
+<header>
+  <div class="wrap nav">
+    <a href="/" aria-label="AffiliaCore"><img class="logo-d" src="/logo.svg" alt="AffiliaCore"><img class="logo-l" src="/logo-light.svg" alt="AffiliaCore"></a>
+    <nav class="nav-links">
+      <a href="#dentro">O que tem dentro</a>
+      <a href="#paraquem">Para quem é</a>
+      <a href="#garantia">Garantia</a>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema">
+        <svg class="ic-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <svg class="ic-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <a class="btn btn-primary btn-sm js-checkout" href="https://pay.kiwify.com.br/83JFB9e">Quero o guia — R$ 47</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <span class="eyebrow">Guia AffiliaCore · Edição 2026</span>
+        <h1>Monte uma agência de afiliados de verdade — com contrato, compliance e <em>margem</em>.</h1>
+        <p class="lead">O guia da AffiliaCore para estruturar e operar uma agência de afiliados no mercado regulamentado brasileiro: os modelos de comissão com contratos reais, a lei de julho/2026 explicada para quem divulga, e o caso — com erros — da agência que deu origem à nossa plataforma.</p>
+        <a class="btn btn-primary btn-lg js-checkout" href="https://pay.kiwify.com.br/83JFB9e">Quero o guia — R$ 47
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <p class="cta-note">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          Acesso imediato · PDF + área de membros · 7 dias de garantia incondicional
+        </p>
+      </div>
+      <div class="book">
+        <img src="/ebook/capa-livro.png" alt="Capa do guia Construindo sua agência de afiliados — edição 2026 da AffiliaCore" width="1600" height="2560">
+        <span class="book-tag"><s>PDF</s>R$ 47</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="notthis">
+  <div class="wrap-narrow">
+    <h2>Este guia não vai te ensinar a apostar. Nem prometer <em>renda</em>.</h2>
+    <p>Nada de print de comissão, sala de sinais, "método validado" ou lifestyle. Aliás: boa parte do que os cursos desse nicho prometem é, hoje, <strong>literalmente proibido</strong> pela regulamentação brasileira de publicidade de apostas — e o guia mostra exatamente onde.</p>
+    <p>O que ele ensina é um <strong>negócio</strong>: a estrutura de agência que contrata com operadores licenciados, gere uma rede de divulgadores profissionais e vive de spread, override e gestão — com CNPJ, contrato e conciliação de centavo.</p>
+  </div>
+</section>
+
+<section id="paraquem">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">Para quem é</span>
+      <h2>É para quem quer subir o degrau — não para quem quer renda extra.</h2>
+    </div>
+    <div class="aud-grid">
+      <div class="aud-card yes">
+        <h3><span class="mk yes"><svg viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>É para você que</h3>
+        <ul>
+          <li><span class="mk yes"><svg viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Já é afiliado e quer virar a estrutura que negocia, não a ponta que aceita tabela.</li>
+          <li><span class="mk yes"><svg viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>É gestor de tráfego/marketing e quer entrar num mercado de comissões altas sem virar personagem de print.</li>
+          <li><span class="mk yes"><svg viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Tem audiência esportiva e quer transformá-la em operação — do jeito que aguenta auditoria.</li>
+          <li><span class="mk yes"><svg viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Vai montar operação para terceiros — a "agência das agências".</li>
+        </ul>
+      </div>
+      <div class="aud-card no">
+        <h3><span class="mk no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></span>Não é para você que</h3>
+        <ul>
+          <li><span class="mk no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></span>Procura "renda extra rápida" — este mercado acabou de ficar caro para amadores, e o guia explica por quê.</li>
+          <li><span class="mk no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></span>Quer aprender a apostar — errou de material (e de mercado).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="dentro">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">O que tem dentro</span>
+      <h2>8 capítulos, do mercado ao seu primeiro trimestre.</h2>
+      <p>Direto, com fonte citada e zero enrolação.</p>
+    </div>
+    <div class="chapters">
+      <div class="chap"><i>01</i><div><b>O mercado que sobrou para os profissionais</b><span>Os números oficiais do 1º ano regulado (R$ 37 bi de GGR, 25 milhões de apostadores) e a consolidação que criou a oportunidade.</span></div></div>
+      <div class="chap"><i>02</i><div><b>Como a agência ganha</b><span>CPA, RevShare, NGR, negative carryover, spread e override — com cláusulas de contratos reais de operadores licenciados.</span></div></div>
+      <div class="chap"><i>03</i><div><b>A lei agora fala de você</b><span>As regras de julho/2026 que responsabilizam quem divulga, a lista do que é proibido prometer e o checklist de verificação prévia.</span></div></div>
+      <div class="chap"><i>04</i><div><b>Montando a operação</b><span>CNPJ, CNAE certo (e a armadilha do errado), o contrato com a casa e o contrato com a sua rede.</span></div></div>
+      <div class="chap"><i>05</i><div><b>Recrutando e gerindo a rede</b><span>Onde estão os afiliados, o filtro que protege sua agência e a gestão da cauda longa.</span></div></div>
+      <div class="chap"><i>06</i><div><b>O caso real da instância nº 0</b><span>A agência que deu origem à AffiliaCore, incluindo os R$ 3.646,75 que sumiram num mês e ninguém percebeu — e a rotina que os achou.</span></div></div>
+      <div class="chap"><i>07</i><div><b>Ferramentas</b><span>O checklist de 9 itens para nunca mais gerir dinheiro de rede em planilha.</span></div></div>
+      <div class="chap"><i>08</i><div><b>Seus primeiros 90 dias</b><span>O plano com critérios de saída por mês + o radar regulatório para não ser pego de surpresa.</span></div></div>
+      <div class="chap bonus"><i>+</i><div><b>Glossário do afiliado profissional</b><span>GGR, NGR, FTD, NCO, override, subid… a linguagem do mercado, decodificada.</span></div></div>
+    </div>
+    <p class="chap-meta">~60 páginas · PDF + área de membros · edição 2026 (com as portarias de julho/2026)</p>
+  </div>
+</section>
+
+<section class="authority">
+  <div class="wrap">
+    <div class="auth-card">
+      <span class="auth-mark" aria-hidden="true"><img class="logo-d" src="/logo.svg" alt=""><img class="logo-l" src="/logo-light.svg" alt=""></span>
+      <h2>Escrito por quem <em>opera</em>, não por quem posa.</h2>
+      <p>A AffiliaCore é a plataforma brasileira de gestão para agências de afiliados. Nosso software não nasceu num pitch deck: nasceu <strong style="color:var(--text);font-weight:600">dentro de uma agência real</strong> — rede de mais de 70 afiliados, múltiplas casas, comissão em duas moedas — que virou a instância nº 0 da plataforma. Este guia é a documentação honesta do que aprendemos lá: os contratos, a lei, os processos e os erros que viraram regra.</p>
+    </div>
+  </div>
+</section>
+
+<section id="comprar">
+  <div class="wrap">
+    <div class="buybox">
+      <div class="price"><s>PDF</s>R$ 47<small> à vista</small></div>
+      <p class="plabel">Pagamento único · PIX ou cartão · acesso imediato após a compra</p>
+      <a class="btn btn-primary btn-lg js-checkout" href="https://pay.kiwify.com.br/83JFB9e">Comprar o guia agora
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <div class="buymeta">
+        <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Acesso imediato</span>
+        <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>PDF + área de membros</span>
+        <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>7 dias de garantia</span>
+      </div>
+    </div>
+    <div class="bump">
+      <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+      <div>
+        <b>No checkout, leve junto o Kit de Operação <span class="plus">+ R$ 27</span></b>
+        <p>As 3 ferramentas do capítulo 4, prontas para usar: a <b>calculadora de comissão</b> (CPA, RevShare/NGR, híbrido, margem de agência e fluxo de caixa — 6 abas com fórmulas), o <b>checklist de compliance</b> para aprovar qualquer peça da sua rede e o <b>modelo de contrato de sub-afiliado</b> para levar ao seu advogado.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="garantia">
+  <div class="wrap">
+    <div class="guarantee">
+      <span class="gseal" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#E45B79" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></span>
+      <div>
+        <h3>7 dias, incondicional.</h3>
+        <p>Leu e não era o que esperava? Reembolso integral pelo próprio painel de compra, sem perguntas. (É a lei — CDC, art. 49 — e é como a gente gostaria de ser tratado.)</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <div class="sec-head center">
+      <span class="kicker">Perguntas frequentes</span>
+      <h2>Antes de comprar.</h2>
+    </div>
+    <div class="faq-list">
+      <details class="faq-item"><summary>Isso é curso de aposta?</summary><p>Não. É um guia de negócio sobre a estrutura de AGÊNCIA de afiliados — marketing de performance para operadores licenciados. Não ensinamos, recomendamos nem incentivamos apostar.</p></details>
+      <details class="faq-item"><summary>Preciso já ser afiliado?</summary><p>Não. O guia começa do zero (mercado → modelo de receita → empresa → rede). Quem já é afiliado pula direto para os capítulos 2–4.</p></details>
+      <details class="faq-item"><summary>Promete quanto vou ganhar?</summary><p>Não — e desconfie de quem promete. O guia mostra os modelos de comissão praticados no mercado (com fontes) e a conta de margem de uma agência; o resultado depende da sua execução.</p></details>
+      <details class="faq-item"><summary>Vale se eu não usar a AffiliaCore?</summary><p>Sim. O guia é agnóstico de ferramenta (o capítulo 7 tem um trecho institucional assumido — um; o resto vale para qualquer stack, até planilha).</p></details>
+      <details class="faq-item"><summary>Como recebo?</summary><p>Acesso imediato após o pagamento: PDF na área de membros. PIX ou cartão.</p></details>
+      <details class="faq-item"><summary>Está atualizado?</summary><p>Edição 2026, incluindo as portarias de julho/2026 (SPA/MF 1.964 e Interministerial 73) — provavelmente a regra mais recente que você vai ver citada em qualquer material do nicho.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="final">
+  <div class="wrap">
+    <h2>O guia que a gente gostaria de ter lido antes de operar.</h2>
+    <p>R$ 47, acesso imediato, 7 dias de garantia. Sem promessa de renda, sem print, sem guru.</p>
+    <a class="btn btn-primary btn-lg js-checkout" href="https://pay.kiwify.com.br/83JFB9e">Quero o guia — R$ 47
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+  </div>
+</section>
+
+<div class="legal">
+  <div class="wrap">
+    <p>Este material trata da estruturação de um negócio de marketing e <strong>não constitui</strong> incentivo, recomendação ou instrução para apostar. Apostas são para maiores de 18 anos. <strong>Ministério da Fazenda adverte: Aposta não é investimento.</strong> Jogue com responsabilidade — plataforma de autoexclusão disponível na SPA/MF.</p>
+  </div>
+</div>
+
+<footer>
+  <div class="wrap">
+    <a href="/" aria-label="AffiliaCore"><img class="logo-d" src="/logo.svg" alt="AffiliaCore"><img class="logo-l" src="/logo-light.svg" alt="AffiliaCore"></a>
+    <span>AffiliaCore © 2026 · Guia institucional · Brasil</span>
+    <a href="https://www.instagram.com/affiliacore.br/" target="_blank" rel="noopener">@affiliacore.br</a>
+  </div>
+</footer>
+
+<script>
+(function () {
+  // GTM: dispara ebook_checkout_click em qualquer CTA de compra
+  document.querySelectorAll('a.js-checkout').forEach(function (el) {
+    el.addEventListener('click', function () {
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({ event: 'ebook_checkout_click' });
+    });
+  });
+})();
+(function () {
+  var meta = document.querySelector('meta[name="theme-color"]');
+  function sync() {
+    if (meta) meta.content = document.documentElement.classList.contains('light') ? '#FBF7F8' : '#26181C';
+  }
+  sync();
+  document.getElementById('theme-toggle').addEventListener('click', function () {
+    var light = document.documentElement.classList.toggle('light');
+    try { localStorage.setItem('ac-theme', light ? 'light' : 'dark'); } catch (e) {}
+    sync();
+  });
+})();
+</script>
+
+</body>
+</html>
