@@ -4,6 +4,18 @@ Uma agência de afiliados é, antes de tudo, uma **empresa de serviços de marke
 
 *(Aviso: o que segue é orientação geral baseada na prática do setor. Estruturação societária e tributária é caso a caso — valide com contador e, para os contratos, advogado.)*
 
+## O mínimo viável da agência (se você começasse amanhã)
+
+Antes dos detalhes, a ordem de montagem. Uma agência sai do papel com **cinco peças** — nem uma a mais para começar:
+
+1. **CNPJ certo** — SLU com o CNAE de agenciamento (não MEI);
+2. **1 casa validada** — licenciada, com cláusula de subcontratação e as cláusulas de dinheiro já lidas;
+3. **1 contrato com sub-afiliado** — compensação e compliance por escrito;
+4. **1 rotina de conciliação** — sua base × o painel da casa, a cada fechamento;
+5. **1 calendário de pagamento** — dia fixo, cumprido religiosamente.
+
+Se essas cinco existem, você tem uma agência: pequena, mas real. O resto deste capítulo é como montar cada uma sem errar caro.
+
 ## Pessoa física ou CNPJ?
 
 A regulação **não exige** CNPJ para ser afiliado — a definição da Portaria 1.231/2024 admite pessoa física. O mercado, porém, decidiu por você: **operadores estruturados pagam contra nota fiscal**, e há programa de casa licenciada que exige expressamente CNPJ para o cadastro. Sem empresa, você fica restrito aos programas mais frouxos — que, não por acaso, são os que mais aparecem em reclamação de calote.

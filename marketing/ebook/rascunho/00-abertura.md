@@ -1,6 +1,6 @@
 # ABERTURA — capa, avisos e introdução
 
-> **RASCUNHO v1 (2026-07-22)** — para revisão de Vinicius/Carlos. Voz: AffiliaCore institucional. Fatos com fonte em `../PESQUISA.md` e `../pesquisa/*.md`. Dados da instância nº 0 anonimizados (decisão 2026-07-22: usar como histórico AffiliaCore, sem expor o cliente).
+> **RASCUNHO v2 (2026-07-23)** — merge das ondas de revisão 1 (enxugamento/estrutura) e 2 (conversão/progressão) sobre o v1. Voz: AffiliaCore institucional. Fatos com fonte em `../PESQUISA.md` e `../pesquisa/*.md`. Dados da instância nº 0 anonimizados (histórico AffiliaCore, sem expor o cliente). Nome do produto na Kiwify = "Construindo sua agência de afiliados" (plataforma barra "apostas"); "Agência, não aposta" segue como hook de LP/social.
 
 ---
 
@@ -46,6 +46,14 @@ Nós somos a **AffiliaCore**, uma empresa brasileira de software. Nosso produto 
 - **O caso real que deu origem à AffiliaCore** — dados históricos da nossa instância nº 0, incluindo os erros (capítulo 6);
 - O que exigir de ferramenta para não gerir dinheiro em planilha (capítulo 7);
 - Um plano de 90 dias e o radar regulatório para não ser surpreendido (capítulo 8).
+
+**Ao final, você vai saber:**
+
+- se faz sentido montar uma agência de afiliados neste mercado — e por quê;
+- como começar sem cair nos erros mais caros (inclusive os que já custaram caro a nós);
+- e o que precisa existir antes de escalar rede, casas e comissão.
+
+**É para você** que já é afiliado e quer subir o degrau, que gere tráfego e quer entrar num mercado de comissão alta, ou que vai montar operação para terceiros. **Não é para você** que procura renda rápida ou quer aprender a apostar — esse não é o assunto (e, como você vai ver, virou o assunto errado com a lei nova).
 
 Se você procura atalho, este material vai te frustrar. Se você procura um negócio — com contrato, nota fiscal, software e margem — bem-vindo. É disso que ele trata.
 

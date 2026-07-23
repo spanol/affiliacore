@@ -16,6 +16,16 @@ Antes de montar a empresa, você precisa entender o produto que ela vende e o di
 
 **Híbrido.** CPA menor na entrada + RevShare menor na sequência. É o modelo que mais cresce, porque alinha os incentivos: a casa não paga caro por cadastro que some, e o afiliado constrói recorrência.
 
+### Um exemplo pra fixar (números ilustrativos)
+
+Digamos que um afiliado seu traga, num mês, 10 jogadores novos que geram R$ 5.000 de NGR:
+
+- **CPA** de R$ 250/FTD → 10 × 250 = **R$ 2.500**, uma vez só. Previsível e imediato.
+- **RevShare** de 30% sobre o NGR → 30% × 5.000 = **R$ 1.500** neste mês — mas que se repete enquanto os jogadores ficarem ativos.
+- **Híbrido** (R$ 120 de CPA + 15% de RevShare) → 10 × 120 + 15% × 5.000 = 1.200 + 750 = **R$ 1.950**, sendo os R$ 750 recorrentes.
+
+No mês 1, o CPA ganha. No mês 6, se metade dos jogadores continuar ativa, o RevShare acumulado já passou o CPA — e não parou. Por isso a escolha do modelo é sobre o **tipo de audiência** (impulso vs. recorrência), não sobre qual número é maior hoje. E margem que você não consegue medir mês a mês não é margem: é palpite.
+
 ## A pegadinha central: sobre O QUÊ incide o seu percentual
 
 RevShare quase nunca incide sobre a receita bruta (GGR). Incide sobre o **NGR — Net Gaming Revenue**: a receita bruta **menos** bônus concedidos, estornos, taxas de processamento, impostos e a chamada **taxa administrativa**. Isso está em contrato, preto no branco. Um exemplo real, de termos públicos de um grande operador licenciado no Brasil: a "Receita Líquida" desconta taxas administrativas (licença, provedores de jogo, plataforma), apostas anuladas, bônus e promoções, estornos, chargebacks, tributos federais, estaduais e municipais — **antes** de aplicar o seu percentual.

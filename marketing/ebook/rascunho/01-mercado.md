@@ -46,7 +46,7 @@ Juntando as peças:
 2. **A era informal acabou** — regulação de publicidade em cadeia, operadores exigindo CNPJ, nota fiscal e contrato;
 3. **A camada "agência" está vazia de profissionais** — sobra guru ensinando a ser afiliado solo (do jeito que a lei proíbe) e falta gente estruturando redes com contrato, compliance e sistema.
 
-Este guia existe para a terceira frase. Nos próximos capítulos, saímos do cenário e entramos na mecânica: como esse dinheiro flui, quem paga quem, e onde ele vaza quando a operação é amadora.
+Este guia existe para a terceira frase. E se o mercado é real, a próxima pergunta é simples: **onde a agência ganha dinheiro de verdade?** É o que o próximo capítulo abre — como esse dinheiro flui, quem paga quem, e onde ele vaza quando a operação é amadora.
 
 ---
 
