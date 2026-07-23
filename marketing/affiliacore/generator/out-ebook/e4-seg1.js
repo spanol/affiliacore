@@ -1,0 +1,13 @@
+const c=document.createElement('canvas');c.width=1080;c.height=1080;
+const x=c.getContext('2d');
+const g=x.createRadialGradient(777.6,-129.6,0,777.6,-129.6,1620);
+g.addColorStop(0,'#fdeef2');g.addColorStop(.4,'#fcf5f7');g.addColorStop(.85,'#fbf7f8');
+x.fillStyle=g;x.fillRect(0,0,1080,1080);
+const A=(cx,cy,rm,sw,dot,ring,dc)=>{x.strokeStyle=ring;x.lineWidth=sw;x.lineCap='round';
+x.beginPath();x.arc(cx,cy,rm,40*Math.PI/180,320*Math.PI/180);x.stroke();
+x.fillStyle=dc;x.beginPath();x.arc(cx,cy,dot,0,7);x.fill();};
+x.strokeStyle='#e7dfe2';x.lineWidth=2;x.beginPath();x.roundRect(60,60,960,960,34);x.stroke();
+x.strokeStyle='#e11d48';x.lineWidth=5;x.lineCap='butt';x.beginPath();x.moveTo(470,588);x.lineTo(610,588);x.stroke();
+A(573.2,956.4,13.8,5.4,5.2,'#be123c','#be123c');
+window.__pc=c;window.__px=x;
+JSON.stringify({seg:1,ok:!!window.__px});
