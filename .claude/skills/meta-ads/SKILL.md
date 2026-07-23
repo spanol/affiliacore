@@ -9,6 +9,26 @@ Manual destilado da 1ª campanha (2026-07-08, publicada com sucesso). A versão
 GENÉRICA da técnica vive em `~/.claude/skills/meta-ads/` — esta aqui carrega os
 fatos e o estado DA CONTA AffiliaCore. Dentro do repo, esta vence.
 
+## Campanha 4 — EBOOK no Instagram + Pixel (2026-07-23)
+
+- **1ª campanha do ebook LIVE**: criativo = **flyer guru** ("Não é curso de
+  guru") turbinado pela **Página FB** (`/latest/boost_post_creation`), objetivo
+  **Tráfego → affiliacore.com.br/ebook**, botão "Saiba mais", Advantage+
+  creative OFF, **placement Instagram-ONLY** (Manual placements, desmarcou
+  FB/Messenger), público Advantage+ BR 18+, **R$20/dia** (total c/ imposto
+  R$22,76/dia). Publicada pelo Vinicius (~8 cliques no início). **Vinicius: ROI
+  do Instagram >> Facebook — priorizar IG.** Saldo estava só R$39,99 → ele
+  adicionou fundos. Técnica de IG-only + pixel na skill genérica `/meta-ads`.
+- **Meta Pixel `1394540769198863`** (dataset "AffiliaCore") criado no **Business
+  Settings → Data Sources → Datasets & pixels** (Events Manager dá 404),
+  conectado à ad account `1038808991862700`. Instalado na `/ebook` (base +
+  InitiateCheckout) e na **Kiwify** (produto ebook → Pixels de conversão →
+  Facebook). Fatos completos na skill de projeto `web-analytics`.
+- **Kiwify:** dashboard.kiwify.com.br logado como Vinicius; produtos "Construindo
+  sua agencia de afiliados" (R$47, id `a055f6a0-862b-11f1-af15-5b281dc87e68`) +
+  "Kit de Operação da Agência" (R$27). Pixel por produto em Configurações →
+  Pixels de conversão (NÃO em Apps — lá são integrações de e-mail/ERP).
+
 ## Fronteiras (não negociáveis)
 
 - **Dinheiro é sempre do Vinicius**: cadastrar/verificar cartão, CPF, telefone
