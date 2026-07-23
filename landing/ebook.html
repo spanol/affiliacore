@@ -9,6 +9,18 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
 })(window,document,'script','dataLayer','GTM-TDL8RHWQ');</script>
 <!-- End Google Tag Manager -->
+<!-- Meta Pixel -->
+<script>
+!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init','1394540769198863');fbq('track','PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none" alt=""
+src="https://www.facebook.com/tr?id=1394540769198863&ev=PageView&noscript=1"/></noscript>
+<!-- End Meta Pixel -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Construindo sua agência de afiliados — Guia AffiliaCore (Edição 2026)</title>
 <meta name="description" content="O guia institucional para estruturar e operar uma agência de afiliados no mercado regulamentado brasileiro: modelos de comissão com contratos reais, a lei de julho/2026 explicada para quem divulga, e o caso real da agência que deu origem à AffiliaCore. R$ 47, acesso imediato, 7 dias de garantia.">
@@ -442,11 +454,12 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
 <script>
 (function () {
-  // GTM: dispara ebook_checkout_click em qualquer CTA de compra
+  // Dispara nos CTAs de compra: GTM (ebook_checkout_click) + Meta Pixel (InitiateCheckout)
   document.querySelectorAll('a.js-checkout').forEach(function (el) {
     el.addEventListener('click', function () {
       window.dataLayer = window.dataLayer || [];
       window.dataLayer.push({ event: 'ebook_checkout_click' });
+      if (window.fbq) window.fbq('track', 'InitiateCheckout');
     });
   });
 })();
