@@ -45,6 +45,22 @@ As TÉCNICAS genéricas vivem nas skills user-level `/search-console` e
 - Deploy da landing: `firebase deploy --config firebase.affiliacore.json
   --project www --only hosting`.
 
+## Meta Pixel (2026-07-23)
+
+- **Pixel "AffiliaCore" (dataset): ID `1394540769198863`** — criado no Business
+  Settings → Data Sources → Datasets & pixels (o Events Manager em
+  `eventsmanager.facebook.com` dá 404/inacessível; criar por Business Settings).
+  Conectado à ad account `1038808991862700`. Portfólio `1550870196394283`.
+- **Instalado na `/ebook`** (`landing/ebook.html`, direto no head): base
+  `fbq('init',...)`+`PageView`; `fbq('track','InitiateCheckout')` no clique dos
+  `a.js-checkout` (junto do GTM `ebook_checkout_click`).
+- **PENDENTE OPERADOR — Kiwify:** colar o Pixel ID em Configurações → Apps/Pixels
+  (Meta/Facebook) do produto → a Kiwify dispara sozinha o acesso ao checkout e a
+  compra (ViewContent/InitiateCheckout/Purchase) no domínio dela. Só assim o
+  "acessou o checkout" e "comprou" são medidos de verdade.
+- Uso: rodou 1ª campanha PAGA no IG (guru flyer → /ebook, tráfego) sem pixel; o
+  pixel agora habilita otimização por conversão em campanhas futuras (Sales).
+
 ## Verificação rápida (E2E)
 
 1. `curl -s https://affiliacore.com.br/ | grep -c GTM-TDL8RHWQ` → 2.
