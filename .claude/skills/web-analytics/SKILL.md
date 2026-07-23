@@ -23,8 +23,9 @@ As TÉCNICAS genéricas vivem nas skills user-level `/search-console` e
 ## GTM + GA4
 
 - **Container GTM: `GTM-TDL8RHWQ`** (conta GTM "AffiliaCore", container
-  "affiliacore.com.br"). Versão 2 publicada 14/07/2026: Tag do Google +
-  evento lead_submit.
+  "affiliacore.com.br"; account id 6366077357, container id 258314601).
+  Versão 2 (14/07/2026): Tag do Google + evento lead_submit.
+  **Versão 3 (23/07/2026): + evento ebook_checkout_click.**
 - **GA4: conta "AffiliaCore" → propriedade "affiliacore.com.br"** · fluxo
   "Site AffiliaCore" (id 15257100200) · **Measurement ID `G-X5572SJY82`** ·
   fuso São Paulo · moeda BRL · métrica otimizada ON.
@@ -33,6 +34,14 @@ As TÉCNICAS genéricas vivem nas skills user-level `/search-console` e
 - **Evento de conversão `lead_submit`**: dataLayer.push no sucesso do form
   de leads (landing/index.html, handler do fetch ao Firestore). No GTM: tag
   "GA4 - lead_submit" + acionador "Evento lead_submit" (evento personalizado).
+- **Evento `ebook_checkout_click`**: dataLayer.push no clique de qualquer CTA
+  de compra da `/ebook` (`landing/ebook.html`, listener nos `a.js-checkout` →
+  checkout Kiwify `pay.kiwify.com.br/83JFB9e`). No GTM: tag
+  "GA4 - ebook_checkout_click" + acionador "Evento ebook_checkout_click"
+  (evento personalizado). E2E verificado 23/07 (collect `en=ebook_checkout_click`
+  com `tid=G-X5572SJY82`). Padrão idêntico ao lead_submit — replicar p/ novos
+  eventos. A `/ebook` carrega o MESMO container/GA4 da home (funil unificado).
+- A home (`index.html`) linka a `/ebook` (nav "Guia" + rodapé).
 - Deploy da landing: `firebase deploy --config firebase.affiliacore.json
   --project www --only hosting`.
 
