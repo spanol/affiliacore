@@ -16,13 +16,49 @@ Produção: clipe a 1,25× (ritmo), 30fps, sem áudio (silêncio na captura) —
 `generator/gen-reels-frames.mjs`; capas em `reels/cover-*.png` (subir como
 capa ao publicar, mantém a grade do perfil consistente).
 
-## Publicação (operador)
+## Publicação — ✅ AGENDADOS 2026-07-23 (fluxo híbrido)
 
-A automação NÃO sobe vídeo pelo MBS (file picker nativo congela a sessão;
-canvas não gera vídeo) → publicar manualmente: MBS desktop (Criar reel) ou
-app do IG. Sugestão de cadência: **1 por dia, 3 dias seguidos (~12h)**, na
-ordem 1→2→3. Ao final, **fixar os 3 no topo do perfil** (IG permite fixar
-até 3) — vira a vitrine permanente do painel na página, que é o objetivo.
+**Os 3 reels estão AGENDADOS no MBS (FB + IG), verificados no Planner:**
+
+| Reel | Data | Status |
+|------|------|--------|
+| 1 · agência | sex 24/07 12:00 | agendado FB+IG |
+| 2 · líder de rede | sáb 25/07 12:00 | agendado FB+IG |
+| 3 · afiliado | dom 26/07 12:00 | agendado FB+IG |
+
+Fluxo que funcionou (híbrido): a automação prepara o composer de Reels
+(`/latest/reels_composer/?asset_id=<page>&business_id=<biz>`), o OPERADOR
+clica "Add Video" e escolhe o arquivo (file picker nativo congela a
+automação), a automação segue com legenda, miniatura e agendamento.
+Obs.: há posts do ebook agendados às 11:00 nos dias 25/26 — reels às 12:00
+ficam 1h depois, cadência ok. **Falta (operador): fixar os 3 no topo do
+perfil do IG após publicarem** — vitrine permanente do painel.
+
+### Gotchas do composer de REELS do MBS (aprendidos 2026-07-23)
+
+- **Reel EDITADO não agenda no IG**: qualquer edição do passo Edit (ex.
+  trilha da biblioteca) desabilita a aba Schedule ("Your edited Instagram
+  reel can't be scheduled") e o aviso diz que edições só sairiam no FB.
+  ⇒ p/ AGENDAR FB+IG: pular o Edit inteiro (reel sai com o áudio original;
+  os nossos são silenciosos). Trilha/áudio em alta = publicar manualmente
+  pelo app do IG.
+- **Campo Title fica `disabled` sempre** (é de reel só-FB; no fluxo
+  combinado FB+IG não é usado). A legenda vai no campo Text (Draft.js:
+  `form_input` falha — usar click + type; fechar typeahead de hashtag
+  clicando em área neutra, nunca Escape).
+- **Vídeo único não sai**: a lixeira dá "At least one video is required" e
+  "Add Video" não aceita um 2º vídeo (reel = 1 vídeo). Anexou errado?
+  Cancel → "Discard changes" e recomeçar o composer. ⇒ ordem certa:
+  **vídeo PRIMEIRO, legenda depois**.
+- **Data/hora do Schedule são digitáveis** neste composer (diferente do
+  composer de anúncios): click no campo → vira input (`7/24/2026`) →
+  ctrl+a + digitar; Tab pula p/ hora segmentada (digitar `12`, seta →,
+  `00`). Fuso exibido: America/Sao_Paulo.
+- Miniatura: "Choose suggested" traz frames do vídeo (o frame 1 = cartão-
+  título da moldura, consistente p/ a grade); "Upload image" abre picker
+  NATIVO (= operador; as `cover-*.png` do kit servem p/ isso).
+- Confirmação real = modal "Reel scheduled" + entrada dupla (FB e IG) na
+  lista `/latest/posts/scheduled_posts` (buscável por legenda).
 
 ## Legendas (verbatim)
 
