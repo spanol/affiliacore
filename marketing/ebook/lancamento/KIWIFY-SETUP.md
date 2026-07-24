@@ -15,7 +15,7 @@
    - Preço: **R$ 47,00** à vista (PIX e cartão; parcelamento irrelevante nesse ticket — pode deixar até 2×).
 2. **Entrega: usar a Área de Membros da Kiwify** (grátis), NÃO anexo de e-mail — motivos (pesquisa §3): percepção de valor, upsell futuro do curso na mesma interface, hábito de login.
    - Criar área de membros → módulo único "O Guia" → aula 1 com o PDF para download + os capítulos como texto se quisermos depois.
-3. **Proteção: ativar DRM Social** (Configurações do produto → E-book/PDF → DRM) — estampa nome/e-mail/CPF do comprador nas páginas do PDF.
+3. **Proteção: ativar DRM Social** — estampa os dados do comprador nas páginas do PDF. ✅ ATIVADO 23/07/2026 nas DUAS áreas (guia + Kit). Onde fica de verdade: **Área de Membros → aba Configurações → "Proteção anti pirataria para e-books" → toggle "Colocar marca d'água…"** (NÃO é em Configurações do produto). Sub-opções (bloquear Ctrl+C / impressão / senha) deixadas OFF de propósito — só a marca d'água; travar cópia/impressão pune o comprador legítimo.
 4. Página de obrigado: padrão da Kiwify por enquanto (a LP própria vem na Fase 2).
 5. E-mail de acesso: revisar o texto padrão — trocar para o tom institucional (2 linhas: o que comprou, onde acessa, e-mail de suporte).
 
