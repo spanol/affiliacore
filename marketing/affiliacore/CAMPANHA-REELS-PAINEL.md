@@ -47,13 +47,13 @@ perfil do IG após publicarem** — vitrine permanente do painel.
   o campo **Title habilita** (vira o título da linha no Planner). Fluxo
   híbrido de música: FB agendado c/ trilha do MBS + IG manual pelo app com
   trending audio (que ainda conta p/ descoberta — biblioteca do MBS não).
-- **Bug do relógio na validação do Schedule** (24/07 ~1h40 BR): o widget
-  valida "20 min a 29 dias" contra um "agora" ERRADO (~11h adiantado; o
-  default de abertura era 12:45 PM com relógio local 01:14 AM). Sintoma:
-  12:00 PM de hoje = vermelho "Scheduled posts need to be shared between
-  20 minutes and 29 days". Workaround: escolher horário ≥ o default que o
-  composer sugeriu ao abrir (aceitou 12:45 PM). O horário AGENDADO conta no
-  fuso São Paulo normalmente (a linha do Planner mostra certo).
+- **"Bug do relógio" que não era da Meta** (24/07): o Schedule recusava
+  12:00 PM ("between 20 minutes and 29 days") porque o RELÓGIO DO PC estava
+  ~11h ATRASADO (mostrava 01:14 quando eram ~12:15 reais) — o composer
+  valida contra a hora REAL do servidor, que estava certa; quem mentia era
+  o `Get-Date` local. Lição: quando a validação de horário da Meta parecer
+  absurda, desconfie do relógio da MÁQUINA primeiro (o default sugerido ao
+  abrir ≈ agora_real+20min é uma boa referência da hora verdadeira).
 - **Campo de hora do reels composer = 3 spinbuttons** (`aria-label`
   hours/minutes/meridiem). Digitação é traiçoeira (auto-advance engole
   dígitos e o display DESSINCRONIZA do estado — dá p/ ver "12:00 PM" com
