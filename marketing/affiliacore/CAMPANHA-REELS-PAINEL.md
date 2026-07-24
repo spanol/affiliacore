@@ -22,9 +22,9 @@ capa ao publicar, mantém a grade do perfil consistente).
 
 | Reel | Data | Status |
 |------|------|--------|
-| 1 · agência | sex 24/07 12:00 | agendado FB+IG |
-| 2 · líder de rede | sáb 25/07 12:00 | agendado FB+IG |
-| 3 · afiliado | dom 26/07 12:00 | agendado FB+IG |
+| 1 · agência | sex 24/07 | **REAGENDADO na madrugada de 24/07 c/ MÚSICA**: FB 12:45 (Dream Dust · erloom, via MBS) + IG = post manual pelo APP c/ trending audio (agendamento MBS do IG deletado) |
+| 2 · líder de rede | sáb 25/07 12:00 | agendado FB+IG (silencioso) |
+| 3 · afiliado | dom 26/07 12:00 | agendado FB+IG (silencioso) |
 
 Fluxo que funcionou (híbrido): a automação prepara o composer de Reels
 (`/latest/reels_composer/?asset_id=<page>&business_id=<biz>`), o OPERADOR
@@ -42,6 +42,23 @@ perfil do IG após publicarem** — vitrine permanente do painel.
   ⇒ p/ AGENDAR FB+IG: pular o Edit inteiro (reel sai com o áudio original;
   os nossos são silenciosos). Trilha/áudio em alta = publicar manualmente
   pelo app do IG.
+- **MAS reel editado SÓ-FACEBOOK AGENDA** (provado 24/07): desmarcando o IG
+  no "Post to", a trilha entra no Edit e o Schedule funciona. No modo só-FB
+  o campo **Title habilita** (vira o título da linha no Planner). Fluxo
+  híbrido de música: FB agendado c/ trilha do MBS + IG manual pelo app com
+  trending audio (que ainda conta p/ descoberta — biblioteca do MBS não).
+- **Bug do relógio na validação do Schedule** (24/07 ~1h40 BR): o widget
+  valida "20 min a 29 dias" contra um "agora" ERRADO (~11h adiantado; o
+  default de abertura era 12:45 PM com relógio local 01:14 AM). Sintoma:
+  12:00 PM de hoje = vermelho "Scheduled posts need to be shared between
+  20 minutes and 29 days". Workaround: escolher horário ≥ o default que o
+  composer sugeriu ao abrir (aceitou 12:45 PM). O horário AGENDADO conta no
+  fuso São Paulo normalmente (a linha do Planner mostra certo).
+- **Campo de hora do reels composer = 3 spinbuttons** (`aria-label`
+  hours/minutes/meridiem). Digitação é traiçoeira (auto-advance engole
+  dígitos e o display DESSINCRONIZA do estado — dá p/ ver "12:00 PM" com
+  estado interno AM). Confiável: focar cada input via JS `.focus()` e usar
+  SETAS (Up/Down); conferir com `aria-valuenow`, não com o olho.
 - **Campo Title fica `disabled` sempre** (é de reel só-FB; no fluxo
   combinado FB+IG não é usado). A legenda vai no campo Text (Draft.js:
   `form_input` falha — usar click + type; fechar typeahead de hashtag
