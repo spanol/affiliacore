@@ -68,13 +68,21 @@ h1,h2,h3{font-family:var(--display);font-weight:800;line-height:1.12;letter-spac
 a{color:inherit}
 section{padding:72px 0}
 
+/* topo fixo: barra de deadline + header num ÚNICO wrapper sticky.
+   Antes eram dois stickies e o header ficava preso em top:38px (a altura da
+   barra no desktop, onde ela cabe em 1 linha). No celular a barra quebra em 2
+   linhas (66px) e, tendo z-index maior, cobria 28px do header — logo e CTA
+   apareciam cortados ao meio durante toda a rolagem. Wrapper único = sem
+   número mágico, e o `display:none` da barra expirada não deixa buraco. */
+.stickytop{position:sticky;top:0;z-index:60}
+
 /* deadline topbar */
-.topbar{position:sticky;top:0;z-index:60;background:linear-gradient(90deg,#7A0E29,#C4123B);color:#fff;text-align:center;padding:9px 16px;font-size:.9rem;font-weight:600}
+.topbar{background:linear-gradient(90deg,#7A0E29,#C4123B);color:#fff;text-align:center;padding:9px 16px;font-size:.9rem;font-weight:600}
 .topbar b{font-family:var(--display);font-weight:800}
 .topbar .js-count{font-variant-numeric:tabular-nums}
 
 /* header */
-header{position:sticky;top:38px;z-index:50;background:rgba(23,11,15,.97);border-bottom:1px solid var(--line)}
+header{background:rgba(23,11,15,.97);border-bottom:1px solid var(--line)}
 .nav{display:flex;align-items:center;justify-content:space-between;height:60px;gap:16px}
 .nav img{height:20px;display:block}
 
@@ -227,20 +235,22 @@ footer img{height:16px;opacity:.85}
 height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <!-- End Google Tag Manager (noscript) -->
 
-<div class="topbar js-deadline">🔥 Preço de lançamento <b>R$ 47</b> termina em <b class="js-count">—</b> · depois vai a <b>R$ 67</b></div>
+<div class="stickytop">
+  <div class="topbar js-deadline">🔥 Preço de lançamento <b>R$ 47</b> termina em <b class="js-count">—</b> · depois vai a <b>R$ 67</b></div>
 
-<header>
-  <div class="wrap nav">
-    <img src="/logo.svg" alt="AffiliaCore">
-    <a class="btn btn-primary btn-sm js-checkout" href="https://pay.kiwify.com.br/83JFB9e"><span class="long">Quero o guia —&nbsp;</span>R$ 47</a>
-  </div>
-</header>
+  <header>
+    <div class="wrap nav">
+      <img src="/logo.svg" alt="AffiliaCore">
+      <a class="btn btn-primary btn-sm js-checkout" href="https://pay.kiwify.com.br/83JFB9e"><span class="long">Quero o guia —&nbsp;</span>R$ 47</a>
+    </div>
+  </header>
+</div>
 
 <section class="hero">
   <div class="wrap">
     <div class="hero-grid">
       <div>
-        <span class="eyebrow">O anti-curso do mercado de apostas · edição 2026</span>
+        <span class="eyebrow">O anti-curso do mercado regulamentado · edição 2026</span>
         <h1>Pare de jogar do lado errado do <em>balcão</em>.</h1>
         <p class="lead"><strong>R$ 37 bilhões de GGR</strong> no primeiro ano do mercado regulado — e nem um centavo disso ficou com quem compra curso de guru. Ficou com as operadoras e com as <strong>agências</strong>: as estruturas com CNPJ, contrato e rede que vivem de spread e override. Este guia mostra, capítulo por capítulo, como uma agência dessas é montada — escrito por quem opera uma, não por quem posa.</p>
         <a class="btn btn-primary btn-lg js-checkout" href="https://pay.kiwify.com.br/83JFB9e">Quero o guia agora — R$ 47
