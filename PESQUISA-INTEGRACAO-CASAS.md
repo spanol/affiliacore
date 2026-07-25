@@ -75,6 +75,12 @@ A agência (ou a própria AffiliaCore) contrata direto com a casa como master e 
 
 ## 4. Regulatório BR (condições de contorno)
 
+> ⚠️ **ATUALIZAÇÃO 2026-07-25 — esta seção ficou incompleta.** Duas portarias publicadas no DOU em 10/07/2026 e **em vigor desde 17/07/2026** mudaram o patamar, e foram verificadas em fonte primária (gov.br/fazenda + gov.br/mj):
+> - **Portaria SPA/MF nº 1.964/2026** — advertência do Ministério da Fazenda (3 frases fixas) ocupando **no mínimo 10% da área** de toda peça publicitária, na horizontal e legível. **[V]**
+> - **Portaria Interministerial MF/SECOM/MJSP nº 73/2026** — estende o compliance a TODA a cadeia de divulgação (afiliado, influenciador, agência, provedor de aplicação). Quem divulga passa a ter dever PRÓPRIO de (i) confirmar que o anunciante é operador autorizado **como condição da contratação**, consultando a lista da SPA; (ii) obter e manter razão social, CNPJ e nº de autorização; (iii) **exibir** essa identificação na peça. Fiscalização pela **Senacon**; a SECOM pode cancelar o cadastro do infrator no **Midiacad**. **[V]**
+>
+> Implicação para o produto: o afiliado não é mais um elo isento — o risco é individual. Ver a memória `bets-publicidade-regulacao` e os cookbooks em `marketing/affiliacore/`.
+
 Base: Lei 14.790/2023 + **Portaria SPA/MF nº 1.231/2024** (publicidade/afiliados; fiscalização desde 01/01/2025). Verificado no texto da portaria **[V]**:
 - **Afiliado** definido no Art. 2º, VI: quem "faz publicidade para agente operador de apostas, mediante compensação… atrelada a resultados".
 - **Art. 21:** operadores são **responsáveis solidários** pelas ações de publicidade dos afiliados.
