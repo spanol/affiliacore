@@ -4,8 +4,12 @@
 > white-label vendável para outras agências de afiliados de apostas. Modelo definido:
 > **Vinicius faz setup + manutenção; o cliente opera**. Instância dedicada por cliente
 > (1 projeto Firebase cada) — SaaS multi-tenant fica para quando houver 5+ clientes.
-> Precificação de referência (benchmark 2026-07-02): setup único R$ 3–8 mil + mensalidade
-> em degraus por nº de afiliados ativos (~R$ 600–1.500/mês); Carlos = cliente 0 (cortesia).
+> ~~Precificação de referência (benchmark 2026-07-02): setup único R$ 3–8 mil + mensalidade
+> em degraus por nº de afiliados ativos (~R$ 600–1.500/mês)~~ **SUPERADA em 2026-07-25 —
+> ver "Modelo de preço vigente" no fim deste doc**: sem taxa de implantação, 1º mês fechado
+> (R$ 600 · fundador R$ 300) e, do 2º em diante, % sobre a margem líquida da agência
+> (a partir de 3%, sobe por faixa de volume) com piso de R$ 600/mês (fundador R$ 300).
+> Carlos = cliente 0 (cortesia).
 
 ## Visão das fases
 
@@ -213,14 +217,16 @@ A versão vendida é naturalmente OTG-free (a x-api-key é da operação do Carl
   Boost do Carlos continua sendo a instância dele.
 - **P5.2 — Jurídico mínimo (1 visita a advogado)**: (a) formalizar por escrito a
   titularidade do IP com o Carlos — barato agora, caro depois; (b) contrato-modelo de
-  licença + serviço (setup, mensalidade, SLA de manutenção, LGPD — o app guarda PII de
-  afiliados).
+  licença + serviço (1º mês, **cláusula da cobrança por % sobre a margem** — definição da
+  base, direito de conferir os números do painel e o que acontece se a instância for
+  desligada no meio do mês —, SLA de manutenção, LGPD — o app guarda PII de afiliados).
 - **P5.3 — Demo + vídeo**: instância demo (P4) + GIF/vídeo de ~3min do fluxo completo
   (import de planilha → comissão calculada → portal do afiliado → auditoria → ranking).
 - **P5.4 — Landing page one-pager** com preço publicado (diferencial: todo o segmento
   enterprise esconde preço). Hospeda no próprio Firebase Hosting.
-- **P5.5 — Precificação v1 publicada**: setup + degraus de mensalidade (referência no topo
-  deste doc); "preço de fundador" travado pros 2–3 primeiros em troca de depoimento.
+- **P5.5 — Precificação v1 publicada**: ~~setup + degraus de mensalidade~~ → **v2 no ar
+  desde 2026-07-25** (1º mês fechado + % sobre a margem; ver o fim deste doc); "preço de
+  fundador" travado pros 3 primeiros em troca de feedback de perto.
 - **P5.6 — Canal de venda**: primeiro cliente vem de indicação (rede do Carlos / mercado de
   afiliados BR), não de marketing pago. Comunidades e grupos de afiliados de apostas como
   segundo canal.
@@ -308,7 +314,8 @@ no `apphosting.<cliente>.yaml`, sem rebuild.
    `landing/` (identidade C: ember/plum, Bricolage+Inter self-hosted, logo em
    curvas) com hero + mock de dashboard em CSS puro, features, white-label,
    **preço publicado** (setup a partir de R$ 3.000 + mensal a partir de
-   R$ 600, card de preço de fundador) e CTA pro direct do @affiliacore.br.
+   R$ 600, card de preço de fundador — *valores da época; preço v2 desde
+   25/07, ver o fim do doc*) e CTA pro direct do @affiliacore.br.
    Servida pelo **projeto Firebase PRÓPRIO `affiliacore`** (decisão
    2026-07-07: a presença comercial do produto NÃO mora no projeto da
    instância 0), site `affiliacore-br`, alias `www` no `.firebaserc` —
@@ -410,3 +417,34 @@ no `apphosting.<cliente>.yaml`, sem rebuild.
 9. **PRÓXIMO:** typo-defense afiliacore.com.br + INPI/Instagram (link na
    bio ainda pendente — operador); playbook no cliente 0; P5.2 jurídico;
    formalizar degraus do P5.5; demo P5.3 quando houver lead quente.
+
+## 💰 Modelo de preço vigente (v2 — no ar desde 2026-07-25)
+
+Substitui a precificação de referência do topo do doc (setup R$ 3–8 mil +
+mensalidade em degraus por nº de afiliados). Decidido pelo Vinicius;
+publicado em `landing/index.html` (deploy verificado em affiliacore.com.br)
+e refletido no `marketing/affiliacore/CAMPANHA-LANCAMENTO.md`.
+
+| | Padrão | Fundador (3 primeiras agências) |
+|---|---|---|
+| **1º mês** — valor fechado, implantação inclusa | R$ 600 | R$ 300 |
+| **2º mês em diante** — % sobre a margem | a partir de 3% | mesma escada |
+| **Piso mensal** (do 2º mês em diante) | R$ 600 | R$ 300 |
+
+- **Sumiu a taxa de implantação.** A implantação (instância, marca, domínio,
+  migração das taxas, onboarding) passa a ser inclusa no 1º mês — some a
+  barreira de entrada de R$ 3 mil.
+- **Base do %: MARGEM LÍQUIDA da agência** (comissão das casas − repasse aos
+  afiliados). Não é comissão bruta nem volume depositado. É o número que o
+  próprio painel calcula e audita.
+- **Cobra-se o MAIOR entre piso e percentual** → com 3% e piso R$ 600, o
+  percentual só ultrapassa o piso acima de **R$ 20 mil de margem no mês**.
+- **O % sobe por faixa de volume operado** (decisão explícita: maior volume →
+  maior %, invertido em relação ao desconto por volume usual). **As faixas
+  acima de 3% NÃO estão definidas** — a LP publica só "a partir de 3%" e o
+  degrau é fechado olhando os números do lead. **Definir a tabela interna é
+  pendência aberta** (sem ela, não cotar acima de 3%).
+- ⚠️ **Risco do modelo:** a base da fatura é um número que o CLIENTE
+  configura (o repasse). Inflar o repasse no painel reduz a margem e a conta
+  da AffiliaCore. Cobrar sobre comissão bruta não teria esse vetor →
+  endereçar no contrato do P5.2 (definição da base + direito de conferir).
