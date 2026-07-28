@@ -212,6 +212,16 @@ function makeApi(base, idToken) {
     let j = null;
     try { j = txt ? JSON.parse(txt) : null; } catch { /* resposta nao-JSON */ }
     if (!r.ok) throw new Error(`${metodo} ${rota} -> ${r.status} ${txt.slice(0, 300)}`);
+    // ARMADILHA: numa instancia cujo build nao tem a rota, o Express cai no
+    // fallback da SPA e devolve 200 text/html. Sem esta guarda, um POST vira
+    // "sucesso" que nao grava NADA (medido na Infinity em 28/07: 141 arestas
+    // teriam sido dadas como escritas). Resposta nao-JSON e' erro, nao sucesso.
+    if (j === null && txt.trim().startsWith('<')) {
+      throw new Error(
+        `${metodo} ${rota} respondeu HTML (a SPA), nao JSON — a rota NAO existe nesta build da instancia. ` +
+        `Falta deployar o codigo que a define.`
+      );
+    }
     return j;
   };
 }
@@ -250,9 +260,26 @@ async function main() {
   const jaExistem = rows.filter((r) => idPorEmail.has(r.email)).length;
   console.log(`aliases existentes: ${idPorEmail.size}   do TSV ja mapeados: ${jaExistem}   a criar: ${rows.length - jaExistem}`);
 
+  // PRE-FLIGHT da fase 2: a rota de upline so' existe na build COM a rede. Conferir
+  // agora (inclusive no dry-run) evita descobrir isso depois de 141 POSTs no vazio.
+  let redeDisponivel = true;
+  if (args.only !== 'roster') {
+    try {
+      const antes = await api('GET', '/api/affiliate-uplines');
+      const n = Object.values(antes?.uplines ?? {}).filter(Boolean).length;
+      console.log(`rota de upline: OK (${n} aresta(s) ja gravada(s) nesta instancia)`);
+    } catch (e) {
+      redeDisponivel = false;
+      console.error(`\n!! FASE DE UPLINES INDISPONIVEL nesta instancia:\n   ${e.message}`);
+      console.error(`   A rede (GET/POST /api/affiliate-uplines) precisa estar DEPLOYADA antes.`);
+      console.error(`   O roster (fase 1) nao depende disso e pode rodar com --only roster.`);
+      if (args.apply) process.exit(1);
+    }
+  }
+
   if (!args.apply) {
     console.log(`\n== DRY-RUN ==`);
-    console.log(`criaria ${rows.length - jaExistem} afiliado(s) nativo(s) e gravaria ${v.arestas} aresta(s).`);
+    console.log(`criaria ${rows.length - jaExistem} afiliado(s) nativo(s) e ${redeDisponivel ? `gravaria ${v.arestas} aresta(s)` : `NAO gravaria aresta (rota indisponivel)`}.`);
     console.log(`rode de novo com --apply para escrever.`);
     return;
   }
