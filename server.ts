@@ -30,6 +30,7 @@ import { normalizeDealInput, buildDealLabel, dealBrandKey, dealToBrandRates } fr
 import { canTransition, type PartnershipStatus } from './src/lib/partnership';
 import { normalizeLegalDocInput, computeNextVersion } from './src/lib/legal';
 import { canTransitionWithdrawal, normalizeWithdrawalAmount, type WithdrawalStatus } from './src/lib/withdrawal';
+import { buildNetworkTree, resolveRepasseCap, exceedsRepasseCap } from './src/lib/network';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -399,14 +400,15 @@ export function createApp(deps: ServerDeps) {
       const subs = Array.isArray(special.subAffiliateIds) ? special.subAffiliateIds.map((s: any) => String(s)) : [];
       if (!subs.includes(subId)) return res.status(403).json({ error: 'Este afiliado não pertence à sua sub-rede.' });
 
-      // Teto = taxa própria do especial (affiliate_configs do callerAffiliateId).
-      // A taxa do sub não pode passar do teto (senão o spread do especial fica negativo).
+      // Teto = taxa própria do especial (affiliate_configs do callerAffiliateId). A
+      // taxa do sub não pode passar do teto (senão o spread do upline fica negativo).
+      // É o "Limite de repasse" do legado — regra PURA em lib/network, a mesma que a
+      // cascata de rede usa, para não divergir de uma reimplementação inline.
       const ownCfgSnap = await adminDb.collection('affiliate_configs').doc(callerAffiliateId).get();
       const ownCfg = ownCfgSnap.exists ? (ownCfgSnap.data() as any) : {};
-      const tetoCpa = Number(ownCfg.cpaValue) || 0;
-      const tetoRev = Number(ownCfg.revPercentage) || 0;
-      if (cpa > tetoCpa || rev > tetoRev) {
-        return res.status(400).json({ error: `A comissão do sub não pode passar da sua taxa (teto: R$ ${tetoCpa}/CPA · ${tetoRev}% REV).` });
+      const cap = resolveRepasseCap(ownCfg);
+      if (exceedsRepasseCap({ cpaValue: cpa, revPercentage: rev }, cap)) {
+        return res.status(400).json({ error: `A comissão do sub não pode passar da sua taxa (teto: R$ ${cap.cpaValue}/CPA · ${cap.revPercentage}% REV).` });
       }
 
       // Fase 3 (auditoria de dinheiro): a mudança de taxa do sub também é
@@ -483,6 +485,66 @@ export function createApp(deps: ServerDeps) {
     } catch (error: any) {
       console.error('Error saving special affiliate:', error);
       return res.status(500).json({ error: error.message || 'Erro interno salvando afiliado especial.' });
+    }
+  });
+
+  // --- Rede de afiliados · aresta filho→upline (affiliate_uplines) ------------
+  // Generaliza o especial+sub-rede (2 níveis) para N níveis, que é o que o legado
+  // da Infinity praticava (4). A aresta é EXPLÍCITA e sobrevive ao sync do mirror
+  // `affiliates`. Server-only (rule admin-only): quem é upline de quem determina
+  // dinheiro (o "lucro sobre equipe"), então nem leitura vai direto ao Firestore.
+  // Ver REDE-AFILIADOS.md e src/lib/network.ts.
+  const readUplineMap = async (): Promise<Record<string, string>> => {
+    const snap = await adminDb!.collection('affiliate_uplines').get();
+    const out: Record<string, string> = {};
+    snap.forEach((d) => {
+      const up = (d.data() as any)?.uplineId;
+      if (up) out[d.id] = String(up);
+    });
+    return out;
+  };
+
+  app.get('/api/affiliate-uplines', requireAdmin, async (_req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      return res.json({ uplines: await readUplineMap() });
+    } catch (error: any) {
+      console.error('Error fetching affiliate uplines:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno.' });
+    }
+  });
+
+  app.post('/api/affiliate-uplines', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const affId = req.body?.affiliateId != null ? String(req.body.affiliateId).trim() : '';
+      const uplineId = req.body?.uplineId != null ? String(req.body.uplineId).trim() : '';
+      if (!affId) return res.status(400).json({ error: 'affiliateId é obrigatório.' });
+      if (uplineId && uplineId === affId) {
+        return res.status(400).json({ error: 'Um afiliado não pode ser upline de si mesmo.' });
+      }
+
+      const ref = adminDb.collection('affiliate_uplines').doc(affId);
+      if (!uplineId) {
+        await ref.set({ affiliateId: affId, uplineId: null, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        return res.json({ affiliateId: affId, uplineId: null });
+      }
+
+      // Barreira de CICLO no WRITE: a árvore nunca fica inconsistente no banco (o
+      // núcleo ainda saneia na leitura, mas aqui o admin recebe o erro na hora).
+      const current = await readUplineMap();
+      const candidate = { ...current, [affId]: uplineId };
+      const ids = new Set<string>([affId, uplineId, ...Object.keys(candidate), ...Object.values(candidate)]);
+      const tree = buildNetworkTree([...ids].map((id) => ({ affiliateId: id, uplineId: candidate[id] ?? null })));
+      if (tree.dropped.some((d) => d.reason === 'ciclo')) {
+        return res.status(400).json({ error: 'Este vínculo criaria um ciclo na rede (o upline já está abaixo deste afiliado).' });
+      }
+
+      await ref.set({ affiliateId: affId, uplineId, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      return res.json({ affiliateId: affId, uplineId });
+    } catch (error: any) {
+      console.error('Error saving affiliate upline:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno salvando o upline.' });
     }
   });
 

@@ -277,6 +277,10 @@ describe('coleções admin-only (servidor via Admin SDK; client direto negado)',
     'houses',
     'house_results',
     'api_partners',
+    // Rede de afiliados: a aresta filho→upline determina DINHEIRO (o "lucro sobre
+    // equipe" pago junto com o repasse direto) e revela a estrutura comercial da
+    // rede inteira → server-only, nem leitura de signed-in. [[REDE-AFILIADOS.md]]
+    'affiliate_uplines',
     // settings/external_api tem FORMA de credencial → leitura admin-only (audit
     // 2026-06-24, espelha R5). Antes era signed-in-read; o doc é credential-shaped.
     'settings',

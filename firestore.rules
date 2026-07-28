@@ -79,6 +79,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Rede de afiliados · aresta filho→upline (N níveis). Quem é upline de quem
+    // determina DINHEIRO (o "lucro sobre equipe" que a agência paga junto com o
+    // repasse direto), então é server-only: leitura e escrita só pelo Admin SDK,
+    // via GET/POST /api/affiliate-uplines (admin). Espelha affiliate_configs — e,
+    // ao contrário de special_affiliates, nem leitura de signed-in (a aresta
+    // revela a estrutura comercial da rede inteira). Ver REDE-AFILIADOS.md.
+    match /affiliate_uplines/{affiliateId} {
+      allow read, write: if isAdmin();
+    }
+
     // Global application settings (inclui settings/external_api, doc com FORMA de
     // credencial). SECURITY: leitura admin-only — antes era `read: isSignedIn()` e
     // qualquer afiliado logado lia o doc credential-shaped. Espelha o fix R5 de

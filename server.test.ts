@@ -527,6 +527,112 @@ describe('POST /api/special/sub-config — taxa do sub também vira config.updat
       .expect(200);
     expect(db.__store.get('audit_logs')?.size ?? 0).toBe(0);
   });
+
+  it('taxa do sub ACIMA do teto do especial ("Limite de repasse") → 400', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const resp = await request(app)
+      .post('/api/special/sub-config')
+      .set('Authorization', 'Bearer esp-uid')
+      .send({ subAffiliateId: 'SUB-1', cpaValue: 401, revPercentage: 10 })
+      .expect(400);
+    expect(resp.body.error).toContain('teto');
+    // Nada gravado: a taxa do sub segue a original.
+    expect(db.__store.get('affiliate_configs')?.get('SUB-1')?.cpaValue).toBe(100);
+  });
+});
+
+// =============================================================================
+// Rede de afiliados — aresta filho→upline (affiliate_uplines), admin-only
+// =============================================================================
+describe('/api/affiliate-uplines — rede de afiliados (N níveis)', () => {
+  const seed = {
+    users: { 'admin-uid': { role: 'admin' }, 'client-uid': { role: 'client', affiliateId: 'A' } },
+    affiliate_uplines: { B: { affiliateId: 'B', uplineId: 'A' } },
+  };
+
+  it('GET exige admin (afiliado comum não lê a estrutura comercial da rede)', async () => {
+    await request(buildApp({ seed })).get('/api/affiliate-uplines').expect(401);
+    await request(buildApp({ seed }))
+      .get('/api/affiliate-uplines')
+      .set('Authorization', 'Bearer client-uid')
+      .expect(403);
+  });
+
+  it('GET devolve o mapa filho→upline (ignora doc com upline nulo)', async () => {
+    const db = makeFirestore({ ...seed, affiliate_uplines: { ...seed.affiliate_uplines, C: { uplineId: null } } });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const resp = await request(app).get('/api/affiliate-uplines').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(resp.body.uplines).toEqual({ B: 'A' });
+  });
+
+  it('POST grava a aresta', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/affiliate-uplines')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'C', uplineId: 'B' })
+      .expect(200);
+    expect(db.__store.get('affiliate_uplines')?.get('C')).toMatchObject({ affiliateId: 'C', uplineId: 'B' });
+  });
+
+  it('POST com uplineId vazio SOLTA o afiliado (vira topo de estrutura)', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const resp = await request(app)
+      .post('/api/affiliate-uplines')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'B', uplineId: '' })
+      .expect(200);
+    expect(resp.body).toEqual({ affiliateId: 'B', uplineId: null });
+    expect(db.__store.get('affiliate_uplines')?.get('B')?.uplineId).toBeNull();
+  });
+
+  it('POST recusa auto-upline', async () => {
+    const resp = await request(buildApp({ seed }))
+      .post('/api/affiliate-uplines')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'A', uplineId: 'A' })
+      .expect(400);
+    expect(resp.body.error).toContain('si mesmo');
+  });
+
+  it('POST recusa CICLO (A→B→A) e não grava nada', async () => {
+    const db = makeFirestore(seed); // já existe B→A
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const resp = await request(app)
+      .post('/api/affiliate-uplines')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'A', uplineId: 'B' })
+      .expect(400);
+    expect(resp.body.error).toContain('ciclo');
+    expect(db.__store.get('affiliate_uplines')?.has('A')).toBe(false);
+  });
+
+  it('POST recusa ciclo INDIRETO de 3 níveis (A→B→C→A)', async () => {
+    const db = makeFirestore({ ...seed, affiliate_uplines: { B: { uplineId: 'A' }, C: { uplineId: 'B' } } });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/affiliate-uplines')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'A', uplineId: 'C' })
+      .expect(400);
+    expect(db.__store.get('affiliate_uplines')?.has('A')).toBe(false);
+  });
+
+  it('POST sem affiliateId → 400; POST de não-admin → 403', async () => {
+    await request(buildApp({ seed }))
+      .post('/api/affiliate-uplines')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ uplineId: 'A' })
+      .expect(400);
+    await request(buildApp({ seed }))
+      .post('/api/affiliate-uplines')
+      .set('Authorization', 'Bearer client-uid')
+      .send({ affiliateId: 'C', uplineId: 'A' })
+      .expect(403);
+  });
 });
 
 // =============================================================================
