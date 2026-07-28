@@ -85,10 +85,50 @@ conversão de EUR**.
    payload à mão**: gravar `{cpaValue:0}` em quem não tem taxa faz `rateStatus` ler "configurado"
    (ausência ≠ R$ 0).
 
+## Rede (uplines) + os ~130 afiliados sem produção — `converter-rede.cjs`
+
+Cobre o que o import de resultados deixou de fora: as **160 pessoas** do legado (não só as 30 que
+produziram) e as **141 arestas** de upline.
+
+**Fonte:** um TSV extraído de `/admin/config` nos **4 bancos** — fora do repo, é PII:
+
+```
+<scratchpad>/infinity-roster-uplines.tsv     159 linhas (160 − a conta de recon)
+email  nome  id_main  gerente_email  fonte_upline  nivel  casas  admin  id_por_casa
+```
+
+⚠️ **Não extraia do banco `main` sozinho** — ele sub-reporta a rede (77 arestas em vez de 141, 83 topos em
+vez de 19). A **casa é a autoridade** para o gerente; o `main` só preenche quem não está em casa nenhuma.
+Medição e justificativa na **§3.1 do doc raiz**.
+
+```bash
+# dry-run (valida, resolve ids, imprime o plano, NÃO escreve)
+node scripts/migracao-infinity/converter-rede.cjs \
+  --tsv "<scratchpad>/infinity-roster-uplines.tsv" \
+  --base https://<instancia-infinity> \
+  --api-key <FIREBASE_WEB_API_KEY da instância> \
+  --admin-email <admin da instância>
+
+# escrever (fases separáveis com --only roster | --only uplines)
+... --apply
+```
+
+Credencial do Admin SDK por `GOOGLE_APPLICATION_CREDENTIALS` ou `FIREBASE_SERVICE_ACCOUNT_KEY` — o Admin SDK
+entra **só** para cunhar o ID token do admin; toda escrita vai por HTTP, porque
+`POST /api/affiliate-uplines` faz a barreira de **ciclo** no write e **audita** a aresta no mesmo batch
+(mudar upline muda dinheiro). Gravar direto no Firestore pularia as duas coisas.
+
+O script é **idempotente** (`boost-affiliates` reusa o alias de e-mail; regravar o mesmo upline gera diff
+vazio e não polui a auditoria), aborta antes de escrever se achar duplicata / auto-upline / órfão / ciclo,
+grava **pai antes do filho**, e no fim confere `GET /api/affiliate-uplines` contra o TSV — se divergir, sai
+com código 1. `generateInvite` é **false** de propósito: migração histórica, ninguém recebe login.
+
 ## O que este runbook NÃO cobre
 
-- **Os outros ~130 afiliados sem produção** (o legado tem 160 pessoas; 30 produziram). O cadastro completo
-  com WhatsApp/Instagram/upline está no legado e pode ser exportado à parte — é a carteira de contatos.
+- **A taxa por afiliado.** É o passo 5 e continua pendente — e o dado **não está** em `/admin/config`
+  (só REV, 0% em todos). As 3 camadas de CPA (300 → 280 → 270) precisam ser extraídas de outra tela;
+  o XLSX de Pagamentos tem `CPA/Deal atual` mas cobre só quem tem saldo. Sem taxa por pessoa não se
+  reproduz os R$ 33.540 do legado.
 - **O passivo de R$ 32.306,40** em aberto (§6.1 do doc raiz): decisão comercial pendente, **bloqueia o
   Financeiro**, não bloqueia esta importação.
 - **Links/tags**: não migram. Ver §6.2.1 do doc raiz (pool de Standby) e o gargalo de atribuição na §5.1.

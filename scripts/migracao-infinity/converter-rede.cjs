@@ -1,0 +1,305 @@
+#!/usr/bin/env node
+/**
+ * Conversor da REDE do legado da Infinity -> AffiliaCore.
+ *
+ * Le o TSV de roster+upline extraido do painel legado (PII: fica FORA do repo, no
+ * scratchpad) e escreve na instancia via HTTP, em duas fases:
+ *
+ *   1. ROSTER   -> POST /api/boost-affiliates   (idempotente por e-mail)
+ *   2. UPLINES  -> POST /api/affiliate-uplines  (uma aresta por chamada)
+ *
+ * POR QUE HTTP e nao Admin SDK direto: `POST /api/affiliate-uplines` faz a barreira
+ * de CICLO no write e AUDITA a aresta no mesmo batch da gravacao — mudar upline muda
+ * dinheiro (o "lucro sobre equipe" sai da taxa do TOPO da estrutura). Gravar direto no
+ * Firestore pularia as duas coisas e reimplementaria regra de servidor no script, o que
+ * o CLAUDE.md proibe. O Admin SDK entra aqui SO para cunhar o token de admin.
+ *
+ * ORDEM OBRIGATORIA: roster primeiro, uplines depois. O POST de upline precisa do
+ * affiliateId da AffiliaCore, e a juncao com o legado e' por E-MAIL.
+ *
+ * Idempotente: rodar de novo nao duplica nada (`boost-affiliates` reusa o alias de
+ * e-mail; regravar o mesmo upline gera diff vazio e nao polui a auditoria).
+ *
+ * USO
+ *   node scripts/migracao-infinity/converter-rede.cjs \
+ *     --tsv "<scratchpad>/infinity-roster-uplines.tsv" \
+ *     --base https://<instancia> \
+ *     --api-key <FIREBASE_WEB_API_KEY da instancia> \
+ *     --admin-email admin@... \
+ *     [--only roster|uplines] [--apply]
+ *
+ * Sem `--apply` e' DRY-RUN: valida, resolve ids, imprime o plano e NAO escreve nada.
+ * Credencial do Admin SDK: GOOGLE_APPLICATION_CREDENTIALS ou FIREBASE_SERVICE_ACCOUNT_KEY.
+ */
+
+const fs = require('fs');
+const admin = require('firebase-admin');
+
+// ---------------------------------------------------------------- argumentos
+function parseArgs(argv) {
+  const out = { apply: false, only: 'ambos' };
+  for (let i = 2; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--apply') out.apply = true;
+    else if (a === '--tsv') out.tsv = argv[++i];
+    else if (a === '--base') out.base = String(argv[++i] || '').replace(/\/+$/, '');
+    else if (a === '--api-key') out.apiKey = argv[++i];
+    else if (a === '--admin-email') out.adminEmail = argv[++i];
+    else if (a === '--admin-uid') out.adminUid = argv[++i];
+    else if (a === '--only') out.only = argv[++i];
+    else throw new Error(`Argumento desconhecido: ${a}`);
+  }
+  const falta = ['tsv', 'base', 'apiKey'].filter((k) => !out[k]);
+  if (falta.length) throw new Error(`Faltam argumentos: ${falta.join(', ')}`);
+  if (!out.adminEmail && !out.adminUid) throw new Error('Informe --admin-email ou --admin-uid.');
+  if (!['ambos', 'roster', 'uplines'].includes(out.only)) throw new Error('--only aceita roster|uplines.');
+  return out;
+}
+
+// ------------------------------------------------------------------ leitura
+const COLS = ['email', 'nome', 'id_main', 'gerente_email', 'fonte_upline', 'nivel', 'casas', 'admin', 'id_por_casa'];
+
+function lerTsv(caminho) {
+  const texto = fs.readFileSync(caminho, 'utf8').replace(/^﻿/, '');
+  const linhas = texto.split(/\r?\n/).filter((l) => l.trim() !== '');
+  if (!linhas.length) throw new Error('TSV vazio.');
+  const head = linhas[0].split('\t').map((s) => s.trim());
+  const faltando = COLS.filter((c) => !head.includes(c));
+  if (faltando.length) throw new Error(`TSV sem as colunas: ${faltando.join(', ')}`);
+  const idx = Object.fromEntries(COLS.map((c) => [c, head.indexOf(c)]));
+  const rows = [];
+  for (const linha of linhas.slice(1)) {
+    const c = linha.split('\t');
+    const email = (c[idx.email] || '').trim().toLowerCase();
+    if (!email) continue;
+    rows.push({
+      email,
+      nome: (c[idx.nome] || '').trim(),
+      idLegado: (c[idx.id_main] || '').trim(),
+      gerente: (c[idx.gerente_email] || '').trim().toLowerCase(),
+      fonte: (c[idx.fonte_upline] || '').trim(),
+      nivel: Number(c[idx.nivel] || 0),
+      casas: (c[idx.casas] || '').split('|').filter(Boolean),
+      admin: (c[idx.admin] || '').trim() === 'sim',
+    });
+  }
+  return rows;
+}
+
+/**
+ * Saneamento ANTES de escrever: e-mail duplicado, upline fora do roster, auto-upline
+ * e ciclo. O servidor tambem barra ciclo, mas descobrir aqui evita escrita parcial.
+ */
+function validar(rows) {
+  const problemas = [];
+  const vistos = new Set();
+  for (const r of rows) {
+    if (vistos.has(r.email)) problemas.push(`e-mail duplicado: ${r.email}`);
+    vistos.add(r.email);
+    if (!r.nome) problemas.push(`sem nome: ${r.email}`);
+  }
+  for (const r of rows) {
+    if (!r.gerente) continue;
+    if (r.gerente === r.email) problemas.push(`auto-upline (o legado usa isso p/ "topo"): ${r.email}`);
+    else if (!vistos.has(r.gerente)) problemas.push(`upline fora do roster: ${r.email} -> ${r.gerente}`);
+  }
+  // ciclos
+  const pai = new Map(rows.map((r) => [r.email, r.gerente && r.gerente !== r.email && vistos.has(r.gerente) ? r.gerente : null]));
+  const nivelDe = new Map();
+  for (const inicio of pai.keys()) {
+    const caminho = new Set();
+    let n = inicio;
+    let d = 0;
+    while (n && !nivelDe.has(n)) {
+      if (caminho.has(n)) { problemas.push(`ciclo envolvendo: ${n}`); break; }
+      caminho.add(n);
+      n = pai.get(n) || null;
+      d++;
+      if (d > rows.length + 1) { problemas.push(`profundidade absurda a partir de ${inicio}`); break; }
+    }
+    // profundidade real (memoizada de baixo p/ cima)
+    const prof = (x, seen) => {
+      if (nivelDe.has(x)) return nivelDe.get(x);
+      const p = pai.get(x);
+      if (!p || seen.has(x)) { nivelDe.set(x, 0); return 0; }
+      seen.add(x);
+      const v = prof(p, seen) + 1;
+      nivelDe.set(x, v);
+      return v;
+    };
+    prof(inicio, new Set());
+  }
+  const arestas = [...pai.values()].filter(Boolean).length;
+  const topos = rows.length - arestas;
+  const niveis = {};
+  for (const r of rows) { const d = nivelDe.get(r.email) ?? 0; niveis[d] = (niveis[d] || 0) + 1; }
+  return { problemas, arestas, topos, niveis, pai, nivelDe };
+}
+
+// --------------------------------------------------------------------- auth
+async function cunharIdToken({ apiKey, adminEmail, adminUid }) {
+  if (!admin.apps.length) {
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+      admin.initializeApp({ credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)) });
+    } else {
+      admin.initializeApp(); // GOOGLE_APPLICATION_CREDENTIALS
+    }
+  }
+  let uid = adminUid;
+  if (!uid) {
+    const user = await admin.auth().getUserByEmail(adminEmail);
+    uid = user.uid;
+  }
+  // O token so' vale se o perfil for admin — requireAdmin le users/{uid}.role.
+  const perfil = await admin.firestore().collection('users').doc(uid).get();
+  const role = perfil.exists ? perfil.data().role : null;
+  if (role !== 'admin') throw new Error(`users/${uid}.role = ${JSON.stringify(role)} — o conversor exige um admin.`);
+  const custom = await admin.auth().createCustomToken(uid);
+  const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: custom, returnSecureToken: true }),
+  });
+  const j = await r.json();
+  if (!r.ok || !j.idToken) throw new Error(`Troca do custom token falhou: ${JSON.stringify(j).slice(0, 300)}`);
+  return { idToken: j.idToken, uid };
+}
+
+// ---------------------------------------------------------------- transporte
+function makeApi(base, idToken) {
+  return async function api(metodo, rota, body) {
+    const r = await fetch(base + rota, {
+      method: metodo,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const txt = await r.text();
+    let j = null;
+    try { j = txt ? JSON.parse(txt) : null; } catch { /* resposta nao-JSON */ }
+    if (!r.ok) throw new Error(`${metodo} ${rota} -> ${r.status} ${txt.slice(0, 300)}`);
+    return j;
+  };
+}
+
+// ------------------------------------------------------------------ execucao
+async function main() {
+  const args = parseArgs(process.argv);
+  const rows = lerTsv(args.tsv);
+  const v = validar(rows);
+
+  console.log(`\n== TSV ==`);
+  console.log(`arquivo:    ${args.tsv}`);
+  console.log(`pessoas:    ${rows.length}`);
+  console.log(`arestas:    ${v.arestas}   topos: ${v.topos}`);
+  console.log(`niveis:     ${Object.keys(v.niveis).sort().map((k) => `n${k}=${v.niveis[k]}`).join('  ')}`);
+  console.log(`fonte:      ${Object.entries(rows.reduce((a, r) => ((a[r.fonte] = (a[r.fonte] || 0) + 1), a), {})).map(([k, n]) => `${k}=${n}`).join('  ')}`);
+  if (v.problemas.length) {
+    console.error(`\n!! ${v.problemas.length} problema(s) no TSV — nada foi escrito:`);
+    for (const p of v.problemas.slice(0, 20)) console.error(`   - ${p}`);
+    if (v.problemas.length > 20) console.error(`   ... e ${v.problemas.length - 20} outros`);
+    process.exit(1);
+  }
+  console.log(`saneamento: OK (sem duplicata, sem auto-upline, sem orfao, sem ciclo)`);
+
+  const { idToken, uid } = await cunharIdToken(args);
+  const api = makeApi(args.base, idToken);
+  console.log(`\n== instancia ==\nbase: ${args.base}\nadmin: ${uid}`);
+
+  // ids ja existentes na AffiliaCore (os 30 que nasceram do import de resultados)
+  const aliases = (await api('GET', '/api/affiliate-email-aliases'))?.aliases ?? [];
+  const idPorEmail = new Map();
+  for (const a of aliases) {
+    const e = String(a.email || '').trim().toLowerCase();
+    if (e && a.affiliateId) idPorEmail.set(e, String(a.affiliateId));
+  }
+  const jaExistem = rows.filter((r) => idPorEmail.has(r.email)).length;
+  console.log(`aliases existentes: ${idPorEmail.size}   do TSV ja mapeados: ${jaExistem}   a criar: ${rows.length - jaExistem}`);
+
+  if (!args.apply) {
+    console.log(`\n== DRY-RUN ==`);
+    console.log(`criaria ${rows.length - jaExistem} afiliado(s) nativo(s) e gravaria ${v.arestas} aresta(s).`);
+    console.log(`rode de novo com --apply para escrever.`);
+    return;
+  }
+
+  // ---- fase 1: roster ------------------------------------------------------
+  if (args.only !== 'uplines') {
+    const aCriar = rows.filter((r) => !idPorEmail.has(r.email));
+    console.log(`\n== fase 1 · roster (${aCriar.length}) ==`);
+    const LOTE = 25;
+    let criados = 0;
+    let reusados = 0;
+    for (let i = 0; i < aCriar.length; i += LOTE) {
+      const lote = aCriar.slice(i, i + LOTE).map((r) => ({
+        name: r.nome,
+        email: r.email,
+        house: r.casas[0] || '', // modelo "1 afiliado -> 1 casa"; sem casa = so' carteira
+      }));
+      // generateInvite fica FALSO de proposito: migracao historica, ninguem recebe login.
+      const resp = await api('POST', '/api/boost-affiliates', { affiliates: lote, generateInvite: false });
+      for (const c of resp?.created ?? []) {
+        if (c.email) idPorEmail.set(String(c.email).toLowerCase(), String(c.affiliateId));
+        if (c.reused) reusados++; else criados++;
+      }
+      console.log(`   lote ${Math.floor(i / LOTE) + 1}: +${resp?.created?.length ?? 0}`);
+    }
+    console.log(`criados: ${criados}   reusados (idempotencia): ${reusados}`);
+  }
+
+  if (args.only === 'roster') {
+    console.log(`\n(--only roster) uplines nao foram tocados.`);
+    return;
+  }
+
+  // ---- fase 2: uplines ----------------------------------------------------
+  // Re-le os aliases: quem foi criado agora precisa entrar no mapa antes das arestas.
+  const aliases2 = (await api('GET', '/api/affiliate-email-aliases'))?.aliases ?? [];
+  for (const a of aliases2) {
+    const e = String(a.email || '').trim().toLowerCase();
+    if (e && a.affiliateId) idPorEmail.set(e, String(a.affiliateId));
+  }
+
+  const semId = rows.filter((r) => !idPorEmail.has(r.email));
+  if (semId.length) {
+    console.error(`\n!! ${semId.length} pessoa(s) do TSV sem affiliateId na AffiliaCore — rode a fase roster antes.`);
+    process.exit(1);
+  }
+
+  // PAI ANTES DO FILHO: sobe por nivel, para a barreira de ciclo nunca ver estado parcial.
+  const comUpline = rows.filter((r) => v.pai.get(r.email)).sort((a, b) => (v.nivelDe.get(a.email) ?? 0) - (v.nivelDe.get(b.email) ?? 0));
+  console.log(`\n== fase 2 · uplines (${comUpline.length}) ==`);
+  let ok = 0;
+  const falhas = [];
+  for (const r of comUpline) {
+    const affiliateId = idPorEmail.get(r.email);
+    const uplineId = idPorEmail.get(v.pai.get(r.email));
+    try {
+      await api('POST', '/api/affiliate-uplines', { affiliateId, uplineId });
+      ok++;
+      if (ok % 25 === 0) console.log(`   ${ok}/${comUpline.length}`);
+    } catch (e) {
+      falhas.push(`${r.email}: ${e.message}`);
+    }
+  }
+  console.log(`arestas gravadas: ${ok}   falhas: ${falhas.length}`);
+  for (const f of falhas.slice(0, 20)) console.error(`   - ${f}`);
+
+  // ---- conferencia --------------------------------------------------------
+  const mapa = (await api('GET', '/api/affiliate-uplines'))?.uplines ?? {};
+  const gravadas = Object.values(mapa).filter(Boolean).length;
+  const esperado = new Map();
+  for (const r of comUpline) esperado.set(idPorEmail.get(r.email), idPorEmail.get(v.pai.get(r.email)));
+  let divergentes = 0;
+  for (const [aff, up] of esperado) if (String(mapa[aff] ?? '') !== String(up)) divergentes++;
+  console.log(`\n== conferencia ==`);
+  console.log(`arestas no banco: ${gravadas}   esperadas do TSV: ${esperado.size}   divergentes: ${divergentes}`);
+  if (divergentes || falhas.length) {
+    console.error(`\n!! conferencia NAO fechou — nao declare a migracao concluida.`);
+    process.exit(1);
+  }
+  console.log(`\nOK. Proximo passo (NAO feito por este script): taxas por afiliado`);
+  console.log(`(affiliate_configs) — passo 5 do README. Sem elas o repasse e' 0 e o`);
+  console.log(`"lucro liquido" do /admin exibe a comissao inteira como lucro.`);
+}
+
+main().catch((e) => { console.error(`\nFALHOU: ${e.message}`); process.exit(1); });
