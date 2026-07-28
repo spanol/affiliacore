@@ -37,6 +37,7 @@ import Auditoria from './pages/Auditoria';
 import NotFound from './pages/NotFound';
 import DashboardLayout from './components/DashboardLayout';
 import UpdateBanner from './components/UpdateBanner';
+import TwoFactorChallenge from './components/TwoFactorChallenge';
 
 // Página inicial do afiliado: especial → painel da sub-rede (/network); afiliado
 // comum → a própria visão de dados em /affiliates/{id}; sem affiliateId → perfil.
@@ -46,7 +47,7 @@ const clientHome = (profile: { affiliateId?: string | null; isSpecial?: boolean 
 };
 
 const ProtectedRoute = ({ children, role }: { children: React.ReactNode, role?: 'admin' | 'client' }) => {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, mfaPending } = useAuth();
   const location = useLocation();
 
   if (loading) return (
@@ -59,7 +60,13 @@ const ProtectedRoute = ({ children, role }: { children: React.ReactNode, role?: 
   );
 
   if (!user) return <Navigate to="/login" replace />;
-  
+
+  // 2FA: a senha sozinha já rende uma sessão do Firebase, então o segundo fator é
+  // cobrado AQUI, antes de qualquer rota autenticada — e não dentro do Login. Assim
+  // um F5 no meio do desafio volta pro desafio em vez de entregar o painel pela
+  // metade. O servidor barra em paralelo (403 MFA_REQUIRED); isto é a camada de UX.
+  if (mfaPending) return <TwoFactorChallenge />;
+
   if (role && profile && profile.role !== role) {
     return <Navigate to={profile.role === 'admin' ? '/admin' : clientHome(profile)} replace />;
   }

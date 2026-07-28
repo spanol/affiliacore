@@ -20,6 +20,10 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from './server';
+import { generateTotpSecret, hashBackupCode, totpCode } from './src/lib/totp';
+
+// Segredo fixo p/ os testes de 2FA — os códigos são gerados de verdade (RFC 6238).
+const SECRET = generateTotpSecret();
 
 // =============================================================================
 // Doubles em memória — Firestore + Admin Auth. Cobrem só o que as rotas testadas
@@ -136,8 +140,12 @@ function makeAdminApp(opts: {
   verify?: (token: string) => any;
   createUser?: (props: any) => any;
   getUserByEmail?: (email: string) => any;
+  // Custom claims por uid (2FA/TOTP): as rotas leem as atuais e regravam mescladas.
+  claims?: Map<string, Record<string, any>>;
 } = {}): any {
+  const claims = opts.claims ?? new Map<string, Record<string, any>>();
   return {
+    __claims: claims,
     auth: () => ({
       // Por default, o token Bearer É o uid (mock simples). requireAuth/requireAdmin
       // resolvem role/affiliateId lendo users/{uid} no Firestore mockado.
@@ -147,6 +155,10 @@ function makeAdminApp(opts: {
         opts.createUser ? opts.createUser(props) : { uid: 'new-uid', ...props },
       getUserByEmail: async (email: string) =>
         opts.getUserByEmail ? opts.getUserByEmail(email) : { uid: 'existing-uid', email },
+      getUser: async (uid: string) => ({ uid, customClaims: claims.get(uid) ?? {} }),
+      setCustomUserClaims: async (uid: string, next: Record<string, any>) => {
+        claims.set(uid, next);
+      },
     }),
   };
 }
@@ -1961,5 +1973,239 @@ describe('/go/:code — redirect público do link de divulgação', () => {
       expect(res.headers.location).toBe('/');
       expect(db.__store.get('link_clicks')?.size ?? 0).toBe(0);
     }
+  });
+});
+
+// =============================================================================
+// 2FA · TOTP próprio (/api/auth/totp) + gate de sessão
+//
+// Substitui o Firebase Multi-Factor. Como o `signInWithEmailAndPassword` conclui
+// sozinho, o enforcement é o GATE do requireAuth/requireAdmin: token com
+// `totpEnabled` só passa se `mfaAuthTime == auth_time` (prova de que o código foi
+// digitado NESTA sessão). Exercitamos o wiring inteiro — enrollment, verify,
+// anti-replay, códigos de backup, disable e o gate — com um TOTP de verdade.
+// =============================================================================
+describe('2FA · TOTP (/api/auth/totp)', () => {
+  const AUTH_TIME = 1_700_000_000;
+  const seed = { users: { u1: { role: 'client', affiliateId: 'aff1' }, admin1: { role: 'admin' } } };
+
+  const token = (uid: string, extra: Record<string, unknown> = {}) => ({
+    uid,
+    email: `${uid}@test`,
+    auth_time: AUTH_TIME,
+    ...extra,
+  });
+
+  function buildTotpApp(args: { tokens: Record<string, any>; seed?: any; claims?: Map<string, any> }) {
+    const db = makeFirestore(args.seed ?? seed);
+    const adminApp = makeAdminApp({ verify: (t: string) => args.tokens[t], claims: args.claims });
+    return { app: createApp({ adminApp, adminDb: db }), db, claims: adminApp.__claims };
+  }
+
+  const enabledSeed = (extra: any = {}) => ({
+    ...seed,
+    auth_totp: { u1: { enabled: true, secret: SECRET, lastCounter: null, backupCodes: [], ...extra } },
+  });
+
+  // --- Enrollment -----------------------------------------------------------
+  it('setup → activate: liga o 2FA, devolve os códigos de backup e grava as claims', async () => {
+    const { app, db, claims } = buildTotpApp({ tokens: { t1: token('u1') } });
+
+    const setup = await request(app).post('/api/auth/totp/setup').set('Authorization', 'Bearer t1').expect(200);
+    expect(setup.body.secretKey).toMatch(/^[A-Z2-7]{32}$/);
+    expect(setup.body.otpauthUrl).toContain('otpauth://totp/');
+    expect(setup.body).toMatchObject({ digits: 6, periodSeconds: 30 });
+    // ainda NÃO está ligado — só um segredo pendente
+    expect(db.__store.get('auth_totp')?.get('u1')).toMatchObject({ enabled: false });
+
+    const res = await request(app)
+      .post('/api/auth/totp/activate')
+      .set('Authorization', 'Bearer t1')
+      .send({ code: totpCode(setup.body.secretKey, Date.now()) })
+      .expect(200);
+
+    expect(res.body.enabled).toBe(true);
+    expect(res.body.backupCodes).toHaveLength(10);
+    res.body.backupCodes.forEach((c: string) => expect(c).toMatch(/^[A-Z2-7]{5}-[A-Z2-7]{5}$/));
+
+    // a claim amarra a verificação ao auth_time DESTA sessão
+    expect(claims.get('u1')).toMatchObject({ totpEnabled: true, mfaAuthTime: AUTH_TIME });
+    // o doc guarda o segredo e só os HASHES dos códigos de backup
+    const doc = db.__store.get('auth_totp')!.get('u1');
+    expect(doc.enabled).toBe(true);
+    expect(doc.pendingSecret).toBeNull();
+    doc.backupCodes.forEach((hash: string) => expect(hash).toMatch(/^[0-9a-f]{64}$/));
+    expect(doc.backupCodes).not.toContain(res.body.backupCodes[0]);
+    const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
+    expect(logs.some((l: any) => l.action === 'mfa.enable' && l.actorId === 'u1')).toBe(true);
+  });
+
+  it('activate com código errado → 400 e o 2FA NÃO liga', async () => {
+    const { app, db, claims } = buildTotpApp({ tokens: { t1: token('u1') } });
+    await request(app).post('/api/auth/totp/setup').set('Authorization', 'Bearer t1').expect(200);
+
+    const res = await request(app)
+      .post('/api/auth/totp/activate')
+      .set('Authorization', 'Bearer t1')
+      .send({ code: '000000' })
+      .expect(400);
+
+    expect(res.body.code).toBe('TOTP_INVALID_CODE');
+    expect(db.__store.get('auth_totp')!.get('u1').enabled).toBe(false);
+    expect(claims.get('u1')).toBeUndefined();
+  });
+
+  it('activate sem setup prévio → 400 (configuração expirada)', async () => {
+    const { app } = buildTotpApp({ tokens: { t1: token('u1') } });
+    const res = await request(app)
+      .post('/api/auth/totp/activate')
+      .set('Authorization', 'Bearer t1')
+      .send({ code: '123456' })
+      .expect(400);
+    expect(res.body.code).toBe('TOTP_SETUP_EXPIRED');
+  });
+
+  it('setup com o 2FA já ativo → 409 (não sobrescreve o segredo em uso)', async () => {
+    const { app } = buildTotpApp({
+      tokens: { t1: token('u1', { totpEnabled: true, mfaAuthTime: AUTH_TIME }) },
+      seed: enabledSeed(),
+    });
+    await request(app).post('/api/auth/totp/setup').set('Authorization', 'Bearer t1').expect(409);
+  });
+
+  // --- Verificação no login -------------------------------------------------
+  it('verify com o código do app → grava a claim da sessão', async () => {
+    const { app, claims } = buildTotpApp({ tokens: { t1: token('u1', { totpEnabled: true }) }, seed: enabledSeed() });
+
+    const res = await request(app)
+      .post('/api/auth/totp/verify')
+      .set('Authorization', 'Bearer t1')
+      .send({ code: totpCode(SECRET, Date.now()) })
+      .expect(200);
+
+    expect(res.body).toMatchObject({ verified: true, usedBackupCode: false, refreshToken: true });
+    expect(claims.get('u1')).toMatchObject({ totpEnabled: true, mfaAuthTime: AUTH_TIME });
+  });
+
+  it('ANTI-REPLAY: o mesmo código não passa duas vezes', async () => {
+    const { app } = buildTotpApp({ tokens: { t1: token('u1', { totpEnabled: true }) }, seed: enabledSeed() });
+    const code = totpCode(SECRET, Date.now());
+
+    await request(app).post('/api/auth/totp/verify').set('Authorization', 'Bearer t1').send({ code }).expect(200);
+    const res = await request(app).post('/api/auth/totp/verify').set('Authorization', 'Bearer t1').send({ code }).expect(400);
+    expect(res.body.code).toBe('TOTP_INVALID_CODE');
+  });
+
+  it('verify com código de backup → consome o código (uso único)', async () => {
+    const backup = 'AAAAA-BBBBB';
+    const { app, db } = buildTotpApp({
+      tokens: { t1: token('u1', { totpEnabled: true }) },
+      seed: enabledSeed({ backupCodes: [hashBackupCode(backup), hashBackupCode('CCCCC-DDDDD')] }),
+    });
+
+    const res = await request(app)
+      .post('/api/auth/totp/verify')
+      .set('Authorization', 'Bearer t1')
+      .send({ code: backup })
+      .expect(200);
+
+    expect(res.body).toMatchObject({ verified: true, usedBackupCode: true, backupCodesRemaining: 1 });
+    expect(db.__store.get('auth_totp')!.get('u1').backupCodes).toEqual([hashBackupCode('CCCCC-DDDDD')]);
+
+    // e não vale de novo
+    await request(app).post('/api/auth/totp/verify').set('Authorization', 'Bearer t1').send({ code: backup }).expect(400);
+  });
+
+  it('verify sem 2FA ativo → 400', async () => {
+    const { app } = buildTotpApp({ tokens: { t1: token('u1') } });
+    const res = await request(app)
+      .post('/api/auth/totp/verify')
+      .set('Authorization', 'Bearer t1')
+      .send({ code: '123456' })
+      .expect(400);
+    expect(res.body.code).toBe('TOTP_NOT_ENABLED');
+  });
+
+  // --- Desativar ------------------------------------------------------------
+  it('disable exige um código válido e limpa doc + claims (preservando as alheias)', async () => {
+    const claims = new Map<string, any>([['u1', { totpEnabled: true, mfaAuthTime: AUTH_TIME, tenant: 'infinity' }]]);
+    const { app, db } = buildTotpApp({
+      tokens: { t1: token('u1', { totpEnabled: true, mfaAuthTime: AUTH_TIME }) },
+      seed: enabledSeed(),
+      claims,
+    });
+
+    await request(app).post('/api/auth/totp/disable').set('Authorization', 'Bearer t1').send({ code: '000000' }).expect(400);
+    expect(db.__store.get('auth_totp')!.has('u1')).toBe(true);
+
+    await request(app)
+      .post('/api/auth/totp/disable')
+      .set('Authorization', 'Bearer t1')
+      .send({ code: totpCode(SECRET, Date.now()) })
+      .expect(200);
+
+    expect(db.__store.get('auth_totp')!.has('u1')).toBe(false);
+    expect(claims.get('u1')).toEqual({ tenant: 'infinity' });
+  });
+
+  // --- Gate de sessão -------------------------------------------------------
+  it('GATE: sessão com 2FA ligado e não verificada → 403 MFA_REQUIRED nas rotas autenticadas', async () => {
+    const { app } = buildTotpApp({
+      tokens: {
+        pendente: token('u1', { totpEnabled: true }),
+        admPendente: token('admin1', { totpEnabled: true }),
+      },
+    });
+
+    const res = await request(app).get('/api/houses').set('Authorization', 'Bearer pendente').expect(403);
+    expect(res.body.code).toBe('MFA_REQUIRED');
+    // requireAdmin barra igual — o gate vem ANTES da checagem de papel
+    const resAdmin = await request(app).get('/api/affiliate-statuses').set('Authorization', 'Bearer admPendente').expect(403);
+    expect(resAdmin.body.code).toBe('MFA_REQUIRED');
+  });
+
+  it('GATE: claim de uma sessão ANTERIOR não serve (auth_time diferente)', async () => {
+    const { app } = buildTotpApp({
+      tokens: { velho: token('u1', { totpEnabled: true, mfaAuthTime: AUTH_TIME - 9999 }) },
+    });
+    const res = await request(app).get('/api/houses').set('Authorization', 'Bearer velho').expect(403);
+    expect(res.body.code).toBe('MFA_REQUIRED');
+  });
+
+  it('GATE: sessão verificada passa; conta sem 2FA passa direto', async () => {
+    const { app } = buildTotpApp({
+      tokens: {
+        ok: token('u1', { totpEnabled: true, mfaAuthTime: AUTH_TIME }),
+        sem2fa: token('u1'),
+      },
+    });
+    await request(app).get('/api/houses').set('Authorization', 'Bearer ok').expect(200);
+    await request(app).get('/api/houses').set('Authorization', 'Bearer sem2fa').expect(200);
+  });
+
+  it('GATE: status e verify seguem acessíveis com a sessão PENDENTE (senão ninguém sai do desafio)', async () => {
+    const { app } = buildTotpApp({ tokens: { pendente: token('u1', { totpEnabled: true }) }, seed: enabledSeed() });
+
+    const status = await request(app).get('/api/auth/totp/status').set('Authorization', 'Bearer pendente').expect(200);
+    expect(status.body).toMatchObject({ enabled: true, verified: false });
+
+    await request(app)
+      .post('/api/auth/totp/verify')
+      .set('Authorization', 'Bearer pendente')
+      .send({ code: totpCode(SECRET, Date.now()) })
+      .expect(200);
+  });
+
+  it('GATE: as rotas de GESTÃO do 2FA exigem sessão verificada (setup/disable não são pré-MFA)', async () => {
+    const { app } = buildTotpApp({ tokens: { pendente: token('u1', { totpEnabled: true }) }, seed: enabledSeed() });
+    await request(app).post('/api/auth/totp/setup').set('Authorization', 'Bearer pendente').expect(403);
+    await request(app).post('/api/auth/totp/disable').set('Authorization', 'Bearer pendente').send({ code: '1' }).expect(403);
+  });
+
+  it('sem token → 401 em todas as rotas do 2FA', async () => {
+    const { app } = buildTotpApp({ tokens: {} });
+    await request(app).get('/api/auth/totp/status').expect(401);
+    await request(app).post('/api/auth/totp/setup').expect(401);
+    await request(app).post('/api/auth/totp/verify').send({ code: '123456' }).expect(401);
   });
 });

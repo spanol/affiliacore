@@ -2,25 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import Login from './Login';
 
+// O Login não conhece mais o 2FA: com o TOTP próprio, a senha conclui o sign-in e
+// quem cobra o segundo fator é o ProtectedRoute (ver TwoFactorChallenge.test.tsx).
+// Aqui provamos justamente isso — o Login autentica e sai do caminho.
 const h = vi.hoisted(() => ({
   signInWithEmailAndPassword: vi.fn(),
-  getMultiFactorResolver: vi.fn(),
-  assertionForSignIn: vi.fn(),
-  resolveSignIn: vi.fn(),
   navigate: vi.fn(),
 }));
 
 vi.mock('firebase/auth', () => ({
   signInWithEmailAndPassword: (...a: any[]) => h.signInWithEmailAndPassword(...a),
-  getMultiFactorResolver: (...a: any[]) => h.getMultiFactorResolver(...a),
-  TotpMultiFactorGenerator: {
-    FACTOR_ID: 'totp',
-    assertionForSignIn: (...a: any[]) => h.assertionForSignIn(...a),
-  },
 }));
-vi.mock('../lib/firebase', () => ({
-  auth: {},
-}));
+vi.mock('../lib/firebase', () => ({ auth: {} }));
 vi.mock('../contexts/ThemeContext', () => ({
   useTheme: () => ({ theme: 'light', toggleTheme: vi.fn() }),
 }));
@@ -38,39 +31,46 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
+const submitLogin = async (email = 'User@Empresa.com ', senha = 'senha123') => {
+  fireEvent.change(screen.getByPlaceholderText('nome@empresa.com'), { target: { value: email } });
+  fireEvent.change(screen.getByPlaceholderText('••••••••'), { target: { value: senha } });
+  await act(async () => {
+    fireEvent.submit(screen.getByPlaceholderText('nome@empresa.com').closest('form')!);
+  });
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
-  h.resolveSignIn.mockResolvedValue({ user: { uid: 'u1' } });
-  h.assertionForSignIn.mockReturnValue('__totp_assertion__');
-  h.getMultiFactorResolver.mockReturnValue({
-    hints: [{ uid: 'totp-1', factorId: 'totp', displayName: 'Authenticator' }],
-    resolveSignIn: (...a: any[]) => h.resolveSignIn(...a),
-  });
 });
 
-describe('Login com 2FA', () => {
-  it('abre a etapa TOTP quando o Firebase exige multi-factor e conclui o login com o código', async () => {
-    h.signInWithEmailAndPassword.mockRejectedValueOnce({ code: 'auth/multi-factor-auth-required' });
+describe('Login', () => {
+  it('normaliza o e-mail e navega para o dashboard', async () => {
+    h.signInWithEmailAndPassword.mockResolvedValueOnce({ user: { uid: 'u1' } });
 
     render(<Login />);
+    await submitLogin();
 
-    fireEvent.change(screen.getByPlaceholderText('nome@empresa.com'), { target: { value: 'user@empresa.com' } });
-    fireEvent.change(screen.getByPlaceholderText('••••••••'), { target: { value: 'senha123' } });
-
-    await act(async () => {
-      fireEvent.submit(screen.getByPlaceholderText('nome@empresa.com').closest('form')!);
-    });
-
-    expect(screen.getByText(/verificação em duas etapas/i)).toBeInTheDocument();
-
-    fireEvent.change(screen.getByPlaceholderText('000000'), { target: { value: '123456' } });
-
-    await act(async () => {
-      fireEvent.submit(screen.getByPlaceholderText('000000').closest('form')!);
-    });
-
-    expect(h.assertionForSignIn).toHaveBeenCalledWith('totp-1', '123456');
-    expect(h.resolveSignIn).toHaveBeenCalledWith('__totp_assertion__');
+    expect(h.signInWithEmailAndPassword).toHaveBeenCalledWith({}, 'user@empresa.com', 'senha123');
     expect(h.navigate).toHaveBeenCalledWith('/dashboard');
+  });
+
+  it('credencial errada → mensagem genérica (não distingue e-mail de senha)', async () => {
+    h.signInWithEmailAndPassword.mockRejectedValueOnce({ code: 'auth/wrong-password' });
+
+    render(<Login />);
+    await submitLogin();
+
+    expect(screen.getByText('E-mail ou senha inválidos.')).toBeInTheDocument();
+    expect(h.navigate).not.toHaveBeenCalled();
+  });
+
+  it('não pede código aqui — o segundo fator é cobrado depois, na rota protegida', async () => {
+    h.signInWithEmailAndPassword.mockResolvedValueOnce({ user: { uid: 'u1' } });
+
+    render(<Login />);
+    await submitLogin();
+
+    expect(screen.queryByPlaceholderText('000000')).not.toBeInTheDocument();
+    expect(screen.queryByText(/verificação em duas etapas/i)).not.toBeInTheDocument();
   });
 });
