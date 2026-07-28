@@ -6,6 +6,7 @@ import {
   calcNetworkPayouts,
   buildRootConfigMap,
   descendantsOf,
+  flattenTree,
   resolveRepasseCap,
   exceedsRepasseCap,
   hasConfiguredRate,
@@ -311,6 +312,40 @@ describe('buildRootConfigMap · ponte com o lucro do /admin', () => {
       0
     );
     expect(viaRoot).toBe(calcNetworkPayouts(tree, rows, configs).agencyCost);
+  });
+});
+
+describe('flattenTree · ordem de exibição da árvore', () => {
+  it('DFS a partir dos topos, com profundidade para a indentação', () => {
+    const tree = buildNetworkTree([
+      { affiliateId: 'R' },
+      { affiliateId: 'C', uplineId: 'R' },
+      { affiliateId: 'G', uplineId: 'C' },
+      { affiliateId: 'X', uplineId: 'R' },
+      { affiliateId: 'OUTRO' },
+    ]);
+    expect(flattenTree(tree)).toEqual([
+      { affiliateId: 'R', depth: 0, isRoot: true, childCount: 2 },
+      { affiliateId: 'C', depth: 1, isRoot: false, childCount: 1 },
+      { affiliateId: 'G', depth: 2, isRoot: false, childCount: 0 },
+      { affiliateId: 'X', depth: 1, isRoot: false, childCount: 0 },
+      { affiliateId: 'OUTRO', depth: 0, isRoot: true, childCount: 0 },
+    ]);
+  });
+
+  it('lista cada nó UMA vez e todos os nós da árvore', () => {
+    const tree = buildNetworkTree([
+      { affiliateId: 'a' },
+      { affiliateId: 'b', uplineId: 'a' },
+      { affiliateId: 'c', uplineId: 'b' },
+    ]);
+    const flat = flattenTree(tree);
+    expect(flat.map((f) => f.affiliateId)).toEqual(['a', 'b', 'c']);
+    expect(new Set(flat.map((f) => f.affiliateId)).size).toBe(tree.ids.length);
+  });
+
+  it('árvore vazia → lista vazia', () => {
+    expect(flattenTree(buildNetworkTree([]))).toEqual([]);
   });
 });
 

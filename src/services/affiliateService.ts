@@ -47,7 +47,7 @@ import {
 } from '../lib/network';
 export {
   buildNetworkTree, buildNetworkNodes, buildEligibleUpline, uplineMapFromSpecials,
-  calcNetworkPayouts, buildRootConfigMap, descendantsOf,
+  calcNetworkPayouts, buildRootConfigMap, descendantsOf, flattenTree,
 } from '../lib/network';
 export type { NetworkTree, NetworkRow, NetworkPayoutResult, UplineMap } from '../lib/network';
 

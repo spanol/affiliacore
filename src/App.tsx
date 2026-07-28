@@ -21,6 +21,7 @@ import AffiliateDetails from './pages/AffiliateDetails';
 import SpecialDashboard from './pages/SpecialDashboard';
 import SpecialSubAffiliates from './pages/SpecialSubAffiliates';
 import SpecialAffiliatesList from './pages/SpecialAffiliatesList';
+import Network from './pages/Network';
 import Financeiro from './pages/Financeiro';
 import PartnerApiExplorer from './pages/PartnerApiExplorer';
 import OtgRoster from './pages/OtgRoster';
@@ -136,6 +137,13 @@ export default function App() {
             <Route path="/special-affiliates" element={
               <ProtectedRoute role="admin">
                 <SpecialAffiliatesList />
+              </ProtectedRoute>
+            } />
+            {/* Rede de afiliados (upline N níveis) — página de MASTER: mostra o
+                custo da agência. [[REDE-AFILIADOS.md]] */}
+            <Route path="/rede" element={
+              <ProtectedRoute role="admin">
+                <Network />
               </ProtectedRoute>
             } />
             {/* P2: rotas OTG/Boost só existem com o módulo OTG ligado (white-label

@@ -16,6 +16,7 @@ import {
   Moon,
   Users,
   Crown,
+  Network as NetworkIcon,
   Wallet,
   Plug,
   Database,
@@ -134,6 +135,8 @@ export default function DashboardLayout() {
           : []),
         ...(profile?.role === 'admin' ? [
           { label: 'Afiliados Especiais', path: '/special-affiliates', icon: Crown },
+          // Rede de afiliados (upline N níveis) — árvore + lucro sobre equipe.
+          { label: 'Rede', path: '/rede', icon: NetworkIcon },
           { label: 'Casas', path: '/casas', icon: Building2 },
           // Marketplace de acordos (P2): opt-in por instância (default OFF → some na
           // Boost). Admin cria as ofertas + aprova as parcerias.

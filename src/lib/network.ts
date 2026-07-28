@@ -447,6 +447,30 @@ export function buildRootConfigMap(
   return map;
 }
 
+// Ordem de EXIBIÇÃO da árvore: DFS (topo, depois a subárvore de cada filho, na
+// ordem de entrada), com a profundidade de cada nó para a indentação. Puro e
+// determinístico — a tela da rede não decide ordenação por conta própria.
+export interface FlatNode {
+  affiliateId: string;
+  depth: number;
+  isRoot: boolean;
+  childCount: number;
+}
+export function flattenTree(tree: NetworkTree): FlatNode[] {
+  const out: FlatNode[] = [];
+  const seen = new Set<string>();
+  const walk = (id: string, depth: number) => {
+    if (seen.has(id)) return; // defesa: árvore já é acíclica, mas não repetimos nó
+    seen.add(id);
+    const children = tree.childrenOf[id] ?? [];
+    out.push({ affiliateId: id, depth, isRoot: !tree.uplineOf[id], childCount: children.length });
+    for (const c of children) walk(c, depth + 1);
+  };
+  for (const r of tree.roots) walk(r, 0);
+  for (const id of tree.ids) walk(id, tree.depthOf[id] ?? 0); // rede órfã (não deve ocorrer)
+  return out;
+}
+
 // Sub-rede COMPLETA (todos os níveis) de um afiliado — o análogo N-níveis do
 // `subAffiliateIds`. Não inclui o próprio id.
 export function descendantsOf(tree: NetworkTree, affiliateId: string): string[] {
