@@ -102,6 +102,44 @@ com teto no próprio CPA. Hoje na AffiliaCore quem define a taxa do sub é o adm
 
 **Rede de 4 níveis** (N1 direto + N2/N3/N4 indiretos) contra o modelo especial+sub-rede atual.
 
+### 3.1 Topologia REAL da rede — medida em 2026-07-28
+
+O "4 níveis" acima é **capacidade da plataforma legada**, não o formato do dado. Varredura read-only de
+`/admin/config` (banco `main`, 4 páginas, rótulo `BET: Infinity Affiliates` conferido em todas):
+
+| Medida | Valor |
+|---|---:|
+| Afiliados | 160 |
+| Com upline real | **77** |
+| Com gerente = **si mesmo** (⇒ topo de estrutura) | **83** |
+| Upline apontando p/ fora do roster | **0** |
+| **Ciclos** | **0** |
+| **Profundidade máxima** | **2** (⇒ **3 níveis**, não 4) |
+| Distribuição por nível (0 / 1 / 2) | 83 / 65 / 12 |
+| Pessoas que são upline de alguém | 19 |
+| Maior sub-rede direta | 30 filhos (depois 16, 8, 3, 3, 2) |
+| REV ≠ 0% | **0 de 160** (CPA-puro confirmado) |
+
+**Consequências para o conversor:**
+
+1. **`gerente == próprio id` significa "sem gerente"** — é a convenção do legado para topo de estrutura.
+   São 83 casos, mais da metade do roster. `buildNetworkTree` já descarta essa aresta como `auto-upline`
+   e faz o afiliado virar topo, então o comportamento sai correto sem tratamento especial — mas o conversor
+   **não deve** enviar essas arestas ao `POST /api/affiliate-uplines` (a rota responde 400 em auto-upline).
+2. **O dado está limpo**: sem ciclo e sem upline órfão. O saneamento da árvore não vai descartar nada além
+   dos auto-uplines, então a rede migrada é fiel ao legado.
+3. A rede é **rasa e concentrada**: 19 uplines para 77 vínculos, e um único gerente com 30 diretos.
+
+⚠️ **Em aberto — árvore por casa.** A medição acima é do `main`. Cada banco tem roster próprio
+(`db=esportivainifi` → rótulo `Esportiva Bet`, 19 usuários — confirmado que NÃO cai no `main`), e o campo
+`Gerente` existe em cada um. **Não foi verificado se o gerente de uma mesma pessoa difere entre casas.**
+Se diferir, o modelo atual da AffiliaCore (uma árvore GLOBAL por instância, com taxa por casa via `byBrand`)
+não representa o legado e precisaria de árvore por casa. Confirmar **antes** de rodar o conversor.
+
+Chaves `?db=` válidas (do próprio painel): `main`, `superbetv2infi`, `stakeinfini`, `esportivainifi`
+(+ `superbetinfini`, `sportinginfini`, `liderinfinity`, `galerainfinity`, `sorteinfinity`, `lotolandinfini`,
+`melbetinfi` — as 7 fachadas do §1).
+
 ---
 
 ## 4. Mapa de campos → schema AffiliaCore
