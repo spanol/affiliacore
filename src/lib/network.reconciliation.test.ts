@@ -15,6 +15,16 @@ import type { AffiliateConfig } from './commission';
 //
 // A AffiliaCore SEM o modelo de rede calcularia 36.830 − 26.780 = R$ 10.050 de lucro:
 // inflado em exatamente os R$ 6.760 de override que o cliente também paga.
+//
+// ⚠️ LIMITE DESTE TESTE — leia antes de citá-lo como prova:
+// Os TOTAIS por casa e o consolidado são REAIS (extraídos do legado). As ÁRVORES
+// abaixo, não: são fixtures AJUSTADAS para decompor esses totais, e duas das taxas
+// usadas (R$ 130 na Stake, R$ 90 na Esportiva) NEM EXISTEM nos conjuntos de taxas
+// realmente praticados. Ou seja: isto prova que o modelo em cascata REPRODUZ os
+// números reais com uma estrutura plausível de 3–4 níveis — NÃO prova que a árvore
+// da Infinity foi conferida. A validação ponta a ponta só acontece quando a árvore
+// real (campo "Gerente #id" dos 160 afiliados) for extraída do painel legado e
+// passada por aqui. Até lá, tratar como teste de MODELO, não de DADO.
 
 interface Node {
   id: string;

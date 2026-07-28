@@ -524,24 +524,51 @@ export function createApp(deps: ServerDeps) {
         return res.status(400).json({ error: 'Um afiliado não pode ser upline de si mesmo.' });
       }
 
-      const ref = adminDb.collection('affiliate_uplines').doc(affId);
-      if (!uplineId) {
-        await ref.set({ affiliateId: affId, uplineId: null, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-        return res.json({ affiliateId: affId, uplineId: null });
-      }
-
       // Barreira de CICLO no WRITE: a árvore nunca fica inconsistente no banco (o
       // núcleo ainda saneia na leitura, mas aqui o admin recebe o erro na hora).
-      const current = await readUplineMap();
-      const candidate = { ...current, [affId]: uplineId };
-      const ids = new Set<string>([affId, uplineId, ...Object.keys(candidate), ...Object.values(candidate)]);
-      const tree = buildNetworkTree([...ids].map((id) => ({ affiliateId: id, uplineId: candidate[id] ?? null })));
-      if (tree.dropped.some((d) => d.reason === 'ciclo')) {
-        return res.status(400).json({ error: 'Este vínculo criaria um ciclo na rede (o upline já está abaixo deste afiliado).' });
+      if (uplineId) {
+        const current = await readUplineMap();
+        const candidate = { ...current, [affId]: uplineId };
+        const ids = new Set<string>([affId, uplineId, ...Object.keys(candidate), ...Object.values(candidate)]);
+        const tree = buildNetworkTree([...ids].map((id) => ({ affiliateId: id, uplineId: candidate[id] ?? null })));
+        if (tree.dropped.some((d) => d.reason === 'ciclo')) {
+          return res.status(400).json({ error: 'Este vínculo criaria um ciclo na rede (o upline já está abaixo deste afiliado).' });
+        }
       }
 
-      await ref.set({ affiliateId: affId, uplineId, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-      return res.json({ affiliateId: affId, uplineId });
+      // Trilha de auditoria: mudar upline MUDA DINHEIRO (o "lucro sobre equipe" que
+      // a agência paga junto com o repasse direto sai da taxa do TOPO da estrutura),
+      // então a aresta é auditada como qualquer escrita de comissão — antes→depois no
+      // MESMO batch da gravação (atômico). Vale para os dois sentidos: definir E
+      // remover o vínculo. Diff vazio (re-gravar o mesmo upline) não polui a trilha.
+      const ref = adminDb.collection('affiliate_uplines').doc(affId);
+      const beforeSnap = await ref.get();
+      const before = beforeSnap.exists ? (beforeSnap.data() as any) : undefined;
+      const nextUpline = uplineId || null;
+      const changes = diffChanges(before, { uplineId: nextUpline }, ['uplineId']);
+
+      const batch = adminDb.batch();
+      batch.set(ref, {
+        affiliateId: affId,
+        uplineId: nextUpline,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      if (changes.length) {
+        appendAuditLog(batch, req, {
+          entityType: 'affiliate_network',
+          entityId: affId,
+          entityLabel: await affiliateNameOf(affId),
+          action: nextUpline ? 'network.set_upline' : 'network.clear_upline',
+          changes,
+          metadata: {
+            uplineName: nextUpline ? await affiliateNameOf(nextUpline) : null,
+            previousUplineName: before?.uplineId ? await affiliateNameOf(String(before.uplineId)) : null,
+          },
+        });
+      }
+      await batch.commit();
+
+      return res.json({ affiliateId: affId, uplineId: nextUpline });
     } catch (error: any) {
       console.error('Error saving affiliate upline:', error);
       return res.status(500).json({ error: error.message || 'Erro interno salvando o upline.' });

@@ -41,6 +41,10 @@ const ACTION_LABELS: Record<string, string> = {
   'house_results.import': 'Importou resultados',
   'house_results.clear': 'Limpou resultados',
   'config.update': 'Alterou comissão (CPA/REV)',
+  // Rede de afiliados: mexer na aresta filho→upline muda o custo da agência (o
+  // repasse passa a sair da taxa do TOPO da estrutura). [[REDE-AFILIADOS.md]]
+  'network.set_upline': 'Definiu upline (rede)',
+  'network.clear_upline': 'Removeu upline (rede)',
   'user.create': 'Criou usuário',
   'user.link_affiliate': 'Vinculou login a afiliado',
   'user.accept_invite': 'Aceitou convite (auto-cadastro)',
@@ -59,6 +63,7 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
   house_results: 'Resultados',
   user: 'Usuário',
   affiliate_config: 'Comissão',
+  affiliate_network: 'Rede (upline)',
 };
 
 export function entityTypeLabel(entityType?: string | null): string {
@@ -193,6 +198,10 @@ const FIELD_LABELS: Record<string, string> = {
   // comissão (config.update)
   cpaValue: 'CPA',
   revPercentage: 'REV (%)',
+  // rede de afiliados (network.set_upline / network.clear_upline)
+  uplineId: 'Upline',
+  uplineName: 'Upline (nome)',
+  previousUplineName: 'Upline anterior (nome)',
   // convite / sincronização
   expiresAt: 'Expira em',
   synced: 'Sincronizados',

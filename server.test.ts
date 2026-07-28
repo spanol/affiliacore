@@ -621,6 +621,87 @@ describe('/api/affiliate-uplines — rede de afiliados (N níveis)', () => {
     expect(db.__store.get('affiliate_uplines')?.has('A')).toBe(false);
   });
 
+  // Mudar upline MUDA DINHEIRO (o repasse passa a sair da taxa do TOPO da
+  // estrutura) → tem que deixar trilha, no mesmo batch da escrita.
+  it('POST loga network.set_upline com antes→depois do uplineId, no MESMO batch', async () => {
+    const db = makeFirestore({ ...seed, affiliates: { C: { id: 'C', name: 'Carla Sub' }, B: { id: 'B', name: 'Bruno Upline' } } });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/affiliate-uplines')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'C', uplineId: 'B' })
+      .expect(200);
+
+    const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({
+      entityType: 'affiliate_network',
+      entityId: 'C',
+      entityLabel: 'Carla Sub',
+      action: 'network.set_upline',
+      actorId: 'admin-uid',
+      metadata: { uplineName: 'Bruno Upline', previousUplineName: null },
+    });
+    expect(logs[0].changes).toEqual([{ field: 'uplineId', before: null, after: 'B' }]);
+    // Atômico: a aresta e a trilha saíram do mesmo commit.
+    expect(db.__store.get('affiliate_uplines')?.get('C')?.uplineId).toBe('B');
+  });
+
+  it('POST loga a REMOÇÃO do vínculo (network.clear_upline) — também é mudança de dinheiro', async () => {
+    const db = makeFirestore({ ...seed, affiliates: { B: { id: 'B', name: 'Bruno' }, A: { id: 'A', name: 'Ana Topo' } } });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/affiliate-uplines')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'B', uplineId: null })
+      .expect(200);
+
+    const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({
+      entityType: 'affiliate_network',
+      entityId: 'B',
+      entityLabel: 'Bruno',
+      action: 'network.clear_upline',
+      metadata: { uplineName: null, previousUplineName: 'Ana Topo' },
+    });
+    expect(logs[0].changes).toEqual([{ field: 'uplineId', before: 'A', after: null }]);
+  });
+
+  it('POST que troca de upline registra o anterior no antes→depois', async () => {
+    const db = makeFirestore({ ...seed, affiliate_uplines: { C: { affiliateId: 'C', uplineId: 'A' } } });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/affiliate-uplines')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'C', uplineId: 'B' })
+      .expect(200);
+    const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
+    expect(logs[0].changes).toEqual([{ field: 'uplineId', before: 'A', after: 'B' }]);
+  });
+
+  it('re-gravar o MESMO upline grava mas NÃO loga (diff vazio, não polui a trilha)', async () => {
+    const db = makeFirestore(seed); // B já aponta p/ A
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/affiliate-uplines')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'B', uplineId: 'A' })
+      .expect(200);
+    expect(db.__store.get('audit_logs')?.size ?? 0).toBe(0);
+  });
+
+  it('POST recusado (ciclo) NÃO deixa trilha — nada mudou', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/affiliate-uplines')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'A', uplineId: 'B' })
+      .expect(400);
+    expect(db.__store.get('audit_logs')?.size ?? 0).toBe(0);
+  });
+
   it('POST sem affiliateId → 400; POST de não-admin → 403', async () => {
     await request(buildApp({ seed }))
       .post('/api/affiliate-uplines')

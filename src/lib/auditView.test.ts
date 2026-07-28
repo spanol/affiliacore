@@ -41,6 +41,12 @@ describe('actionLabel / entityTypeLabel', () => {
     expect(entityTypeLabel('house_results')).toBe('Resultados');
     expect(entityTypeLabel('desconhecido')).toBe('desconhecido');
   });
+  it('rotula as ações de REDE (mudar upline muda dinheiro → tem que ser legível)', () => {
+    expect(actionLabel('network.set_upline')).toBe('Definiu upline (rede)');
+    expect(actionLabel('network.clear_upline')).toBe('Removeu upline (rede)');
+    expect(entityTypeLabel('affiliate_network')).toBe('Rede (upline)');
+    expect(fieldLabel('uplineId')).toBe('Upline');
+  });
 });
 
 describe('entityDisplay / actorDisplay', () => {
