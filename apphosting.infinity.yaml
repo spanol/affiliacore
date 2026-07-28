@@ -51,9 +51,28 @@ env:
       - RUNTIME
 
   # Roxo principal passado pelo cliente. A engine gera a escala accent-* +
-  # contraste WCAG em runtime. Canvas/surface seguem o tema base por enquanto.
+  # contraste WCAG em runtime.
   - variable: VITE_BRAND_ACCENT
     value: '#8332B9'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Fundo PRETO (2026-07-28, pedido do cliente): sem estes dois overrides a
+  # instância HERDAVA o canvas/surface ember do apphosting.yaml BASE (plum
+  # #26181C / #3F1D2B), que re-tinta a ramp neutral-* inteira + os tokens glass
+  # escuros — modais, cards e cabeçalhos saíam AVERMELHADOS. 'none' não é
+  # palavra mágica: é só uma string não-hex, e os resolvers de theming.ts tratam
+  # qualquer não-hex como AUSENTE (contrato testado em theming.test.ts), então a
+  # instância cai nos defaults do index.css (neutral + navy #141C2A) — o mesmo
+  # fundo da Boost. O accent roxo acima segue valendo.
+  - variable: VITE_BRAND_CANVAS
+    value: 'none'
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_BRAND_SURFACE
+    value: 'none'
     availability:
       - BUILD
       - RUNTIME
