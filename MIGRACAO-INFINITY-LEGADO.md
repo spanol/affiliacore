@@ -155,6 +155,35 @@ O XLSX de Pagamentos (21 colunas) foi baixado e parseado; serve para **conferir 
 
 ---
 
+## 5.1 Painel da casa (Esportiva Bet) — a fonte de verdade real
+
+`wallet.esportiva.bet.br`, conta **`infinity.affiliates01`**, afiliado **544865**. Verificado 2026-07-27.
+**A conta é da Infinity** — isso encerra, no plano técnico, a dúvida do §6.2.
+
+- **Régua comercial: CPA de R$ 120 pago sobre QFTD** (46 QFTDs × 120 = R$ 5.520 em jul/2026). Bate exatamente
+  com a base 120 que o legado praticava. `Comissão Total = CPA + RevShare`, e **o RevShare pode ser NEGATIVO**
+  (jul/2026: −R$ 178,46, porque o P&L ficou negativo) — ou seja, jogador ganhando **come a comissão de CPA**.
+  Com repasse de R$ 110/CPA, a margem da Esportiva é fina e sensível a isso.
+- **O painel GERA link** (≠ do legado, que só registra): 6 templates em "Meus Links" com "Personalizar" +
+  "Copiar Link", e uma aba "Links Gerados" por afiliado. O link é `go.aff.esportiva.bet/<template>` + `?afp=<tag>`.
+  Criar link novo é **aditivo** — tag diferente é balde diferente, não encosta em link existente.
+- **O `afp` sobrevive até o destino final** (probe 2026-07-27): `go.aff.esportiva.bet/urto4foy?afp=teste01`
+  aterrissa em `esportiva.bet.br/?src=…&utm_source=544865&ext_marker=infinity&afp=teste01`.
+- **⚠️ O relatório atrasa ~1 dia.** Em 27/07 a última linha era 26/07, e o clique de teste não moveu o
+  contador de visitas do dia. **Toda rotina manual lê D−1** — um piloto de 1 semana só fecha no 8º dia.
+- **⚠️ Atribuição por tag: NÃO comprovada.** O Relatório de Mídia tem as dimensões `Source ID`, `Link`,
+  `Child Affiliate`, `Campaign ID/name` e `Deal group ID` — mas agrupando por `Source ID` **e** por
+  `Child Affiliate` no período 01/05→31/07/2026 **todas as linhas vêm vazias ("—")**. Não prova que não
+  funciona; prova que **nunca foi usada** (quase todos os links gerados são a URL base, sem `?afp=`).
+  Probe pendente: um clique com `afp=teste01` foi disparado em 27/07 — **conferir em 28/07** se o
+  `Source ID` popula. É o que destrava (ou mata) a atribuição por afiliado sem depender de postback.
+
+> Nota que recontextualiza o legado: como o painel da G8 lança resultado por **digitação manual**
+> ("Novo dia"), os números por afiliado de lá foram alguém digitando — não necessariamente uma
+> atribuição que a casa entregava pronta.
+
+---
+
 ## 6. Riscos e decisões pendentes
 
 1. **Passivo de R$ 32.306,40** — quem honra? Se a AffiliaCore assume, migra como saldo inicial de carteira
