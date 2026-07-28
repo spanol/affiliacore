@@ -17,9 +17,32 @@ env:
       - RUNTIME
 
   # Marca: produto + sufixo explícito de demo (honesto em print/screenshot).
-  # SHORT/logo/favicon/tema ficam nos defaults do produto (AffiliaCore ember).
+  # SHORT/logo/favicon ficam nos defaults do produto.
   - variable: VITE_BRAND_NAME
     value: 'AffiliaCore Demo'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # TEMA EMBER DO PRODUTO — AffiliaCore Direção C "Core" (P5.1). Morava no
+  # apphosting.yaml BASE até 2026-07-28, quando foi movido p/ cá: no base ele
+  # vazava p/ TODA label (canvas re-tinta a ramp neutral-* inteira → modais
+  # avermelhados na Infinity/Previsão). A demo é a VITRINE do produto, então é
+  # aqui que a identidade ember vive — e só aqui. Label de cliente nasce no
+  # default preto do index.css. Estes valores são os mesmos do logo/favicon de
+  # public/affiliacore/ (tile #26181C) e do dev-run em scripts/provision.
+  - variable: VITE_BRAND_ACCENT
+    value: '#E11D48'
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_BRAND_CANVAS
+    value: '#26181C'
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: VITE_BRAND_SURFACE
+    value: '#3F1D2B'
     availability:
       - BUILD
       - RUNTIME

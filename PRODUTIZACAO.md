@@ -418,6 +418,41 @@ no `apphosting.<cliente>.yaml`, sem rebuild.
    bio ainda pendente — operador); playbook no cliente 0; P5.2 jurídico;
    formalizar degraus do P5.5; demo P5.3 quando houver lead quente.
 
+## 🎨 Fundo preto = padrão de label (2026-07-28)
+
+**Reclamação do cliente Infinity:** modais e "outras features" com o fundo
+avermelhado. **Causa:** o P5.1 pinou o tema ember do PRODUTO
+(`VITE_BRAND_ACCENT/CANVAS/SURFACE`) no `apphosting.yaml` **base** — que é
+herdado por toda instância. Infinity e Previsão declaravam só o próprio
+`ACCENT`, então herdavam `CANVAS #26181C` + `SURFACE #3F1D2B`; e o CANVAS não é
+"o fundo da página": ele re-tinta a ramp `--color-neutral-*` INTEIRA + os tokens
+glass escuros (`theming.ts`), ou seja, modais, cards, bordas e cabeçalhos. Duas
+labels vivas com a cara errada, e os comentários dos dois yamls afirmavam o
+contrário ("canvas/surface seguem o neutro default").
+
+**Executado o "plano B" que o próprio `apphosting.boost.yaml` já previa:**
+
+- `apphosting.yaml` (base) **não declara mais tema nenhum** — o padrão de
+  qualquer instância volta a ser o default do `index.css`: canvas neutro (preto)
+  + surface navy `#141C2A`.
+- O ember do produto **mudou de arquivo, não sumiu**: vive em
+  `apphosting.demo.yaml` (a vitrine AffiliaCore, ainda estacionada). Se um dia
+  existir outra instância "cara do produto", ela declara os 3 hexes.
+- Label declara só o que é DELA (tipicamente `VITE_BRAND_ACCENT`): Infinity
+  segue roxa `#8332B9`, Previsão verde `#00B919` — as duas agora sobre preto.
+- Boost mantém os `'none'` como pin explícito da instância 0 (redundantes hoje,
+  seguro se o base voltar a ter tema).
+- **Invariante travado em `src/lib/instanceTheming.test.ts`**: lê os yamls,
+  mescla base+instância pelo `resolveThemeTokens` real e falha se (a) o base
+  ganhar `VITE_BRAND_*`, ou (b) alguma label emitir `--color-neutral-*` /
+  `--color-brand` / `--color-glass-*`. A demo é a exceção declarada.
+- Playbook (`scripts/provision/README.md`), skill `provision-instance` e
+  `.env.example` atualizados: **não declarar `CANVAS`/`SURFACE` numa label** sem
+  o cliente pedir.
+
+⚠️ **Operador:** as `VITE_BRAND_*` são BUILD — Infinity e Previsão só ficam
+pretas no **próximo rollout** de cada backend.
+
 ## 💰 Modelo de preço vigente (v2 — no ar desde 2026-07-25)
 
 Substitui a precificação de referência do topo do doc (setup R$ 3–8 mil +

@@ -106,25 +106,28 @@ env:
   - variable: VITE_BRAND_FAVICON_URL
     value: 'https://<storage-ou-cdn>/favicon.svg'
     availability: [BUILD, RUNTIME]
-  - variable: VITE_BRAND_ACCENT     # P3.1: cor de destaque da marca (1 hex; gera a
-    value: '#E11D48'                # escala inteira + contraste WCAG em runtime)
+  - variable: VITE_BRAND_ACCENT     # P3.1: cor de destaque DO CLIENTE (1 hex; gera
+    value: '<accent-do-cliente>'    # a escala inteira + contraste WCAG em runtime)
     availability: [BUILD, RUNTIME]
-  - variable: VITE_BRAND_SURFACE    # opcional: navy de superfície (login/hero)
-    value: '#141C2A'
-    availability: [BUILD, RUNTIME]
-  - variable: VITE_BRAND_STYLE      # P3.2: 'glass' (default, look Boost) ou
-    value: 'solid'                  # 'solid' (opaco, sem blur — corporativo)
-    availability: [BUILD, RUNTIME]
-  - variable: VITE_BRAND_CANVAS     # P3.3: matiz do canvas ESCURO (re-tinta a
-    value: '#0f172a'                # ramp neutral-*; ausência = cinza neutro)
-    availability: [BUILD, RUNTIME]
-  - variable: VITE_BRAND_THEME      # P3.3: tema inicial sem preferência salva
-    value: 'light'                  # ('light'|'dark'; ausência = SO)
+  - variable: VITE_BRAND_THEME      # P3.3 (opcional): tema inicial sem preferência
+    value: 'dark'                   # salva ('light'|'dark'; ausência = SO)
     availability: [BUILD, RUNTIME]
   - variable: FIREBASE_STORAGE_BUCKET
     value: '<project-id>.firebasestorage.app'
     availability: [RUNTIME]
 ```
+
+**🎨 Fundo PRETO é o padrão — não declare `VITE_BRAND_CANVAS`/`VITE_BRAND_SURFACE`.**
+O default do `index.css` (neutral + navy `#141C2A`) é o que a label deve ter; o
+`ACCENT` do cliente já pinta tudo que precisa ser da marca. Declare canvas/surface
+só se o cliente PEDIR um fundo tingido — e saiba o que está fazendo: o `CANVAS`
+re-tinta a ramp `neutral-*` INTEIRA + os tokens glass escuros, ou seja, muda a cor
+de modais, cards, bordas e cabeçalhos (foi assim que a Infinity subiu com tudo
+avermelhado em jul/2026, herdando o ember do produto que morava no base).
+`VITE_BRAND_STYLE: 'solid'` (opaco, sem blur) é opção de look corporativo e não
+mexe na cor. O invariante "label nasce preta" está travado em
+`src/lib/instanceTheming.test.ts` — se você adicionar canvas a uma label, atualize
+o teste conscientemente.
 
 **⚠️ Neutralizar os secrets OTG do base (obrigatório em instância OTG-free):** o
 `apphosting.yaml` base referencia secrets que só existem no projeto da instância 0

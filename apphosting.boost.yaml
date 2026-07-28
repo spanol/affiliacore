@@ -42,15 +42,17 @@ env:
       - BUILD
       - RUNTIME
 
-  # P5.1 (flip de cores, 2026-07-07): o apphosting.yaml BASE agora define o tema
-  # do PRODUTO (AffiliaCore ember: ACCENT/CANVAS/SURFACE). A Boost fica no look
-  # ORIGINAL (amber + neutral + navy = defaults do index.css): 'none' NÃO é
-  # palavra mágica — é só uma string que não é hex, e os resolvers de
-  # theming.ts tratam qualquer não-hex como AUSENTE (contrato testado em
-  # theming.test.ts). NÃO trocar por um hex amber: a engine gera ramp ≠ paleta
-  # Tailwind exata (a instância deixaria de ser pixel-idêntica). Plano B, se
-  # algo surpreender no rollout: tirar o tema do base e declará-lo só nos yaml
-  # POR instância (o base fica sem VITE_BRAND_ACCENT/CANVAS/SURFACE).
+  # P5.1 (flip de cores, 2026-07-07): a Boost fica no look ORIGINAL (amber +
+  # neutral + navy = defaults do index.css). 'none' NÃO é palavra mágica — é só
+  # uma string que não é hex, e os resolvers de theming.ts tratam qualquer
+  # não-hex como AUSENTE (contrato testado em theming.test.ts). NÃO trocar por
+  # um hex amber: a engine gera ramp ≠ paleta Tailwind exata (a instância
+  # deixaria de ser pixel-idêntica).
+  # 2026-07-28: o "plano B" previsto aqui foi EXECUTADO — o tema do produto saiu
+  # do apphosting.yaml BASE (vazava p/ toda label: modais avermelhados na
+  # Infinity) e vive agora no apphosting.demo.yaml. Estes três 'none' viraram
+  # redundantes, mas ficam como PIN explícito da instância 0: se um dia o base
+  # voltar a ter tema, a Boost não muda um pixel.
   - variable: VITE_BRAND_ACCENT
     value: 'none'
     availability:

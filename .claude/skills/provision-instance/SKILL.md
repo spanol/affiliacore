@@ -66,6 +66,12 @@ o backend** pelos comandos acima (refaz o IAM inteiro). NUNCA conceda papel a pa
   OTG-free com os secrets OTG neutralizados `value: 'unused'`). Trocar: `VITE_BRAND_NAME`/
   `_SHORT`/`_ACCENT`, `FIREBASE_STORAGE_BUCKET`, `MASTER_ADMIN_EMAIL`, e
   `VITE_BRAND_LOGO_URL`/`_FAVICON_URL` → `/<cliente>/logo.svg` / `/<cliente>/favicon.svg`.
+- **Fundo PRETO é o padrão da label: NÃO declare `VITE_BRAND_CANVAS`/`_SURFACE`.** Só o
+  `_ACCENT` do cliente. O canvas re-tinta a ramp `neutral-*` inteira + os tokens glass
+  (modais, cards, cabeçalhos) — foi o que deixou a Infinity avermelhada em jul/2026,
+  herdando o ember do produto que morava no `apphosting.yaml` base. Só declare se o
+  cliente PEDIR fundo tingido; o invariante está travado em
+  `src/lib/instanceTheming.test.ts` (atualize o teste se for uma exceção consciente).
 - Marca visual em **`public/<cliente>/`** — 4 arquivos:
   - `logo.svg` **MONO BRANCO obrigatório** (o app aplica `invert dark:invert-0`;
     colorir faz a cor virar verde no tema claro).

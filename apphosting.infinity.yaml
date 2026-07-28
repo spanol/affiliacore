@@ -58,24 +58,12 @@ env:
       - BUILD
       - RUNTIME
 
-  # Fundo PRETO (2026-07-28, pedido do cliente): sem estes dois overrides a
-  # instância HERDAVA o canvas/surface ember do apphosting.yaml BASE (plum
-  # #26181C / #3F1D2B), que re-tinta a ramp neutral-* inteira + os tokens glass
-  # escuros — modais, cards e cabeçalhos saíam AVERMELHADOS. 'none' não é
-  # palavra mágica: é só uma string não-hex, e os resolvers de theming.ts tratam
-  # qualquer não-hex como AUSENTE (contrato testado em theming.test.ts), então a
-  # instância cai nos defaults do index.css (neutral + navy #141C2A) — o mesmo
-  # fundo da Boost. O accent roxo acima segue valendo.
-  - variable: VITE_BRAND_CANVAS
-    value: 'none'
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: VITE_BRAND_SURFACE
-    value: 'none'
-    availability:
-      - BUILD
-      - RUNTIME
+  # Canvas/surface NÃO são declarados de propósito: fundo PRETO do produto
+  # (defaults do index.css — neutral + navy #141C2A). Era o que o cliente
+  # esperava e não acontecia: até 2026-07-28 o apphosting.yaml BASE pinava o
+  # ember da AffiliaCore e esta instância o HERDAVA, deixando modais e cards
+  # avermelhados. O tema saiu do base (foi p/ apphosting.demo.yaml) e o
+  # invariante está travado em src/lib/instanceTheming.test.ts.
 
   - variable: FIREBASE_STORAGE_BUCKET
     value: 'infinity-affiliacore.firebasestorage.app'

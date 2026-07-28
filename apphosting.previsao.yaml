@@ -29,7 +29,10 @@ env:
 
   # Verde da marca (#00B919, passado pelo cliente); a engine gera a escala
   # accent-* + contraste WCAG em runtime. Tema inicial escuro (o site do
-  # cliente é dark). Canvas/surface seguem o neutro default por ora.
+  # cliente é dark). Canvas/surface seguem o neutro default (fundo preto) —
+  # verdade só a partir de 2026-07-28: até lá esta instância HERDAVA o ember do
+  # apphosting.yaml base e subia com os fundos escuros avermelhados (mesmo bug
+  # reclamado pelo cliente Infinity). O tema saiu do base; nada a declarar aqui.
   - variable: VITE_BRAND_ACCENT
     value: '#00B919'
     availability:

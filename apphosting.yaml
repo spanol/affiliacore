@@ -41,28 +41,20 @@ env:
   # instância do Carlos vive em apphosting.boost.yaml (ambiente `boost`, associado
   # ao backend boost-agency-server no console em 2026-07-05).
 
-  # P5.1 (flip de cores, 2026-07-07): TEMA do produto — AffiliaCore Direção C
-  # "Core" (ember + canvas plum). Entra por ENV, e não pelos defaults do
-  # index.css, porque a engine de ramps (theming.ts) não reproduz as paletas
-  # Tailwind exatas a partir de 1 hex — os defaults do CSS têm que continuar
-  # amber/neutral p/ a Boost seguir pixel-idêntica. A Boost "des-seta" estas
-  # envs com valor VAZIO no apphosting.boost.yaml ('' = ausente p/ os
-  # resolvers; testado em theming.test.ts/branding.test.ts).
-  - variable: VITE_BRAND_ACCENT
-    value: '#E11D48'
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: VITE_BRAND_CANVAS
-    value: '#26181C'
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: VITE_BRAND_SURFACE
-    value: '#3F1D2B'
-    availability:
-      - BUILD
-      - RUNTIME
+  # TEMA — INTENCIONALMENTE AUSENTE DAQUI (2026-07-28). O base é herdado por
+  # TODA instância, então tema no base = tema em toda label que não sobrescrever.
+  # O P5.1 (2026-07-07) pinou aqui o ember do produto (AffiliaCore Direção C:
+  # ACCENT #E11D48 + CANVAS #26181C + SURFACE #3F1D2B) e isso VAZOU: como o
+  # CANVAS re-tinta a ramp neutral-* inteira + os tokens glass escuros
+  # (theming.ts), Infinity e Previsão — que só declaravam o próprio ACCENT —
+  # subiram com modais/cards AVERMELHADOS (reclamação do cliente Infinity).
+  #
+  # Regra agora: o PADRÃO de uma label é o default do index.css — canvas neutro
+  # (preto) + surface navy #141C2A. Cada instância declara só o que é SEU:
+  #   - marca do cliente  → apphosting.<instância>.yaml (tipicamente só ACCENT)
+  #   - ember do produto  → apphosting.demo.yaml (a vitrine da AffiliaCore)
+  # Invariante travado em src/lib/instanceTheming.test.ts: nenhuma label pode
+  # herdar CANVAS/SURFACE daqui. Não reintroduza VITE_BRAND_* neste arquivo.
 
   # Credenciais do Firebase Admin SDK (conteúdo do service-account.json).
   # Criar com:  firebase apphosting:secrets:set firebase-service-account-key
