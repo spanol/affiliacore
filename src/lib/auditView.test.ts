@@ -45,7 +45,8 @@ describe('actionLabel / entityTypeLabel', () => {
     expect(actionLabel('network.set_upline')).toBe('Definiu upline (rede)');
     expect(actionLabel('network.clear_upline')).toBe('Removeu upline (rede)');
     expect(entityTypeLabel('affiliate_network')).toBe('Rede (upline)');
-    expect(fieldLabel('uplineId')).toBe('Upline');
+    expect(fieldLabel('upline')).toBe('Upline');
+    expect(fieldLabel('uplineId')).toBe('Upline (id)');
   });
 });
 

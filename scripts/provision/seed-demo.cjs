@@ -153,11 +153,30 @@ const HOUSE_ROSTER = {
 const SPECIAL_INDEX = 1;
 const SUB_INDICES = [6, 7, 8];
 
+// Rede de afiliados (upline N níveis) — arestas EXPLÍCITAS filho→upline, por
+// índice em PRODUCERS. Complementa a sub-rede da especial (que já dá 2 níveis) e
+// exercita a tela /rede + a decomposição "repasse direto × lucro sobre equipe"
+// do /admin. A aresta explícita VENCE a derivada do especial (Carla sai de baixo
+// da Ana e vai para o Lucas). [[REDE-AFILIADOS.md]]
+const UPLINES = [
+  // Estrutura da Ana (70) com 4 NÍVEIS e taxa sempre decrescente:
+  [2, 1],   // Lucas (60)  → Ana (70)
+  [5, 2],   // Duda (50)   → Lucas (60)
+  [14, 5],  // Bruno (40)  → Duda (50)      ← 4º nível
+  [7, 2],   // Carla (45)  → Lucas (60)     ← explícito vence o vínculo do especial
+  // Estrutura do Yago (65), 3 níveis:
+  [9, 0],   // Marina (48) → Yago (65)
+  [10, 9],  // Pedro (45)  → Marina (48)
+  // Casos de borda propositais, p/ o painel "pontos de atenção" da /rede:
+  [11, 12], // Julia (45)  → Felipe (42): SPREAD NEGATIVO (downline ganha mais)
+  [15, 18], // Larissa (40) → Vitor (SEM taxa): aresta cai, Larissa vira topo
+];
+
 // Coleções que o WIPE limpa por inteiro (inclui o rastro de uso da demo por
 // leads: convites, contatos, auditoria, notificações...). `leads` NUNCA entra.
 const WIPE_COLLECTIONS = [
   'users', 'affiliates', 'affiliate_statuses', 'affiliate_email_aliases', 'affiliate_configs',
-  'special_affiliates', 'houses', 'house_results', 'audit_logs', 'user_notifications',
+  'special_affiliates', 'affiliate_uplines', 'houses', 'house_results', 'audit_logs', 'user_notifications',
   'notices', 'direct_messages', 'daily_rankings', 'ranking_prizes', 'invites', 'contacts',
   'affiliate_links', 'link_clicks', 'link_click_stats', 'affiliate_analytics',
   'payment_profiles', 'api_partners', 'pending_affiliates', 'app_meta', 'settings',
@@ -517,6 +536,15 @@ async function seed() {
     subAffiliateIds: SUB_INDICES.map((i) => affId(PRODUCERS[i].name)),
     updatedAt: daysAgo(30),
   }));
+
+  // 4.1) Rede de afiliados — aresta explícita filho→upline (affiliate_uplines).
+  UPLINES.forEach(([child, upline]) => {
+    writes.push((b) => b.set(db.collection('affiliate_uplines').doc(affId(PRODUCERS[child].name)), {
+      affiliateId: affId(PRODUCERS[child].name),
+      uplineId: affId(PRODUCERS[upline].name),
+      updatedAt: daysAgo(25),
+    }));
+  });
 
   // 5) Resultados manuais — janela EXATA (últimos 30 dias) + janela anterior (~87%)
   const allRows = buildAllRows(w1Days, w0Days);

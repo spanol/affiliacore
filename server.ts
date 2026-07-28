@@ -545,6 +545,7 @@ export function createApp(deps: ServerDeps) {
       const beforeSnap = await ref.get();
       const before = beforeSnap.exists ? (beforeSnap.data() as any) : undefined;
       const nextUpline = uplineId || null;
+      const prevUpline = before?.uplineId ? String(before.uplineId) : null;
       const changes = diffChanges(before, { uplineId: nextUpline }, ['uplineId']);
 
       const batch = adminDb.batch();
@@ -554,16 +555,19 @@ export function createApp(deps: ServerDeps) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
       if (changes.length) {
+        // O NOME vem primeiro (id de afiliado é opaco na tela da /auditoria, que
+        // exibe `changes` em ordem); o id fica logo atrás como a verdade auditável.
+        const nomes = {
+          field: 'upline',
+          before: prevUpline ? await affiliateNameOf(prevUpline) : null,
+          after: nextUpline ? await affiliateNameOf(nextUpline) : null,
+        };
         appendAuditLog(batch, req, {
           entityType: 'affiliate_network',
           entityId: affId,
           entityLabel: await affiliateNameOf(affId),
           action: nextUpline ? 'network.set_upline' : 'network.clear_upline',
-          changes,
-          metadata: {
-            uplineName: nextUpline ? await affiliateNameOf(nextUpline) : null,
-            previousUplineName: before?.uplineId ? await affiliateNameOf(String(before.uplineId)) : null,
-          },
+          changes: [nomes, ...changes],
         });
       }
       await batch.commit();

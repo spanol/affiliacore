@@ -198,10 +198,11 @@ const FIELD_LABELS: Record<string, string> = {
   // comissão (config.update)
   cpaValue: 'CPA',
   revPercentage: 'REV (%)',
-  // rede de afiliados (network.set_upline / network.clear_upline)
-  uplineId: 'Upline',
-  uplineName: 'Upline (nome)',
-  previousUplineName: 'Upline anterior (nome)',
+  // rede de afiliados (network.set_upline / network.clear_upline). O par é
+  // proposital: `upline` traz o NOME (legível na tela) e `uplineId`, o id — a
+  // verdade auditável, que sobrevive a renomeação do afiliado.
+  upline: 'Upline',
+  uplineId: 'Upline (id)',
   // convite / sincronização
   expiresAt: 'Expira em',
   synced: 'Sincronizados',

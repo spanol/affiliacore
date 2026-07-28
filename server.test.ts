@@ -640,9 +640,12 @@ describe('/api/affiliate-uplines — rede de afiliados (N níveis)', () => {
       entityLabel: 'Carla Sub',
       action: 'network.set_upline',
       actorId: 'admin-uid',
-      metadata: { uplineName: 'Bruno Upline', previousUplineName: null },
     });
-    expect(logs[0].changes).toEqual([{ field: 'uplineId', before: null, after: 'B' }]);
+    // NOME primeiro (é o que a /auditoria mostra), id logo atrás (verdade auditável).
+    expect(logs[0].changes).toEqual([
+      { field: 'upline', before: null, after: 'Bruno Upline' },
+      { field: 'uplineId', before: null, after: 'B' },
+    ]);
     // Atômico: a aresta e a trilha saíram do mesmo commit.
     expect(db.__store.get('affiliate_uplines')?.get('C')?.uplineId).toBe('B');
   });
@@ -663,9 +666,11 @@ describe('/api/affiliate-uplines — rede de afiliados (N níveis)', () => {
       entityId: 'B',
       entityLabel: 'Bruno',
       action: 'network.clear_upline',
-      metadata: { uplineName: null, previousUplineName: 'Ana Topo' },
     });
-    expect(logs[0].changes).toEqual([{ field: 'uplineId', before: 'A', after: null }]);
+    expect(logs[0].changes).toEqual([
+      { field: 'upline', before: 'Ana Topo', after: null },
+      { field: 'uplineId', before: 'A', after: null },
+    ]);
   });
 
   it('POST que troca de upline registra o anterior no antes→depois', async () => {
@@ -677,7 +682,10 @@ describe('/api/affiliate-uplines — rede de afiliados (N níveis)', () => {
       .send({ affiliateId: 'C', uplineId: 'B' })
       .expect(200);
     const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
-    expect(logs[0].changes).toEqual([{ field: 'uplineId', before: 'A', after: 'B' }]);
+    expect(logs[0].changes).toEqual([
+      { field: 'upline', before: null, after: null }, // sem mirror `affiliates` no seed
+      { field: 'uplineId', before: 'A', after: 'B' },
+    ]);
   });
 
   it('re-gravar o MESMO upline grava mas NÃO loga (diff vazio, não polui a trilha)', async () => {
