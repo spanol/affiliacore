@@ -37,6 +37,19 @@ import {
 } from '../lib/commission';
 export { resolveBrandRates, rateStatus, calcAffiliatePayout, calcNetProfit, houseCommissionForRow };
 export type { BrandRates, AffiliateConfig };
+// Rede de afiliados (upline / "lucro sobre equipe") — núcleo PURO em lib/network.
+import {
+  buildRootConfigMap,
+  calcNetworkPayouts,
+  type NetworkTree,
+  type NetworkRow,
+  type NetworkPayoutResult,
+} from '../lib/network';
+export {
+  buildNetworkTree, buildNetworkNodes, buildEligibleUpline, uplineMapFromSpecials,
+  calcNetworkPayouts, buildRootConfigMap, descendantsOf,
+} from '../lib/network';
+export type { NetworkTree, NetworkRow, NetworkPayoutResult, UplineMap } from '../lib/network';
 
 // Acordos (deals) + parcerias (marketplace, P2). Re-exporta os puros p/ as páginas
 // importarem tudo do service (mesmo padrão do núcleo de comissão acima).
@@ -136,6 +149,37 @@ export async function fetchAffiliateConfigs(): Promise<Record<string, AffiliateC
   } catch (error) {
     console.error('Error fetching affiliate configs:', error);
     return {};
+  }
+}
+
+// --- Rede de afiliados · ingestão da aresta filho→upline ---------------------
+// `affiliate_uplines/{affiliateId}` é server-only (rule admin-only) e sobrevive ao
+// sync do mirror `affiliates`. É a fonte EXPLÍCITA da árvore; o vínculo derivado de
+// `special_affiliates` continua valendo p/ quem não tem aresta própria (ver
+// buildNetworkNodes). Só o admin lê/escreve. Ver REDE-AFILIADOS.md.
+export async function fetchAffiliateUplines(): Promise<Record<string, string>> {
+  try {
+    const resp = await authFetch('/api/affiliate-uplines', { method: 'GET', headers: { Accept: 'application/json' } });
+    if (!resp.ok) return {};
+    const body = await resp.json().catch(() => null);
+    return body && typeof body?.uplines === 'object' && body.uplines ? (body.uplines as Record<string, string>) : {};
+  } catch (error) {
+    console.error('Error fetching affiliate uplines:', error);
+    return {};
+  }
+}
+
+// Define (ou remove, com uplineId vazio/null) o upline de um afiliado. O servidor
+// recusa auto-upline e ciclo — a árvore nunca fica inconsistente no banco.
+export async function saveAffiliateUpline(affiliateId: string, uplineId: string | null): Promise<void> {
+  const resp = await authFetch('/api/affiliate-uplines', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ affiliateId: String(affiliateId), uplineId: uplineId ? String(uplineId) : null }),
+  });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro: ${resp.status}`);
   }
 }
 
@@ -1054,22 +1098,87 @@ export function calcManualHouseNetProfit(
 //   • `byHouseTotal` = Σ dos cards. Invariante: quando todo afiliado tem casa conhecida,
 //                  `netProfit === byHouseTotal`; a diferença é o lucro dos afiliados sem
 //                  casa mapeada (que não viram card).
+//   • `network` (opcional) = a REDE de afiliados (upline N níveis). Quando presente,
+//                  o repasse de cada linha passa a usar a taxa do TOPO da estrutura
+//                  (buildRootConfigMap) — que é a forma telescopada da cascata — e o
+//                  lucro passa a descontar TAMBÉM o "lucro sobre equipe" dos uplines,
+//                  que a agência paga junto com o repasse direto. Sem isso o /admin
+//                  superestima o lucro em exatamente o override (R$ 6.760 de R$ 33.540
+//                  na migração da Infinity). Generaliza o `subToSpecialConfig` (2
+//                  níveis) sem tocar na fórmula: só troca o mapa afiliado→config.
+//                  `directPayout`/`overridePayout` decompõem o repasse total e SEMPRE
+//                  somam o custo usado no `netProfit`. Ver REDE-AFILIADOS.md.
 export function composeAdminProfit(
   results: any[],
   manualRows: StoredManualRow[],
   configs: Record<string, AffiliateConfig | undefined>,
   subToSpecialConfig: Record<string, AffiliateConfig>,
-  houseOf: (affiliateId: string) => { key: string; brandId?: string } | null
-): { netProfit: number; byHouse: Record<string, HouseNetProfit>; byHouseTotal: number } {
-  const manualByHouse = calcManualHouseNetProfit(manualRows, configs, subToSpecialConfig);
+  houseOf: (affiliateId: string) => { key: string; brandId?: string } | null,
+  network?: NetworkTree | null
+): {
+  netProfit: number;
+  byHouse: Record<string, HouseNetProfit>;
+  byHouseTotal: number;
+  directPayout: number;
+  overridePayout: number;
+  network: NetworkPayoutResult | null;
+} {
+  // A rede VENCE o vínculo de especial (é o mesmo modelo, generalizado a N níveis);
+  // o subToSpecialConfig segue valendo p/ quem não está na árvore.
+  const effectiveConfig = network
+    ? { ...subToSpecialConfig, ...buildRootConfigMap(network, configs) }
+    : subToSpecialConfig;
+
+  const manualByHouse = calcManualHouseNetProfit(manualRows, configs, effectiveConfig);
   const byHouse: Record<string, HouseNetProfit> = {
-    ...calcNetProfitByHouse(results, houseOf, configs, subToSpecialConfig),
+    ...calcNetProfitByHouse(results, houseOf, configs, effectiveConfig),
     ...manualByHouse,
   };
   const byHouseTotal = Object.values(byHouse).reduce((s, h) => s + h.netProfit, 0);
   const manualTotal = Object.values(manualByHouse).reduce((s, h) => s + h.netProfit, 0);
-  const netProfit = calcAgencyNetProfit(results, configs, subToSpecialConfig, houseOf).netProfit + manualTotal;
-  return { netProfit, byHouse, byHouseTotal };
+  const agg = calcAgencyNetProfit(results, configs, effectiveConfig, houseOf);
+  const netProfit = agg.netProfit + manualTotal;
+
+  // Decomposição repasse direto × override. Sai da MESMA base escopada (results +
+  // manuais atribuídos), com o MESMO brandId que os cards usam.
+  const netPayouts = network
+    ? calcNetworkPayouts(network, buildNetworkRows(results, manualRows, houseOf), configs)
+    : null;
+  const totalPayout = agg.payout + Object.values(manualByHouse).reduce((s, h) => s + h.payout, 0);
+  return {
+    netProfit,
+    byHouse,
+    byHouseTotal,
+    directPayout: netPayouts ? netPayouts.directTotal : totalPayout,
+    overridePayout: netPayouts ? netPayouts.overrideTotal : 0,
+    network: netPayouts,
+  };
+}
+
+// Linhas OTG + manuais ATRIBUÍDAS no shape da rede, resolvendo o brandId do MESMO
+// jeito que os cards por casa (houseOf p/ a OTG; slug→id conhecido p/ a manual).
+function buildNetworkRows(
+  results: any[],
+  manualRows: StoredManualRow[],
+  houseOf: (affiliateId: string) => { key: string; brandId?: string } | null
+): NetworkRow[] {
+  const brandKeyOf = (slug: string) => getKnownBrands().find((b) => b.slug === slug)?.id ?? slug;
+  const rows: NetworkRow[] = [];
+  for (const r of Array.isArray(results) ? results : []) {
+    const id = String(r?.affiliate_id ?? r?.id ?? '');
+    if (!id) continue;
+    rows.push({ affiliateId: id, brandId: houseOf(id)?.brandId, qualified_cpa: r?.qualified_cpa, rvs: r?.rvs });
+  }
+  for (const r of Array.isArray(manualRows) ? manualRows : []) {
+    if (!r || r.affiliateId === null) continue; // não-atribuído fica como margem
+    rows.push({
+      affiliateId: String(r.affiliateId),
+      brandId: brandKeyOf(r.houseSlug),
+      qualified_cpa: r.qualified_cpa,
+      rvs: r.rvs,
+    });
+  }
+  return rows;
 }
 
 // --- Link de divulgação da agência (/go/:code) -------------------------------

@@ -36,6 +36,7 @@ import {
   calcNetProfit,
   saveAffiliateConfig,
   saveAffiliateBrandRates,
+  buildNetworkTree,
 } from './affiliateService';
 import { StoredManualRow, emptyMetrics, addMetrics } from '../lib/houseResults';
 import fc from 'fast-check';
@@ -735,7 +736,76 @@ describe('composeAdminProfit · headline == Σ cards (invariante 7c1c830 + eixo 
 
   it('tolera entradas vazias', () => {
     const p = composeAdminProfit([], [], configs, {}, houseOf);
-    expect(p).toEqual({ netProfit: 0, byHouse: {}, byHouseTotal: 0 });
+    expect(p).toEqual({ netProfit: 0, byHouse: {}, byHouseTotal: 0, directPayout: 0, overridePayout: 0, network: null });
+  });
+
+  it('sem rede, o repasse total é 100% direto (override 0) — comportamento de hoje', () => {
+    const p = composeAdminProfit(results, [], configs, {}, houseOf);
+    expect(p.overridePayout).toBe(0);
+    expect(p.directPayout).toBe(1000 + 3 * 50 + 2 * 80);
+    expect(p.network).toBeNull();
+  });
+});
+
+describe('composeAdminProfit · REDE de afiliados (lucro sobre equipe descontado)', () => {
+  // Cadeia de 3 níveis numa casa só: R(300) → C(200) → G(100).
+  const results = [
+    { id: 'R', total_commission: 1200, qualified_cpa: 1, rvs: 0 },
+    { id: 'C', total_commission: 1200, qualified_cpa: 1, rvs: 0 },
+    { id: 'G', total_commission: 1200, qualified_cpa: 1, rvs: 0 },
+  ];
+  const configs = {
+    R: { affiliateId: 'R', cpaValue: 300, revPercentage: 0 },
+    C: { affiliateId: 'C', cpaValue: 200, revPercentage: 0 },
+    G: { affiliateId: 'G', cpaValue: 100, revPercentage: 0 },
+  } as any;
+  const houseOf = (id: string) => (configs[id] ? { key: 'Superbet', brandId: 'sb' } : null);
+  const network = buildNetworkTree([
+    { affiliateId: 'R' },
+    { affiliateId: 'C', uplineId: 'R' },
+    { affiliateId: 'G', uplineId: 'C' },
+  ]);
+
+  it('o lucro DESCONTA o override: sem rede R$ 3.000, com rede R$ 2.700', () => {
+    const semRede = composeAdminProfit(results, [], configs, {}, houseOf);
+    const comRede = composeAdminProfit(results, [], configs, {}, houseOf, network);
+    expect(semRede.netProfit).toBe(3600 - 600);           // só o repasse direto
+    expect(comRede.netProfit).toBe(3600 - 900);           // + R$ 300 de lucro sobre equipe
+    expect(semRede.netProfit - comRede.netProfit).toBe(comRede.overridePayout);
+  });
+
+  it('directPayout + overridePayout == o repasse DE FATO usado no lucro', () => {
+    const p = composeAdminProfit(results, [], configs, {}, houseOf, network);
+    expect(p.directPayout).toBe(600);
+    expect(p.overridePayout).toBe(300);
+    const comissao = 3600;
+    expect(comissao - (p.directPayout + p.overridePayout)).toBe(p.netProfit);
+  });
+
+  it('mantém o invariante "agregado == Σ dos cards" com a rede ligada', () => {
+    const p = composeAdminProfit(results, [], configs, {}, houseOf, network);
+    expect(p.netProfit).toBe(p.byHouseTotal);
+    expect(p.byHouse.Superbet.payout).toBe(900);
+  });
+
+  it('a rede vence o vínculo de especial (mesmo modelo, N níveis) sem duplicar custo', () => {
+    // subToSpecialConfig antigo mandava G pela taxa de C (200); a rede manda pela do
+    // TOPO (300) — o que a agência de fato paga. Nada é somado duas vezes.
+    const legado = { G: configs.C, C: configs.R } as any;
+    const p = composeAdminProfit(results, [], configs, legado, houseOf, network);
+    expect(p.byHouse.Superbet.payout).toBe(900);
+    expect(p.directPayout + p.overridePayout).toBe(900);
+  });
+
+  it('inclui as linhas MANUAIS atribuídas na decomposição', () => {
+    const manual = [
+      { houseSlug: 'kto', date: '2026-06-01', affiliateId: 'G', ...addMetrics(emptyMetrics(), { qualified_cpa: 2, total_commission: 900 }) },
+    ] as any;
+    const p = composeAdminProfit(results, manual, configs, {}, houseOf, network);
+    // G produz +2 CPAs manuais: direto 2×100, override 2×(300−100).
+    expect(p.directPayout).toBe(600 + 200);
+    expect(p.overridePayout).toBe(300 + 400);
+    expect(p.netProfit).toBe(p.byHouseTotal);
   });
 });
 

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, humanizeName } from '../lib/utils';
-import { fetchAffiliates, fetchAllResults, fetchAllResultsByBrand, fetchAllResultsByCampaign, fetchAffiliateConfigs, fetchSpecialAffiliates, fetchManualResults, buildSubToSpecialConfig, composeAdminProfit, deriveManualRowsCommission, CampaignRow, SpecialAffiliate } from '../services/affiliateService';
+import { fetchAffiliates, fetchAllResults, fetchAllResultsByBrand, fetchAllResultsByCampaign, fetchAffiliateConfigs, fetchSpecialAffiliates, fetchManualResults, fetchAffiliateUplines, buildSubToSpecialConfig, buildNetworkNodes, buildNetworkTree, buildEligibleUpline, composeAdminProfit, deriveManualRowsCommission, CampaignRow, SpecialAffiliate } from '../services/affiliateService';
 import DateRangePicker from '../components/DateRangePicker';
 import CampaignBreakdown from '../components/CampaignBreakdown';
 import AffiliatePerformanceChart from '../components/AffiliatePerformanceChart';
@@ -47,6 +47,9 @@ export default function AdminDashboard() {
   // Resultados MANUAIS (casas 'manual', via upload) — incorporados aos totais e ao
   // lucro por casa sem contaminar a atribuição da OTG.
   const [manualRows, setManualRows] = useState<StoredManualRow[]>([]);
+  // Rede de afiliados: aresta filho→upline (affiliate_uplines). Alimenta o
+  // "lucro sobre equipe" que a agência paga ALÉM do repasse direto.
+  const [uplines, setUplines] = useState<Record<string, string>>({});
   // Cotação EUR→BRL (AwesomeAPI) — converte o CPA das casas (gravado em EUR) p/ R$.
   const [eurRate, setEurRate] = useState<number>(() => getCachedEurBrlRate());
 
@@ -95,13 +98,14 @@ export default function AdminDashboard() {
         if (houses.length) syncKnownBrandsFrom(houses);
         setEurRate(eur.rate);
 
-        const [allResults, cfgs, campaigns, specialData, byBrand, manual] = await Promise.all([
+        const [allResults, cfgs, campaigns, specialData, byBrand, manual, uplineMap] = await Promise.all([
           fetchAllResults(range),
           fetchAffiliateConfigs(),
           fetchAllResultsByCampaign(range, brandAffiliateIds ?? undefined),
           fetchSpecialAffiliates(),
           fetchAllResultsByBrand(range),
           fetchManualResults(range),
+          fetchAffiliateUplines(),
         ]);
         setResults(Array.isArray(allResults) ? allResults : []);
         setConfigs(cfgs || {});
@@ -109,6 +113,7 @@ export default function AdminDashboard() {
         setSpecials(specialData || {});
         setBrandRows(Array.isArray(byBrand) ? byBrand : []);
         setManualRows(Array.isArray(manual) ? manual : []);
+        setUplines(uplineMap || {});
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
         setResults([]);
@@ -117,6 +122,7 @@ export default function AdminDashboard() {
         setSpecials({});
         setBrandRows([]);
         setManualRows([]);
+        setUplines({});
       } finally {
         setLoading(false);
       }
@@ -252,9 +258,22 @@ export default function AdminDashboard() {
   // ESCOPADA pelo filtro de marca — antes o headline escopava (scopedResults) mas os
   // cards por casa somavam TODAS as casas (results cru), e ao filtrar uma marca os dois
   // divergiam (mesma classe do 7c1c830, no eixo do filtro). [[boost-net-profit-per-house]]
+  // Árvore da rede (N níveis). Une a aresta EXPLÍCITA de `affiliate_uplines` com o
+  // vínculo derivado de `special_affiliates` (retrocompat: o especial de hoje é uma
+  // rede de 2 níveis). Um upline SEM taxa configurada perde a aresta — ausência de
+  // config ≠ R$ 0, e a estrutura inteira sairia de graça. [[REDE-AFILIADOS.md]]
+  const network = useMemo(
+    () =>
+      buildNetworkTree(
+        buildNetworkNodes({ ids: affiliates, specials, uplines }),
+        { isEligibleUpline: buildEligibleUpline(configs) }
+      ),
+    [affiliates, specials, uplines, configs]
+  );
+
   const profit = useMemo(
-    () => composeAdminProfit(scopedResults, manualScoped, configs, subToSpecialConfig, houseOf),
-    [scopedResults, manualScoped, configs, subToSpecialConfig, houseOf]
+    () => composeAdminProfit(scopedResults, manualScoped, configs, subToSpecialConfig, houseOf, network),
+    [scopedResults, manualScoped, configs, subToSpecialConfig, houseOf, network]
   );
   const netProfit = profit.netProfit;
 
@@ -470,6 +489,25 @@ export default function AdminDashboard() {
                 Comissão recebida das casas − repasse aos afiliados.{' '}
                 <span className="italic">Sem custos fixos, usando o total reportado pela casa.</span>
               </p>
+              {/* Decomposição do repasse quando há REDE: a agência paga o repasse
+                  direto MAIS o "lucro sobre equipe" dos uplines. Sem mostrar os dois,
+                  o lucro parece maior do que é (o override é ~20% do que se paga). */}
+              {profit.overridePayout > 0 && (
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mt-3 text-[11px] font-medium text-slate-500 dark:text-neutral-400">
+                  <span>
+                    Repasse direto:{' '}
+                    <strong className="text-slate-700 dark:text-neutral-200 tabular-nums">
+                      R$ {profit.directPayout.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </strong>
+                  </span>
+                  <span>
+                    Lucro sobre equipe (upline):{' '}
+                    <strong className="text-slate-700 dark:text-neutral-200 tabular-nums">
+                      R$ {profit.overridePayout.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </strong>
+                  </span>
+                </div>
+              )}
             </div>
             <div className="relative shrink-0 p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500">
               <DollarSign size={24} />
