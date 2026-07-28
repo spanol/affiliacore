@@ -7,12 +7,15 @@ import {
   fetchSpecialAffiliates,
   fetchAffiliates,
   fetchAllResults,
+  fetchManualResults,
   fetchAffiliateConfigs,
   saveSubAffiliateConfig,
   calcAffiliatePayout,
   SpecialAffiliate,
   AffiliateConfig,
 } from '../services/affiliateService';
+import { producingAffiliateIds } from '../lib/affiliateActivity';
+import { StoredManualRow } from '../lib/houseResults';
 import DateRangePicker from '../components/DateRangePicker';
 import BrandFilter from '../components/BrandFilter';
 import { getBrandName, uniqueBrands, ALL_BRANDS, buildBrandIdOf } from '../lib/brand';
@@ -34,6 +37,7 @@ export default function SpecialSubAffiliates() {
   const [loading, setLoading] = useState(true);
   const [special, setSpecial] = useState<SpecialAffiliate | null>(null);
   const [results, setResults] = useState<any[]>([]);
+  const [manualRows, setManualRows] = useState<StoredManualRow[]>([]);
   const [configs, setConfigs] = useState<Record<string, AffiliateConfig>>({});
   const [pool, setPool] = useState<any[]>([]); // mirror p/ afiliado→brandId (byBrand)
   // Edição da comissão de cada sub (CPA/REV), com teto = taxa própria do especial.
@@ -52,15 +56,19 @@ export default function SpecialSubAffiliates() {
     if (!ownId) return;
     try {
       setLoading(true);
-      const [specials, rows, cfgs, poolData] = await Promise.all([
+      const [specials, rows, cfgs, poolData, manual] = await Promise.all([
         fetchSpecialAffiliates(),
         fetchAllResults(range),
         fetchAffiliateConfigs(),
         fetchAffiliates().catch(() => []),
+        // Casas MANUAIS entram na atividade: sem isto, numa instância OTG-free
+        // todo sub aparecia como parado. `fetchManualResults` já degrada p/ [].
+        fetchManualResults(range).catch(() => []),
       ]);
       const mine = specials[ownId] || null;
       setSpecial(mine);
       setResults(Array.isArray(rows) ? rows : []);
+      setManualRows(Array.isArray(manual) ? manual : []);
       setConfigs(cfgs);
       setPool(Array.isArray(poolData) ? poolData : []);
       // semente dos inputs editáveis a partir dos configs salvos
@@ -93,11 +101,19 @@ export default function SpecialSubAffiliates() {
   const rowById = (id: string) => results.find((r) => String(r.affiliate_id ?? r.id ?? '') === String(id));
   const subIds = special?.subAffiliateIds?.map(String) || [];
 
+  // Produção no período unindo OTG + MANUAL — definição ÚNICA em lib/affiliateActivity
+  // (antes a regra vivia inline aqui, só com a OTG e só com funil: um sub que produziu
+  // em casa manual, ou cuja única evidência era a comissão, aparecia como parado).
+  const producingIds = useMemo(
+    () => producingAffiliateIds(results, manualRows),
+    [results, manualRows]
+  );
+
   // Enriquece cada sub com nome, marca e atividade (produção no período) para
   // alimentar busca/filtros sem recomputar dentro do .map de renderização.
   const subs = useMemo(() => subIds.map((id) => {
     const r = rowById(id) || {};
-    const producing = (r.registrations || 0) > 0 || (r.first_deposits || 0) > 0 || (r.qualified_cpa || 0) > 0;
+    const producing = producingIds.has(String(id));
     return {
       id,
       row: r,
@@ -106,7 +122,7 @@ export default function SpecialSubAffiliates() {
       producing,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [special, results]);
+  }), [special, results, producingIds]);
 
   const availableBrands = useMemo(() => uniqueBrands(subs.map((s) => s.row)), [subs]);
 

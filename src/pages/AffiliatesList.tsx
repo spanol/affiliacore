@@ -19,7 +19,11 @@ import {
   Clock,
   X
 } from 'lucide-react';
-import { fetchAffiliates, fetchAffiliateConfigs, fetchAffiliateStatuses, saveAffiliateConfig, buildBrandConfigTopPayload, updateAffiliateStatus, fetchRegisteredUsers, updateUserRole, syncAffiliates, AffiliateConfig, fetchSpecialAffiliates, SpecialAffiliate, fetchPendingAffiliates, importPendingAffiliates, createAccessInvite } from '../services/affiliateService';
+import { fetchAffiliates, fetchAffiliateConfigs, fetchAffiliateStatuses, saveAffiliateConfig, buildBrandConfigTopPayload, updateAffiliateStatus, fetchRegisteredUsers, updateUserRole, syncAffiliates, AffiliateConfig, fetchSpecialAffiliates, SpecialAffiliate, fetchPendingAffiliates, importPendingAffiliates, createAccessInvite, fetchAllResults, fetchManualResults } from '../services/affiliateService';
+import DateRangePicker from '../components/DateRangePicker';
+import { DateRange, getDefaultRange } from '../lib/dateRange';
+import { producingAffiliateIds } from '../lib/affiliateActivity';
+import { StoredManualRow } from '../lib/houseResults';
 import { OTG_ENABLED } from '../lib/instanceClient';
 import SpecialAffiliateModal from '../components/SpecialAffiliateModal';
 import { useToast } from '../contexts/ToastContext';
@@ -84,6 +88,14 @@ export default function AffiliatesList() {
   // (handleConfigChange mexe em `configs`, não aqui); atualiza só no save.
   const [savedConfigIds, setSavedConfigIds] = useState<Set<string>>(new Set());
   const [onlyNeedsConfig, setOnlyNeedsConfig] = useState(false);
+  // Filtro por ATIVIDADE (produziu no período). Espelha o que a visão do especial
+  // já tem em /network, agora com a MESMA função pura e incluindo casa manual.
+  // Os resultados só são buscados quando o filtro sai de 'all' — a lista não paga
+  // o custo de uma varredura de resultados para quem não usa o filtro.
+  const [activityFilter, setActivityFilter] = useState<'all' | 'producing' | 'idle'>('all');
+  const [activityRange, setActivityRange] = useState<DateRange>(() => getDefaultRange());
+  const [activityRows, setActivityRows] = useState<{ otg: any[]; manual: StoredManualRow[] }>({ otg: [], manual: [] });
+  const [loadingActivity, setLoadingActivity] = useState(false);
 
   const isAdmin = profile?.role === 'admin';
   const pageTitle = isAdmin ? 'Gestão de Afiliados' : 'Meus Clientes';
@@ -193,6 +205,27 @@ export default function AffiliatesList() {
   useEffect(() => {
     loadData();
   }, [isAdmin]);
+
+  // Resultados do período — só quando o filtro de atividade está ligado. Falha de
+  // qualquer fonte cai em lista vazia (o filtro degrada, a tela não quebra).
+  useEffect(() => {
+    if (!isAdmin || activityFilter === 'all') return;
+    let cancelado = false;
+    setLoadingActivity(true);
+    Promise.all([
+      fetchAllResults(activityRange).catch(() => []),
+      fetchManualResults(activityRange).catch(() => []),
+    ])
+      .then(([otg, manual]) => {
+        if (cancelado) return;
+        setActivityRows({
+          otg: Array.isArray(otg) ? otg : [],
+          manual: Array.isArray(manual) ? manual : [],
+        });
+      })
+      .finally(() => { if (!cancelado) setLoadingActivity(false); });
+    return () => { cancelado = true; };
+  }, [isAdmin, activityFilter, activityRange.startDate, activityRange.endDate]);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -332,8 +365,21 @@ export default function AffiliatesList() {
   const needsAccess = (item: any) => !item.isPending && !item.userUid;
 
   const needsConfigCount = isAdmin ? filteredAffiliates.filter(needsConfig).length : 0;
+
+  // Produção no período: OTG + MANUAL. Sem o manual, numa instância OTG-free
+  // (100% casas manuais) TODO afiliado cairia em "sem produção". [[affiliateActivity]]
+  const producingIds = useMemo(
+    () => producingAffiliateIds(activityRows.otg, activityRows.manual),
+    [activityRows]
+  );
+  const matchesActivity = (item: any) => {
+    if (activityFilter === 'all') return true;
+    const produziu = producingIds.has(idOf(item));
+    return activityFilter === 'producing' ? produziu : !produziu;
+  };
+
   const visibleAffiliates = isAdmin
-    ? (onlyNeedsConfig ? filteredAffiliates.filter(needsConfig) : filteredAffiliates)
+    ? (onlyNeedsConfig ? filteredAffiliates.filter(needsConfig) : filteredAffiliates).filter(matchesActivity)
     : [];
 
   const handleOpenDetails = (affiliate: any) => {
@@ -534,9 +580,32 @@ export default function AffiliatesList() {
               </button>
             )}
             <BrandFilter brands={availableBrands} value={brandFilter} onChange={setBrandFilter} />
-            <button className="p-2.5 rounded-full border border-slate-200 dark:border-neutral-700 text-slate-500 dark:text-neutral-300 hover:text-accent-500 hover:border-accent-500/40 transition-colors">
-              <Filter size={16} />
-            </button>
+            {/* Período do filtro de atividade — só aparece quando o filtro está ligado,
+                porque "produziu" sem período visível seria um número sem régua. */}
+            {isAdmin && activityFilter !== 'all' && (
+              <DateRangePicker value={activityRange} onChange={setActivityRange} />
+            )}
+            {isAdmin && (
+              <button
+                onClick={() => setActivityFilter((v) => (v === 'all' ? 'producing' : v === 'producing' ? 'idle' : 'all'))}
+                title={
+                  activityFilter === 'all'
+                    ? 'Filtrar por produção no período (cadastro, FTD, CPA, comissão ou depósito)'
+                    : activityFilter === 'producing'
+                      ? 'Mostrando quem PRODUZIU no período — clique para ver quem não produziu'
+                      : 'Mostrando quem NÃO produziu no período — clique para remover o filtro'
+                }
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider border transition-all',
+                  activityFilter === 'producing' && 'bg-emerald-500 text-white border-emerald-500 shadow-sm',
+                  activityFilter === 'idle' && 'bg-slate-500 text-white border-slate-500 shadow-sm',
+                  activityFilter === 'all' && 'bg-white dark:bg-neutral-900 text-slate-500 dark:text-neutral-300 border-slate-200 dark:border-neutral-700 hover:text-accent-500 hover:border-accent-500/40'
+                )}
+              >
+                {loadingActivity ? <Loader2 size={13} className="animate-spin" /> : <Filter size={13} />}
+                {activityFilter === 'all' ? 'Produção' : activityFilter === 'producing' ? 'Com produção' : 'Sem produção'}
+              </button>
+            )}
           </div>
         </div>
 

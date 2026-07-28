@@ -10,7 +10,8 @@ import {
   Wallet,
   Target,
   Banknote,
-  Crown
+  Crown,
+  Filter
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, humanizeName } from '../lib/utils';
@@ -27,6 +28,8 @@ import { StoredManualRow, aggregateByHouse, emptyMetrics, addMetrics } from '../
 import { fetchHouses, syncKnownBrandsFrom } from '../services/houseService';
 import { fetchEurBrlRate, getCachedEurBrlRate } from '../lib/currency';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
+import { producingAffiliateIds } from '../lib/affiliateActivity';
+import { readAffiliateCountMode, writeAffiliateCountMode, AffiliateCountMode } from '../lib/affiliateCountMode';
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
@@ -35,6 +38,10 @@ export default function AdminDashboard() {
   const [affiliates, setAffiliates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<DateRange>(() => getDefaultRange());
+  // Contador de afiliados: carteira inteira ou só quem produziu no período. A
+  // escolha persiste por navegador — ver lib/affiliateCountMode.
+  const [countMode, setCountMode] = useState<AffiliateCountMode>(() => readAffiliateCountMode());
+  useEffect(() => { writeAffiliateCountMode(countMode); }, [countMode]);
   // Por Campanha — desempenho agregado da rede por campanha (groupBy=campaign).
   const [campaignRows, setCampaignRows] = useState<CampaignRow[]>([]);
   // Por casa (groupBy=brand) — comparação entre casas. Hoje só Superbet; a seção
@@ -315,13 +322,45 @@ export default function AdminDashboard() {
   }, [brandRows, brandFilter, profit]);
 
   // Contagem de afiliados respeita o filtro de marca.
-  const affiliatesCount = useMemo(
-    () => (brandFilter === ALL_BRANDS ? affiliates.length : affiliates.filter((a) => getBrandName(a) === brandFilter).length),
+  const affiliatesInBrand = useMemo(
+    () => (brandFilter === ALL_BRANDS ? affiliates : affiliates.filter((a) => getBrandName(a) === brandFilter)),
     [affiliates, brandFilter]
   );
+  const affiliatesCount = affiliatesInBrand.length;
 
-  const metrics = [
-    { label: 'Total de Afiliados', value: affiliatesCount.toString(), icon: Users, color: 'brand' },
+  // Quem produziu no período: OTG + MANUAL, da mesma base escopada que alimenta o
+  // lucro. Sem o manual, uma instância OTG-free contaria zero. [[affiliateActivity]]
+  const producingIds = useMemo(
+    () => producingAffiliateIds(scopedResults, manualScoped),
+    [scopedResults, manualScoped]
+  );
+  const producingCount = useMemo(
+    () => affiliatesInBrand.filter((a) => producingIds.has(String(a?.id ?? a?.affiliate_id ?? ''))).length,
+    [affiliatesInBrand, producingIds]
+  );
+
+  type MetricCard = {
+    label: string;
+    value: string;
+    icon: typeof Users;
+    color: string;
+    toggle?: { mode: AffiliateCountMode; onToggle: () => void; hint: string };
+  };
+  const metrics: MetricCard[] = [
+    {
+      label: countMode === 'producing' ? 'Afiliados com produção' : 'Total de Afiliados',
+      value: (countMode === 'producing' ? producingCount : affiliatesCount).toString(),
+      icon: Users,
+      color: 'brand',
+      // Toggle carteira ↔ período. Só o 1º card tem; os outros ignoram estes campos.
+      toggle: {
+        mode: countMode,
+        onToggle: () => setCountMode((m) => (m === 'all' ? 'producing' : 'all')),
+        hint: countMode === 'producing'
+          ? `${affiliatesCount} na carteira`
+          : `${producingCount} produziram no período`,
+      },
+    },
     { label: 'Total comissão', value: `R$ ${totals.commission.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: DollarSign, color: 'green' },
     // 'Total CPA' (R$) é métrica que SÓ a OTG reporta — o import manual coleta a
     // CONTAGEM de CPA, não o dinheiro (`cpa` manual = 0 no v1). Numa instância
@@ -419,6 +458,20 @@ export default function AdminDashboard() {
                     "text-2xl font-bold tracking-tight truncate",
                     idx === 0 ? "text-white" : "text-slate-900 dark:text-white"
                   )}>{metric.value}</h3>
+                  {metric.toggle && (
+                    <button
+                      type="button"
+                      onClick={metric.toggle.onToggle}
+                      aria-pressed={metric.toggle.mode === 'producing'}
+                      title={metric.toggle.mode === 'producing'
+                        ? 'Mostrando quem produziu no período — clique para ver a carteira inteira'
+                        : 'Mostrando a carteira inteira — clique para ver só quem produziu no período'}
+                      className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 text-[10px] font-bold uppercase tracking-wider text-neutral-300 hover:text-white transition-colors"
+                    >
+                      <Filter size={11} />
+                      {metric.toggle.hint}
+                    </button>
+                  )}
                 </div>
               </>
             )}
