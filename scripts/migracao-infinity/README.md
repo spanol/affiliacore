@@ -105,16 +105,29 @@ Medição e justificativa na **§3.1 do doc raiz**.
 # dry-run (valida, resolve ids, imprime o plano, NÃO escreve)
 node scripts/migracao-infinity/converter-rede.cjs \
   --tsv "<scratchpad>/infinity-roster-uplines.tsv" \
-  --base https://<instancia-infinity> \
-  --api-key <FIREBASE_WEB_API_KEY da instância> \
-  --admin-email <admin da instância>
+  --base https://infinity-server--infinity-affiliacore.us-east4.hosted.app \
+  --id-token-file "<scratchpad>/token.txt"
 
 # escrever (fases separáveis com --only roster | --only uplines)
 ... --apply
 ```
 
-Credencial do Admin SDK por `GOOGLE_APPLICATION_CREDENTIALS` ou `FIREBASE_SERVICE_ACCOUNT_KEY` — o Admin SDK
-entra **só** para cunhar o ID token do admin; toda escrita vai por HTTP, porque
+**Como obter o `token.txt`** (nenhuma chave permanente em disco): abra a instância logado como **admin**,
+DevTools → Console, cole e depois salve o conteúdo colado num arquivo:
+
+```js
+const db = await new Promise(r => { const q = indexedDB.open('firebaseLocalStorageDb'); q.onsuccess = () => r(q.result); });
+const all = await new Promise(r => { const q = db.transaction('firebaseLocalStorage').objectStore('firebaseLocalStorage').getAll(); q.onsuccess = () => r(q.result); });
+copy(all[0].value.stsTokenManager.accessToken);   // vai para a área de transferência
+```
+
+O token vale ~1h — de sobra para as ~300 chamadas. O script aceita o JWT cru **ou** o JSON do usuário
+(`{stsTokenManager:{accessToken}}`), valida o formato, avisa quanto tempo resta e **nunca imprime o valor**.
+Vem por **arquivo** e não por argumento de propósito: `argv` vaza em lista de processos.
+
+**Alternativa (b):** `--api-key <WEB_API_KEY> --admin-email <admin>` com credencial do projeto em
+`GOOGLE_APPLICATION_CREDENTIALS`/`FIREBASE_SERVICE_ACCOUNT_KEY` — aí o Admin SDK cunha o token. Exige chave
+de service account em disco (apagar depois). Em qualquer das duas, toda escrita vai por HTTP, porque
 `POST /api/affiliate-uplines` faz a barreira de **ciclo** no write e **audita** a aresta no mesmo batch
 (mudar upline muda dinheiro). Gravar direto no Firestore pularia as duas coisas.
 

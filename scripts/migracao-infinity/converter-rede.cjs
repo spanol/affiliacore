@@ -20,16 +20,20 @@
  * Idempotente: rodar de novo nao duplica nada (`boost-affiliates` reusa o alias de
  * e-mail; regravar o mesmo upline gera diff vazio e nao polui a auditoria).
  *
- * USO
+ * USO — duas formas de autenticar como admin:
+ *
+ *   (a) ID token de arquivo (preferida: nenhuma chave permanente em disco)
  *   node scripts/migracao-infinity/converter-rede.cjs \
  *     --tsv "<scratchpad>/infinity-roster-uplines.tsv" \
  *     --base https://<instancia> \
- *     --api-key <FIREBASE_WEB_API_KEY da instancia> \
- *     --admin-email admin@... \
+ *     --id-token-file "<scratchpad>/token.txt" \
  *     [--only roster|uplines] [--apply]
  *
+ *   (b) Admin SDK cunhando o token (precisa de credencial DO PROJETO da instancia
+ *       em GOOGLE_APPLICATION_CREDENTIALS ou FIREBASE_SERVICE_ACCOUNT_KEY)
+ *   ... --api-key <FIREBASE_WEB_API_KEY> --admin-email admin@...
+ *
  * Sem `--apply` e' DRY-RUN: valida, resolve ids, imprime o plano e NAO escreve nada.
- * Credencial do Admin SDK: GOOGLE_APPLICATION_CREDENTIALS ou FIREBASE_SERVICE_ACCOUNT_KEY.
  */
 
 const fs = require('fs');
@@ -46,12 +50,19 @@ function parseArgs(argv) {
     else if (a === '--api-key') out.apiKey = argv[++i];
     else if (a === '--admin-email') out.adminEmail = argv[++i];
     else if (a === '--admin-uid') out.adminUid = argv[++i];
+    else if (a === '--id-token-file') out.idTokenFile = argv[++i];
     else if (a === '--only') out.only = argv[++i];
     else throw new Error(`Argumento desconhecido: ${a}`);
   }
-  const falta = ['tsv', 'base', 'apiKey'].filter((k) => !out[k]);
+  // Com --id-token-file nao entra Admin SDK, logo nao ha o que cunhar: dispensa
+  // --api-key e --admin-*. O token e' de vida curta (~1h), vem de ARQUIVO (nunca de
+  // argv, que vaza em lista de processo) e o script nunca o imprime.
+  const obrigatorios = out.idTokenFile ? ['tsv', 'base'] : ['tsv', 'base', 'apiKey'];
+  const falta = obrigatorios.filter((k) => !out[k]);
   if (falta.length) throw new Error(`Faltam argumentos: ${falta.join(', ')}`);
-  if (!out.adminEmail && !out.adminUid) throw new Error('Informe --admin-email ou --admin-uid.');
+  if (!out.idTokenFile && !out.adminEmail && !out.adminUid) {
+    throw new Error('Informe --id-token-file, ou --admin-email/--admin-uid para cunhar via Admin SDK.');
+  }
   if (!['ambos', 'roster', 'uplines'].includes(out.only)) throw new Error('--only aceita roster|uplines.');
   return out;
 }
@@ -137,7 +148,31 @@ function validar(rows) {
 }
 
 // --------------------------------------------------------------------- auth
-async function cunharIdToken({ apiKey, adminEmail, adminUid }) {
+async function cunharIdToken({ apiKey, adminEmail, adminUid, idTokenFile }) {
+  // Caminho sem Admin SDK: o operador cola um ID token de admin (obtido na propria
+  // sessao logada da instancia) num arquivo. Evita chave de service account em disco.
+  if (idTokenFile) {
+    const bruto = fs.readFileSync(idTokenFile, 'utf8').trim();
+    if (!bruto) throw new Error(`${idTokenFile} esta vazio.`);
+    // Aceita o token cru OU um JSON com { idToken } / { stsTokenManager: { accessToken } }.
+    let tok = bruto;
+    if (bruto.startsWith('{')) {
+      const j = JSON.parse(bruto);
+      tok = j.idToken || j.stsTokenManager?.accessToken || j.accessToken || '';
+    }
+    tok = tok.replace(/^["']|["']$/g, '').trim();
+    if (tok.split('.').length !== 3) throw new Error('O conteudo nao parece um ID token JWT (esperado 3 partes separadas por ponto).');
+    // exp/uid saem do proprio payload — nao imprime o token, so' o diagnostico.
+    let uid = '(desconhecido)', restamMin = null;
+    try {
+      const p = JSON.parse(Buffer.from(tok.split('.')[1], 'base64').toString('utf8'));
+      uid = p.user_id || p.sub || uid;
+      if (p.exp) restamMin = Math.round((p.exp * 1000 - Date.now()) / 60000);
+    } catch { /* payload ilegivel: segue, o servidor decide */ }
+    if (restamMin !== null && restamMin <= 0) throw new Error(`Token EXPIRADO ha ${-restamMin} min — pegue um novo.`);
+    if (restamMin !== null) console.log(`token de arquivo: uid ${uid}, expira em ~${restamMin} min`);
+    return { idToken: tok, uid };
+  }
   if (!admin.apps.length) {
     if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
       admin.initializeApp({ credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)) });
