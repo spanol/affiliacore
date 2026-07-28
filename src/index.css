@@ -52,7 +52,7 @@
      monocromático EXATO de hoje (branco/neutral-200/neutral-400) — sem
      VITE_BRAND_ACCENT a landing da Boost e da AffiliaCore não muda um pixel.
      Quando a instância declara um accent, resolveThemeTokens sobrescreve estas
-     vars no :root (src/lib/theming.ts, buildLpTokens) e a LP passa a falar a cor
+     vars no :root (src/lib/theming.ts, buildPublicTokens) e a LP passa a falar a cor
      do cliente sem uma linha de código por label. NÃO aponte estas classes para
      accent-* direto: o accent tem default âmbar no @theme, então isso pintaria a
      LP de toda instância. */
@@ -63,6 +63,17 @@
   --color-lp-focus: #ffffff;
   --color-lp-glow: rgb(255 255 255 / 0.05); /* blobs desfocados do fundo */
   --color-lp-halo: rgb(255 255 255 / 0.2); /* box-shadow do frame do hero */
+
+  /* Telas de auth (Login/Register/ForgotPassword/ResetPassword/InviteAccept):
+     o card CLARO. O modo escuro delas reusa os --color-lp-* acima (mesmo papel:
+     marca sobre fundo escuro), por isso aqui só existe a metade clara. Defaults
+     apontam para a superfície navy de hoje — inclusive seguindo
+     VITE_BRAND_SURFACE de quem declarar — então label sem accent não muda. Com
+     accent, buildPublicTokens sobrescreve e o botão/foco/link falam a cor do
+     cliente nos DOIS temas. */
+  --color-auth-cta: var(--color-brand);
+  --color-auth-cta-text: #ffffff;
+  --color-auth-cta-hover: var(--color-brand-light);
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Plus Jakarta Sans", "Inter", sans-serif;

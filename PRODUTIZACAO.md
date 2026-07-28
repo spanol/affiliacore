@@ -453,7 +453,7 @@ contrário ("canvas/surface seguem o neutro default").
 ⚠️ **Operador:** as `VITE_BRAND_*` são BUILD — Infinity e Previsão só ficam
 pretas no **próximo rollout** de cada backend.
 
-## 🎨 LP pública tematizada (2026-07-28)
+## 🎨 Superfície pública tematizada — LP + auth (2026-07-28)
 
 **Reclamação do cliente Infinity, na sequência da anterior:** a landing padrão
 não usava o roxo da marca em lugar nenhum. **Causa:** o accent estava certo em
@@ -465,24 +465,38 @@ tokens). Ou seja: a LP era monocromática por construção, em toda instância.
 **Solução — tokens próprios da LP, acesos só por quem declara accent:**
 
 - `index.css` ganhou `--color-lp-cta` / `-cta-text` / `-cta-hover` / `-icon` /
-  `-focus` / `-glow` / `-halo`, com defaults = o monocromático EXATO de hoje
-  (`#fff`, `#0a0a0a`, `#e5e5e5`, `#a3a3a3`, branco/5%, branco/20%).
-- `buildLpTokens` (`theming.ts`) deriva os 7 da ramp accent e `resolveThemeTokens`
-  só os emite **dentro do `if (accent)`**. Sem `VITE_BRAND_ACCENT` nada é
-  emitido → **Boost e AffiliaCore ficam pixel-idênticas**; Infinity/Previsão
-  falam a cor do cliente sem código por label.
+  `-focus` / `-glow` / `-halo` (landing, fundo escuro fixo), com defaults = o
+  monocromático EXATO de hoje (`#fff`, `#0a0a0a`, `#e5e5e5`, `#a3a3a3`,
+  branco/5%, branco/20%); e `--color-auth-cta` / `-cta-text` / `-cta-hover`
+  (metade CLARA do card de auth), com defaults apontando p/ `var(--color-brand)`
+  / `var(--color-brand-light)` — ou seja, ainda seguem `VITE_BRAND_SURFACE` de
+  quem declarar. **A metade ESCURA das telas de auth reusa os `--color-lp-*`**
+  (mesmo papel: marca sobre fundo escuro), por isso não há `-dark` duplicado.
+- `buildPublicTokens` (`theming.ts`) deriva os 10 da ramp accent e
+  `resolveThemeTokens` só os emite **dentro do `if (accent)`**. Sem
+  `VITE_BRAND_ACCENT` nada é emitido → **Boost e AffiliaCore ficam
+  pixel-idênticas**; Infinity/Previsão falam a cor do cliente sem código por
+  label.
 - **Por que não apontar as classes direto p/ `accent-*`:** o accent tem default
-  ÂMBAR no `@theme`, então isso pintaria a LP de TODA instância de âmbar —
-  exatamente o vazamento que o fix do fundo preto acabou de fechar.
+  ÂMBAR no `@theme`, então isso pintaria a superfície pública de TODA instância
+  de âmbar — exatamente o vazamento que o fix do fundo preto acabou de fechar.
 - Consumidores: `Home.tsx` (nav, menu mobile, CTA do hero, "Aplicar para
-  Parceria", 2 blobs de fundo, ícones dos StatCards, foco dos inputs) e
-  `HomePrizesSection.tsx` (CTA do pódio). A utility `.glow-white` virou
-  `.glow-lp` (segue `--color-lp-halo`).
+  Parceria", 2 blobs de fundo, ícones dos StatCards, foco dos inputs),
+  `HomePrizesSection.tsx` (CTA do pódio) e as 5 telas de auth — `Login`,
+  `Register`, `ForgotPassword`, `ResetPassword`, `InviteAccept` (6 CTAs, 18
+  inputs, 8 links/spinners; padrão de classe idêntico nas cinco). A utility
+  `.glow-white` virou `.glow-lp` (segue `--color-lp-halo`).
 - Ouro/prata/bronze do pódio seguem FIXOS (âmbar = ouro), como já era.
 - **Invariantes travados:** `theming.test.ts` (sem accent → nenhuma
-  `--color-lp-*`; canvas/surface sozinhos não acendem a LP; hover escurece o
-  CTA; glow/halo saem com alpha) e `instanceTheming.test.ts` (LP da Infinity =
-  accent-500; LP da Boost = vazia).
+  `--color-lp-*`/`--color-auth-*`; canvas/surface sozinhos não acendem;
+  auth-cta == lp-cta, p/ o visitante não ver duas cores de marca entre a LP e o
+  login; hover escurece o CTA nos dois temas; glow/halo saem com alpha) e
+  `instanceTheming.test.ts` (Infinity = accent-500 na LP E no auth; Boost =
+  vazia).
+
+**Deixado de fora de propósito:** `NotFound.tsx` (CTA `bg-slate-900
+dark:bg-brand`, lógica invertida — mapear mudaria pixel da Boost) e `Terms.tsx`
+(botão one-off). Ambos precisam de decisão de design antes, não de token.
 
 ⚠️ **Operador:** BUILD como as demais — a Infinity só fica roxa no **próximo
 rollout**.

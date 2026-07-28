@@ -142,15 +142,17 @@ export interface ThemeTokens {
   cssVars: Record<string, string>;
 }
 
-// ——— LP pública: CTA e detalhes seguem o accent (só quando declarado) —————
+// ——— Superfícies PÚBLICAS (LP + auth): seguem o accent, só quando declarado ——
 
-// A landing (Home + seção de premiações) é o MESMO código em toda instância e
-// nasceu monocromática (CTA branco sobre preto). Apontar as classes p/ accent-*
-// direto pintaria a LP de todo mundo — o accent tem default ÂMBAR no @theme, e
-// a Boost/AffiliaCore ficariam âmbar sem ninguém pedir. Por isso a LP consome
-// tokens próprios (--color-lp-*, defaults monocromáticos no index.css) que só
-// são emitidos aqui quando a instância declara VITE_BRAND_ACCENT: label sem
-// accent = LP pixel-idêntica; Infinity/Previsão = LP na cor do cliente.
+// A landing e as telas de auth são o MESMO código em toda instância e nasceram
+// sem cor de marca: a LP monocromática (CTA branco sobre preto), o card de auth
+// no navy de superfície. Apontar as classes p/ accent-* direto pintaria a
+// superfície pública de todo mundo — o accent tem default ÂMBAR no @theme, e a
+// Boost/AffiliaCore ficariam âmbar sem ninguém pedir. Por isso elas consomem
+// tokens próprios (--color-lp-* e --color-auth-*, defaults no index.css = o
+// visual de hoje) que só são emitidos aqui quando a instância declara
+// VITE_BRAND_ACCENT: label sem accent = pixel-idêntica; Infinity/Previsão = na
+// cor do cliente.
 //
 // Alphas maiores que os do branco original de propósito: branco a 5% ainda lê
 // como névoa sobre o preto, um roxo saturado a 5% simplesmente some.
@@ -158,14 +160,15 @@ const LP_GLOW_ALPHA = 0.2;
 const LP_HALO_ALPHA = 0.35;
 
 /**
- * Tokens da LP derivados do accent da instância. Hex inválido/ausente → null
- * (a LP fica no monocromático do index.css).
+ * Tokens das superfícies públicas derivados do accent da instância. Hex
+ * inválido/ausente → null (LP e auth ficam no default do index.css).
  */
-export function buildLpTokens(hex: unknown): Record<string, string> | null {
+export function buildPublicTokens(hex: unknown): Record<string, string> | null {
   const steps = accentHslSteps(hex);
   const ramp = buildAccentRamp(hex);
   if (!steps || !ramp) return null;
   return {
+    // Landing (fundo escuro fixo).
     '--color-lp-cta': hslCss(steps['500']),
     '--color-lp-cta-text': ramp.contrast,
     '--color-lp-cta-hover': hslCss(steps['600']), // hover ESCURECE (igual branco→neutral-200)
@@ -173,6 +176,10 @@ export function buildLpTokens(hex: unknown): Record<string, string> | null {
     '--color-lp-focus': hslCss(steps['400']),
     '--color-lp-glow': hslCss(steps['500'], LP_GLOW_ALPHA),
     '--color-lp-halo': hslCss(steps['400'], LP_HALO_ALPHA),
+    // Card de auth, metade CLARA (a escura reusa os --color-lp-* acima).
+    '--color-auth-cta': hslCss(steps['500']),
+    '--color-auth-cta-text': ramp.contrast,
+    '--color-auth-cta-hover': hslCss(steps['600']),
   };
 }
 
@@ -289,8 +296,8 @@ export function resolveThemeTokens(env?: Record<string, unknown> | null): ThemeT
   if (accent) {
     for (const step of ACCENT_STEPS) cssVars[`--color-accent-${step}`] = accent[step];
     cssVars['--color-accent-contrast'] = accent.contrast;
-    // LP pública: CTA/glow/ícones só ganham cor quando há accent declarado.
-    Object.assign(cssVars, buildLpTokens(e.VITE_BRAND_ACCENT) ?? {});
+    // Superfícies públicas (LP + auth) só ganham cor quando há accent declarado.
+    Object.assign(cssVars, buildPublicTokens(e.VITE_BRAND_ACCENT) ?? {});
   }
 
   const surface = parseHex(e.VITE_BRAND_SURFACE);

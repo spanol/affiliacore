@@ -108,7 +108,7 @@ export default function InviteAccept() {
   if (validating) {
     return shell(
       <div className="flex flex-col items-center gap-4 py-8">
-        <Loader2 className="w-8 h-8 text-brand dark:text-white animate-spin" />
+        <Loader2 className="w-8 h-8 text-auth-cta dark:text-lp-cta animate-spin" />
         <p className="text-xs font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest">Validando convite...</p>
       </div>
     );
@@ -122,7 +122,7 @@ export default function InviteAccept() {
         </div>
         <h2 className="text-xl font-bold text-slate-900 dark:text-white">Convite indisponível</h2>
         <p className="text-sm text-slate-500 dark:text-neutral-400">{inviteError}</p>
-        <Link to="/login" className="inline-block text-brand dark:text-white hover:underline text-xs font-bold uppercase tracking-wider">Ir para o login</Link>
+        <Link to="/login" className="inline-block text-auth-cta dark:text-lp-cta hover:underline text-xs font-bold uppercase tracking-wider">Ir para o login</Link>
       </div>
     );
   }
@@ -170,7 +170,7 @@ export default function InviteAccept() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all outline-none"
+              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-auth-cta/20 focus:border-auth-cta transition-all outline-none"
               placeholder="nome@exemplo.com"
             />
           </div>
@@ -186,7 +186,7 @@ export default function InviteAccept() {
               value={phone}
               onChange={(e) => setPhone(maskPhone(e.target.value))}
               required
-              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all outline-none"
+              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-auth-cta/20 focus:border-auth-cta transition-all outline-none"
               placeholder="(11) 99999-9999"
             />
           </div>
@@ -200,7 +200,7 @@ export default function InviteAccept() {
               type="text"
               value={socialMedia}
               onChange={(e) => setSocialMedia(e.target.value)}
-              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all outline-none"
+              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-auth-cta/20 focus:border-auth-cta transition-all outline-none"
               placeholder="@seuperfil"
             />
           </div>
@@ -216,7 +216,7 @@ export default function InviteAccept() {
               value={cpf}
               onChange={(e) => setCpf(maskCPF(e.target.value))}
               required
-              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all outline-none"
+              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-auth-cta/20 focus:border-auth-cta transition-all outline-none"
               placeholder="000.000.000-00"
             />
           </div>
@@ -232,7 +232,7 @@ export default function InviteAccept() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all outline-none"
+              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-auth-cta/20 focus:border-auth-cta transition-all outline-none"
               placeholder="Mínimo 6 caracteres"
             />
           </div>
@@ -248,7 +248,7 @@ export default function InviteAccept() {
               onChange={(e) => setConfirm(e.target.value)}
               required
               minLength={6}
-              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all outline-none"
+              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-auth-cta/20 focus:border-auth-cta transition-all outline-none"
               placeholder="Repita a senha"
             />
           </div>
@@ -257,14 +257,14 @@ export default function InviteAccept() {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full py-4 rounded-2xl font-bold mt-4 flex items-center justify-center gap-2 transition-all disabled:opacity-50 bg-brand text-white hover:bg-brand-light shadow-lg shadow-brand/20 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 dark:shadow-white/10"
+          className="w-full py-4 rounded-2xl font-bold mt-4 flex items-center justify-center gap-2 transition-all disabled:opacity-50 bg-auth-cta text-auth-cta-text hover:bg-auth-cta-hover shadow-lg shadow-auth-cta/20 dark:bg-lp-cta dark:text-lp-cta-text dark:hover:bg-lp-cta-hover dark:shadow-lp-cta/10"
         >
           {submitting ? <Loader2 size={18} className="animate-spin" /> : <><UserPlus size={18} /> Ativar meu acesso</>}
         </button>
       </form>
 
       <p className="text-center mt-8 text-xs font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-tight">
-        Já tem acesso? <Link to="/login" className="text-brand dark:text-white hover:underline">Fazer login</Link>
+        Já tem acesso? <Link to="/login" className="text-auth-cta dark:text-lp-cta hover:underline">Fazer login</Link>
       </p>
     </>
   );

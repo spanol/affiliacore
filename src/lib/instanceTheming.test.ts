@@ -65,18 +65,20 @@ describe('tema por instância (apphosting.*.yaml)', () => {
     expect(cssVars['--color-accent-500']).toBe('hsl(276 57.4% 46.1%)');
   });
 
-  it('a LP da Infinity fala o roxo da marca (CTA/glow/ícones)', () => {
+  it('a superfície pública da Infinity fala o roxo da marca (LP + telas de auth)', () => {
     const { cssVars } = resolveThemeTokens(merged('infinity'));
     expect(cssVars['--color-lp-cta']).toBe(cssVars['--color-accent-500']);
     expect(cssVars['--color-lp-cta-text']).toBe(cssVars['--color-accent-contrast']);
     expect(cssVars['--color-lp-glow']).toMatch(/^hsl\(276 /);
+    expect(cssVars['--color-auth-cta']).toBe(cssVars['--color-accent-500']);
   });
 
-  it('a LP da Boost segue MONOCROMÁTICA (label sem accent = LP pixel-idêntica)', () => {
-    // Os --color-lp-* nascem branco/neutral no index.css. A Boost pina o accent
-    // em 'none', então nada é emitido e a landing pública dela não muda um pixel.
+  it('a superfície pública da Boost segue SEM cor de marca (label sem accent = pixel-idêntica)', () => {
+    // Os --color-lp-*/--color-auth-* nascem branco/neutral/navy no index.css. A
+    // Boost pina o accent em 'none', então nada é emitido e a landing + as telas
+    // de auth dela não mudam um pixel.
     const { cssVars } = resolveThemeTokens(merged('boost'));
-    expect(Object.keys(cssVars).filter((v) => v.startsWith('--color-lp-'))).toEqual([]);
+    expect(Object.keys(cssVars).filter((v) => /^--color-(lp|auth)-/.test(v))).toEqual([]);
   });
 
   it('a DEMO (vitrine do produto) segue no ember AffiliaCore', () => {

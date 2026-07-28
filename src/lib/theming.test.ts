@@ -4,7 +4,7 @@ import {
   SOLID_STYLE_VARS,
   buildAccentRamp,
   buildCanvasRamp,
-  buildLpTokens,
+  buildPublicTokens,
   lightenSurface,
   parseHex,
   relativeLuminance,
@@ -180,7 +180,7 @@ describe('resolveThemeTokens', () => {
   });
 });
 
-describe('tokens da LP pública (--color-lp-*)', () => {
+describe('tokens das superfícies públicas (--color-lp-* / --color-auth-*)', () => {
   const LP_VARS = [
     '--color-lp-cta',
     '--color-lp-cta-text',
@@ -190,48 +190,59 @@ describe('tokens da LP pública (--color-lp-*)', () => {
     '--color-lp-glow',
     '--color-lp-halo',
   ];
+  const AUTH_VARS = ['--color-auth-cta', '--color-auth-cta-text', '--color-auth-cta-hover'];
+  const publicVarsOf = (vars: Record<string, string>) =>
+    Object.keys(vars).filter((v) => /^--color-(lp|auth)-/.test(v));
 
-  it('hex inválido/ausente → null (LP fica no monocromático do index.css)', () => {
-    expect(buildLpTokens(undefined)).toBeNull();
-    expect(buildLpTokens('')).toBeNull();
-    expect(buildLpTokens('none')).toBeNull();
-    expect(buildLpTokens(42)).toBeNull();
+  it('hex inválido/ausente → null (LP e auth ficam no default do index.css)', () => {
+    expect(buildPublicTokens(undefined)).toBeNull();
+    expect(buildPublicTokens('')).toBeNull();
+    expect(buildPublicTokens('none')).toBeNull();
+    expect(buildPublicTokens(42)).toBeNull();
   });
 
-  it('INVARIANTE: instância SEM accent não emite var de LP nenhuma', () => {
-    // A landing é o mesmo código em toda label e nasceu monocromática (CTA
-    // branco). Se um --color-lp-* vazar sem accent declarado, a LP da Boost e da
-    // AffiliaCore muda de cor sem ninguém pedir.
+  it('INVARIANTE: instância SEM accent não emite var pública nenhuma', () => {
+    // Landing e telas de auth são o mesmo código em toda label e nasceram sem
+    // cor de marca (LP monocromática, card de auth no navy). Se um --color-lp-*
+    // ou --color-auth-* vazar sem accent declarado, a superfície pública da
+    // Boost e da AffiliaCore muda de cor sem ninguém pedir.
     for (const unset of [{}, { VITE_BRAND_ACCENT: '' }, { VITE_BRAND_ACCENT: 'none' }]) {
-      const { cssVars } = resolveThemeTokens(unset);
-      expect(Object.keys(cssVars).filter((v) => v.startsWith('--color-lp-'))).toEqual([]);
+      expect(publicVarsOf(resolveThemeTokens(unset).cssVars)).toEqual([]);
     }
-    // canvas/surface sozinhos também não acendem a LP — só o ACCENT acende.
+    // canvas/surface sozinhos também não acendem — só o ACCENT acende.
     const { cssVars } = resolveThemeTokens({
       VITE_BRAND_CANVAS: '#26181C',
       VITE_BRAND_SURFACE: '#3F1D2B',
       VITE_BRAND_STYLE: 'solid',
     });
-    expect(Object.keys(cssVars).filter((v) => v.startsWith('--color-lp-'))).toEqual([]);
+    expect(publicVarsOf(cssVars)).toEqual([]);
   });
 
-  it('com accent, a LP inteira sai da ramp da marca', () => {
+  it('com accent, LP e auth saem da MESMA ramp da marca', () => {
     const hex = '#8332B9'; // roxo da Infinity
     const { cssVars } = resolveThemeTokens({ VITE_BRAND_ACCENT: hex });
     const ramp = buildAccentRamp(hex)!;
 
-    for (const name of LP_VARS) expect(cssVars[name], name).toBeTruthy();
+    for (const name of [...LP_VARS, ...AUTH_VARS]) expect(cssVars[name], name).toBeTruthy();
     expect(cssVars['--color-lp-cta']).toBe(ramp['500']);
     expect(cssVars['--color-lp-cta-text']).toBe(ramp.contrast);
     expect(cssVars['--color-lp-cta-hover']).toBe(ramp['600']);
     expect(cssVars['--color-lp-icon']).toBe(ramp['400']);
     expect(hueOf(cssVars['--color-lp-cta'])).toBeCloseTo(hueOf(ramp['500']), 1);
+
+    // O card CLARO de auth usa o MESMO tom do CTA escuro da LP: um visitante que
+    // sai da landing roxa e clica em "Entrar" não pode ver outra cor de marca.
+    expect(cssVars['--color-auth-cta']).toBe(cssVars['--color-lp-cta']);
+    expect(cssVars['--color-auth-cta-text']).toBe(cssVars['--color-lp-cta-text']);
+    expect(cssVars['--color-auth-cta-hover']).toBe(cssVars['--color-lp-cta-hover']);
   });
 
-  it('o hover ESCURECE o CTA (mesmo sentido de branco→neutral-200)', () => {
+  it('o hover ESCURECE o CTA nos dois temas (mesmo sentido de branco→neutral-200)', () => {
     const { cssVars } = resolveThemeTokens({ VITE_BRAND_ACCENT: '#8332B9' });
     expect(lightnessOf(cssVars['--color-lp-cta-hover']))
       .toBeLessThan(lightnessOf(cssVars['--color-lp-cta']));
+    expect(lightnessOf(cssVars['--color-auth-cta-hover']))
+      .toBeLessThan(lightnessOf(cssVars['--color-auth-cta']));
   });
 
   it('glow e halo saem translúcidos (são blobs/box-shadow, não fills)', () => {
