@@ -171,12 +171,29 @@ O XLSX de Pagamentos (21 colunas) foi baixado e parseado; serve para **conferir 
   aterrissa em `esportiva.bet.br/?src=…&utm_source=544865&ext_marker=infinity&afp=teste01`.
 - **⚠️ O relatório atrasa ~1 dia.** Em 27/07 a última linha era 26/07, e o clique de teste não moveu o
   contador de visitas do dia. **Toda rotina manual lê D−1** — um piloto de 1 semana só fecha no 8º dia.
-- **⚠️ Atribuição por tag: NÃO comprovada.** O Relatório de Mídia tem as dimensões `Source ID`, `Link`,
-  `Child Affiliate`, `Campaign ID/name` e `Deal group ID` — mas agrupando por `Source ID` **e** por
-  `Child Affiliate` no período 01/05→31/07/2026 **todas as linhas vêm vazias ("—")**. Não prova que não
-  funciona; prova que **nunca foi usada** (quase todos os links gerados são a URL base, sem `?afp=`).
-  Probe pendente: um clique com `afp=teste01` foi disparado em 27/07 — **conferir em 28/07** se o
-  `Source ID` popula. É o que destrava (ou mata) a atribuição por afiliado sem depender de postback.
+- **⚠️ GARGALO CONFIRMADO: hoje não existe atribuição por afiliado nesta conta.** Os **quatro** eixos
+  possíveis foram verificados e **todos estão vazios**:
+  1. `Source ID` (o `afp`) — vazio em 01/05→31/07/2026;
+  2. `Child Affiliate` — vazio no mesmo período;
+  3. **Rede de indicados** (Network Afiliado, após sincronizar) — *"Nenhum indicado aprovado na sua rede"*;
+  4. seletor **Afiliado** — uma única conta (544865).
+
+  Tudo cai no balde agregado da conta `infinity`. O próprio Maurício confirmou de forma independente:
+  *"os dados funcionaram sim, mas foram contabilizados lá na dashboard infinity"*. O rastreamento funciona
+  (308 visitas / 72 registros / 48 FTDs / 46 QFTDs em jul), só não se separa por origem.
+  Não prova que a segmentação não funcione; prova que **nunca foi alimentada** (quase todo link gerado é a
+  URL base, sem `?afp=`; os 288 tagueados do Standby nunca foram distribuídos).
+
+  **⚠️ Atribuição retroativa é impossível** — o tráfego que já entrou sem tag não se reclassifica.
+
+  **Três saídas, em ordem de custo:**
+  - **A — tag `afp` (probe pendente).** Clique com `afp=teste01` disparado em 27/07; **conferir em 28/07**
+    se o `Source ID` popula. Mais barato e não muda o modelo comercial. É o caminho preferencial.
+  - **B — sub-conta na casa** via `wallet.esportiva.bet.br/registro?paff=544865`: o afiliado vira conta
+    própria vinculada à Infinity e passa a aparecer em "Rede de indicados" / `Child Affiliate`. É o desenho
+    nativo da casa e funciona com certeza — mas exige aprovação da casa e **enfraquece a Infinity como
+    intermediária** (o afiliado passa a ter relação direta com a operadora).
+  - **C — nosso `/go/:code`**: já funciona e conta clique em tempo real, mas só converte com postback.
 
 > Nota que recontextualiza o legado: como o painel da G8 lança resultado por **digitação manual**
 > ("Novo dia"), os números por afiliado de lá foram alguém digitando — não necessariamente uma
