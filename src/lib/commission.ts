@@ -33,7 +33,17 @@ export interface AffiliateConfig {
 // coerção nativa (Number([5])===5), e primitivos/strings ficam inalterados.
 export const num = (v: any): number => {
   if (v !== null && typeof v === 'object' && !Array.isArray(v)) return 0;
-  const n = Number(v);
+  // O guard acima não basta: um ARRAY cujo conteúdo não coage também lança —
+  // `Number([{}])` chama Array.prototype.toString → String({}) → "Cannot convert
+  // object to primitive value" (achado property 2026-07-27, mesma classe do bug
+  // de 2026-06-24, um nível abaixo). num() é a porta ÚNICA do cálculo de dinheiro
+  // e não pode lançar em NENHUMA entrada: qualquer coerção que falhe vira 0.
+  let n: number;
+  try {
+    n = Number(v);
+  } catch {
+    return 0;
+  }
   return Number.isFinite(n) ? n : 0;
 };
 
