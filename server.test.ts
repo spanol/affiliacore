@@ -1657,3 +1657,114 @@ describe('marketplace desligado por instância (default OFF)', () => {
     await expect404(request(app).post('/api/partnerships').send({ dealId: 'd1' }));
   });
 });
+
+// =============================================================================
+// /go/:code — o redirect PÚBLICO do link de divulgação. Tinha 0 teste de rota: só
+// os helpers puros (tracking.ts) eram exercitados, nunca o wiring. É a peça mais
+// exposta do produto (quem bate nela é a audiência do afiliado, sem login) e, no
+// piloto com influenciador, o clique é a ÚNICA métrica que não depende da casa
+// nem do próprio influenciador — se ela mentir, não sobra número confiável.
+//
+// Testamos a NOSSA lógica: injeção de subid preservando params, casamento
+// clickId==subid (o que habilita o postback futuro), classificação de bot, LGPD
+// (nunca o IP cru) e o fail-safe pro fallback. O `increment` do contador é
+// semântica do Firestore, não nossa — não é papel deste teste.
+describe('/go/:code — redirect público do link de divulgação', () => {
+  const linkSeed = (over: Record<string, any> = {}) => ({
+    affiliate_links: {
+      ABC123: {
+        code: 'ABC123',
+        affiliateId: 'affX',
+        brandId: 'esportiva',
+        // Já traz `wm` (ref do afiliado na casa): o subid tem que CONVIVER, não substituir.
+        registerUrl: 'https://esportiva.bet/cadastro?wm=infinity01',
+        active: true,
+        ...over,
+      },
+    },
+  });
+  const CHROME_UA =
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+
+  it('link ativo → 302 pro registerUrl com subid injetado, preservando o `wm`', async () => {
+    const db = makeFirestore(linkSeed());
+    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .get('/go/ABC123')
+      .set('User-Agent', CHROME_UA)
+      .expect(302);
+    const dest = new URL(res.headers.location);
+    expect(dest.origin + dest.pathname).toBe('https://esportiva.bet/cadastro');
+    expect(dest.searchParams.get('wm')).toBe('infinity01'); // param da casa preservado
+    expect(dest.searchParams.get('subid')).toMatch(/^[0-9a-f]{24}$/);
+  });
+
+  it('o clickId gravado É o subid da URL (casamento que habilita o postback)', async () => {
+    const db = makeFirestore(linkSeed());
+    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .get('/go/ABC123')
+      .set('User-Agent', CHROME_UA)
+      .expect(302);
+    const subid = new URL(res.headers.location).searchParams.get('subid')!;
+    const clicks = [...(db.__store.get('link_clicks')?.entries() ?? [])];
+    expect(clicks).toHaveLength(1);
+    const [docId, row] = clicks[0];
+    expect(docId).toBe(subid); // o doc é indexado pelo subid → postback casa por id
+    expect(row).toMatchObject({ clickId: subid, code: 'ABC123', affiliateId: 'affX', brandId: 'esportiva', isBot: false });
+  });
+
+  it('LGPD: grava só hash truncado do IP — nunca o IP cru', async () => {
+    const db = makeFirestore(linkSeed());
+    await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .get('/go/ABC123')
+      .set('User-Agent', CHROME_UA)
+      .set('X-Forwarded-For', '203.0.113.42')
+      .expect(302);
+    const row = [...(db.__store.get('link_clicks')?.values() ?? [])][0] as any;
+    expect(row.ipHash).toMatch(/^[0-9a-f]{16}$/);
+    expect(JSON.stringify(row)).not.toContain('203.0.113.42');
+  });
+
+  it('bot de preview (facebookexternalhit) → isBot:true; navegador real → isBot:false', async () => {
+    const dbBot = makeFirestore(linkSeed());
+    await request(createApp({ adminApp: makeAdminApp(), adminDb: dbBot }))
+      .get('/go/ABC123')
+      .set('User-Agent', 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)')
+      .expect(302);
+    expect(([...(dbBot.__store.get('link_clicks')?.values() ?? [])][0] as any).isBot).toBe(true);
+
+    const dbHuman = makeFirestore(linkSeed());
+    await request(createApp({ adminApp: makeAdminApp(), adminDb: dbHuman }))
+      .get('/go/ABC123')
+      .set('User-Agent', CHROME_UA)
+      .expect(302);
+    expect(([...(dbHuman.__store.get('link_clicks')?.values() ?? [])][0] as any).isBot).toBe(false);
+  });
+
+  it('série diária é gravada em {code}__{dia-BR}', async () => {
+    const db = makeFirestore(linkSeed());
+    await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .get('/go/ABC123')
+      .set('User-Agent', CHROME_UA)
+      .expect(302);
+    const stats = [...(db.__store.get('link_click_stats')?.entries() ?? [])];
+    expect(stats).toHaveLength(1);
+    expect(stats[0][0]).toMatch(/^ABC123__\d{4}-\d{2}-\d{2}$/);
+    expect(stats[0][1]).toMatchObject({ code: 'ABC123', affiliateId: 'affX', brandId: 'esportiva' });
+  });
+
+  it('link inativo, code inexistente ou sem registerUrl → fallback e NÃO registra clique', async () => {
+    for (const seed of [
+      linkSeed({ active: false }),
+      linkSeed({ registerUrl: null }),
+      { affiliate_links: {} },
+    ]) {
+      const db = makeFirestore(seed as any);
+      const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+        .get('/go/ABC123')
+        .set('User-Agent', CHROME_UA)
+        .expect(302);
+      expect(res.headers.location).toBe('/');
+      expect(db.__store.get('link_clicks')?.size ?? 0).toBe(0);
+    }
+  });
+});
