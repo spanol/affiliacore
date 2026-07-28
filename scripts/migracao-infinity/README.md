@@ -125,10 +125,13 @@ com código 1. `generateInvite` é **false** de propósito: migração históric
 
 ## O que este runbook NÃO cobre
 
-- **A taxa por afiliado.** É o passo 5 e continua pendente — e o dado **não está** em `/admin/config`
-  (só REV, 0% em todos). As 3 camadas de CPA (300 → 280 → 270) precisam ser extraídas de outra tela;
-  o XLSX de Pagamentos tem `CPA/Deal atual` mas cobre só quem tem saldo. Sem taxa por pessoa não se
-  reproduz os R$ 33.540 do legado.
+- **O passo 5 (taxas), embora agora os valores sejam conhecidos.** As 3 camadas ficam no card
+  "Configuração de CPA" de `/admin/config`, **por casa** (§3.2 do doc raiz):
+  V2 300/**280**/270 · Stake 185/**160**/140 · Esportiva 120/**110**/100 (Sistema/Agente/Afiliado).
+  `byBrand[casa].cpaValue` = coluna **Agente (direto)** nos **18 topos**, **Afiliado (ref)** nos demais —
+  isso reproduz os R$ 33.540 do legado (`Agente` × CPAs, conferido). REV fica **ausente**, não zero.
+  ⚠️ O **deal individual** no meio da árvore ("Limite de repasse") continua desconhecido: afeta o extrato
+  de cada afiliado, não o custo da agência.
 - **O passivo de R$ 32.306,40** em aberto (§6.1 do doc raiz): decisão comercial pendente, **bloqueia o
   Financeiro**, não bloqueia esta importação.
 - **Links/tags**: não migram. Ver §6.2.1 do doc raiz (pool de Standby) e o gargalo de atribuição na §5.1.

@@ -148,9 +148,40 @@ preenche quem não aparece em casa nenhuma (5 pessoas). Nos 7 conflitos, a casa 
    do TOPO dela (`buildRootConfigMap`). Migrar pela árvore do `main` faria 83 pessoas virarem topo e
    subestimaria o "lucro sobre equipe". Ver `REDE-AFILIADOS.md`.
 
-**Ainda em aberto: a taxa por pessoa.** `/admin/config` só expõe REV (0% em todos). O CPA por afiliado
-(as 3 camadas 300 → 280 → 270) não está nessa tela; o XLSX de Pagamentos tem `CPA/Deal atual` mas cobre só
-quem tem saldo. Sem taxa por pessoa não é possível reproduzir os R$ 33.540 do legado nem rodar o passo 5.
+### 3.2 As 3 camadas de CPA são por CASA — e fecham os R$ 33.540
+
+O card **"Configuração de CPA"** no topo de `/admin/config` (por banco) expõe as 3 camadas. Lidas em
+2026-07-28:
+
+| Casa | `CPA Sistema` | `CPA Agente (direto)` | `CPA Afiliado (ref)` |
+|---|---:|---:|---:|
+| Super Bet V2 | 300 | **280** | 270 |
+| Stake | 185 | **160** | 140 |
+| Esportiva Bet | 120 | **110** | 100 |
+| (`main`, não é casa) | 125 | 115 | 100 |
+
+**Reconciliação com o dado real — o modelo da rede reproduz o legado:**
+
+| Cálculo | Resultado | Confere com |
+|---|---:|---|
+| `Sistema` × CPAs — 67×300 + 58×185 + 50×120 | **R$ 36.830,00** | comissão importada (§ runbook) |
+| `Agente` × CPAs — 67×280 + 58×160 + 50×110 | **R$ 33.540,00** | bruto do passivo (§6.1) |
+| diferença | **R$ 3.290,00** | lucro real da agência |
+
+Isso valida `buildRootConfigMap` contra dado de produção: o custo da agência é a produção de cada estrutura
+× taxa do **TOPO** dela, e o topo é pago na camada `Agente (direto)` da casa. Até aqui a reconciliação de
+`REDE-AFILIADOS.md` usava fixtures com taxas ajustadas; agora os três produtos somam o total do painel.
+
+**Para o passo 5**, portanto: `affiliate_configs.byBrand[casa].cpaValue` = a coluna `Agente (direto)` para
+os **18 topos de estrutura** e `Afiliado (ref)` para os demais. REV fica ausente (não zero — ausência ≠ R$ 0).
+
+⚠️ **O que ainda NÃO está resolvido: o deal individual.** Esses três valores são o **padrão do BET**, e o
+legado permite deal por pessoa (é o "Limite de repasse" do §3: o afiliado define o CPA do indicado, com teto
+no próprio). A decomposição R$ 26.780 direto + R$ 6.760 de equipe do export **não** sai dos spreads
+uniformes (10/20/10 daria R$ 2.330), o que confirma que há taxa individual no meio da árvore. Consequência:
+o **custo total** da agência está reconciliado, mas **como esses R$ 33.540 se repartem entre os 159
+afiliados** depende de deals que não estão em `/admin/config`. Isso afeta o extrato de cada afiliado, não o
+lucro da agência.
 
 Chaves `?db=` válidas (do próprio painel): `main`, `superbetv2infi`, `stakeinfini`, `esportivainifi`
 (+ `superbetinfini`, `sportinginfini`, `liderinfinity`, `galerainfinity`, `sorteinfinity`, `lotolandinfini`,
