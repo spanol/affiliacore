@@ -102,39 +102,55 @@ com teto no próprio CPA. Hoje na AffiliaCore quem define a taxa do sub é o adm
 
 **Rede de 4 níveis** (N1 direto + N2/N3/N4 indiretos) contra o modelo especial+sub-rede atual.
 
-### 3.1 Topologia REAL da rede — medida em 2026-07-28
+### 3.1 Topologia REAL da rede — medida em 2026-07-28 (4 bancos)
 
-O "4 níveis" acima é **capacidade da plataforma legada**, não o formato do dado. Varredura read-only de
-`/admin/config` (banco `main`, 4 páginas, rótulo `BET: Infinity Affiliates` conferido em todas):
+Varredura read-only de `/admin/config` nos **4 bancos** (`main` + as 3 casas), 9 páginas no total, com o
+rótulo `BET:` conferido em cada resposta (`Infinity Affiliates` / `Super Bet V2` / `Stake` / `Esportiva Bet`
+— todos distintos, logo nenhum caiu no fallback silencioso do §1).
 
-| Medida | Valor |
-|---|---:|
-| Afiliados | 160 |
-| Com upline real | **77** |
-| Com gerente = **si mesmo** (⇒ topo de estrutura) | **83** |
-| Upline apontando p/ fora do roster | **0** |
-| **Ciclos** | **0** |
-| **Profundidade máxima** | **2** (⇒ **3 níveis**, não 4) |
-| Distribuição por nível (0 / 1 / 2) | 83 / 65 / 12 |
-| Pessoas que são upline de alguém | 19 |
-| Maior sub-rede direta | 30 filhos (depois 16, 8, 3, 3, 2) |
-| REV ≠ 0% | **0 de 160** (CPA-puro confirmado) |
+⚠️ **O banco `main` SUB-REPORTA a rede — não use ele como fonte.** Uma primeira medição só do `main` deu
+77 arestas e 83 topos; a união com os bancos de casa mostra que aquilo era um subconjunto:
+
+| Medida | `main` sozinho | **União (verdade)** |
+|---|---:|---:|
+| Afiliados | 160 | 160 |
+| Com upline real | 77 | **141** |
+| Topos de estrutura | 83 | **19** |
+| Profundidade máxima | 2 (3 níveis) | **3 (⇒ 4 níveis)** |
+| Distribuição por nível (0/1/2/3) | 83 / 65 / 12 / — | **19 / 91 / 39 / 11** |
+| Ciclos | 0 | **0** |
+| Upline fora do roster | 0 | **0** |
+| Pessoas que são upline | 19 | **19** |
+| Maior sub-rede direta | 30 | **34** |
+| REV ≠ 0% | 0 de 160 | **0 de 160** (CPA-puro) |
+
+O `main` diz "topo" para **64** pessoas que têm gerente no banco da casa onde operam, e em **7** casos
+aponta um gerente que **nenhuma casa** confirma. Os "4 níveis" do §3 eram, afinal, o dado **também** — não
+só capacidade da plataforma.
+
+**A árvore é GLOBAL — o schema atual serve.** Das 40 pessoas presentes em mais de uma casa, **zero** têm
+gerente diferente entre casas (34 têm o mesmo gerente em todas, 6 são topo em todas). Nenhum gerente citado
+numa casa está fora do roster do `main`. Portanto uma árvore única por instância + taxa por casa via
+`byBrand` representa o legado fielmente; **não** é preciso árvore por casa.
+
+**Regra de resolução do upline** (a que o conversor implementa): a **CASA é a autoridade**; o `main` só
+preenche quem não aparece em casa nenhuma (5 pessoas). Nos 7 conflitos, a casa vence.
 
 **Consequências para o conversor:**
 
-1. **`gerente == próprio id` significa "sem gerente"** — é a convenção do legado para topo de estrutura.
-   São 83 casos, mais da metade do roster. `buildNetworkTree` já descarta essa aresta como `auto-upline`
-   e faz o afiliado virar topo, então o comportamento sai correto sem tratamento especial — mas o conversor
-   **não deve** enviar essas arestas ao `POST /api/affiliate-uplines` (a rota responde 400 em auto-upline).
-2. **O dado está limpo**: sem ciclo e sem upline órfão. O saneamento da árvore não vai descartar nada além
+1. **`gerente == próprio id` significa "sem gerente"** — convenção do legado para topo de estrutura.
+   O conversor **não deve** enviar essas arestas ao `POST /api/affiliate-uplines` (a rota responde 400 em
+   auto-upline); `buildNetworkTree` também as descarta sozinho na leitura.
+2. **O dado está limpo**: sem ciclo e sem upline órfão, nos 4 bancos. O saneamento não descarta nada além
    dos auto-uplines, então a rede migrada é fiel ao legado.
-3. A rede é **rasa e concentrada**: 19 uplines para 77 vínculos, e um único gerente com 30 diretos.
+3. A rede é **concentrada**: 19 uplines para 141 vínculos, e um único gerente com 34 diretos.
+4. **19 topos, não 83, é o que define o custo da agência** — o custo é a produção de cada estrutura × taxa
+   do TOPO dela (`buildRootConfigMap`). Migrar pela árvore do `main` faria 83 pessoas virarem topo e
+   subestimaria o "lucro sobre equipe". Ver `REDE-AFILIADOS.md`.
 
-⚠️ **Em aberto — árvore por casa.** A medição acima é do `main`. Cada banco tem roster próprio
-(`db=esportivainifi` → rótulo `Esportiva Bet`, 19 usuários — confirmado que NÃO cai no `main`), e o campo
-`Gerente` existe em cada um. **Não foi verificado se o gerente de uma mesma pessoa difere entre casas.**
-Se diferir, o modelo atual da AffiliaCore (uma árvore GLOBAL por instância, com taxa por casa via `byBrand`)
-não representa o legado e precisaria de árvore por casa. Confirmar **antes** de rodar o conversor.
+**Ainda em aberto: a taxa por pessoa.** `/admin/config` só expõe REV (0% em todos). O CPA por afiliado
+(as 3 camadas 300 → 280 → 270) não está nessa tela; o XLSX de Pagamentos tem `CPA/Deal atual` mas cobre só
+quem tem saldo. Sem taxa por pessoa não é possível reproduzir os R$ 33.540 do legado nem rodar o passo 5.
 
 Chaves `?db=` válidas (do próprio painel): `main`, `superbetv2infi`, `stakeinfini`, `esportivainifi`
 (+ `superbetinfini`, `sportinginfini`, `liderinfinity`, `galerainfinity`, `sorteinfinity`, `lotolandinfini`,
