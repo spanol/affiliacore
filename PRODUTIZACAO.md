@@ -453,6 +453,40 @@ contrário ("canvas/surface seguem o neutro default").
 ⚠️ **Operador:** as `VITE_BRAND_*` são BUILD — Infinity e Previsão só ficam
 pretas no **próximo rollout** de cada backend.
 
+## 🎨 LP pública tematizada (2026-07-28)
+
+**Reclamação do cliente Infinity, na sequência da anterior:** a landing padrão
+não usava o roxo da marca em lugar nenhum. **Causa:** o accent estava certo em
+env e na engine, mas a `Home.tsx` nunca foi tematizada — CTA `bg-white`, glows
+`bg-white/5`, ícones `text-neutral-400`, zero classe `accent-*`. O único roxo da
+página vinha do `HeroDashboardMock` (a mini-dashboard do hero, que já usava os
+tokens). Ou seja: a LP era monocromática por construção, em toda instância.
+
+**Solução — tokens próprios da LP, acesos só por quem declara accent:**
+
+- `index.css` ganhou `--color-lp-cta` / `-cta-text` / `-cta-hover` / `-icon` /
+  `-focus` / `-glow` / `-halo`, com defaults = o monocromático EXATO de hoje
+  (`#fff`, `#0a0a0a`, `#e5e5e5`, `#a3a3a3`, branco/5%, branco/20%).
+- `buildLpTokens` (`theming.ts`) deriva os 7 da ramp accent e `resolveThemeTokens`
+  só os emite **dentro do `if (accent)`**. Sem `VITE_BRAND_ACCENT` nada é
+  emitido → **Boost e AffiliaCore ficam pixel-idênticas**; Infinity/Previsão
+  falam a cor do cliente sem código por label.
+- **Por que não apontar as classes direto p/ `accent-*`:** o accent tem default
+  ÂMBAR no `@theme`, então isso pintaria a LP de TODA instância de âmbar —
+  exatamente o vazamento que o fix do fundo preto acabou de fechar.
+- Consumidores: `Home.tsx` (nav, menu mobile, CTA do hero, "Aplicar para
+  Parceria", 2 blobs de fundo, ícones dos StatCards, foco dos inputs) e
+  `HomePrizesSection.tsx` (CTA do pódio). A utility `.glow-white` virou
+  `.glow-lp` (segue `--color-lp-halo`).
+- Ouro/prata/bronze do pódio seguem FIXOS (âmbar = ouro), como já era.
+- **Invariantes travados:** `theming.test.ts` (sem accent → nenhuma
+  `--color-lp-*`; canvas/surface sozinhos não acendem a LP; hover escurece o
+  CTA; glow/halo saem com alpha) e `instanceTheming.test.ts` (LP da Infinity =
+  accent-500; LP da Boost = vazia).
+
+⚠️ **Operador:** BUILD como as demais — a Infinity só fica roxa no **próximo
+rollout**.
+
 ## 💰 Modelo de preço vigente (v2 — no ar desde 2026-07-25)
 
 Substitui a precificação de referência do topo do doc (setup R$ 3–8 mil +

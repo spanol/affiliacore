@@ -82,8 +82,8 @@ export default function Home() {
     <div className="min-h-screen bg-neutral-950 text-neutral-400 font-sans selection:bg-white selection:text-neutral-950">
       {/* Dynamic background */}
       <div className="fixed inset-0 z-0 pointer-events-none bg-grid-white opacity-[0.03]" />
-      <div className="fixed top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-white/5 blur-[120px] pointer-events-none" />
-      <div className="fixed bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-white/5 blur-[120px] pointer-events-none" />
+      <div className="fixed top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-lp-glow blur-[120px] pointer-events-none" />
+      <div className="fixed bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-lp-glow blur-[120px] pointer-events-none" />
 
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-glass-chrome-dark backdrop-blur-glass-medium border-b border-neutral-800/50">
@@ -101,7 +101,7 @@ export default function Home() {
             </Link>
             <Link
               to="/register"
-              className="px-6 py-2.5 rounded-full bg-white text-neutral-950 font-bold text-sm hover:bg-neutral-200 transition-colors"
+              className="px-6 py-2.5 rounded-full bg-lp-cta text-lp-cta-text font-bold text-sm hover:bg-lp-cta-hover transition-colors"
             >
               Cadastrar
             </Link>
@@ -135,7 +135,7 @@ export default function Home() {
                 </Link>
                 <Link
                   to="/register"
-                  className="mt-2 px-5 py-3 rounded-xl bg-white text-neutral-950 text-center font-bold"
+                  className="mt-2 px-5 py-3 rounded-xl bg-lp-cta text-lp-cta-text text-center font-bold"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Cadastrar
@@ -179,7 +179,7 @@ export default function Home() {
           >
             <Link
               to="/register"
-              className="px-8 py-4 rounded-full bg-white text-neutral-950 font-semibold hover:bg-neutral-200 transition-colors flex items-center justify-center gap-2 shadow-xl shadow-white/10 group"
+              className="px-8 py-4 rounded-full bg-lp-cta text-lp-cta-text font-semibold hover:bg-lp-cta-hover transition-colors flex items-center justify-center gap-2 shadow-xl shadow-lp-cta/10 group"
             >
               Quero ser um Afiliado
               <MoveRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -196,7 +196,7 @@ export default function Home() {
             className="mt-24 w-full relative"
           >
             <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-transparent to-transparent z-10 pointer-events-none" />
-            <div className="rounded-2xl md:rounded-[2rem] border border-neutral-800/60 bg-glass-frame-dark p-2 md:p-3 backdrop-blur-glass-strong shadow-2xl relative overflow-hidden glow-white">
+            <div className="rounded-2xl md:rounded-[2rem] border border-neutral-800/60 bg-glass-frame-dark p-2 md:p-3 backdrop-blur-glass-strong shadow-2xl relative overflow-hidden glow-lp">
               <div className="rounded-xl overflow-hidden border border-neutral-700/50 bg-neutral-950">
                 <HeroDashboardMock />
               </div>
@@ -215,19 +215,19 @@ export default function Home() {
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-            <StatCard icon={<Users className="w-6 h-6 text-neutral-400" />} value="+12.000" label="Afiliados" />
+            <StatCard icon={<Users className="w-6 h-6 text-lp-icon" />} value="+12.000" label="Afiliados" />
             <StatCard
-              icon={<MonitorPlay className="w-6 h-6 text-neutral-400" />}
+              icon={<MonitorPlay className="w-6 h-6 text-lp-icon" />}
               value="+200k/mês"
               label="Usuários Cadastrados"
             />
             <StatCard
-              icon={<ArrowRightLeft className="w-6 h-6 text-neutral-400" />}
+              icon={<ArrowRightLeft className="w-6 h-6 text-lp-icon" />}
               value="+120k/mês"
               label="FTDs"
             />
             <StatCard
-              icon={<Target className="w-6 h-6 text-neutral-400" />}
+              icon={<Target className="w-6 h-6 text-lp-icon" />}
               value="+100k/mês"
               label="CPAs Qualificados"
             />
@@ -381,7 +381,7 @@ export default function Home() {
 
           <Link
               to="/register"
-              className="shrink-0 w-full md:w-auto px-8 py-4 rounded-xl bg-white text-neutral-950 font-bold text-lg text-center hover:bg-neutral-200 transition-transform active:scale-95"
+              className="shrink-0 w-full md:w-auto px-8 py-4 rounded-xl bg-lp-cta text-lp-cta-text font-bold text-lg text-center hover:bg-lp-cta-hover transition-transform active:scale-95"
             >
               Aplicar para Parceria
             </Link>
@@ -509,7 +509,7 @@ export default function Home() {
                   <button
                     type="submit"
                     disabled={status === 'submitting'}
-                    className="w-full px-8 py-4 rounded-xl bg-white text-neutral-950 font-bold text-lg hover:bg-neutral-200 transition-colors flex justify-center items-center gap-2 mt-4 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full px-8 py-4 rounded-xl bg-lp-cta text-lp-cta-text font-bold text-lg hover:bg-lp-cta-hover transition-colors flex justify-center items-center gap-2 mt-4 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {status === 'submitting' ? (
                       <>
@@ -580,7 +580,7 @@ export default function Home() {
 }
 
 const inputClass =
-  'w-full px-4 py-3 rounded-xl bg-neutral-950/50 border border-neutral-800 focus:border-white focus:ring-1 focus:ring-white outline-none transition-all text-white placeholder:text-neutral-600';
+  'w-full px-4 py-3 rounded-xl bg-neutral-950/50 border border-neutral-800 focus:border-lp-focus focus:ring-1 focus:ring-lp-focus outline-none transition-all text-white placeholder:text-neutral-600';
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (

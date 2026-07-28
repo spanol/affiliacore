@@ -93,7 +93,7 @@ export default function HomePrizesSection() {
       <div className="mt-12 flex justify-center">
         <Link
           to="/register"
-          className="px-8 py-4 rounded-full bg-white text-neutral-950 font-semibold hover:bg-neutral-200 transition-colors flex items-center justify-center gap-2 shadow-xl shadow-white/10 group"
+          className="px-8 py-4 rounded-full bg-lp-cta text-lp-cta-text font-semibold hover:bg-lp-cta-hover transition-colors flex items-center justify-center gap-2 shadow-xl shadow-lp-cta/10 group"
         >
           Quero disputar o pódio
           <MoveRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />

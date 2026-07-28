@@ -97,26 +97,37 @@ const DARK_T: Array<[AccentStep, number]> = [
 const L_MAX = 0.97;
 const L_MIN = 0.10;
 
+/** Degraus da escala accent em HSL (a ramp em string sai daqui). */
+function accentHslSteps(hex: unknown): Record<AccentStep, Hsl> | null {
+  const rgb = parseHex(hex);
+  if (!rgb) return null;
+  const base = rgbToHsl(rgb.r, rgb.g, rgb.b);
+
+  const out = {} as Record<AccentStep, Hsl>;
+  for (const [step, t] of LIGHT_T) {
+    const l = base.l + (L_MAX - base.l) * t;
+    const s = base.s * (1 - 0.25 * t); // fundos claros menos saturados
+    out[step] = { h: base.h, s, l };
+  }
+  out['500'] = base;
+  for (const [step, t] of DARK_T) {
+    const l = base.l - (base.l - L_MIN) * t;
+    out[step] = { h: base.h, s: base.s, l };
+  }
+  return out;
+}
+
 /**
  * Gera a escala accent completa a partir de UM hex (o tom "500" da marca).
  * Hex inválido/vazio → null (chamador mantém o default do CSS).
  */
 export function buildAccentRamp(hex: unknown): AccentRamp | null {
   const rgb = parseHex(hex);
-  if (!rgb) return null;
-  const base = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  const steps = accentHslSteps(hex);
+  if (!rgb || !steps) return null;
 
   const ramp = {} as AccentRamp;
-  for (const [step, t] of LIGHT_T) {
-    const l = base.l + (L_MAX - base.l) * t;
-    const s = base.s * (1 - 0.25 * t); // fundos claros menos saturados
-    ramp[step] = hslCss({ h: base.h, s, l });
-  }
-  ramp['500'] = hslCss(base);
-  for (const [step, t] of DARK_T) {
-    const l = base.l - (base.l - L_MIN) * t;
-    ramp[step] = hslCss({ h: base.h, s: base.s, l });
-  }
+  for (const step of ACCENT_STEPS) ramp[step] = hslCss(steps[step]);
 
   // Texto sobre o accent (botões bg-accent-500/600): branco quando o contraste
   // WCAG passa de 4.5:1; senão um quase-preto quente (mesma família do amber-950).
@@ -129,6 +140,40 @@ export function buildAccentRamp(hex: unknown): AccentRamp | null {
 export interface ThemeTokens {
   /** Vars CSS a aplicar no :root; vazio = fica tudo no default do index.css. */
   cssVars: Record<string, string>;
+}
+
+// ——— LP pública: CTA e detalhes seguem o accent (só quando declarado) —————
+
+// A landing (Home + seção de premiações) é o MESMO código em toda instância e
+// nasceu monocromática (CTA branco sobre preto). Apontar as classes p/ accent-*
+// direto pintaria a LP de todo mundo — o accent tem default ÂMBAR no @theme, e
+// a Boost/AffiliaCore ficariam âmbar sem ninguém pedir. Por isso a LP consome
+// tokens próprios (--color-lp-*, defaults monocromáticos no index.css) que só
+// são emitidos aqui quando a instância declara VITE_BRAND_ACCENT: label sem
+// accent = LP pixel-idêntica; Infinity/Previsão = LP na cor do cliente.
+//
+// Alphas maiores que os do branco original de propósito: branco a 5% ainda lê
+// como névoa sobre o preto, um roxo saturado a 5% simplesmente some.
+const LP_GLOW_ALPHA = 0.2;
+const LP_HALO_ALPHA = 0.35;
+
+/**
+ * Tokens da LP derivados do accent da instância. Hex inválido/ausente → null
+ * (a LP fica no monocromático do index.css).
+ */
+export function buildLpTokens(hex: unknown): Record<string, string> | null {
+  const steps = accentHslSteps(hex);
+  const ramp = buildAccentRamp(hex);
+  if (!steps || !ramp) return null;
+  return {
+    '--color-lp-cta': hslCss(steps['500']),
+    '--color-lp-cta-text': ramp.contrast,
+    '--color-lp-cta-hover': hslCss(steps['600']), // hover ESCURECE (igual branco→neutral-200)
+    '--color-lp-icon': hslCss(steps['400']),
+    '--color-lp-focus': hslCss(steps['400']),
+    '--color-lp-glow': hslCss(steps['500'], LP_GLOW_ALPHA),
+    '--color-lp-halo': hslCss(steps['400'], LP_HALO_ALPHA),
+  };
 }
 
 // ——— P3.2: estilo das superfícies de marca (efeito glass) ————————————————
@@ -244,6 +289,8 @@ export function resolveThemeTokens(env?: Record<string, unknown> | null): ThemeT
   if (accent) {
     for (const step of ACCENT_STEPS) cssVars[`--color-accent-${step}`] = accent[step];
     cssVars['--color-accent-contrast'] = accent.contrast;
+    // LP pública: CTA/glow/ícones só ganham cor quando há accent declarado.
+    Object.assign(cssVars, buildLpTokens(e.VITE_BRAND_ACCENT) ?? {});
   }
 
   const surface = parseHex(e.VITE_BRAND_SURFACE);

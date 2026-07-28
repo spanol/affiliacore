@@ -48,6 +48,22 @@
   --blur-glass-medium: 12px;
   --blur-glass-strong: 24px;
 
+  /* LP pública (Home): CTAs e detalhes de marca. Os defaults abaixo são o
+     monocromático EXATO de hoje (branco/neutral-200/neutral-400) — sem
+     VITE_BRAND_ACCENT a landing da Boost e da AffiliaCore não muda um pixel.
+     Quando a instância declara um accent, resolveThemeTokens sobrescreve estas
+     vars no :root (src/lib/theming.ts, buildLpTokens) e a LP passa a falar a cor
+     do cliente sem uma linha de código por label. NÃO aponte estas classes para
+     accent-* direto: o accent tem default âmbar no @theme, então isso pintaria a
+     LP de toda instância. */
+  --color-lp-cta: #ffffff;
+  --color-lp-cta-text: #0a0a0a; /* neutral-950 */
+  --color-lp-cta-hover: #e5e5e5; /* neutral-200 */
+  --color-lp-icon: #a3a3a3; /* neutral-400 */
+  --color-lp-focus: #ffffff;
+  --color-lp-glow: rgb(255 255 255 / 0.05); /* blobs desfocados do fundo */
+  --color-lp-halo: rgb(255 255 255 / 0.2); /* box-shadow do frame do hero */
+
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Plus Jakarta Sans", "Inter", sans-serif;
 }
@@ -83,8 +99,10 @@
 /* Custom utilities for the Boost landing page (dark "neutral-950" design).
    Ported additively from the designer scaffold (src/Lp/src/index.css). */
 @layer utilities {
-  .glow-white {
-    box-shadow: 0 0 40px -10px rgba(255, 255, 255, 0.2);
+  /* Halo do frame do hero. Segue --color-lp-halo (branco por default, accent da
+     instância quando declarado) — por isso não se chama mais `glow-white`. */
+  .glow-lp {
+    box-shadow: 0 0 40px -10px var(--color-lp-halo);
   }
   .bg-grid-white {
     background-size: 40px 40px;

@@ -4,6 +4,7 @@ import {
   SOLID_STYLE_VARS,
   buildAccentRamp,
   buildCanvasRamp,
+  buildLpTokens,
   lightenSurface,
   parseHex,
   relativeLuminance,
@@ -123,11 +124,14 @@ describe('resolveThemeTokens', () => {
     }
   });
 
-  it('VITE_BRAND_ACCENT emite a escala completa + contrast', () => {
+  it('VITE_BRAND_ACCENT emite a escala completa + contrast (+ tokens da LP)', () => {
     const { cssVars } = resolveThemeTokens({ VITE_BRAND_ACCENT: '#E11D48' });
-    expect(Object.keys(cssVars)).toHaveLength(ACCENT_STEPS.length + 1);
+    const accentVars = Object.keys(cssVars).filter((v) => v.startsWith('--color-accent-'));
+    expect(accentVars).toHaveLength(ACCENT_STEPS.length + 1);
     expect(cssVars['--color-accent-500']).toMatch(/^hsl\(/);
     expect(cssVars['--color-accent-contrast']).toBe('#ffffff');
+    // O accent NÃO pode emitir canvas/surface/glass por tabela (isso é do CANVAS).
+    expect(Object.keys(cssVars).filter((v) => /^--color-(neutral|brand|glass)/.test(v))).toEqual([]);
   });
 
   it('VITE_BRAND_SURFACE emite brand + brand-light derivada', () => {
@@ -173,6 +177,69 @@ describe('resolveThemeTokens', () => {
     });
     expect(cssVars['--color-accent-500']).toBeDefined();
     expect(cssVars['--blur-glass-strong']).toBe('0px');
+  });
+});
+
+describe('tokens da LP pública (--color-lp-*)', () => {
+  const LP_VARS = [
+    '--color-lp-cta',
+    '--color-lp-cta-text',
+    '--color-lp-cta-hover',
+    '--color-lp-icon',
+    '--color-lp-focus',
+    '--color-lp-glow',
+    '--color-lp-halo',
+  ];
+
+  it('hex inválido/ausente → null (LP fica no monocromático do index.css)', () => {
+    expect(buildLpTokens(undefined)).toBeNull();
+    expect(buildLpTokens('')).toBeNull();
+    expect(buildLpTokens('none')).toBeNull();
+    expect(buildLpTokens(42)).toBeNull();
+  });
+
+  it('INVARIANTE: instância SEM accent não emite var de LP nenhuma', () => {
+    // A landing é o mesmo código em toda label e nasceu monocromática (CTA
+    // branco). Se um --color-lp-* vazar sem accent declarado, a LP da Boost e da
+    // AffiliaCore muda de cor sem ninguém pedir.
+    for (const unset of [{}, { VITE_BRAND_ACCENT: '' }, { VITE_BRAND_ACCENT: 'none' }]) {
+      const { cssVars } = resolveThemeTokens(unset);
+      expect(Object.keys(cssVars).filter((v) => v.startsWith('--color-lp-'))).toEqual([]);
+    }
+    // canvas/surface sozinhos também não acendem a LP — só o ACCENT acende.
+    const { cssVars } = resolveThemeTokens({
+      VITE_BRAND_CANVAS: '#26181C',
+      VITE_BRAND_SURFACE: '#3F1D2B',
+      VITE_BRAND_STYLE: 'solid',
+    });
+    expect(Object.keys(cssVars).filter((v) => v.startsWith('--color-lp-'))).toEqual([]);
+  });
+
+  it('com accent, a LP inteira sai da ramp da marca', () => {
+    const hex = '#8332B9'; // roxo da Infinity
+    const { cssVars } = resolveThemeTokens({ VITE_BRAND_ACCENT: hex });
+    const ramp = buildAccentRamp(hex)!;
+
+    for (const name of LP_VARS) expect(cssVars[name], name).toBeTruthy();
+    expect(cssVars['--color-lp-cta']).toBe(ramp['500']);
+    expect(cssVars['--color-lp-cta-text']).toBe(ramp.contrast);
+    expect(cssVars['--color-lp-cta-hover']).toBe(ramp['600']);
+    expect(cssVars['--color-lp-icon']).toBe(ramp['400']);
+    expect(hueOf(cssVars['--color-lp-cta'])).toBeCloseTo(hueOf(ramp['500']), 1);
+  });
+
+  it('o hover ESCURECE o CTA (mesmo sentido de branco→neutral-200)', () => {
+    const { cssVars } = resolveThemeTokens({ VITE_BRAND_ACCENT: '#8332B9' });
+    expect(lightnessOf(cssVars['--color-lp-cta-hover']))
+      .toBeLessThan(lightnessOf(cssVars['--color-lp-cta']));
+  });
+
+  it('glow e halo saem translúcidos (são blobs/box-shadow, não fills)', () => {
+    const { cssVars } = resolveThemeTokens({ VITE_BRAND_ACCENT: '#8332B9' });
+    for (const name of ['--color-lp-glow', '--color-lp-halo']) {
+      // hsl(H S% L% / A) — sem o alpha o blob viraria um disco chapado no fundo.
+      expect(cssVars[name], name).toMatch(/^hsl\([\d.]+ [\d.]+% [\d.]+% \/ 0\.\d+\)$/);
+    }
   });
 });
 
