@@ -20,6 +20,20 @@ ainda não carregou e como auto-seed na 1ª vez que a coleção está vazia. Em
 runtime, `setKnownBrands` (no boot do `DashboardLayout`) substitui o registro
 vivo pelas casas do backend.
 
+## Presets de ícone — `presets/`
+
+A subpasta `presets/` tem **26 ícones SVG gerados** (um por casa conhecida e
+autorizada pelo SPA/MF), oferecidos na grade "Usar um preset de casa" do modal de
+`/casas`. Eles **não são as logos oficiais** — são monogramas sobre a **cor de marca
+medida** no site oficial de cada casa (método em `PESQUISA-PRESETS-CASAS.md`).
+
+Não edite esses arquivos à mão: a fonte de verdade é `src/lib/housePresets.ts` e eles
+são regerados por `npm run icons:casas`. Um teste compara os arquivos com o catálogo,
+então edição manual (ou catálogo alterado sem regerar) quebra o build.
+
+Escolher um preset sobe o SVG pelo mesmo caminho do upload manual; quem quiser a logo
+oficial baixa pelo link que o próprio seletor mostra e usa "Trocar logo".
+
 ## Logos das sementes hospedadas aqui
 
 Os arquivos desta pasta (`superbet.png`, `sportingbet.png`) são as **logos

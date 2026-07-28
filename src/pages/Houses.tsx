@@ -3,7 +3,8 @@ import { motion } from 'motion/react';
 import { Navigate } from 'react-router-dom';
 import {
   Building2, Plus, Loader2, Pencil, Trash2, X, Upload, Link2, Check, Power,
-  Table2, AlertTriangle, FileSpreadsheet, Cloud, Calendar, Download,
+  Table2, AlertTriangle, FileSpreadsheet, Cloud, Calendar, Download, Sparkles,
+  ChevronDown, ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -22,6 +23,9 @@ import { buildImportRoster } from '../lib/boostAffiliate';
 import { canImport, buildImportPayload } from '../lib/houseImport';
 import { parseSpreadsheetFile, downloadResultsTemplate, isExcelFile } from '../lib/xlsx';
 import { humanizeName } from '../lib/utils';
+import {
+  HOUSE_PRESETS, HousePreset, buildHouseIconDataUrl, housePresetIconPath,
+} from '../lib/housePresets';
 import { fetchEurBrlRate, eurToBrl, formatBrl, getCachedEurBrlQuote, EurBrlQuote } from '../lib/currency';
 import EntityAuditHistory from '../components/EntityAuditHistory';
 
@@ -248,6 +252,91 @@ function HouseLogo({ house, size = 40 }: { house: House; size?: number }) {
   );
 }
 
+// Seletor de presets: grade com as casas mais conhecidas E autorizadas pelo SPA/MF
+// (catálogo em src/lib/housePresets.ts). Escolher uma preenche nome/slug e carrega o
+// ícone na cor de marca da casa — que entra pelo MESMO caminho do upload manual
+// (data URL → uploadHouseLogo no servidor), sem rota nova e sem mudança no backend.
+function PresetPicker({
+  selected, editing, onPick,
+}: { selected: string | null; editing: boolean; onPick: (preset: HousePreset) => void }) {
+  // Ao CRIAR, o preset é o caminho mais provável — abre aberto. Ao editar, a casa já
+  // tem identidade; o seletor fica recolhido pra não competir com os campos.
+  const [open, setOpen] = useState(!editing);
+  const sel = HOUSE_PRESETS.find((p) => p.slug === selected) ?? null;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 dark:border-neutral-700 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 bg-slate-50 dark:bg-neutral-800/60 hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors"
+      >
+        <span className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-neutral-200">
+          <Sparkles size={13} className="text-accent-500" />
+          Usar um preset de casa
+          <span className="font-medium text-slate-400 dark:text-neutral-500">({HOUSE_PRESETS.length})</span>
+        </span>
+        <ChevronDown size={14} className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="p-3 space-y-3">
+          <div className="flex flex-wrap gap-1.5">
+            {HOUSE_PRESETS.map((p) => (
+              <button
+                key={p.slug}
+                type="button"
+                onClick={() => onPick(p)}
+                title={`${p.name} · ${p.site}`}
+                aria-pressed={selected === p.slug}
+                className={`p-1 rounded-xl border-2 transition-all ${
+                  selected === p.slug
+                    ? 'border-accent-500 scale-105'
+                    : 'border-transparent hover:border-slate-300 dark:hover:border-neutral-600'
+                }`}
+              >
+                <img src={housePresetIconPath(p)} alt={p.name} className="w-9 h-9 rounded-lg block" />
+              </button>
+            ))}
+          </div>
+
+          {sel && (
+            <div className="rounded-xl bg-slate-50 dark:bg-neutral-800/60 px-3 py-2.5 space-y-1">
+              <p className="text-xs font-bold text-slate-700 dark:text-neutral-100">
+                {sel.name} <span className="font-mono font-medium text-slate-400 dark:text-neutral-500">· {sel.site}</span>
+              </p>
+              <p className="text-[10px] text-slate-500 dark:text-neutral-400">
+                {sel.legalEntity} — autorizada pela {sel.spaPortaria}
+              </p>
+              <div className="flex flex-wrap gap-3 pt-0.5">
+                <a
+                  href={`https://${sel.site}`} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[10px] font-bold text-accent-500 hover:underline"
+                >
+                  <ExternalLink size={10} /> site oficial
+                </a>
+                {sel.officialLogoUrl && (
+                  <a
+                    href={sel.officialLogoUrl} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[10px] font-bold text-accent-500 hover:underline"
+                  >
+                    <Download size={10} /> baixar a logo oficial
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
+          <p className="text-[10px] leading-relaxed text-slate-400 dark:text-neutral-500">
+            O ícone do preset é gerado na cor de marca da casa — <strong>não é a logo oficial</strong>.
+            Para usar a logo real, baixe no site da casa e clique em “Trocar logo”.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --- Modal de criar/editar casa ---------------------------------------------
 function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () => void; onSaved: () => void | Promise<void> }) {
   const { push } = useToast();
@@ -268,6 +357,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
   const [defaultRev, setDefaultRev] = useState<string>(house?.defaultRev != null ? String(house.defaultRev) : '');
   const [eurQuote, setEurQuote] = useState<EurBrlQuote>(() => getCachedEurBrlQuote());
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
+  const [presetSlug, setPresetSlug] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Cotação EUR→BRL ao vivo (AwesomeAPI) p/ o preview do CPA em R$.
@@ -280,8 +370,23 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
   const effectiveSlug = slugTouched ? slug : autoSlug;
   const logoPreview = logoBase64 ?? house?.logo ?? null;
 
+  // Aplica um preset. Ao CRIAR, adota também nome e slug canônicos da casa (o slug
+  // do preset é fixado à mão porque o autoSlug do nome divergiria em alguns casos —
+  // "F12.Bet" viraria "f12-bet", e o slug é o id do documento). Ao EDITAR, mexe só
+  // no ícone: nome e slug já estão em uso por dados históricos.
+  const applyPreset = (preset: HousePreset) => {
+    setPresetSlug(preset.slug);
+    setLogoBase64(buildHouseIconDataUrl(preset));
+    if (!editing) {
+      setName(preset.name);
+      setSlugTouched(true);
+      setSlug(preset.slug);
+    }
+  };
+
   const onPickFile = (file?: File) => {
     if (!file) return;
+    setPresetSlug(null); // upload manual vence o preset
     if (!/^image\/(png|jpe?g|webp|svg\+xml)$/i.test(file.type)) {
       push({ type: 'error', message: 'Use PNG, JPG, WEBP ou SVG.' });
       return;
@@ -369,6 +474,8 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                 <p className="text-[10px] text-slate-400 dark:text-neutral-500 mt-1.5">PNG, JPG, WEBP ou SVG · máx. 2MB</p>
               </div>
             </div>
+
+            <PresetPicker selected={presetSlug} editing={editing} onPick={applyPreset} />
 
             <Field label="Nome">
               <input
