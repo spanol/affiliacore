@@ -3,6 +3,20 @@
 Extração feita em 2026-07-28 do painel legado (`admininfinityaffiliates.shop`).
 Contexto, inventário e riscos: **`MIGRACAO-INFINITY-LEGADO.md`** na raiz.
 
+> ## ✅ EXECUTADA em 2026-07-28
+>
+> Casas criadas (manuais) e os 3 arquivos importados na instância `infinity-affiliacore`
+> (build `196440c`). **Conferido no `/admin` com período 01/04→28/07/2026 — bate 100% com o legado:**
+> 30 afiliados · 351 cadastros · 208 FTD · 175 CPA · comissão **R$ 36.830,00** · depositado R$ 43.602,48.
+>
+> Os 30 afiliados foram criados como nativos Boost pelo próprio import (idempotente por e-mail:
+> os 146 itens da 1ª casa viraram 27 afiliados; a Stake achou 18 dos 19 já criados). **Convite de acesso
+> NÃO foi gerado** — ninguém recebeu login, é migração histórica.
+>
+> **⚠️ FALTA o passo 5 (taxas por afiliado).** Sem `affiliate_configs`, o repasse é 0 e o
+> "lucro líquido da agência" do `/admin` exibe a comissão inteira (R$ 36.830) como lucro.
+> O real é **R$ 36.830 − R$ 33.540 = R$ 3.290**. Enquanto o passo 5 não rodar, esse número está inflado.
+
 ## Os arquivos
 
 Ficam **fora do repo** (contêm PII: nome + e-mail), no scratchpad da sessão:
