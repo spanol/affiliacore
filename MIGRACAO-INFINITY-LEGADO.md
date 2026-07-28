@@ -160,10 +160,28 @@ O XLSX de Pagamentos (21 colunas) foi baixado e parseado; serve para **conferir 
 1. **Passivo de R$ 32.306,40** — quem honra? Se a AffiliaCore assume, migra como saldo inicial de carteira
    (a carteira do Tier 1, na branch `feat/integracao-affility`, é o lugar). Se a G8 honra, migra só o histórico.
    **Bloqueia o go-live da tela de Financeiro.**
-2. **As tags são da G8**, não da Infinity. `NakataAgency###`, `aff###` e `infinitw##` são subids da conta da G8
-   nas casas (links Income Access, `wlsuperbet.adsrv.eacdn.com`). Os ~50 afiliados produtivos **precisam de link novo**
-   emitido na conta da Infinity — não há migração de link, há reemissão. Isso implica **perder a atribuição de
-   jogadores já cadastrados** sob as tags antigas, salvo acordo com a casa.
+2. **De quem é a conta de afiliado na casa?** — pergunta comercial em aberto, mas o lado técnico está resolvido
+   (ver §6.2.1). As tags são séries por casa: `NakataAgency###` (Super Bet V2), `aff###` (Stake) e
+   **`infinitw###`** (Esportiva). O prefixo `infinitw` é claramente Infinity-branded, o que sugere sub-conta da
+   Infinity; mas **a NFE do legado era emitida pela G8**. Ou seja: a marca é da Infinity, o fluxo de pagamento
+   passava pela G8. Confirmar com a casa quem detém o contrato **antes** de prometer atribuição a terceiros.
+   ⚠️ Correção de uma afirmação anterior deste documento: as tags **não** são obviamente "da G8" — a evidência
+   do prefixo aponta para o contrário.
+
+### 6.2.1 Não é preciso reemitir link: há um pool pronto
+
+O painel legado **não gera** link — ele só **registra** link cunhado na plataforma da casa. As duas formas de
+entrada são "cole links (1 por linha), tag extraída de `?tag=` ou `?afp2=`" e import XLSX (`Coluna A: Link,
+Coluna B: Tag`). Mas ele tem um terceiro fluxo, que resolve o problema: **atribuir um link do Standby a um
+usuário** (`action + user_id + standby_id`).
+
+E o Standby da Esportiva tem **288 links prontos e sem dono**, todos em `go.aff.esportiva.bet`, mesmo path,
+param `afp`, com **288 tags distintas** da série `infinitw###` (ex.: `infinitw291`…`infinitw296`).
+
+Consequência prática: para dar um link rastreável a um afiliado novo na Esportiva **não é preciso gerar nada na
+casa nem escrever no painel legado** — basta tomar a URL de um standby não usado e apontá-la como `registerUrl`
+do afiliado na AffiliaCore. O `/go/:code` embrulha, conta o clique do nosso lado, e a casa reporta pela tag do
+link. Zero impacto em qualquer link existente (são links nunca atribuídos).
 3. **CPA de 3 camadas com repasse self-service** vira requisito da AffiliaCore ou a Infinity aceita 2 camadas?
    Idem **rede de 4 níveis** vs especial+sub-rede.
 4. **ISS varia por casa** (5% / 2% / 2%) — o modelo atual assume taxa única.
@@ -210,7 +228,9 @@ Um banco por casa · o fallback silencioso de `?db=` para `main` · Universidade
    explícito e os invariantes da §4. Saída: `affiliates`, `affiliate_email_aliases`, `affiliate_configs` (byBrand),
    `houses` (3, manual), `house_results` (2.340 linhas).
 3. Seed das 3 casas na instância Infinity com `dataSource:'manual'` e CPA por casa (280/160/110).
-4. Reemitir links das ~50 contas produtivas na conta da Infinity (§6.2).
+4. Links das contas produtivas: consumir o pool de Standby (§6.2.1) em vez de reemitir na casa — a URL vira
+   `registerUrl` do afiliado na AffiliaCore, sem escrever no painel legado. Confirmar antes o item §6.2
+   (quem detém o contrato na casa).
 5. Backlog de features: **CPA Abuser** e **Meta de CPA mensal** primeiro (baratas e de impacto direto no dinheiro);
    **WhatsApp/Evolution** como diferencial comercial.
 
