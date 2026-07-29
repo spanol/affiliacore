@@ -1,42 +1,44 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 110" role="img" aria-label="Infinity Affiliates">
   <!-- Favicon Infinity — só o símbolo (o wordmark seria ilegível a 16px), colorido
        sobre o canvas escuro da marca. Favicon NÃO sofre `invert`, então pode ter cor.
-       Geometria e máscara idênticas ao logo.svg (ver o comentário lá): alças tangentes
-       fechadas + fita de crescimento a 45° recortada das alças, saindo em seta. -->
+       Marca idêntica ao logo-color-dark.svg (ver o comentário técnico lá): anéis
+       entrelaçados + fita/seta por ORDEM DE PINTURA e tom — sem máscara, cor separa. -->
   <defs>
-    <linearGradient id="infFloop" gradientUnits="userSpaceOnUse" x1="8" y1="86" x2="60" y2="34">
-      <stop offset="0%"   stop-color="#5B21B6" />
-      <stop offset="55%"  stop-color="#8B3FE0" />
-      <stop offset="100%" stop-color="#A855F7" />
+    <linearGradient id="fLf" gradientUnits="userSpaceOnUse" x1="10" y1="88" x2="58" y2="34">
+      <stop offset="0%"   stop-color="#6D28D9" />
+      <stop offset="55%"  stop-color="#9333EA" />
+      <stop offset="100%" stop-color="#B06CF9" />
     </linearGradient>
-    <linearGradient id="infFring" gradientUnits="userSpaceOnUse" x1="60" y1="86" x2="112" y2="30">
-      <stop offset="0%"   stop-color="#7A3AB8" />
-      <stop offset="100%" stop-color="#2C1145" />
+    <linearGradient id="fRt" gradientUnits="userSpaceOnUse" x1="64" y1="36" x2="114" y2="82">
+      <stop offset="0%"   stop-color="#9061E8" />
+      <stop offset="45%"  stop-color="#4A2478" />
+      <stop offset="100%" stop-color="#221033" />
     </linearGradient>
-    <linearGradient id="infFarrow" gradientUnits="userSpaceOnUse" x1="49" y1="71" x2="112" y2="8">
-      <stop offset="0%"   stop-color="#7C3AED" />
-      <stop offset="45%"  stop-color="#C084FC" />
-      <stop offset="100%" stop-color="#F3E8FF" />
+    <linearGradient id="fSh" gradientUnits="userSpaceOnUse" x1="47" y1="71" x2="104" y2="14">
+      <stop offset="0%"   stop-color="#8B5CF6" />
+      <stop offset="19%"  stop-color="#F2E8FE" />
+      <stop offset="55%"  stop-color="#D4B2FA" />
+      <stop offset="100%" stop-color="#E7D4FE" />
     </linearGradient>
-    <mask id="infCutF" maskUnits="userSpaceOnUse" x="-10" y="-10" width="150" height="130">
-      <rect x="-10" y="-10" width="150" height="130" fill="#ffffff" />
-      <g fill="#000000" stroke="#000000" stroke-linecap="round" stroke-linejoin="round">
-        <path fill="none" stroke-width="17" d="M45.86 74.14 L99 21" />
-        <path stroke-width="5" d="M113.85 6.15 L111.02 33.02 L86.98 8.98 Z" />
-      </g>
-    </mask>
+    <linearGradient id="fHd" gradientUnits="userSpaceOnUse" x1="79" y1="39" x2="104" y2="14">
+      <stop offset="0%"   stop-color="#C89FF8" />
+      <stop offset="100%" stop-color="#F7F0FF" />
+    </linearGradient>
+    <radialGradient id="fGl" gradientUnits="userSpaceOnUse" cx="58" cy="60" r="11">
+      <stop offset="0%"   stop-color="#FFFFFF" stop-opacity="0.75" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+    </radialGradient>
   </defs>
 
-  <rect width="110" height="110" rx="26" fill="#120B18" />
+  <rect width="110" height="110" rx="26" fill="#0C0712" />
 
-  <g transform="translate(8.18, 16.5) scale(0.78)" fill="none" stroke-width="13" stroke-linejoin="round">
-    <g mask="url(#infCutF)">
-      <path stroke="url(#infFring)" d="M60 60 C60 47, 73 34, 86 34 C99 34, 112 47, 112 60
-               C112 73, 99 86, 86 86 C73 86, 60 73, 60 60 Z" />
-      <path stroke="url(#infFloop)" d="M60 60 C60 47, 47 34, 34 34 C21 34, 8 47, 8 60
-               C8 73, 21 86, 34 86 C47 86, 60 73, 60 60 Z" />
-    </g>
-    <path stroke="url(#infFarrow)" stroke-linecap="round" d="M45.86 74.14 L99 21" />
-    <path fill="url(#infFarrow)" stroke="none" d="M113.85 6.15 L111.02 33.02 L86.98 8.98 Z" />
+  <g transform="translate(10.2, 13.4) scale(0.8)" fill="none" stroke-width="10" stroke-linejoin="round">
+    <path stroke="url(#fRt)" d="M108 60 C108 45.64 96.36 34 82 34 C67.64 34 56 45.64 56 60
+             C56 74.36 67.64 86 82 86 C96.36 86 108 74.36 108 60 Z" />
+    <path stroke="url(#fLf)" d="M60 60 C60 45.64 48.36 34 34 34 C19.64 34 8 45.64 8 60
+             C8 74.36 19.64 86 34 86 C48.36 86 60 74.36 60 60 Z" />
+    <path stroke="url(#fSh)" stroke-linecap="round" d="M47 71 L89 29" />
+    <circle cx="58" cy="60" r="11" fill="url(#fGl)" stroke="none" />
+    <path fill="url(#fHd)" stroke="none" d="M104 14 L94.8 41.6 L89.8 28.2 L76.4 23.2 Z" />
   </g>
 </svg>

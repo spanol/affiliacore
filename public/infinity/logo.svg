@@ -1,73 +1,75 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 376 110" role="img" aria-label="Infinity Affiliates">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 424 110" role="img" aria-label="Infinity Affiliates">
   <!-- Logo Infinity — MONO BRANCO DE PROPÓSITO. O app aplica `invert dark:invert-0`
        (DashboardLayout, Login, Register, InviteAccept, Forgot/ResetPassword): branco
        vira preto no tema claro e segue branco no escuro. NÃO colorir este arquivo —
-       invert sobre o roxo #8332B9 devolve verde-amarelado. Versões coloridas em
-       logo-color-dark.svg / logo-color-light.svg (marketing, social, documento).
+       invert sobre o roxo #8332B9 devolve verde-amarelado. As versões coloridas
+       (logo-color-dark/light.svg) são os lockups EMPILHADOS = referência do cliente;
+       este é o lockup HORIZONTAL, exclusivo do app (a 30px de altura o empilhado
+       seria ilegível).
 
-       Marca (revisão pedida pelo cliente, 2026-07-28): lemniscata de duas alças
-       TANGENTES (r=26, centros 34 e 86, encosto em 60,60) com a FITA DE CRESCIMENTO
-       cortando o conjunto a 45° — nasce dentro da alça esquerda, passa pelo encosto,
-       atravessa o vazio da alça direita e sai em seta acima dela. O eixo da fita é
-       x+y=120, que por construção passa no encosto (60,60) E no topo da alça direita
-       (86,34); é isso que faz a fita "sair" da lemniscata em vez de cruzá-la a esmo.
+       Marca idêntica à dos coloridos (ver o comentário técnico no logo-color-dark):
+       anéis ENTRELAÇADOS r=26 centros 34/82, fita de crescimento no eixo x+y=118
+       saindo em seta com entalhe. Em mono não existe tom pra separar as
+       sobreposições, então o entrelace é por MÁSCARA (a versão 1-cor do weave):
+       `mCutA` recorta o anel ESQUERDO em volta da fita+seta; `mCutB` recorta o anel
+       DIREITO em volta da fita+seta E do anel esquerdo (esquerdo passa por cima,
+       como na ordem de pintura dos coloridos). Folga = 2.5 por lado (fita 10 → corte 15; a seta corta com stroke 7 pra não
+       sobrar lasca do anel entre a fita e a base da seta). Mexeu em qualquer path? Replique o path IDÊNTICO dentro das máscaras.
 
-       A sobreposição fita×alças é resolvida por MÁSCARA (`infCutM`), não por cor: as
-       alças (círculos FECHADOS) são recortadas com 2 de folga em volta da fita, e a
-       fita é desenhada por cima. É o que permite o MESMO desenho servir em mono
-       (aqui) e em cor — branco sobre branco não tem contraste e, sem o recorte, a
-       marca vira um caroço sólido: a corda 60,60→86,34 encosta no arco superior-
-       esquerdo da alça direita, então as duas formas SEMPRE se sobrepõem.
-       Mexeu na fita? Replique o path IDÊNTICO dentro da máscara (só muda a largura:
-       13 no traço visível, 17 na máscara = 2 de folga por lado).
-
-       Wordmark INFINITY desenhado em curvas (só hastes retas, sai exato sem depender
-       de fonte instalada); AFFILIATES é monolinha traçada, com tracking largo. -->
+       Wordmark INFINITY em curvas com scale(1.2,1) (peso/largura da referência);
+       AFFILIATES monolinha stroke 3.2 com tracking constante (gap 21). -->
 
   <defs>
-    <mask id="infCutM" maskUnits="userSpaceOnUse" x="-10" y="-10" width="150" height="130">
+    <mask id="mCutA" maskUnits="userSpaceOnUse" x="-10" y="-10" width="150" height="130">
       <rect x="-10" y="-10" width="150" height="130" fill="#ffffff" />
       <g fill="#000000" stroke="#000000" stroke-linecap="round" stroke-linejoin="round">
-        <path fill="none" stroke-width="17" d="M45.86 74.14 L99 21" />
-        <path stroke-width="5" d="M113.85 6.15 L111.02 33.02 L86.98 8.98 Z" />
+        <path fill="none" stroke-width="15" d="M47 71 L89 29" />
+        <path stroke-width="7" d="M104 14 L94.8 41.6 L89.8 28.2 L76.4 23.2 Z" />
+      </g>
+    </mask>
+    <mask id="mCutB" maskUnits="userSpaceOnUse" x="-10" y="-10" width="150" height="130">
+      <rect x="-10" y="-10" width="150" height="130" fill="#ffffff" />
+      <g fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round">
+        <path stroke-width="15" d="M47 71 L89 29" />
+        <path fill="#000000" stroke-width="7" transform="translate(91.25,26.75) scale(1.3) translate(-91.25,-26.75)" d="M104 14 L94.8 41.6 L89.8 28.2 L76.4 23.2 Z" />
+        <path stroke-width="15" d="M60 60 C60 45.64 48.36 34 34 34 C19.64 34 8 45.64 8 60
+                 C8 74.36 19.64 86 34 86 C48.36 86 60 74.36 60 60 Z" />
       </g>
     </mask>
   </defs>
 
-  <g transform="translate(8.65, 10.62) scale(0.9)" fill="none" stroke="#ffffff" stroke-width="13" stroke-linejoin="round">
-    <g mask="url(#infCutM)">
-      <path d="M60 60 C60 47, 73 34, 86 34 C99 34, 112 47, 112 60
-               C112 73, 99 86, 86 86 C73 86, 60 73, 60 60 Z" />
-      <path d="M60 60 C60 47, 47 34, 34 34 C21 34, 8 47, 8 60
-               C8 73, 21 86, 34 86 C47 86, 60 73, 60 60 Z" />
+  <g transform="translate(5, -5) scale(1)" fill="none" stroke="#ffffff" stroke-width="10" stroke-linejoin="round">
+    <path mask="url(#mCutB)" d="M108 60 C108 45.64 96.36 34 82 34 C67.64 34 56 45.64 56 60
+             C56 74.36 67.64 86 82 86 C96.36 86 108 74.36 108 60 Z" />
+    <path mask="url(#mCutA)" d="M60 60 C60 45.64 48.36 34 34 34 C19.64 34 8 45.64 8 60
+             C8 74.36 19.64 86 34 86 C48.36 86 60 74.36 60 60 Z" />
+    <path stroke-linecap="round" d="M47 71 L89 29" />
+    <path fill="#ffffff" stroke="none" d="M104 14 L94.8 41.6 L89.8 28.2 L76.4 23.2 Z" />
+  </g>
+
+  <g transform="translate(128, 22)">
+    <g transform="scale(1.2, 1)" fill="#ffffff">
+      <path transform="translate(0,0)"   d="M0 0 H11 V40 H0 Z" />
+      <path transform="translate(18,0)"  d="M0 0 H11 L23 24.5 V0 H34 V40 H23 L11 15.5 V40 H0 Z" />
+      <path transform="translate(59,0)"  d="M0 0 H28 V11 H11 V16.5 H24 V27.5 H11 V40 H0 Z" />
+      <path transform="translate(94,0)"  d="M0 0 H11 V40 H0 Z" />
+      <path transform="translate(112,0)" d="M0 0 H11 L23 24.5 V0 H34 V40 H23 L11 15.5 V40 H0 Z" />
+      <path transform="translate(153,0)" d="M0 0 H11 V40 H0 Z" />
+      <path transform="translate(171,0)" d="M0 0 H32 V11 H21.5 V40 H10.5 V11 H0 Z" />
+      <path transform="translate(204,0)" d="M0 0 H11.5 L16 10.5 L20.5 0 H32 L21.5 24 V40 H10.5 V24 Z" />
     </g>
-    <path stroke-linecap="round" d="M45.86 74.14 L99 21" />
-    <path fill="#ffffff" stroke="none" d="M113.85 6.15 L111.02 33.02 L86.98 8.98 Z" />
   </g>
 
-  <g transform="translate(130, 22)" fill="#ffffff">
-    <path transform="translate(0,0)"   d="M0 0 H11 V40 H0 Z" />
-    <path transform="translate(18,0)"  d="M0 0 H11 L23 24.5 V0 H34 V40 H23 L11 15.5 V40 H0 Z" />
-    <path transform="translate(59,0)"  d="M0 0 H28 V11 H11 V16.5 H24 V27.5 H11 V40 H0 Z" />
-    <path transform="translate(94,0)"  d="M0 0 H11 V40 H0 Z" />
-    <path transform="translate(112,0)" d="M0 0 H11 L23 24.5 V0 H34 V40 H23 L11 15.5 V40 H0 Z" />
-    <path transform="translate(153,0)" d="M0 0 H11 V40 H0 Z" />
-    <path transform="translate(171,0)" d="M0 0 H32 V11 H21.5 V40 H10.5 V11 H0 Z" />
-    <path transform="translate(204,0)" d="M0 0 H11.5 L16 10.5 L20.5 0 H32 L21.5 24 V40 H10.5 V24 Z" />
-  </g>
-
-  <g fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M156.5 88 L161.5 74 L166.5 88 M158.2 83.2 H164.8" />
-    <path d="M179.3 88 V74 H187.3 M179.3 81 H185.8" />
-    <path d="M200.1 88 V74 H208.1 M200.1 81 H206.6" />
-    <path d="M220.9 74 V88" />
-    <path d="M233.7 74 V88 H241.2" />
-    <path d="M254 74 V88" />
-    <path d="M266.8 88 L271.8 74 L276.8 88 M268.5 83.2 H275.1" />
-    <path d="M289.6 74 H298.6 M294.1 74 V88" />
-    <path d="M318.9 74 H311.4 V88 H318.9 M311.4 81 H317.4" />
-    <path d="M339.3 77 C339.3 74.6, 337.3 74, 335.7 74 C333.5 74, 331.7 75.2, 331.7 77.4
-             C331.7 79.6, 333.5 80.4, 335.7 81 C337.9 81.6, 339.7 82.4, 339.7 84.6
-             C339.7 86.8, 337.9 88, 335.7 88 C333.7 88, 332.1 87.4, 332.1 85" />
+  <g transform="translate(140.9, 74)" fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+    <path transform="translate(0,0)"     d="M0 14 L5 0 L10 14 M1.8 9.6 H8.2" />
+    <path transform="translate(31,0)"    d="M0 14 V0 H8 M0 7.2 H6.4" />
+    <path transform="translate(60,0)"    d="M0 14 V0 H8 M0 7.2 H6.4" />
+    <path transform="translate(89,0)"    d="M0 0 V14" />
+    <path transform="translate(110,0)"   d="M0 0 V14 H7.5" />
+    <path transform="translate(138.5,0)" d="M0 0 V14" />
+    <path transform="translate(159.5,0)" d="M0 14 L5 0 L10 14 M1.8 9.6 H8.2" />
+    <path transform="translate(190.5,0)" d="M0 0 H9 M4.5 0 V14" />
+    <path transform="translate(220.5,0)" d="M8 0 H0 V14 H8 M0 7.2 H6" />
+    <path transform="translate(249.5,0)" d="M7.6 3 C7.6 0.6 5.6 0 4 0 C1.8 0 0 1.2 0 3.4 C0 5.6 1.8 6.4 4 7 C6.2 7.6 8 8.4 8 10.6 C8 12.8 6.2 14 4 14 C2 14 0.4 13.4 0.4 11" />
   </g>
 </svg>
