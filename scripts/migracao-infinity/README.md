@@ -138,13 +138,33 @@ com código 1. `generateInvite` é **false** de propósito: migração históric
 
 ## O que este runbook NÃO cobre
 
-- **O passo 5 (taxas), embora agora os valores sejam conhecidos.** As 3 camadas ficam no card
-  "Configuração de CPA" de `/admin/config`, **por casa** (§3.2 do doc raiz):
-  V2 300/**280**/270 · Stake 185/**160**/140 · Esportiva 120/**110**/100 (Sistema/Agente/Afiliado).
-  `byBrand[casa].cpaValue` = coluna **Agente (direto)** nos **18 topos**, **Afiliado (ref)** nos demais —
-  isso reproduz os R$ 33.540 do legado (`Agente` × CPAs, conferido). REV fica **ausente**, não zero.
-  ⚠️ O **deal individual** no meio da árvore ("Limite de repasse") continua desconhecido: afeta o extrato
-  de cada afiliado, não o custo da agência.
+- (nada pendente aqui além do que estiver marcado na fase 3 abaixo)
+
+## Fase 3 · taxas por casa (o passo 5) — `--only taxas`
+
+**Fonte:** TSV de deals extraído de `/admin/pagamentos` nas 3 casas — PII, fora do repo:
+
+```
+<scratchpad>/infinity-deals.tsv       196 linhas (138 V2 + 39 Stake + 19 Esportiva)
+email  nome  casa  cpa_deal  papel  nivel  cpas  total  sponsor_id  head_id  id_legado
+```
+
+⚠️ **Não use o padrão do BET para os não-cabeças.** Os deals individuais variam muito (V2 vai de 120 a 280);
+só os **cabeças** são uniformes na camada Agente (280/160/110). Detalhe e reconciliação na **§3.3 do doc raiz**.
+
+```bash
+node scripts/migracao-infinity/converter-rede.cjs \
+  --tsv "<scratchpad>/infinity-roster-uplines.tsv" \
+  --base https://infinity-server--infinity-affiliacore.us-east4.hosted.app \
+  --id-token-file "<scratchpad>/token.txt" \
+  --only taxas --deals "<scratchpad>/infinity-deals.tsv"      # + --apply para escrever
+```
+
+Grava **só** `byBrand[slug].cpaValue` — sem taxa de topo e sem `revPercentage` (o REV é 0% em 100% do
+legado e gravar 0 faria `rateStatus` ler "configurado"; ausência ≠ R$ 0). O **slug** da casa é resolvido
+pelo NOME contra a instância (`GET /api/houses`), nunca chutado, e a fase aborta se algum nome não casar.
+Linha sem afiliado na instância só é descartada se tiver **0 CPA** — com produção, aborta. No fim relê
+`GET /api/affiliate-configs` e compara par a par.
 - **O passivo de R$ 32.306,40** em aberto (§6.1 do doc raiz): decisão comercial pendente, **bloqueia o
   Financeiro**, não bloqueia esta importação.
 - **Links/tags**: não migram. Ver §6.2.1 do doc raiz (pool de Standby) e o gargalo de atribuição na §5.1.

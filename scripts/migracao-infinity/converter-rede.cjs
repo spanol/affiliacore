@@ -51,6 +51,7 @@ function parseArgs(argv) {
     else if (a === '--admin-email') out.adminEmail = argv[++i];
     else if (a === '--admin-uid') out.adminUid = argv[++i];
     else if (a === '--id-token-file') out.idTokenFile = argv[++i];
+    else if (a === '--deals') out.deals = argv[++i];
     else if (a === '--only') out.only = argv[++i];
     else throw new Error(`Argumento desconhecido: ${a}`);
   }
@@ -63,7 +64,8 @@ function parseArgs(argv) {
   if (!out.idTokenFile && !out.adminEmail && !out.adminUid) {
     throw new Error('Informe --id-token-file, ou --admin-email/--admin-uid para cunhar via Admin SDK.');
   }
-  if (!['ambos', 'roster', 'uplines'].includes(out.only)) throw new Error('--only aceita roster|uplines.');
+  if (!['ambos', 'roster', 'uplines', 'taxas'].includes(out.only)) throw new Error('--only aceita roster|uplines|taxas.');
+  if (out.only === 'taxas' && !out.deals) throw new Error('--only taxas exige --deals <tsv de deals>.');
   return out;
 }
 
@@ -145,6 +147,129 @@ function validar(rows) {
   const niveis = {};
   for (const r of rows) { const d = nivelDe.get(r.email) ?? 0; niveis[d] = (niveis[d] || 0) + 1; }
   return { problemas, arestas, topos, niveis, pai, nivelDe };
+}
+
+// ------------------------------------------------------------ deals (fase 3)
+const DEAL_COLS = ['email', 'casa', 'cpa_deal'];
+
+/**
+ * TSV de deals extraido da tela de Pagamentos do legado: uma linha por
+ * (pessoa, casa) com o CPA individual praticado. E' o que alimenta
+ * `affiliate_configs.byBrand[<slug da casa>].cpaValue`.
+ */
+function lerDeals(caminho) {
+  const texto = fs.readFileSync(caminho, 'utf8').replace(/^﻿/, '');
+  const linhas = texto.split(/\r?\n/).filter((l) => l.trim() !== '');
+  const head = linhas[0].split('\t').map((s) => s.trim());
+  const faltando = DEAL_COLS.filter((c) => !head.includes(c));
+  if (faltando.length) throw new Error(`TSV de deals sem as colunas: ${faltando.join(', ')}`);
+  const idx = Object.fromEntries(head.map((h, i) => [h, i]));
+  return linhas.slice(1).map((l) => {
+    const c = l.split('\t');
+    return {
+      email: (c[idx.email] || '').trim().toLowerCase(),
+      casa: (c[idx.casa] || '').trim(),
+      cpa: Number(c[idx.cpa_deal]),
+      papel: idx.papel != null ? (c[idx.papel] || '').trim() : '',
+      cpas: idx.cpas != null ? Number(c[idx.cpas]) || 0 : 0,
+    };
+  }).filter((d) => d.email && d.casa);
+}
+
+const chaveNome = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+/**
+ * Fase 3 — taxa POR CASA de cada afiliado.
+ *
+ * Grava SO `byBrand[slug].cpaValue`: nada de taxa de topo e nada de
+ * `revPercentage` — no legado o REV e' 0% em 100% dos cadastros, e gravar 0
+ * faria `rateStatus` ler "configurado" (ausencia != R$ 0).
+ *
+ * A chave do byBrand e' o SLUG da casa: p/ casa MANUAL o `brandKeyOf` do
+ * calculo cai em `id ?? slug` e casa manual nao tem `id` (que e' o brandId da
+ * OTG). O slug e' resolvido pelo NOME contra a instancia — nunca chutado.
+ */
+async function fase3Taxas(api, args, idPorEmail) {
+  const deals = lerDeals(args.deals);
+  console.log(`\n== fase 3 · taxas por casa ==`);
+  console.log(`linhas de deal: ${deals.length}`);
+
+  // nome da casa -> slug, resolvido CONTRA A INSTANCIA
+  const respostaCasas = await api('GET', '/api/houses');
+  const casas = Array.isArray(respostaCasas) ? respostaCasas : (respostaCasas?.houses ?? []);
+  const slugPorNome = new Map();
+  for (const h of casas) {
+    const slug = String(h?.slug ?? h?.id ?? '').trim();
+    if (slug) slugPorNome.set(chaveNome(h?.name), slug);
+  }
+  const nomesTsv = [...new Set(deals.map((d) => d.casa))];
+  const semCasa = nomesTsv.filter((n) => !slugPorNome.has(chaveNome(n)));
+  if (semCasa.length) {
+    throw new Error(`Casa do TSV sem correspondente na instancia: ${semCasa.join(', ')}. ` +
+      `Casas da instancia: ${[...slugPorNome.values()].join(', ') || '(nenhuma)'}`);
+  }
+  console.log(`casas resolvidas: ${nomesTsv.map((n) => `${n} -> ${slugPorNome.get(chaveNome(n))}`).join('  |  ')}`);
+
+  // agrupa por afiliado; quem nao tem afiliado na instancia so' pode ser descartado
+  // se NAO tiver producao — senao estariamos jogando fora configuracao de dinheiro.
+  const porAfiliado = new Map();
+  const orfaos = [];
+  for (const d of deals) {
+    const affId = idPorEmail.get(d.email);
+    if (!affId) { orfaos.push(d); continue; }
+    if (!Number.isFinite(d.cpa) || d.cpa < 0) throw new Error(`cpa_deal invalido para ${d.email} / ${d.casa}`);
+    if (!porAfiliado.has(affId)) porAfiliado.set(affId, {});
+    porAfiliado.get(affId)[slugPorNome.get(chaveNome(d.casa))] = { cpaValue: d.cpa };
+  }
+  if (orfaos.length) {
+    const comProducao = orfaos.filter((o) => o.cpas > 0);
+    console.log(`sem afiliado na instancia: ${orfaos.length} linha(s) (${[...new Set(orfaos.map((o) => o.email))].length} pessoa(s)), producao somada: ${orfaos.reduce((s, o) => s + o.cpas, 0)} CPA(s)`);
+    if (comProducao.length) {
+      throw new Error(`${comProducao.length} linha(s) sem afiliado na instancia TEM producao — nao da p/ descartar. Rode a fase roster antes.`);
+    }
+    console.log(`  -> todas com 0 CPA (tipicamente conta de teste/recon): descartadas com seguranca.`);
+  }
+
+  const totalPares = [...porAfiliado.values()].reduce((s, m) => s + Object.keys(m).length, 0);
+  console.log(`afiliados a configurar: ${porAfiliado.size}   pares (afiliado,casa): ${totalPares}`);
+  const distintos = [...new Set(deals.map((d) => d.cpa))].sort((a, b) => a - b);
+  console.log(`CPAs distintos no conjunto: ${distintos.join(', ')}`);
+
+  if (!args.apply) {
+    console.log(`\n(dry-run) nenhuma taxa gravada. Use --apply.`);
+    return;
+  }
+
+  let ok = 0;
+  const falhas = [];
+  for (const [affId, byBrand] of porAfiliado) {
+    try {
+      await api('PATCH', `/api/affiliate-configs/${encodeURIComponent(affId)}`, { byBrand });
+      ok++;
+      if (ok % 25 === 0) console.log(`   ${ok}/${porAfiliado.size}`);
+    } catch (e) {
+      falhas.push(`${affId}: ${e.message}`);
+    }
+  }
+  console.log(`configs gravadas: ${ok}   falhas: ${falhas.length}`);
+  for (const f of falhas.slice(0, 20)) console.error(`   - ${f}`);
+
+  // conferencia: relê e compara CADA par (afiliado, casa)
+  const resp = await api('GET', '/api/affiliate-configs');
+  const configs = resp?.configs ?? resp ?? {};
+  let divergentes = 0;
+  for (const [affId, byBrand] of porAfiliado) {
+    const gravado = configs?.[affId]?.byBrand ?? {};
+    for (const [slug, taxa] of Object.entries(byBrand)) {
+      if (Number(gravado?.[slug]?.cpaValue) !== Number(taxa.cpaValue)) divergentes++;
+    }
+  }
+  console.log(`\n== conferencia (taxas) ==`);
+  console.log(`pares esperados: ${totalPares}   divergentes: ${divergentes}`);
+  if (divergentes || falhas.length) {
+    console.error(`\n!! conferencia NAO fechou — nao declare o passo 5 concluido.`);
+    process.exit(1);
+  }
 }
 
 // --------------------------------------------------------------------- auth
@@ -259,6 +384,12 @@ async function main() {
   }
   const jaExistem = rows.filter((r) => idPorEmail.has(r.email)).length;
   console.log(`aliases existentes: ${idPorEmail.size}   do TSV ja mapeados: ${jaExistem}   a criar: ${rows.length - jaExistem}`);
+
+  // Fase 3 e' independente das outras: so' precisa do mapa e-mail -> affiliateId.
+  if (args.only === 'taxas') {
+    await fase3Taxas(api, args, idPorEmail);
+    return;
+  }
 
   // PRE-FLIGHT da fase 2: a rota de upline so' existe na build COM a rede. Conferir
   // agora (inclusive no dry-run) evita descobrir isso depois de 141 POSTs no vazio.

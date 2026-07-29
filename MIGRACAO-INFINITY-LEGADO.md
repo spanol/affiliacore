@@ -175,13 +175,41 @@ Isso valida `buildRootConfigMap` contra dado de produção: o custo da agência 
 **Para o passo 5**, portanto: `affiliate_configs.byBrand[casa].cpaValue` = a coluna `Agente (direto)` para
 os **18 topos de estrutura** e `Afiliado (ref)` para os demais. REV fica ausente (não zero — ausência ≠ R$ 0).
 
-⚠️ **O que ainda NÃO está resolvido: o deal individual.** Esses três valores são o **padrão do BET**, e o
-legado permite deal por pessoa (é o "Limite de repasse" do §3: o afiliado define o CPA do indicado, com teto
-no próprio). A decomposição R$ 26.780 direto + R$ 6.760 de equipe do export **não** sai dos spreads
-uniformes (10/20/10 daria R$ 2.330), o que confirma que há taxa individual no meio da árvore. Consequência:
-o **custo total** da agência está reconciliado, mas **como esses R$ 33.540 se repartem entre os 159
-afiliados** depende de deals que não estão em `/admin/config`. Isso afeta o extrato de cada afiliado, não o
-lucro da agência.
+Esses três valores são o **padrão do BET**. O deal por pessoa existe (é o "Limite de repasse" do §3) e vive
+em outra tela — ver §3.3.
+
+### 3.3 Os deals INDIVIDUAIS estão em `/admin/pagamentos` — extraídos em 2026-07-28
+
+A tela de Pagamentos tem os modos **"Pagar gerente da rede"** e **"Pagamento individual"**
+(`pagamentos.php?payment_mode=structure|individual`) e, decisivo: **o payload da equipe de cada cabeça vem
+embutido no HTML**, no `onclick="openTeamModal({...})"` — não é preciso abrir modal por modal.
+
+Por cabeça: `parent_cpa`, `own_cpas`, `structure_cpas`, `gross_total`, `iss_value`, `downline_repasse`,
+`downline_profit`, `team_rows[]`. Por membro em `team_rows`: **`cpa` (o deal individual)**, `cpas`, `total`,
+`margin_diff`, `parent_profit`, `level`, `sponsor_id`, `head_id`, `path_ids`, `path_names`.
+
+**Cobertura é TOTAL** (a suspeita de que o export só pegava quem tem saldo era do XLSX, não da tela):
+138 na V2 + 39 na Stake + 19 na Esportiva = **196 pares (pessoa, casa), 149 pessoas, zero sem deal**.
+
+| Casa | Cabeças | Membros | CPAs | Bruto | Lucro de equipe |
+|---|---:|---:|---:|---:|---:|
+| Super Bet V2 | 13 | 125 | 67 | R$ 18.760 | R$ 4.180 |
+| Stake | 5 | 34 | 58 | R$ 9.280 | R$ 2.040 |
+| Esportiva Bet | 6 | 13 | 50 | R$ 5.500 | R$ 540 |
+| **Total** | | | **175** | **R$ 33.540** | **R$ 6.760** |
+
+Fecha com tudo: o bruto é o passivo do §6.1, e o lucro de equipe é exatamente os R$ 6.760 do modelo de rede
+(direto = 33.540 − 6.760 = **R$ 26.780**).
+
+⚠️ **Os deals variam MUITO — não use o padrão do BET para os não-cabeças.** Valores distintos praticados:
+V2 `120,130,150,180,200,220,230,240,250,260,270,280`; Stake `100,120,130,140,150,160`;
+Esportiva `80,90,95,100,110`. Os **cabeças**, sim, são uniformes na camada Agente (280/160/110).
+Configurar todo mundo em "Afiliado (ref)" reproduziria o custo total mas erraria o extrato individual.
+
+**Para o passo 5:** `affiliate_configs.byBrand[<slug da casa>].cpaValue` = a coluna `cpa` do TSV de deals.
+A chave é o **slug**, não o brandId: em `calcManualHouseNetProfit`, `brandKeyOf` cai em `id ?? slug` e casa
+manual não tem `id` (que é o brandId da OTG). REV fica **ausente** (0% em 100% do legado; gravar 0 faria
+`rateStatus` ler "configurado").
 
 Chaves `?db=` válidas (do próprio painel): `main`, `superbetv2infi`, `stakeinfini`, `esportivainifi`
 (+ `superbetinfini`, `sportinginfini`, `liderinfinity`, `galerainfinity`, `sorteinfinity`, `lotolandinfini`,
