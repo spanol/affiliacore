@@ -50,6 +50,23 @@ env:
       - BUILD
       - RUNTIME
 
+  # Logo POR TEMA com o ∞ em roxo (pedido do cliente 2026-07-29): par completo
+  # → o app troca a logo pelo tema SEM `invert` (InstanceLogo). ⚠️ Os nomes dos
+  # arquivos cruzam de propósito: "sidebar-dark" = TEXTO escuro → tema CLARO;
+  # "sidebar-white" = TEXTO branco → tema ESCURO. O VITE_BRAND_LOGO_URL acima
+  # segue declarado como fallback mono (e-mails/usos fora do app).
+  - variable: VITE_BRAND_LOGO_LIGHT_URL
+    value: '/infinity/logo-sidebar-dark.svg'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: VITE_BRAND_LOGO_DARK_URL
+    value: '/infinity/logo-sidebar-white.svg'
+    availability:
+      - BUILD
+      - RUNTIME
+
   # Roxo principal passado pelo cliente. A engine gera a escala accent-* +
   # contraste WCAG em runtime.
   - variable: VITE_BRAND_ACCENT

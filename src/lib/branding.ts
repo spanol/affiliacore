@@ -18,6 +18,13 @@ export interface Brand {
   shortName: string;
   logoUrl: string;
   faviconUrl: string;
+  // Par OPCIONAL de logo POR TEMA (pedido Infinity 2026-07-29): quando os DOIS
+  // estão setados, o app troca a logo pelo tema SEM aplicar `invert` (logo
+  // colorida sobrevive; o invert faria roxo virar verde). Par incompleto ou
+  // ausente → comportamento clássico: logoUrl mono + invert. A regra do par
+  // vive no <BrandLogo/> — aqui os campos são só resolvidos, independentes.
+  logoLightUrl: string | null; // exibida no tema CLARO
+  logoDarkUrl: string | null; // exibida no tema ESCURO
 }
 
 const str = (v: unknown): string | null => {
@@ -33,5 +40,7 @@ export function resolveBrand(env?: Record<string, unknown> | null, baseUrl = '/'
     shortName: str(e.VITE_BRAND_SHORT) ?? 'AffiliaCore',
     logoUrl: str(e.VITE_BRAND_LOGO_URL) ?? `${base}affiliacore/logo.svg`,
     faviconUrl: str(e.VITE_BRAND_FAVICON_URL) ?? `${base}affiliacore/favicon.svg`,
+    logoLightUrl: str(e.VITE_BRAND_LOGO_LIGHT_URL),
+    logoDarkUrl: str(e.VITE_BRAND_LOGO_DARK_URL),
   };
 }

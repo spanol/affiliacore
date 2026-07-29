@@ -6,7 +6,7 @@ import { auth } from '../lib/firebase';
 import { applyPasswordReset, readPasswordResetEmail } from '../lib/authSecurity';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
-import { BRAND } from '../lib/brandingClient';
+import InstanceLogo from '../components/InstanceLogo';
 
 export default function ResetPassword() {
   const { theme } = useTheme();
@@ -65,7 +65,7 @@ export default function ResetPassword() {
         className="relative w-full max-w-md bg-glass-card dark:bg-glass-card-dark backdrop-blur-glass-strong p-8 md:p-10 rounded-3xl shadow-xl shadow-slate-900/5 dark:shadow-black/30 border border-slate-200/70 dark:border-neutral-800"
       >
         <div className="text-center mb-8">
-          <img src={BRAND.logoUrl} alt={BRAND.shortName} className="h-7 w-auto mx-auto mb-4 invert dark:invert-0" />
+          <InstanceLogo className="h-7 w-auto mx-auto mb-4" />
           <p className="text-slate-400 dark:text-neutral-500 text-[10px] font-bold uppercase tracking-widest">Crie sua nova senha</p>
         </div>
 

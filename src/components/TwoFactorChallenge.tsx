@@ -4,7 +4,7 @@ import { ShieldCheck, AlertCircle, KeyRound } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { verifyTotpCode } from '../lib/authSecurity';
 import { useAuth } from '../contexts/AuthContext';
-import { BRAND } from '../lib/brandingClient';
+import InstanceLogo from './InstanceLogo';
 
 // Segundo fator do LOGIN. Fica no ProtectedRoute (não no Login) de propósito: a
 // sessão pendente sobrevive a um F5, e assim existe UM só caminho que a resolve —
@@ -41,7 +41,7 @@ export default function TwoFactorChallenge() {
     <div className="min-h-screen bg-slate-50 dark:bg-neutral-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white dark:bg-neutral-900/60 p-8 md:p-10 rounded-3xl shadow-xl shadow-slate-900/5 dark:shadow-black/30 border border-slate-200/70 dark:border-neutral-800">
         <div className="text-center mb-8">
-          <img src={BRAND.logoUrl} alt={BRAND.shortName} className="h-7 w-auto mx-auto mb-4 invert dark:invert-0" />
+          <InstanceLogo className="h-7 w-auto mx-auto mb-4" />
           <p className="text-slate-400 dark:text-neutral-500 text-[10px] font-bold uppercase tracking-widest">
             Verificação em duas etapas
           </p>

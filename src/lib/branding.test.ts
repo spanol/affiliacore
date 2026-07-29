@@ -8,6 +8,8 @@ describe('resolveBrand · marca por instância (P3)', () => {
       shortName: 'AffiliaCore',
       logoUrl: '/affiliacore/logo.svg',
       faviconUrl: '/affiliacore/favicon.svg',
+      logoLightUrl: null,
+      logoDarkUrl: null,
     });
   });
 
@@ -23,6 +25,8 @@ describe('resolveBrand · marca por instância (P3)', () => {
       shortName: 'Boost',
       logoUrl: '/boost-home/logo.svg',
       faviconUrl: '/boost-home/favicon.svg',
+      logoLightUrl: null,
+      logoDarkUrl: null,
     });
   });
 
@@ -54,5 +58,22 @@ describe('resolveBrand · marca por instância (P3)', () => {
     const b = resolveBrand({ VITE_BRAND_NAME: 123 as any, VITE_BRAND_LOGO_URL: null });
     expect(b.name).toBe('AffiliaCore');
     expect(b.logoUrl).toBe('/affiliacore/logo.svg');
+  });
+
+  it('par de logo por tema (Infinity): resolvido campo a campo, SEM default', () => {
+    const b = resolveBrand({
+      VITE_BRAND_LOGO_LIGHT_URL: '/infinity/logo-sidebar-dark.svg',
+      VITE_BRAND_LOGO_DARK_URL: '/infinity/logo-sidebar-white.svg',
+    });
+    expect(b.logoLightUrl).toBe('/infinity/logo-sidebar-dark.svg');
+    expect(b.logoDarkUrl).toBe('/infinity/logo-sidebar-white.svg');
+  });
+
+  it('logo por tema ausente ou vazia → null (o BrandLogo cai no mono+invert)', () => {
+    expect(resolveBrand({}).logoLightUrl).toBeNull();
+    expect(resolveBrand({}).logoDarkUrl).toBeNull();
+    const b = resolveBrand({ VITE_BRAND_LOGO_LIGHT_URL: '   ', VITE_BRAND_LOGO_DARK_URL: '' });
+    expect(b.logoLightUrl).toBeNull();
+    expect(b.logoDarkUrl).toBeNull();
   });
 });

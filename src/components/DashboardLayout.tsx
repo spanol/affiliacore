@@ -34,7 +34,7 @@ import NotificationBell from './NotificationBell';
 import ThemeToggle from './ThemeToggle';
 import DirectMessagePopup from './DirectMessagePopup';
 import { LOCAL_VERSION, LOCAL_COMMIT } from '../lib/version';
-import { BRAND } from '../lib/brandingClient';
+import InstanceLogo from './InstanceLogo';
 
 export default function DashboardLayout() {
   const { profile } = useAuth();
@@ -170,11 +170,7 @@ export default function DashboardLayout() {
     <div className="flex flex-col h-full bg-white dark:bg-neutral-950 border-r border-slate-200 dark:border-neutral-800/80">
       <div className="p-6 pb-4">
         <Link to="/" className="flex items-center gap-2 group">
-          <img
-            src={BRAND.logoUrl}
-            alt={BRAND.shortName}
-            className="h-[30px] w-auto invert dark:invert-0 transition-opacity group-hover:opacity-80"
-          />
+          <InstanceLogo className="h-[30px] w-auto transition-opacity group-hover:opacity-80" />
         </Link>
       </div>
 

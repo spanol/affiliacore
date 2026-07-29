@@ -14,6 +14,7 @@ import {
 import { cn } from '../lib/utils';
 import { BRAND } from '../lib/brandingClient';
 import { OTG_ENABLED } from '../lib/instanceClient';
+import InstanceLogo from './InstanceLogo';
 
 // LP hero: miniatura VIVA da dashboard — substitui o screenshot estático da
 // Boost (a arte antiga aparecia âmbar/BOOST em qualquer instância). Montada
@@ -77,7 +78,7 @@ export default function HeroDashboardMock() {
     >
       {/* Sidebar em miniatura */}
       <div className="hidden sm:flex w-[21%] max-w-[200px] flex-col gap-3 border-r border-slate-200 dark:border-neutral-800/80 p-3 md:p-4" aria-hidden="true">
-        <img src={BRAND.logoUrl} alt="" className="h-4 md:h-5 w-auto self-start" />
+        <InstanceLogo alt="" className="h-4 md:h-5 w-auto self-start" />
         <div className="mt-1">
           <p className="px-1.5 text-[6px] md:text-[8px] uppercase tracking-widest font-bold text-slate-400 dark:text-neutral-500 mb-1">
             Principal

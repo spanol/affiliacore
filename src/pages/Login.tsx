@@ -7,8 +7,8 @@ import { LogIn, Mail, Lock, AlertCircle } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
 import { normalizeAuthEmail } from '../lib/authSecurity';
+import InstanceLogo from '../components/InstanceLogo';
 
-import { BRAND } from '../lib/brandingClient';
 
 // O 2FA NÃO aparece aqui. Com o TOTP próprio, a senha já conclui o sign-in do
 // Firebase; quem cobra o segundo fator é o ProtectedRoute (TwoFactorChallenge),
@@ -45,7 +45,7 @@ export default function Login() {
         className="relative w-full max-w-md bg-glass-card dark:bg-glass-card-dark backdrop-blur-glass-strong p-8 md:p-10 rounded-3xl shadow-xl shadow-slate-900/5 dark:shadow-black/30 border border-slate-200/70 dark:border-neutral-800"
       >
         <div className="text-center mb-8">
-          <img src={BRAND.logoUrl} alt={BRAND.shortName} className="h-7 w-auto mx-auto mb-4 invert dark:invert-0" />
+          <InstanceLogo className="h-7 w-auto mx-auto mb-4" />
           <p className="text-slate-400 dark:text-neutral-500 text-[10px] font-bold uppercase tracking-widest">Acesse sua área restrita</p>
         </div>
 

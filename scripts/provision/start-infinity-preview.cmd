@@ -19,8 +19,11 @@ set VITE_BRAND_NAME=Infinity
 set VITE_BRAND_SHORT=Infinity
 set VITE_BRAND_LOGO_URL=/infinity/logo.svg
 set VITE_BRAND_FAVICON_URL=/infinity/favicon.svg
+rem Logo por tema (∞ roxo): "sidebar-dark" = texto escuro -> tema CLARO e vice-versa.
+set VITE_BRAND_LOGO_LIGHT_URL=/infinity/logo-sidebar-dark.svg
+set VITE_BRAND_LOGO_DARK_URL=/infinity/logo-sidebar-white.svg
 set VITE_BRAND_ACCENT=#8332B9
-set VITE_BRAND_CANVAS=#26181C
-set VITE_BRAND_SURFACE=#3F1D2B
+rem CANVAS/SURFACE removidos (2026-07-29): a instancia real NAO os declara — o
+rem preview pinava o vinho antigo e nao representava o app (apphosting.infinity.yaml).
 set PORT=3124
 npm run dev
