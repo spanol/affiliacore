@@ -140,3 +140,58 @@ describe('AuthProvider (R14)', () => {
     expect(h.snapshotRegs[0].unsub).toHaveBeenCalledTimes(1);
   });
 });
+
+// 2FA (TOTP próprio): o AuthContext lê as claims do ID token e publica `mfaPending`,
+// que o ProtectedRoute usa p/ trocar a rota inteira pelo desafio. É de UX — quem
+// ENFORÇA é o servidor —, então erro ao ler as claims NÃO pode trancar a tela.
+function MfaConsumer() {
+  const { mfaPending } = useAuth();
+  return <span data-testid="mfa">{String(mfaPending)}</span>;
+}
+const mfa = () => screen.getByTestId('mfa').textContent;
+
+/** Usuário com as claims que o Firebase devolveria no getIdTokenResult(). */
+const userWithClaims = (uid: string, claims: any) => ({
+  uid,
+  getIdTokenResult: async () => ({ claims }),
+});
+
+describe('AuthProvider · 2FA pendente', () => {
+  it('sem 2FA ligado → não pendente', async () => {
+    render(<AuthProvider><MfaConsumer /></AuthProvider>);
+    await fireAuth(userWithClaims('u1', { auth_time: 1000 }));
+    expect(mfa()).toBe('false');
+  });
+
+  it('2FA ligado e ainda não confirmado nesta sessão → pendente', async () => {
+    render(<AuthProvider><MfaConsumer /></AuthProvider>);
+    await fireAuth(userWithClaims('u1', { totpEnabled: true, auth_time: 1000 }));
+    expect(mfa()).toBe('true');
+  });
+
+  it('2FA já confirmado nesta sessão (mfaAuthTime == auth_time) → não pendente', async () => {
+    render(<AuthProvider><MfaConsumer /></AuthProvider>);
+    await fireAuth(userWithClaims('u1', { totpEnabled: true, mfaAuthTime: 1000, auth_time: 1000 }));
+    expect(mfa()).toBe('false');
+  });
+
+  it('login NOVO com a claim da sessão anterior → volta a pendente', async () => {
+    render(<AuthProvider><MfaConsumer /></AuthProvider>);
+    await fireAuth(userWithClaims('u1', { totpEnabled: true, mfaAuthTime: 1000, auth_time: 5000 }));
+    expect(mfa()).toBe('true');
+  });
+
+  it('logout limpa o estado', async () => {
+    render(<AuthProvider><MfaConsumer /></AuthProvider>);
+    await fireAuth(userWithClaims('u1', { totpEnabled: true, auth_time: 1000 }));
+    expect(mfa()).toBe('true');
+    await fireAuth(null);
+    expect(mfa()).toBe('false');
+  });
+
+  it('falha ao ler as claims NÃO tranca a tela (o servidor segue barrando)', async () => {
+    render(<AuthProvider><MfaConsumer /></AuthProvider>);
+    await fireAuth({ uid: 'u1', getIdTokenResult: async () => { throw new Error('offline'); } });
+    expect(mfa()).toBe('false');
+  });
+});

@@ -31,6 +31,24 @@ import { canTransition, type PartnershipStatus } from './src/lib/partnership';
 import { normalizeLegalDocInput, computeNextVersion } from './src/lib/legal';
 import { canTransitionWithdrawal, normalizeWithdrawalAmount, type WithdrawalStatus } from './src/lib/withdrawal';
 import { buildNetworkTree, resolveRepasseCap, exceedsRepasseCap } from './src/lib/network';
+import {
+  BACKUP_CODE_COUNT,
+  buildOtpauthUrl,
+  consumeBackupCode,
+  generateBackupCodes,
+  generateTotpSecret,
+  hashBackupCode,
+  verifyTotp,
+  TOTP_DIGITS,
+  TOTP_PERIOD_SECONDS,
+} from './src/lib/totp';
+import {
+  buildMfaDisabledClaims,
+  buildMfaVerifiedClaims,
+  mergeCustomClaims,
+  mfaSatisfied,
+  MFA_REQUIRED_CODE,
+} from './src/lib/mfaSession';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -127,10 +145,24 @@ export function createApp(deps: ServerDeps) {
     }
   };
 
-  const requireAuth: express.RequestHandler = async (req, res, next) => {
+  // Gate do 2FA (TOTP próprio). O `signInWithEmailAndPassword` CONCLUI sozinho — a
+  // senha sozinha já rende um ID token válido —, então quem barra a sessão que ainda
+  // não digitou o código é o servidor, aqui, para TODA rota autenticada. A regra mora
+  // em src/lib/mfaSession (mesma que o client usa p/ mostrar o desafio). Fail-closed.
+  const denyMfaPending = (decoded: any, res: express.Response): boolean => {
+    if (mfaSatisfied(decoded)) return false;
+    res.status(403).json({ error: 'Confirme o código do autenticador para continuar.', code: MFA_REQUIRED_CODE });
+    return true;
+  };
+
+  // `enforceMfa: false` existe SÓ p/ as rotas do próprio 2FA (status/verificar): é
+  // justamente nelas que a sessão ainda não passou pelo segundo fator. Qualquer outra
+  // rota usa `requireAuth`.
+  const buildRequireAuth = (enforceMfa: boolean): express.RequestHandler => async (req, res, next) => {
     if (!adminApp || !adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     const decoded = await verifyBearer(req);
     if (!decoded) return res.status(401).json({ error: 'Não autenticado.' });
+    if (enforceMfa && denyMfaPending(decoded, res)) return;
 
     let role: string | null = null;
     let affiliateId: string | null = null;
@@ -145,14 +177,18 @@ export function createApp(deps: ServerDeps) {
       // fall through with null role/affiliateId
     }
 
-    (req as any).user = { uid: decoded.uid, email: decoded.email, role, affiliateId };
+    (req as any).user = { uid: decoded.uid, email: decoded.email, role, affiliateId, claims: decoded };
     next();
   };
+
+  const requireAuth = buildRequireAuth(true);
+  const requireAuthPreMfa = buildRequireAuth(false);
 
   const requireAdmin: express.RequestHandler = async (req, res, next) => {
     if (!adminApp || !adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     const decoded = await verifyBearer(req);
     if (!decoded) return res.status(401).json({ error: 'Não autenticado.' });
+    if (denyMfaPending(decoded, res)) return;
     let name: string | null = null;
     try {
       const snap = await adminDb.collection('users').doc(decoded.uid).get();
@@ -165,7 +201,7 @@ export function createApp(deps: ServerDeps) {
     } catch {
       return res.status(500).json({ error: 'Erro ao verificar permissões.' });
     }
-    (req as any).user = { uid: decoded.uid, email: decoded.email, name };
+    (req as any).user = { uid: decoded.uid, email: decoded.email, name, claims: decoded };
     next();
   };
 
@@ -372,6 +408,247 @@ export function createApp(deps: ServerDeps) {
     }
     return value ?? null;
   };
+
+  // --- 2FA · TOTP próprio (app autenticador) --------------------------------
+  // Substitui o Firebase Multi-Factor (Identity Platform), que exigia upgrade pago
+  // do projeto por instância white-label. Aqui o segredo é nosso: fica em
+  // `auth_totp/{uid}`, coleção server-only nas rules (`read, write: if false` — nem
+  // o admin lê pelo SDK do cliente). Só o Admin SDK toca.
+  //
+  // Doc: { enabled, secret, pendingSecret, pendingAt, lastCounter, backupCodes[] }
+  //   • `secret`      — base32, o mesmo do QR;
+  //   • `lastCounter` — passo de 30s do último código aceito → o MESMO código não
+  //                     vale duas vezes (anti-replay dentro da janela);
+  //   • `backupCodes` — só HASHES sha-256; o código em claro é mostrado uma vez.
+  //
+  // O enforcement da sessão é o gate em buildRequireAuth (claims + mfaSession.ts).
+  const TOTP_PENDING_TTL_MS = 15 * 60 * 1000;
+  const totpDoc = (uid: string) => adminDb!.collection('auth_totp').doc(uid);
+
+  const readTotpDoc = async (uid: string) => {
+    const snap = await totpDoc(uid).get();
+    const data = (snap.exists ? snap.data() : null) as any;
+    return {
+      enabled: data?.enabled === true,
+      secret: typeof data?.secret === 'string' ? data.secret : null,
+      pendingSecret: typeof data?.pendingSecret === 'string' ? data.pendingSecret : null,
+      pendingAt: typeof data?.pendingAt === 'number' ? data.pendingAt : null,
+      lastCounter: typeof data?.lastCounter === 'number' ? data.lastCounter : null,
+      backupCodes: Array.isArray(data?.backupCodes) ? data.backupCodes.map(String) : [],
+    };
+  };
+
+  // `setCustomUserClaims` SOBRESCREVE o objeto inteiro — sempre por cima das atuais.
+  const patchCustomClaims = async (uid: string, patch: Record<string, unknown>) => {
+    const current = await adminApp!.auth().getUser(uid);
+    await adminApp!.auth().setCustomUserClaims(uid, mergeCustomClaims(current?.customClaims as any, patch));
+  };
+
+  // Rate limit APERTADO: cada request aqui é uma tentativa de adivinhar 6 dígitos.
+  // Bucket por uid (o caller já está autenticado); IP normalizado como fallback.
+  const totpLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => String((req as any).user?.uid || ipKeyGenerator(String(req.ip || ''))),
+    message: { error: 'Muitas tentativas de código. Aguarde alguns minutos.' },
+  });
+
+  // Estado do 2FA da própria conta. PRÉ-MFA de propósito: é o que o Login consulta
+  // logo após a senha, quando a sessão ainda não passou pelo segundo fator.
+  app.get('/api/auth/totp/status', requireAuthPreMfa, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const { uid, claims } = (req as any).user;
+      const doc = await readTotpDoc(uid);
+      res.json({
+        enabled: doc.enabled,
+        verified: mfaSatisfied(claims),
+        backupCodesRemaining: doc.enabled ? doc.backupCodes.length : 0,
+      });
+    } catch (error) {
+      console.error('Erro ao ler status do 2FA:', error);
+      res.status(500).json({ error: 'Erro ao consultar o 2FA.' });
+    }
+  });
+
+  // Passo 1 do enrollment: gera o segredo PENDENTE (nada é ligado ainda) e devolve a
+  // otpauth:// p/ o QR. O client desenha o QR — a URL nunca precisa virar imagem aqui.
+  app.post('/api/auth/totp/setup', requireAuth, totpLimiter, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const { uid, email } = (req as any).user;
+      const doc = await readTotpDoc(uid);
+      if (doc.enabled) {
+        return res.status(409).json({ error: 'O 2FA já está ativo. Desative antes de configurar de novo.' });
+      }
+      const secret = generateTotpSecret();
+      await totpDoc(uid).set(
+        { enabled: false, pendingSecret: secret, pendingAt: Date.now(), updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true },
+      );
+      res.json({
+        secretKey: secret,
+        otpauthUrl: buildOtpauthUrl({ secret, account: String(email || uid), issuer: BRAND.shortName }),
+        digits: TOTP_DIGITS,
+        periodSeconds: TOTP_PERIOD_SECONDS,
+      });
+    } catch (error) {
+      console.error('Erro ao iniciar o 2FA:', error);
+      res.status(500).json({ error: 'Erro ao iniciar a configuração do 2FA.' });
+    }
+  });
+
+  // Passo 2: o código do app prova que o segredo foi guardado → liga o 2FA, emite os
+  // códigos de backup (mostrados UMA vez) e já marca ESTA sessão como verificada
+  // (senão o usuário se auto-expulsaria ao ativar).
+  app.post('/api/auth/totp/activate', requireAuth, totpLimiter, async (req, res) => {
+    if (!adminDb || !adminApp) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const { uid, claims } = (req as any).user;
+      const doc = await readTotpDoc(uid);
+      if (doc.enabled) return res.status(409).json({ error: 'O 2FA já está ativo.' });
+      if (!doc.pendingSecret || !doc.pendingAt || Date.now() - doc.pendingAt > TOTP_PENDING_TTL_MS) {
+        return res.status(400).json({ error: 'Configuração expirada. Gere um novo QR code.', code: 'TOTP_SETUP_EXPIRED' });
+      }
+
+      const matched = verifyTotp(doc.pendingSecret, req.body?.code, { atMs: Date.now() });
+      if (matched === null) {
+        return res.status(400).json({ error: 'Código inválido. Confira o autenticador e tente novamente.', code: 'TOTP_INVALID_CODE' });
+      }
+
+      const backupCodes = generateBackupCodes();
+      await totpDoc(uid).set(
+        {
+          enabled: true,
+          secret: doc.pendingSecret,
+          pendingSecret: null,
+          pendingAt: null,
+          lastCounter: matched,
+          backupCodes: backupCodes.map(hashBackupCode),
+          enabledAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+
+      try {
+        await patchCustomClaims(uid, buildMfaVerifiedClaims(claims?.auth_time, Date.now()));
+      } catch (claimError) {
+        // Sem a claim o gate não enforça — não deixe o 2FA "meio ligado": desfaz.
+        await totpDoc(uid).delete().catch(() => {});
+        throw claimError;
+      }
+
+      await writeAuditLog(req, { entityType: 'user', entityId: uid, action: 'mfa.enable' });
+      // `refreshToken: true` → o client PRECISA chamar getIdToken(true) p/ o token
+      // novo carregar as claims; senão a próxima request ainda vem sem elas.
+      res.json({ enabled: true, backupCodes, refreshToken: true });
+    } catch (error) {
+      console.error('Erro ao ativar o 2FA:', error);
+      res.status(500).json({ error: 'Erro ao ativar o 2FA.' });
+    }
+  });
+
+  // Segundo fator do LOGIN: aceita o código do app ou um código de backup (uso único).
+  // Pré-MFA por definição — é esta rota que tira a sessão do estado pendente.
+  app.post('/api/auth/totp/verify', requireAuthPreMfa, totpLimiter, async (req, res) => {
+    if (!adminDb || !adminApp) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const { uid, claims } = (req as any).user;
+      const doc = await readTotpDoc(uid);
+      if (!doc.enabled || !doc.secret) {
+        return res.status(400).json({ error: 'Não há 2FA ativo nesta conta.', code: 'TOTP_NOT_ENABLED' });
+      }
+
+      const matched = verifyTotp(doc.secret, req.body?.code, { atMs: Date.now() });
+      // Código já usado neste passo de 30s → replay, recusa como se fosse inválido.
+      const freshTotp = matched !== null && (doc.lastCounter === null || matched > doc.lastCounter);
+      const remainingBackup = freshTotp ? null : consumeBackupCode(doc.backupCodes, req.body?.code);
+
+      if (!freshTotp && remainingBackup === null) {
+        return res.status(400).json({ error: 'Código inválido. Tente novamente.', code: 'TOTP_INVALID_CODE' });
+      }
+
+      await totpDoc(uid).set(
+        {
+          ...(freshTotp ? { lastCounter: matched } : { backupCodes: remainingBackup }),
+          lastVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      await patchCustomClaims(uid, buildMfaVerifiedClaims(claims?.auth_time, Date.now()));
+
+      res.json({
+        verified: true,
+        usedBackupCode: !freshTotp,
+        backupCodesRemaining: freshTotp ? doc.backupCodes.length : remainingBackup!.length,
+        refreshToken: true,
+      });
+    } catch (error) {
+      console.error('Erro ao verificar o 2FA:', error);
+      res.status(500).json({ error: 'Erro ao verificar o código.' });
+    }
+  });
+
+  // Emite um lote NOVO de códigos de backup (invalida os antigos). Sem isto, quem
+  // gasta os 10 códigos fica sem rede de segurança se perder o celular.
+  app.post('/api/auth/totp/backup-codes', requireAuth, totpLimiter, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const { uid } = (req as any).user;
+      const doc = await readTotpDoc(uid);
+      if (!doc.enabled || !doc.secret) {
+        return res.status(400).json({ error: 'Não há 2FA ativo nesta conta.', code: 'TOTP_NOT_ENABLED' });
+      }
+      // Exige um código NOVO do app: gerar códigos de recuperação é uma ação sensível.
+      const matched = verifyTotp(doc.secret, req.body?.code, { atMs: Date.now() });
+      if (matched === null || (doc.lastCounter !== null && matched <= doc.lastCounter)) {
+        return res.status(400).json({ error: 'Código inválido. Tente novamente.', code: 'TOTP_INVALID_CODE' });
+      }
+
+      const backupCodes = generateBackupCodes();
+      await totpDoc(uid).set(
+        { lastCounter: matched, backupCodes: backupCodes.map(hashBackupCode), updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true },
+      );
+      await writeAuditLog(req, { entityType: 'user', entityId: uid, action: 'mfa.backup_codes.regenerate' });
+      res.json({ backupCodes, backupCodesRemaining: BACKUP_CODE_COUNT });
+    } catch (error) {
+      console.error('Erro ao gerar códigos de backup:', error);
+      res.status(500).json({ error: 'Erro ao gerar novos códigos de backup.' });
+    }
+  });
+
+  // Desliga o 2FA. Exige um código VÁLIDO (app ou backup) mesmo com a sessão já
+  // verificada: uma aba esquecida aberta não deve conseguir remover o fator.
+  app.post('/api/auth/totp/disable', requireAuth, totpLimiter, async (req, res) => {
+    if (!adminDb || !adminApp) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const { uid } = (req as any).user;
+      const doc = await readTotpDoc(uid);
+      if (!doc.enabled || !doc.secret) {
+        return res.status(400).json({ error: 'Não há 2FA ativo nesta conta.', code: 'TOTP_NOT_ENABLED' });
+      }
+
+      const matched = verifyTotp(doc.secret, req.body?.code, { atMs: Date.now() });
+      const freshTotp = matched !== null && (doc.lastCounter === null || matched > doc.lastCounter);
+      if (!freshTotp && consumeBackupCode(doc.backupCodes, req.body?.code) === null) {
+        return res.status(400).json({ error: 'Código inválido. Tente novamente.', code: 'TOTP_INVALID_CODE' });
+      }
+
+      // Claims primeiro: se o doc sumisse antes, uma falha aqui deixaria o usuário
+      // com `totpEnabled` no token e sem segredo p/ verificar — trancado pra fora.
+      await patchCustomClaims(uid, buildMfaDisabledClaims());
+      await totpDoc(uid).delete();
+      await writeAuditLog(req, { entityType: 'user', entityId: uid, action: 'mfa.disable' });
+      res.json({ enabled: false, refreshToken: true });
+    } catch (error) {
+      console.error('Erro ao desativar o 2FA:', error);
+      res.status(500).json({ error: 'Erro ao desativar o 2FA.' });
+    }
+  });
 
   // B3 · Afiliado especial define a comissão de um sub-afiliado da própria sub-rede.
   // `affiliate_configs` é admin-only nas rules; este endpoint grava via Admin SDK

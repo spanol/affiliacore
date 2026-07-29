@@ -262,6 +262,32 @@ describe('affiliate_configs/{id} (R5 — taxas mediadas pelo servidor)', () => {
 });
 
 // =============================================================================
+// auth_totp — 2FA: a coleção MAIS fechada do arquivo (nem admin lê)
+// O doc guarda o segredo TOTP: quem o lê gera códigos válidos e derruba o segundo
+// fator. Só o Admin SDK (que ignora as rules) toca, pelas rotas /api/auth/totp.
+// =============================================================================
+describe('auth_totp/{uid} (segredo do 2FA — ninguém lê pelo client)', () => {
+  beforeEach(async () => {
+    await seedDoc('auth_totp', 'user-1', { enabled: true, secret: 'GEZDGNBVGY3TQOJQ', backupCodes: ['abc'] });
+  });
+
+  it('client NÃO lê o próprio segredo (o app nunca precisa dele)', async () => {
+    await assertFails(getDoc(doc(asClient(), 'auth_totp', 'user-1')));
+  });
+
+  it('client NÃO escreve — senão desligaria o próprio 2FA sem passar pelo servidor', async () => {
+    await assertFails(setDoc(doc(asClient(), 'auth_totp', 'user-1'), { enabled: false }));
+  });
+
+  it('nem o ADMIN lê ou escreve: é material criptográfico, não dado de gestão', async () => {
+    await seedAdmin();
+    await assertFails(getDoc(doc(asAdmin(), 'auth_totp', 'user-1')));
+    await assertFails(getDocs(collection(asAdmin(), 'auth_totp')));
+    await assertFails(setDoc(doc(asAdmin(), 'auth_totp', 'user-2'), { enabled: true }));
+  });
+});
+
+// =============================================================================
 // Coleções admin-only — leitura/escrita do cliente sempre NEGADA
 // (PII de pagamento, logs, casas, resultados manuais, links, partner keys)
 // =============================================================================

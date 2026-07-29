@@ -43,6 +43,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // 2FA (TOTP) por usuário: segredo do autenticador + hashes dos códigos de backup.
+    // A regra mais fechada do arquivo — NEM O ADMIN lê pelo SDK do cliente. O segredo
+    // é material criptográfico: quem o lê gera códigos válidos e derruba o segundo
+    // fator. Só o Admin SDK (que ignora estas rules) toca, pelas rotas /api/auth/totp.
+    // Não afrouxe para `isAdmin()` — não existe caso de uso de leitura pelo cliente.
+    match /auth_totp/{userId} {
+      allow read, write: if false;
+    }
+
     // Local mirror of the external affiliate list (synced by admins).
     match /affiliates/{affiliateId} {
       allow read: if isSignedIn();
