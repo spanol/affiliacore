@@ -43,6 +43,15 @@ describe('catálogo de presets de casas', () => {
     }
   });
 
+  // A URL da logo oficial é o caminho de escape do ícone autoral (o admin baixa e
+  // sobe a logo real). URL malformada quebraria esse link silenciosamente.
+  it('a URL da logo oficial é https ou asset local do repo', () => {
+    for (const p of HOUSE_PRESETS) {
+      if (!p.officialLogoUrl) continue;
+      expect(p.officialLogoUrl, p.name).toMatch(/^(https:\/\/|\/brands\/)/);
+    }
+  });
+
   it('declara a licença SPA/MF e o domínio .bet.br de cada casa', () => {
     for (const p of HOUSE_PRESETS) {
       expect(p.spaPortaria, p.name).toMatch(/^SPA\/MF nº /);
@@ -159,6 +168,40 @@ describe('fallback de logo por preset', () => {
   it('não casa casa desconhecida', () => {
     expect(findHousePresetFor('Casa Inventada XYZ')).toBeNull();
     expect(findHousePresetFor('', null, undefined)).toBeNull();
+  });
+
+  // "Super Bet V2" é o nome real da casa no painel legado da Infinity — mesma casa,
+  // instância diferente. Tratado por REGRA (sufixo de versão), não por caso especial.
+  it('casa nome com sufixo de versão no preset base', () => {
+    expect(findHousePresetFor('Super Bet V2')?.slug).toBe('superbet');
+    expect(findHousePresetFor('Superbet V2')?.slug).toBe('superbet');
+    expect(findHousePresetFor('superbet-v2')?.slug).toBe('superbet');
+    expect(findHousePresetFor('Betano 2')?.slug).toBe('betano');
+  });
+
+  it('casa apelidos declarados no catálogo', () => {
+    expect(findHousePresetFor('7k')?.slug).toBe('bet7k');
+    expect(findHousePresetFor('Viva Sorte Bet')?.slug).toBe('vivasorte');
+  });
+
+  // A tolerância de versão é estreita de propósito: qualquer sobra faria "StakeBet"
+  // (que pode ser outra casa) virar Stake.
+  it('NÃO casa sobra que não seja sufixo de versão', () => {
+    expect(findHousePresetFor('StakeBet')).toBeNull();
+    expect(findHousePresetFor('Betano Cassino')).toBeNull();
+    expect(findHousePresetFor('Superbet Premium')).toBeNull();
+  });
+
+  // Casamento exato tem que vencer a regra frouxa, senão um preset de nome curto
+  // com sufixo numérico poderia sequestrar uma casa que já casa exatamente.
+  it('casamento exato vence a tolerância de versão', () => {
+    expect(findHousePresetFor('bet365')?.slug).toBe('bet365');
+    expect(findHousePresetFor('7games')?.slug).toBe('7games');
+    expect(findHousePresetFor('brazino777')?.slug).toBe('brazino777');
+  });
+
+  it('a logo do preset segue a mesma resolução p/ nome versionado', () => {
+    expect(houseLogoOrPreset(null, 'Super Bet V2')).toBe('/brands/presets/superbet.svg');
   });
 
   // Invariante: o upload do admin é a verdade. O preset só preenche o VAZIO.

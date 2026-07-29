@@ -118,6 +118,52 @@ nesta coleta. Não estão no catálogo — mas o admin segue livre pra criar a c
 cor medida na fonte oficial. Sem isso, o preset estaria afirmando algo que não foi
 verificado.
 
+### Casamento casa↔preset (apelidos e versões)
+
+A agência batiza a casa como quiser no cadastro, então o casamento normaliza acento,
+caixa e separador: `"Esportes da Sorte"`, `"esportes-da-sorte"` e `"EsportesDaSorte"`
+caem na mesma chave. Isso já resolve `"Super Bet"` → Superbet e `"Bet 365"` → bet365.
+
+Duas tolerâncias além disso:
+- **Sufixo de versão** (`v?<dígitos>` no fim): `"Super Bet V2"` → Superbet. É o padrão
+  de painel legado (a Infinity chama assim), mesma casa em instância nova. Restrito a
+  esse formato de propósito — aceitar qualquer sobra faria `"StakeBet"` virar Stake.
+- **Apelidos declarados** (`aliases`), só pro que a normalização não pega: `"7k"` →
+  Bet7k, `"Viva Sorte Bet"` → Viva Sorte.
+
+Casamento **exato sempre vence** a tolerância de versão, pra um preset de nome curto
+não sequestrar uma casa que já casa exatamente com outro.
+
+## 4.1 Experimento: e se usássemos as logos OFICIAIS? (28/07/2026)
+
+Coletei as logos oficiais das 26 casas (apple-touch-icon / favicon / og:image do
+próprio site `.bet.br`) e montei a comparação lado a lado com o ícone autoral.
+**O resultado contrariou a expectativa** — logo oficial não é uniformemente melhor:
+
+**Coleta:** 21 de 26 vieram. Falharam **H2bet** e **Betsson** (nenhum candidato
+válido), e **BR4BET, F12.Bet e Lotogreen** baixaram o **mesmo arquivo byte a byte**
+(favicon genérico de plataforma, 4.286 b) — detectado por hash, descartado.
+
+| Veredito | Casas | Por quê |
+|---|---|---|
+| **Oficial ganha** | Betano, Superbet, Sportingbet, KTO, Brazino777, Stake, Bet7k, 7Games, Vbet | Símbolo forte e legível a 40px; reconhecimento imediato |
+| **Oficial perde** | bet365, Betfair, Esportes da Sorte, Betnacional, Novibet, BetMGM, Blaze | Marca abstrata que não se lê a 40px (seta da Betfair, "e" da Esportes da Sorte), ou arte escura que some no tema escuro |
+| **Oficial inutilizável** | EstrelaBet | Só existe como banner 1200×630 — proporção errada pra ícone |
+| **Sem logo** | H2bet, Betsson, BR4BET, F12.Bet, Lotogreen | Ver coleta acima |
+
+**O achado que importa:** individualmente algumas logos oficiais são melhores, mas
+**como conjunto elas não formam sistema** — proporções, respiro e fundo variam por
+casa, e várias são transparentes desenhadas só pro tema escuro delas. Numa lista, o
+que faz escanear rápido é a uniformidade (mesma silhueta, mesmo peso óptico), e é
+justamente isso que o conjunto oficial não tem. O autoral perde em reconhecimento
+individual e ganha em leitura de lista.
+
+**Decisão:** manter o autoral como base e deixar a troca por casa na mão do admin —
+que é o desenho que já existe. O ganho concreto do experimento foi enriquecer
+`officialLogoUrl`: de 6 para **19 casas** com link direto verificado, então "baixar a
+logo oficial" no seletor agora resolve pra maioria. Ficaram sem link as 5 sem logo +
+EstrelaBet (só banner) + MC Games (a URL tem hash de deploy, quebra no próximo build).
+
 ## 5. Como usar
 
 **No app** — `/casas` → **Nova casa** → o bloco **"Usar um preset de casa"** abre com a

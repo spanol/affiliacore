@@ -40,6 +40,11 @@ export interface HousePreset {
   // marcas podem dividir a mesma autorização (ex.: BR4BET e Lotogreen, ambas Sabiá).
   legalEntity: string;
   spaPortaria: string;
+  // Grafias alternativas que a MESMA casa recebe no cadastro de cada agência. Só
+  // para variações que a normalização NÃO resolve sozinha: "Super Bet" já casa com
+  // "Superbet" (o separador some), mas "Super Bet V2" não — é nome de instância do
+  // painel legado da Infinity, não uma casa diferente.
+  aliases?: string[];
 }
 
 // Contraste relativo (WCAG) — decide monograma claro ou escuro quando a casa não
@@ -77,11 +82,15 @@ export function monogramColor(preset: HousePreset): string {
 // mais prováveis primeiro.
 export const HOUSE_PRESETS: HousePreset[] = [
   { slug: 'betano', name: 'Betano', monogram: 'B', color: '#ff3c00', colorSource: 'logo-oficial',
-    site: 'betano.bet.br', officialLogoUrl: 'https://www.betano.bet.br/assets/static/favicons/betano/apple-icon-57x57.png',
+    site: 'betano.bet.br', officialLogoUrl: 'https://www.betano.bet.br/assets/static/favicons/betano/apple-icon-180x180.png',
     legalEntity: 'Kaizen Gaming Brasil LTDA', spaPortaria: 'SPA/MF nº 246, de 07/02/2025' },
   { slug: 'superbet', name: 'Superbet', monogram: 'S', color: '#fd0104', colorSource: 'logo-oficial',
     site: 'superbet.bet.br', officialLogoUrl: '/brands/superbet.png',
-    legalEntity: 'SPRBT Interactive Brasil LTDA', spaPortaria: 'SPA/MF nº 2.090, de 30/12/2024' },
+    legalEntity: 'SPRBT Interactive Brasil LTDA', spaPortaria: 'SPA/MF nº 2.090, de 30/12/2024',
+    // "Super Bet V2" é como a casa aparece no painel legado da Infinity — mesma casa,
+    // instância nova. Já cairia na regra de sufixo de versão; fica explícito por ser
+    // nome real em produção. ("Super Bet" sem o V2 a normalização já resolve.)
+    aliases: ['Super Bet V2'] },
   { slug: 'sportingbet', name: 'Sportingbet', monogram: 'sb', color: '#003dc4', colorSource: 'logo-oficial',
     site: 'sportingbet.bet.br', officialLogoUrl: '/brands/sportingbet.png',
     legalEntity: 'Ventmear Brasil S.A.', spaPortaria: 'SPA/MF nº 247, de 07/02/2025' },
@@ -89,49 +98,52 @@ export const HOUSE_PRESETS: HousePreset[] = [
     site: 'bet365.bet.br', officialLogoUrl: 'https://bet365.bet.br/sportsbook-static/favicons/favicon-167x167.png',
     legalEntity: 'HS do Brasil LTDA', spaPortaria: 'SPA/MF nº 250, de 07/02/2025' },
   { slug: 'betfair', name: 'Betfair', monogram: 'bf', color: '#ffb80c', accent: '#1e1e1e', colorSource: 'css-oficial',
-    site: 'betfair.bet.br',
+    site: 'betfair.bet.br', officialLogoUrl: 'https://betfair.bet.br/favicon.ico',
     legalEntity: 'NSX Betfair Brasil S.A.', spaPortaria: 'SPA/MF nº 2.291, de 09/10/2025' },
   { slug: 'betnacional', name: 'Betnacional', monogram: 'BN', color: '#131e32', accent: '#ebbd54', colorSource: 'logo-oficial',
-    site: 'betnacional.bet.br', officialLogoUrl: 'https://betnacional.bet.br/assets/skins/betnacional/favicon/apple-icon-57x57.png',
+    site: 'betnacional.bet.br', officialLogoUrl: 'https://betnacional.bet.br/assets/skins/betnacional/favicon/apple-icon-180x180.png',
     legalEntity: 'NSX Brasil S.A.', spaPortaria: 'SPA/MF nº 1.814, de 15/08/2025' },
   { slug: 'kto', name: 'KTO', monogram: 'KTO', color: '#da0000', colorSource: 'logo-oficial',
     site: 'kto.bet.br', officialLogoUrl: 'https://static.kto.bet.br/lo/2026/07/06220509/kto-favicon-2-300x300.png',
     legalEntity: 'Apollo Operations LTDA', spaPortaria: 'SPA/MF nº 2.093, de 30/12/2024' },
   { slug: 'esportes-da-sorte', name: 'Esportes da Sorte', monogram: 'EdS', color: '#38e67d', accent: '#08301a', colorSource: 'logo-oficial',
-    site: 'esportesdasorte.bet.br', officialLogoUrl: 'https://esportesdasorte.bet.br/logo.png',
+    site: 'esportesdasorte.bet.br', officialLogoUrl: 'https://esportesdasorte.bet.br/logo.png', // wordmark, não é quadrado
+
     legalEntity: 'Esportes Gaming Brasil LTDA', spaPortaria: 'SPA/MF nº 1.559, de 18/07/2025' },
   { slug: 'estrelabet', name: 'EstrelaBet', monogram: 'EB', color: '#ffd700', accent: '#1a1400', colorSource: 'css-oficial',
     site: 'estrelabet.bet.br',
     legalEntity: 'EB Intermediacoes e Jogos S.A.', spaPortaria: 'SPA/MF nº 1.762, de 13/08/2025' },
   { slug: 'brazino777', name: 'Brazino777', monogram: '777', color: '#035d03', colorSource: 'logo-oficial',
-    site: 'brazino777.bet.br',
+    site: 'brazino777.bet.br', officialLogoUrl: 'https://www.brazino-cdnsrv-cst.org/build/images/favicons/apple-touch-icon-152x152.png',
     legalEntity: 'Futuras Apostas LTDA', spaPortaria: 'SPA/MF nº 466, de 10/03/2025' },
   { slug: 'stake', name: 'Stake', monogram: 'St', color: '#1a2c38', accent: '#4bc4ff', colorSource: 'theme-color',
-    site: 'stake.bet.br',
+    site: 'stake.bet.br', officialLogoUrl: 'https://stake.bet.br/favicon.ico',
     legalEntity: 'Stake Brazil LTDA', spaPortaria: 'SPA/MF nº 263, de 07/02/2025' },
   { slug: 'bet7k', name: 'Bet7k', monogram: '7K', color: '#a1cd3d', accent: '#16182a', colorSource: 'css-oficial',
-    site: '7k.bet.br',
-    legalEntity: 'Ana Gaming Brasil S.A.', spaPortaria: 'SPA/MF nº 1.056, de 14/05/2025' },
+    site: '7k.bet.br', officialLogoUrl: 'https://7k.bet.br/pwa/apple-touch-icon-180x180.png',
+    legalEntity: 'Ana Gaming Brasil S.A.', spaPortaria: 'SPA/MF nº 1.056, de 14/05/2025',
+    aliases: ['7k'] }, // o domínio e a camisa do Vitória usam só "7k"
   { slug: '7games', name: '7Games', monogram: '7G', color: '#1b1b1b', accent: '#f5d76e', colorSource: 'css-oficial',
-    site: '7games.bet.br',
+    site: '7games.bet.br', officialLogoUrl: 'https://7games.bet.br/apple-touch-icon.png',
     legalEntity: 'OIG Gaming Brazil LTDA', spaPortaria: 'SPA/MF nº 2.096, de 30/12/2024' },
   { slug: 'vbet', name: 'Vbet', monogram: 'V', color: '#d80d83', colorSource: 'logo-oficial',
-    site: 'vbet.bet.br',
+    site: 'vbet.bet.br', officialLogoUrl: 'https://vbet.bet.br/favicon.ico',
     legalEntity: 'SC Operating Brazil LTDA', spaPortaria: 'SPA/MF nº 254, de 07/02/2025' },
   { slug: 'h2bet', name: 'H2bet', monogram: 'H2', color: '#77148e', accent: '#24cfa4', colorSource: 'css-oficial',
     site: 'h2.bet.br',
     legalEntity: 'H2 Licensed LTDA', spaPortaria: 'SPA/MF nº 253, de 07/02/2025' },
   { slug: 'vivasorte', name: 'Viva Sorte', monogram: 'VS', color: '#ff7912', accent: '#1a243d', colorSource: 'css-oficial',
-    site: 'vivasorte.bet.br',
-    legalEntity: 'Jogo Principal LTDA', spaPortaria: 'SPA/MF nº 262, de 18/02/2025' },
+    site: 'vivasorte.bet.br', officialLogoUrl: 'https://cn.vivasorte.bet.br/assets/icons/apple-touch-icon.png',
+    legalEntity: 'Jogo Principal LTDA', spaPortaria: 'SPA/MF nº 262, de 18/02/2025',
+    aliases: ['Viva Sorte Bet'] }, // grafia usada no patrocínio do Athletico
   { slug: 'novibet', name: 'Novibet', monogram: 'N', color: '#0a1324', accent: '#29a8ac', colorSource: 'theme-color',
-    site: 'novibet.bet.br',
+    site: 'novibet.bet.br', officialLogoUrl: 'https://novibet.bet.br/assets/images/logos/apple-touch-icon-180x180.png',
     legalEntity: 'NVBT Gaming LTDA', spaPortaria: 'SPA/MF nº 249, de 07/02/2025' },
   { slug: 'pixbet', name: 'Pixbet', monogram: 'px', color: '#ccff00', accent: '#12200a', colorSource: 'theme-color',
-    site: 'pixbet.bet.br',
+    site: 'pixbet.bet.br', officialLogoUrl: 'https://pixbet.bet.br/assets/brands/pixbet/favicons/apple-touch-icon.png',
     legalEntity: 'Pixbet Soluções Tecnológicas LTDA', spaPortaria: 'SPA/MF nº 2.326, de 14/10/2025' },
   { slug: 'blaze', name: 'Blaze', monogram: 'BZ', color: '#131521', accent: '#e60026', colorSource: 'theme-color',
-    site: 'blaze.bet.br',
+    site: 'blaze.bet.br', officialLogoUrl: 'https://blaze.bet.br/apple-touch-icon.png',
     legalEntity: 'Foggo Entertainment LTDA', spaPortaria: 'SPA/MF nº 471, de 10/03/2025' },
   { slug: 'betsson', name: 'Betsson', monogram: 'bs', color: '#ff6600', colorSource: 'theme-color',
     site: 'betsson.bet.br',
@@ -140,7 +152,7 @@ export const HOUSE_PRESETS: HousePreset[] = [
     site: 'f12.bet.br',
     legalEntity: 'F12 do Brasil Jogos Eletrônicos LTDA', spaPortaria: 'SPA/MF nº 1.423, de 30/06/2025' },
   { slug: 'aposta-ganha', name: 'Aposta Ganha', monogram: 'AG', color: '#ff3d00', colorSource: 'css-oficial',
-    site: 'apostaganha.bet.br',
+    site: 'apostaganha.bet.br', officialLogoUrl: 'https://apostaganha.bet.br/assets/favicon.png',
     legalEntity: 'Aposta Ganha Loterias LTDA', spaPortaria: 'SPA/MF nº 807, de 23/03/2026' },
   { slug: 'br4bet', name: 'BR4BET', monogram: 'BR4', color: '#12b530', accent: '#04240c', colorSource: 'theme-color',
     site: 'br4.bet.br',
@@ -233,13 +245,41 @@ const matchKey = (s?: string | null): string =>
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
 
+// Todas as chaves sob as quais um preset responde: slug, nome e apelidos.
+const presetKeys = (p: HousePreset): string[] =>
+  [p.slug, p.name, ...(p.aliases ?? [])].map(matchKey).filter(Boolean);
+
+// Sufixo de VERSÃO no fim do nome da casa: "v2", "V3", "2". É o padrão de painel
+// legado ("Super Bet V2" na Infinity) — mesma casa, instância diferente. Restrito de
+// propósito a v?<dígitos>: aceitar qualquer sobra faria "Stake" casar com "StakeBet",
+// que pode ser outra casa.
+const VERSION_SUFFIX = /^v?\d{1,2}$/;
+
 // Acha o preset de uma casa por qualquer das chaves (slug, id do doc, nome).
+// Duas passadas: primeiro casamento EXATO (em todas as chaves de todos os presets),
+// e só depois a tolerância de sufixo de versão — assim uma casa que casa exatamente
+// com um preset nunca é roubada pela regra frouxa de outro.
 export function findHousePresetFor(...keys: (string | null | undefined)[]): HousePreset | null {
-  for (const k of keys) {
-    const key = matchKey(k);
-    if (!key) continue;
-    const hit = HOUSE_PRESETS.find((p) => matchKey(p.slug) === key || matchKey(p.name) === key);
-    if (hit) return hit;
+  const wanted = keys.map(matchKey).filter(Boolean);
+  if (!wanted.length) return null;
+
+  for (const key of wanted) {
+    const exact = HOUSE_PRESETS.find((p) => presetKeys(p).includes(key));
+    if (exact) return exact;
+  }
+
+  // Casa "<preset><versão>" → o preset. Entre vários prefixos possíveis vence o MAIS
+  // LONGO, pra não deixar um preset de nome curto sequestrar o de nome mais completo.
+  for (const key of wanted) {
+    let best: { preset: HousePreset; len: number } | null = null;
+    for (const p of HOUSE_PRESETS) {
+      for (const pk of presetKeys(p)) {
+        if (!key.startsWith(pk) || key === pk) continue;
+        if (!VERSION_SUFFIX.test(key.slice(pk.length))) continue;
+        if (!best || pk.length > best.len) best = { preset: p, len: pk.length };
+      }
+    }
+    if (best) return best.preset;
   }
   return null;
 }
