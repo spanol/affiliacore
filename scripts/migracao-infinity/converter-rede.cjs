@@ -52,19 +52,23 @@ function parseArgs(argv) {
     else if (a === '--admin-uid') out.adminUid = argv[++i];
     else if (a === '--id-token-file') out.idTokenFile = argv[++i];
     else if (a === '--deals') out.deals = argv[++i];
+    else if (a === '--links') out.links = argv[++i];
+    else if (a === '--casa') out.casa = argv[++i];
     else if (a === '--only') out.only = argv[++i];
     else throw new Error(`Argumento desconhecido: ${a}`);
   }
   // Com --id-token-file nao entra Admin SDK, logo nao ha o que cunhar: dispensa
   // --api-key e --admin-*. O token e' de vida curta (~1h), vem de ARQUIVO (nunca de
   // argv, que vaza em lista de processo) e o script nunca o imprime.
-  const obrigatorios = out.idTokenFile ? ['tsv', 'base'] : ['tsv', 'base', 'apiKey'];
+  // A fase de links nao le o TSV de roster — ela tem fonte propria (--links).
+  const base = out.only === 'links' ? ['links', 'base'] : ['tsv', 'base'];
+  const obrigatorios = out.idTokenFile ? base : [...base, 'apiKey'];
   const falta = obrigatorios.filter((k) => !out[k]);
   if (falta.length) throw new Error(`Faltam argumentos: ${falta.join(', ')}`);
   if (!out.idTokenFile && !out.adminEmail && !out.adminUid) {
     throw new Error('Informe --id-token-file, ou --admin-email/--admin-uid para cunhar via Admin SDK.');
   }
-  if (!['ambos', 'roster', 'uplines', 'taxas'].includes(out.only)) throw new Error('--only aceita roster|uplines|taxas.');
+  if (!['ambos', 'roster', 'uplines', 'taxas', 'links'].includes(out.only)) throw new Error('--only aceita roster|uplines|taxas|links.');
   if (out.only === 'taxas' && !out.deals) throw new Error('--only taxas exige --deals <tsv de deals>.');
   return out;
 }
@@ -272,6 +276,193 @@ async function fase3Taxas(api, args, idPorEmail) {
   }
 }
 
+// ------------------------------------------------------------ links (fase 4)
+const LINK_COLS = ['email', 'url'];
+
+/**
+ * TSV dos links de divulgacao ja atribuidos no legado (tela /admin/regras,
+ * visao `com_link`): uma linha por (pessoa, casa) com a URL cunhada NA CASA.
+ *
+ * Colunas: email, url [, nome, tag, casa]. `tag` e' conferencia (a tag tem que
+ * bater com a da query da URL); `casa` sobrepoe o --casa da linha de comando.
+ */
+function lerLinks(caminho) {
+  const texto = fs.readFileSync(caminho, 'utf8').replace(/^﻿/, '');
+  const linhas = texto.split(/\r?\n/).filter((l) => l.trim() !== '');
+  const head = linhas[0].split('\t').map((s) => s.trim());
+  const faltando = LINK_COLS.filter((c) => !head.includes(c));
+  if (faltando.length) throw new Error(`TSV de links sem as colunas: ${faltando.join(', ')}`);
+  const idx = Object.fromEntries(head.map((h, i) => [h, i]));
+  return linhas.slice(1).map((l) => {
+    const c = l.split('\t');
+    return {
+      email: (c[idx.email] || '').trim().toLowerCase(),
+      url: (c[idx.url] || '').trim(),
+      nome: idx.nome != null ? (c[idx.nome] || '').trim() : '',
+      tag: idx.tag != null ? (c[idx.tag] || '').trim() : '',
+      casa: idx.casa != null ? (c[idx.casa] || '').trim() : '',
+    };
+  }).filter((r) => r.email || r.url);
+}
+
+// Mesma convencao de tag do nucleo puro (src/lib/linkTriage.ts): as plataformas
+// que aparecem no legado e nas casas BR. Duplicado aqui de proposito — o script
+// e' .cjs e nao importa o modulo TS; a lista e' pequena e estavel.
+const PARAMS_DE_TAG = ['tag', 'afp', 'afp2', 'btag', 'subid', 'sub_id', 'clickid'];
+function tagDaUrl(url) {
+  try {
+    const u = new URL(url);
+    for (const p of PARAMS_DE_TAG) {
+      const v = u.searchParams.get(p);
+      if (v && v.trim()) return v.trim();
+    }
+  } catch { /* quem chama ja recusou a URL invalida */ }
+  return '';
+}
+
+// Chave de marca do link — MESMA regra do `dealBrandKey` (src/lib/deal.ts):
+// brandId da OTG quando existe, senao o slug. Casa manual cai no slug.
+const brandKeyDaCasa = (h) => String(h?.brandId ?? '').trim() || String(h?.slug ?? h?.id ?? '').trim();
+
+/**
+ * Fase 4 — links de divulgacao ja atribuidos no legado.
+ *
+ * Grava `affiliate_links` via `POST /api/affiliate-links`, que e' IDEMPOTENTE por
+ * (afiliado, marca): rodar de novo nao cunha codigo novo, so' atualiza o destino —
+ * o /go/:code que o afiliado ja recebeu continua valendo.
+ *
+ * A URL migrada e' a da CASA (ex.: go.aff.esportiva.bet/...?afp=<tag>), entao a
+ * atribuicao do lado da casa continua pela tag; o /go/:code so' embrulha, conta o
+ * clique do nosso lado e repassa o subid. O link antigo que o afiliado ja
+ * distribuiu NAO para de funcionar — e' da casa, nao nosso.
+ */
+async function fase4Links(api, args, idPorEmail) {
+  const linhas = lerLinks(args.links);
+  console.log(`\n== fase 4 · links de divulgacao ==`);
+  console.log(`linhas no TSV: ${linhas.length}`);
+
+  // casa -> slug/brandKey, resolvido CONTRA A INSTANCIA (nunca chutado)
+  const respostaCasas = await api('GET', '/api/houses');
+  const casas = Array.isArray(respostaCasas) ? respostaCasas : (respostaCasas?.houses ?? []);
+  const casaPorNome = new Map();
+  for (const h of casas) casaPorNome.set(chaveNome(h?.name), h);
+
+  const problemas = [];
+  const vistos = new Set();
+  const urlsVistas = new Set();
+  const alvo = [];
+
+  for (const r of linhas) {
+    const nomeCasa = r.casa || args.casa || '';
+    if (!nomeCasa) { problemas.push(`${r.email}: sem casa (use --casa "<nome>" ou a coluna casa)`); continue; }
+    const casa = casaPorNome.get(chaveNome(nomeCasa));
+    if (!casa) {
+      problemas.push(`${r.email}: casa "${nomeCasa}" nao existe na instancia (casas: ${casas.map((h) => h?.name).join(', ') || 'nenhuma'})`);
+      continue;
+    }
+    if (!/^https?:\/\/.+/i.test(r.url)) { problemas.push(`${r.email}: URL invalida (${r.url || 'vazia'})`); continue; }
+    // Tag da planilha CONTRA a tag da URL: pega erro de copia/cola antes de gravar
+    // um afiliado apontando pro balde de outro.
+    const tagUrl = tagDaUrl(r.url);
+    if (r.tag && tagUrl && r.tag !== tagUrl) {
+      problemas.push(`${r.email}: tag "${r.tag}" nao bate com a da URL ("${tagUrl}")`);
+      continue;
+    }
+    if (urlsVistas.has(r.url)) { problemas.push(`URL repetida no TSV (dois afiliados no mesmo balde): ${r.url}`); continue; }
+    urlsVistas.add(r.url);
+
+    const brandKey = brandKeyDaCasa(casa);
+    const chave = `${r.email}|${brandKey}`;
+    if (vistos.has(chave)) { problemas.push(`${r.email}: duplicado para a mesma casa`); continue; }
+    vistos.add(chave);
+
+    const affiliateId = idPorEmail.get(r.email);
+    // Sem afiliado na instancia o link se perderia — aqui NAO ha descarte seguro
+    // (diferente da fase 3, onde linha com 0 CPA podia cair fora).
+    if (!affiliateId) { problemas.push(`${r.email}: sem afiliado na instancia — rode a fase roster antes`); continue; }
+
+    alvo.push({ ...r, affiliateId, brandKey, casaNome: casa?.name ?? nomeCasa, tag: r.tag || tagUrl });
+  }
+
+  if (problemas.length) {
+    console.error(`\n!! ${problemas.length} problema(s) no TSV — NADA foi escrito:`);
+    for (const p of problemas.slice(0, 20)) console.error(`   - ${p}`);
+    if (problemas.length > 20) console.error(`   ... e ${problemas.length - 20} outros`);
+    process.exit(1);
+  }
+
+  const porCasa = alvo.reduce((a, r) => ((a[r.casaNome] = (a[r.casaNome] || 0) + 1), a), {});
+  console.log(`casas: ${Object.entries(porCasa).map(([n, q]) => `${n}=${q}`).join('  ')}`);
+  console.log(`saneamento: OK (URL http(s), tag coerente, sem duplicata, todos com afiliado)`);
+
+  // Estado atual: o POST e' idempotente, entao separamos o que e' criacao do que
+  // e' atualizacao de destino — muda o que o operador espera ver no fim.
+  const atuais = (await api('GET', '/api/affiliate-links'))?.links ?? [];
+  const porPar = new Map();
+  for (const l of atuais) {
+    const k = `${String(l.affiliateId ?? '')}|${String(l.brandId ?? '')}`;
+    if (!porPar.has(k)) porPar.set(k, l);
+  }
+  let criar = 0, atualizar = 0, iguais = 0;
+  for (const r of alvo) {
+    const atual = porPar.get(`${r.affiliateId}|${r.brandKey}`);
+    if (!atual) criar++;
+    else if (String(atual.registerUrl ?? '') !== r.url) atualizar++;
+    else iguais++;
+  }
+  console.log(`links ja na instancia: ${atuais.length}   a criar: ${criar}   a atualizar destino: ${atualizar}   ja identicos: ${iguais}`);
+
+  if (!args.apply) {
+    console.log(`\n(dry-run) nenhum link gravado. Use --apply.`);
+    return;
+  }
+
+  let ok = 0;
+  const falhas = [];
+  for (const r of alvo) {
+    try {
+      await api('POST', '/api/affiliate-links', {
+        affiliateId: r.affiliateId,
+        brandId: r.brandKey,
+        registerUrl: r.url,
+      });
+      ok++;
+    } catch (e) {
+      falhas.push(`${r.email}: ${e.message}`);
+    }
+  }
+  console.log(`links gravados: ${ok}   falhas: ${falhas.length}`);
+  for (const f of falhas.slice(0, 20)) console.error(`   - ${f}`);
+
+  // conferencia: rele e compara o destino de CADA par (afiliado, casa)
+  const depois = (await api('GET', '/api/affiliate-links'))?.links ?? [];
+  const depoisPorPar = new Map();
+  for (const l of depois) depoisPorPar.set(`${String(l.affiliateId ?? '')}|${String(l.brandId ?? '')}`, l);
+  let divergentes = 0;
+  for (const r of alvo) {
+    const l = depoisPorPar.get(`${r.affiliateId}|${r.brandKey}`);
+    if (!l || String(l.registerUrl ?? '') !== r.url || l.active === false) divergentes++;
+  }
+  console.log(`\n== conferencia (links) ==`);
+  console.log(`esperados: ${alvo.length}   divergentes: ${divergentes}`);
+  if (divergentes || falhas.length) {
+    console.error(`\n!! conferencia NAO fechou — nao declare a migracao de links concluida.`);
+    process.exit(1);
+  }
+  console.log(`\nOK. Os links aparecem em /links (triagem do admin) e em "Meus Links" do afiliado.`);
+}
+
+// e-mail -> affiliateId da instancia (juncao com o legado e' sempre por e-mail)
+async function mapaEmailParaId(api) {
+  const aliases = (await api('GET', '/api/affiliate-email-aliases'))?.aliases ?? [];
+  const m = new Map();
+  for (const a of aliases) {
+    const e = String(a.email || '').trim().toLowerCase();
+    if (e && a.affiliateId) m.set(e, String(a.affiliateId));
+  }
+  return m;
+}
+
 // --------------------------------------------------------------------- auth
 async function cunharIdToken({ apiKey, adminEmail, adminUid, idTokenFile }) {
   // Caminho sem Admin SDK: o operador cola um ID token de admin (obtido na propria
@@ -354,6 +545,16 @@ function makeApi(base, idToken) {
 // ------------------------------------------------------------------ execucao
 async function main() {
   const args = parseArgs(process.argv);
+
+  // Fase 4 e' autonoma: fonte propria (--links) e so' precisa do mapa e-mail->id.
+  if (args.only === 'links') {
+    const { idToken, uid } = await cunharIdToken(args);
+    const api = makeApi(args.base, idToken);
+    console.log(`\n== instancia ==\nbase: ${args.base}\nadmin: ${uid}`);
+    await fase4Links(api, args, await mapaEmailParaId(api));
+    return;
+  }
+
   const rows = lerTsv(args.tsv);
   const v = validar(rows);
 

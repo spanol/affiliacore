@@ -136,6 +136,41 @@ vazio e não polui a auditoria), aborta antes de escrever se achar duplicata / a
 grava **pai antes do filho**, e no fim confere `GET /api/affiliate-uplines` contra o TSV — se divergir, sai
 com código 1. `generateInvite` é **false** de propósito: migração histórica, ninguém recebe login.
 
+## Fase 4 · links de divulgação — `--only links`
+
+**Fonte:** TSV extraído da tela `/admin/regras?db=<db>&view=com_link` do legado (a visão
+"Com link") — PII, fora do repo:
+
+```
+<scratchpad>/infinity-links-esportiva.tsv     11 linhas (Esportiva Bet)
+email  nome  tag  url
+```
+
+```bash
+node scripts/migracao-infinity/converter-rede.cjs \
+  --only links --links "<scratchpad>/infinity-links-esportiva.tsv" \
+  --casa "Esportiva Bet" \
+  --base https://infinityaffiliates.agency \
+  --id-token-file "<scratchpad>/token.txt"        # + --apply para escrever
+```
+
+Grava `affiliate_links` por `POST /api/affiliate-links`, **idempotente por (afiliado, casa)**:
+rodar de novo não cunha código novo, só atualiza o destino — o `/go/:code` já compartilhado
+continua valendo. A chave de marca segue o `dealBrandKey` (brandId da OTG, senão o slug), e a
+casa é resolvida **pelo nome contra a instância**, nunca chutada.
+
+Aborta antes de escrever se achar: URL não-http(s), **tag da planilha divergente da tag da URL**
+(pega copy/paste que jogaria um afiliado no balde de outro), URL repetida, par (e-mail, casa)
+duplicado, ou e-mail sem afiliado na instância. Aqui **não há descarte seguro** — diferente da
+fase 3, onde linha com 0 CPA podia cair fora, um link sem dono simplesmente se perderia.
+
+⚠️ **A URL migrada é a da CASA** (`go.aff.esportiva.bet/...?afp=<tag>`), então a atribuição do
+lado da casa continua pela tag; o `/go/:code` só embrulha, conta o clique do nosso lado e passa
+o subid. **O link antigo que o afiliado já distribuiu não para de funcionar** — ele é da casa.
+
+**Não migrar o Standby.** Os 288 links pré-gerados da Esportiva são pool sem dono (§6.2.1 do doc
+raiz). O lugar deles é o import de standby da tela `/links` (triagem), não esta fase.
+
 ## O que este runbook NÃO cobre
 
 - (nada pendente aqui além do que estiver marcado na fase 3 abaixo)
@@ -167,4 +202,6 @@ Linha sem afiliado na instância só é descartada se tiver **0 CPA** — com pr
 `GET /api/affiliate-configs` e compara par a par.
 - **O passivo de R$ 32.306,40** em aberto (§6.1 do doc raiz): decisão comercial pendente, **bloqueia o
   Financeiro**, não bloqueia esta importação.
-- **Links/tags**: não migram. Ver §6.2.1 do doc raiz (pool de Standby) e o gargalo de atribuição na §5.1.
+- **Links/tags**: os ATRIBUÍDOS migram na fase 4 acima (11 na Esportiva). Fora dela seguem: o pool de
+  Standby (§6.2.1 do doc raiz, entra pela triagem em `/links`) e o gargalo de atribuição da §5.1 —
+  que a API da casa (TAP by Smartico, `group_by=afp`) resolve quando destravar.
