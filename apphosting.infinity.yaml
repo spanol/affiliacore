@@ -58,6 +58,13 @@ env:
       - BUILD
       - RUNTIME
 
+  # VITE_BRAND_THEME NÃO declarado: a instância segue a preferência do SO de cada
+  # usuário. ⚠️ Desde P5.6 isso vale TAMBÉM para a landing pública (a LP era
+  # dark-only e virou theme-aware, com toggle na nav) — ou seja, visitante com o
+  # SO no claro vê a landing da Infinity CLARA. Se o cliente quiser a porta de
+  # entrada sempre escura, declarar aqui `VITE_BRAND_THEME: 'dark'` (é BUILD:
+  # só vale no próximo rollout). Ver PRODUTIZACAO.md § "LP theme-aware".
+
   # Canvas/surface NÃO são declarados de propósito: fundo PRETO do produto
   # (defaults do index.css — neutral + navy #141C2A). Era o que o cliente
   # esperava e não acontecia: até 2026-07-28 o apphosting.yaml BASE pinava o

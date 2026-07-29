@@ -110,12 +110,20 @@ env:
     value: '<accent-do-cliente>'    # a escala inteira + contraste WCAG em runtime)
     availability: [BUILD, RUNTIME]
   - variable: VITE_BRAND_THEME      # P3.3 (opcional): tema inicial sem preferência
-    value: 'dark'                   # salva ('light'|'dark'; ausência = SO)
-    availability: [BUILD, RUNTIME]
+    value: 'dark'                   # salva ('light'|'dark'; ausência = SO).
+    availability: [BUILD, RUNTIME]  # P5.6: vale TAMBÉM p/ a landing pública.
   - variable: FIREBASE_STORAGE_BUCKET
     value: '<project-id>.firebasestorage.app'
     availability: [RUNTIME]
 ```
+
+**🌗 `VITE_BRAND_THEME` decide também a LANDING (desde P5.6).** A LP era dark-only
+e virou theme-aware (mesmo `ThemeContext` do app, com toggle na nav), então esta
+env deixou de ser "o tema do app logado" e passou a decidir a **porta de entrada**
+da marca. Sem declarar nada, um visitante com o SO no claro vê a landing CLARA —
+o que costuma surpreender quem só viu o mock escuro na venda. **Pergunte ao
+cliente antes do 1º rollout**; se ele quer a vitrine sempre escura, pine
+`value: 'dark'`. É BUILD: mudar depois exige rollout novo.
 
 **🎨 Fundo PRETO é o padrão — não declare `VITE_BRAND_CANVAS`/`VITE_BRAND_SURFACE`.**
 O default do `index.css` (neutral + navy `#141C2A`) é o que a label deve ter; o

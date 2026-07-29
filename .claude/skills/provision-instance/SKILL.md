@@ -18,6 +18,7 @@ Modelo: **1 repo/`main` p/ todos, 1 projeto Firebase por cliente**, config por e
 | `<project-id>` | `alfa-affiliacore` | projeto Firebase |
 | `<Marca>` / `<Curto>` | `Agência Alfa` / `Alfa` | `VITE_BRAND_NAME`/`_SHORT` |
 | `<accent>` | `#8332B9` | `VITE_BRAND_ACCENT` |
+| tema de entrada | `dark` (ou omitir) | `VITE_BRAND_THEME` — vale p/ LP **e** app |
 | admin do cliente | `admin@alfa.com` | login do cliente |
 | seu teste | `voce@alfa.com` | smoke test da AffiliaCore |
 
@@ -72,6 +73,12 @@ o backend** pelos comandos acima (refaz o IAM inteiro). NUNCA conceda papel a pa
   herdando o ember do produto que morava no `apphosting.yaml` base. Só declare se o
   cliente PEDIR fundo tingido; o invariante está travado em
   `src/lib/instanceTheming.test.ts` (atualize o teste se for uma exceção consciente).
+- **`VITE_BRAND_THEME` decide também a LANDING (P5.6).** A LP virou theme-aware
+  (mesmo `ThemeContext` do app + toggle na nav), então esta env não é mais só "o
+  tema do app logado": é a porta de entrada da marca. Sem declarar, visitante com
+  SO no claro vê a landing CLARA — o que surpreende quem só viu o mock escuro na
+  venda. **PERGUNTE ao cliente antes do 1º rollout**; querendo vitrine sempre
+  escura, `VITE_BRAND_THEME: 'dark'`. É BUILD: mudar depois exige rollout novo.
 - Marca visual em **`public/<cliente>/`** — 4 arquivos:
   - `logo.svg` **MONO BRANCO obrigatório** (o app aplica `invert dark:invert-0`;
     colorir faz a cor virar verde no tema claro).

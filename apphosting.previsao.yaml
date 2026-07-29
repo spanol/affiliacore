@@ -39,6 +39,10 @@ env:
       - BUILD
       - RUNTIME
 
+  # Tema inicial de quem não tem preferência salva. Desde P5.6 vale TAMBÉM para
+  # a landing pública (a LP virou theme-aware), então este 'dark' é o que garante
+  # que a porta de entrada da Previsão siga escura mesmo p/ visitante com SO no
+  # claro. Remover = a LP passa a seguir o SO do visitante.
   - variable: VITE_BRAND_THEME
     value: 'dark'
     availability:
