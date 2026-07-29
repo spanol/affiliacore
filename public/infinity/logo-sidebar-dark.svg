@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 484 110" role="img" aria-label="Infinity Affiliates">
+  <!-- Variante da SIDEBAR p/ TEMA CLARO (pedido do cliente 2026-07-29): lockup
+       horizontal com o INFINITO EM ROXO e wordmark ESCURO (#0F0B14, o texto do
+       lockup-light do kit). Par da logo-sidebar-white.svg (texto branco, escuro).
+       ⚠️ NÃO aponte BRAND.logoUrl direto p/ este arquivo enquanto o app aplicar
+       `invert dark:invert-0` na logo — ver o aviso na logo-sidebar-white.svg.
+       Anel: gradiente do lockup-light do kit (fecha em quase-preto à direita, o
+       tratamento do cliente p/ fundo claro). Seta: família fechada de roxo, mesma
+       razão do favicon — não reintroduzir a rampa clara + shine a ~30px. -->
+  <defs>
+    <linearGradient id="sdInf" gradientUnits="userSpaceOnUse" x1="60" y1="90" x2="340" y2="210">
+      <stop offset="0" stop-color="#8B5CF6" />
+      <stop offset=".38" stop-color="#7C3AED" />
+      <stop offset=".62" stop-color="#3B1663" />
+      <stop offset="1" stop-color="#140E1C" />
+    </linearGradient>
+    <linearGradient id="sdArw" gradientUnits="userSpaceOnUse" x1="165" y1="190" x2="299" y2="38">
+      <stop offset="0" stop-color="#5B21B6" />
+      <stop offset=".7" stop-color="#7C3AED" />
+      <stop offset="1" stop-color="#9333EA" />
+    </linearGradient>
+  </defs>
+
+  <g fill="none" transform="translate(-14.16, -14.39) scale(0.517)">
+    <path d="M 165,189.7 L 235,110.3 A 60 60 0 1 1 235,189.7 L 165,110.3 A 60 60 0 1 0 165,189.7 Z" stroke="url(#sdInf)" stroke-width="42" stroke-linejoin="round" />
+    <path d="M 165,189.7 L 235,110.3 A 60 60 0 1 1 235,189.7 L 165,110.3 A 60 60 0 1 0 165,189.7 Z" stroke="#fff" stroke-opacity=".10" stroke-width="10" stroke-linejoin="round" />
+    <path d="M 165,189.7 L 262.8,78.8" stroke="url(#sdArw)" stroke-width="42" />
+    <path d="M 232.8,52.3 L 299.2,37.5 L 292.8,105.2 Z" fill="url(#sdArw)" stroke="none" />
+  </g>
+
+  <g transform="translate(186, 22)">
+    <g transform="scale(1.2, 1)" fill="#0F0B14">
+      <path transform="translate(0,0)"   d="M0 0 H11 V40 H0 Z" />
+      <path transform="translate(18,0)"  d="M0 0 H11 L23 24.5 V0 H34 V40 H23 L11 15.5 V40 H0 Z" />
+      <path transform="translate(59,0)"  d="M0 0 H28 V11 H11 V16.5 H24 V27.5 H11 V40 H0 Z" />
+      <path transform="translate(94,0)"  d="M0 0 H11 V40 H0 Z" />
+      <path transform="translate(112,0)" d="M0 0 H11 L23 24.5 V0 H34 V40 H23 L11 15.5 V40 H0 Z" />
+      <path transform="translate(153,0)" d="M0 0 H11 V40 H0 Z" />
+      <path transform="translate(171,0)" d="M0 0 H32 V11 H21.5 V40 H10.5 V11 H0 Z" />
+      <path transform="translate(204,0)" d="M0 0 H11.5 L16 10.5 L20.5 0 H32 L21.5 24 V40 H10.5 V24 Z" />
+    </g>
+  </g>
+
+  <g transform="translate(198.9, 74)" fill="none" stroke="#0F0B14" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+    <path transform="translate(0,0)"     d="M0 14 L5 0 L10 14 M1.8 9.6 H8.2" />
+    <path transform="translate(31,0)"    d="M0 14 V0 H8 M0 7.2 H6.4" />
+    <path transform="translate(60,0)"    d="M0 14 V0 H8 M0 7.2 H6.4" />
+    <path transform="translate(89,0)"    d="M0 0 V14" />
+    <path transform="translate(110,0)"   d="M0 0 V14 H7.5" />
+    <path transform="translate(138.5,0)" d="M0 0 V14" />
+    <path transform="translate(159.5,0)" d="M0 14 L5 0 L10 14 M1.8 9.6 H8.2" />
+    <path transform="translate(190.5,0)" d="M0 0 H9 M4.5 0 V14" />
+    <path transform="translate(220.5,0)" d="M8 0 H0 V14 H8 M0 7.2 H6" />
+    <path transform="translate(249.5,0)" d="M7.6 3 C7.6 0.6 5.6 0 4 0 C1.8 0 0 1.2 0 3.4 C0 5.6 1.8 6.4 4 7 C6.2 7.6 8 8.4 8 10.6 C8 12.8 6.2 14 4 14 C2 14 0.4 13.4 0.4 11" />
+  </g>
+</svg>
