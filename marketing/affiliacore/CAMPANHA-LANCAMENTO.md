@@ -150,32 +150,34 @@ Simulador.
 > segmentação sugerida: interesses "marketing de afiliados/apostas esportivas",
 > lookalike de seguidores, BR, 25–45.
 
-## Modelo de preço vigente (desde 2026-07-25 — espelha a landing)
+## Modelo de preço vigente (v3, desde 2026-07-29 — espelha a landing)
 
-Fonte da verdade = seção `#preco` do affiliacore.com.br. **Acabou a taxa de
-implantação** (era R$ 3.000 / R$ 1.500 fundador) e a mensalidade fixa em
-degraus por nº de afiliados. Vale isto:
+Fonte da verdade = seção `#preco` do affiliacore.com.br. **O % sobre a margem
+ACABOU** (era o modelo v2, de 25/07) — o 1º cliente pagante recusou trabalhar
+com percentual sobre a receita. **Voltou a taxa de implantação.** Vale isto:
 
 | | Padrão | Fundador (3 primeiras) |
 |---|---|---|
-| **1º mês** (valor fechado, implantação inclusa) | R$ 600 | R$ 300 |
-| **2º mês em diante** | % sobre a margem, a partir de 3% | mesma escada |
-| **Piso mensal** (do 2º mês em diante) | R$ 600 | R$ 300 |
+| **Implantação** (uma vez, na assinatura) | R$ 3.000 | R$ 1.500 |
+| **1ª mensalidade** (mês da implantação) | R$ 600 | R$ 300 |
+| **Mensalidade** (do 2º mês em diante) | R$ 2.500 | R$ 1.250 |
 
-- **Base do %: a MARGEM LÍQUIDA da agência** — o que as casas pagam MENOS o
-  que ela repassa aos afiliados. Não é sobre comissão bruta nem sobre
-  depósitos. É o mesmo número que o painel já calcula e audita.
-- **Cobra-se o MAIOR entre piso e percentual.** Com 3% e piso de R$ 600, o
-  percentual só passa o piso quando a margem do mês supera **R$ 20 mil** —
-  abaixo disso o cliente paga o piso. Serve de resposta pronta pra "e se eu
-  tiver um mês fraco?".
-- **O % sobe por faixa de volume operado** (quanto maior a operação, maior o
-  degrau). ⚠️ **As faixas acima de 3% ainda NÃO estão definidas internamente**
-  — enquanto não estiverem, **não cotar percentual acima de 3%** por conta
-  própria; a landing publica só "a partir de 3%" e o degrau se fecha olhando
-  os números do lead.
-- Argumento de entrada: some a barreira de R$ 3 mil, o cliente entra por
-  R$ 600 (ou R$ 300) e a AffiliaCore só cresce se a margem dele crescer.
+- **É tudo FIXO.** Não há percentual sobre comissão, sobre margem nem sobre
+  depósitos; não há degrau por volume nem por nº de afiliados. Resposta pronta
+  pra "e se eu crescer?": **a conta é a mesma**.
+- **Fundador = metade de tudo**, travado enquanto for cliente. Não invente
+  combinações fora da tabela (ex.: implantação cheia com mensalidade de
+  fundador) — a simplicidade é o argumento.
+- **Argumento de entrada:** a AffiliaCore não entra na comissão de ninguém.
+  O que a operação render é inteiro da agência; ela paga pela infraestrutura
+  que calcula, audita e dá portal à rede. Num cenário de R$ 24 mil de margem/mês
+  (o padrão do simulador da LP), a mensalidade cheia é ~10% — e essa fatia
+  **encolhe** conforme o cliente cresce, ao contrário do modelo de %.
+- **Objeção "R$ 3 mil de entrada é caro":** o caminho NÃO é dar desconto solto
+  — é o preço de fundador (metade) enquanto houver vaga das 3, e a demo ao vivo
+  antes de pedir o aceite. Parcelar a implantação é decisão do Vinicius, caso a caso.
+- ⚠️ **Não cotar % sobre margem pra ninguém** — nem como alternativa "se
+  preferir". O modelo saiu da mesa e da página.
 
 ## Pitch de resposta a leads (Inbox MBS / direct)
 
@@ -245,34 +247,35 @@ próximo passo** (nunca "qualquer coisa me chama").
 3. **Msg 1 no WhatsApp na mesma hora** (recap + valores + fundador + demo
    com DUAS opções de horário):
    > Opa [nome], Vinicius da AffiliaCore 👊 Como falamos: painel white-label
-   > pra tua operação de [X afiliados / casas Y]. Os valores: o primeiro mês
-   > é fechado em R$ 600 e já vem com a implantação inclusa (tua marca, teu
-   > domínio, migração das taxas e onboarding dos primeiros afiliados) — não
-   > tem taxa de setup separada. Do 2º mês em diante é um percentual sobre a
-   > TUA margem (o que a casa te paga menos o que você repassa aos afiliados),
-   > a partir de 3%, com piso de R$ 600/mês — paga sempre o maior entre os
-   > dois, então mês fraco não vira conta alta. Nas 3 primeiras agências vale
-   > o preço de fundador: R$ 300 no 1º mês e piso de R$ 300/mês, travado
-   > enquanto for cliente. Próximo passo: te mostro o painel rodando num
-   > cenário igual ao teu, 15–20min por vídeo.
+   > pra tua operação de [X afiliados / casas Y]. Os valores: implantação de
+   > R$ 3.000, uma vez só — tua marca, teu domínio, migração das taxas e
+   > onboarding dos primeiros afiliados. Depois é mensalidade fixa de R$ 2.500,
+   > e a primeira mensalidade é R$ 600 (o mês da implantação entra reduzido).
+   > É tudo fixo: não pego percentual da tua comissão nem da tua margem — se
+   > tua operação dobrar, a conta continua a mesma. Nas 3 primeiras agências
+   > vale o preço de fundador, metade de tudo: R$ 1.500 de implantação, R$ 300
+   > na primeira mensalidade e R$ 1.250/mês, travado enquanto for cliente.
+   > Próximo passo: te mostro o painel rodando num cenário igual ao teu,
+   > 15–20min por vídeo.
    > Consegue [amanhã às 15h] ou [quinta às 11h]?
 4. **Demo ao vivo (15–20min, vídeo) = a ferramenta de fechamento (P5.3).**
    Mostrar o /admin num cenário parecido com o do lead (nº de afiliados,
    casas dele, CPA/REV). A demo LOCAL nos emuladores já serve p/ screen-share
    hoje (receita no README § demo); instância cloud com credenciais é só p/
    o lead mexer sozinho depois (gates do operador no playbook §demo).
-5. **Proposta por escrito no WhatsApp no MESMO dia da demo**: o que o 1º mês
-   inclui (implantação, domínio/marca, onboarding), como funciona a cobrança
-   do 2º mês em diante (base = margem líquida, degrau do % e piso), condição
-   de fundador e VALIDADE (ex.: 7 dias). Pedir o "fechado?" explícito.
+5. **Proposta por escrito no WhatsApp no MESMO dia da demo**: o que a
+   implantação inclui (instância, domínio/marca, migração das taxas,
+   onboarding), a régua de cobrança (implantação na assinatura → R$ 600 na 1ª
+   mensalidade → R$ 2.500/mês do 2º em diante), a condição de fundador (metade
+   de tudo, travada) e a VALIDADE (ex.: 7 dias). Pedir o "fechado?" explícito.
 6. **Follow-up disciplinado**: 24h e 72h (1 linha: "ficou alguma dúvida da
    proposta?"); 2 sem resposta → pausa de 1 semana → último toque.
 
-Checklist de qualificação (mínimo p/ posicionar o degrau do %):
+Checklist de qualificação (o preço é fixo — isto serve p/ saber se o lead
+sustenta a mensalidade e p/ ancorar o valor, não p/ calcular a cobrança):
 - **quanto a operação gera de comissão por mês e quanto sobra de margem
-  depois do repasse aos afiliados** — é a BASE da cobrança e o que define o
-  degrau; sem esse número não dá pra fechar faixa (e abaixo de ~R$ 20 mil de
-  margem a conta é o piso, o que costuma ser um bom argumento)
+  depois do repasse aos afiliados** — não entra na conta da fatura, mas é o
+  número que ancora o preço ("R$ 2.500 em cima de R$ 24 mil de margem")
 - nº de afiliados ativos + em quais casas opera
 - como fecha comissão hoje (planilha/sistema) e com que frequência
 - modelo CPA / REV / híbrido; quem vai operar o painel no dia a dia

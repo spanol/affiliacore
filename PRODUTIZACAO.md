@@ -5,10 +5,11 @@
 > **Vinicius faz setup + manutenção; o cliente opera**. Instância dedicada por cliente
 > (1 projeto Firebase cada) — SaaS multi-tenant fica para quando houver 5+ clientes.
 > ~~Precificação de referência (benchmark 2026-07-02): setup único R$ 3–8 mil + mensalidade
-> em degraus por nº de afiliados ativos (~R$ 600–1.500/mês)~~ **SUPERADA em 2026-07-25 —
-> ver "Modelo de preço vigente" no fim deste doc**: sem taxa de implantação, 1º mês fechado
-> (R$ 600 · fundador R$ 300) e, do 2º em diante, % sobre a margem líquida da agência
-> (a partir de 3%, sobe por faixa de volume) com piso de R$ 600/mês (fundador R$ 300).
+> em degraus por nº de afiliados ativos~~ → ~~v2 (2026-07-25): sem implantação + % sobre a
+> margem~~ **v3 VIGENTE desde 2026-07-29 — ver "Modelo de preço vigente" no fim deste doc**:
+> volta o modelo 100% FIXO — implantação R$ 3.000 + 1ª mensalidade R$ 600 + R$ 2.500/mês do
+> 2º em diante; fundador (3 primeiras) na metade: R$ 1.500 + R$ 300 + R$ 1.250/mês.
+> **O % sobre a margem morreu** (o 1º cliente pagante recusou o modelo).
 > Carlos = cliente 0 (cortesia).
 
 ## Visão das fases
@@ -224,9 +225,9 @@ A versão vendida é naturalmente OTG-free (a x-api-key é da operação do Carl
   (import de planilha → comissão calculada → portal do afiliado → auditoria → ranking).
 - **P5.4 — Landing page one-pager** com preço publicado (diferencial: todo o segmento
   enterprise esconde preço). Hospeda no próprio Firebase Hosting.
-- **P5.5 — Precificação v1 publicada**: ~~setup + degraus de mensalidade~~ → **v2 no ar
-  desde 2026-07-25** (1º mês fechado + % sobre a margem; ver o fim deste doc); "preço de
-  fundador" travado pros 3 primeiros em troca de feedback de perto.
+- **P5.5 — Precificação publicada**: ~~v1 setup + degraus~~ → ~~v2 (% sobre a margem)~~ →
+  **v3 no ar desde 2026-07-29** (implantação + mensalidade fixa; ver o fim deste doc);
+  "preço de fundador" (metade de tudo) travado pros 3 primeiros em troca de feedback de perto.
 - **P5.6 — Canal de venda**: primeiro cliente vem de indicação (rede do Carlos / mercado de
   afiliados BR), não de marketing pago. Comunidades e grupos de afiliados de apostas como
   segundo canal.
@@ -313,9 +314,9 @@ no `apphosting.<cliente>.yaml`, sem rebuild.
    https://affiliacore-br.web.app):** one-pager estático em
    `landing/` (identidade C: ember/plum, Bricolage+Inter self-hosted, logo em
    curvas) com hero + mock de dashboard em CSS puro, features, white-label,
-   **preço publicado** (setup a partir de R$ 3.000 + mensal a partir de
-   R$ 600, card de preço de fundador — *valores da época; preço v2 desde
-   25/07, ver o fim do doc*) e CTA pro direct do @affiliacore.br.
+   **preço publicado** (implantação + mensalidade, card de preço de fundador
+   — *os valores mudaram 2×; a tabela vigente está no fim do doc*) e CTA pro
+   direct do @affiliacore.br.
    Servida pelo **projeto Firebase PRÓPRIO `affiliacore`** (decisão
    2026-07-07: a presença comercial do produto NÃO mora no projeto da
    instância 0), site `affiliacore-br`, alias `www` no `.firebaserc` —
@@ -537,33 +538,45 @@ landing CLARA. Foi decisão consciente (consistência com o app); se algum clien
 quiser a porta de entrada sempre escura, o caminho é `VITE_BRAND_THEME=dark` no
 yaml da instância.
 
-## 💰 Modelo de preço vigente (v2 — no ar desde 2026-07-25)
+## 💰 Modelo de preço vigente (v3 — no ar desde 2026-07-29)
 
-Substitui a precificação de referência do topo do doc (setup R$ 3–8 mil +
-mensalidade em degraus por nº de afiliados). Decidido pelo Vinicius;
-publicado em `landing/index.html` (deploy verificado em affiliacore.com.br)
-e refletido no `marketing/affiliacore/CAMPANHA-LANCAMENTO.md`.
+Terceira versão. Substitui a **v2** (2026-07-25: sem implantação, 1º mês
+fechado + % sobre a margem líquida a partir de 3% com piso), que por sua vez
+substituiu a v1 de referência (setup R$ 3–8 mil + degraus por nº de
+afiliados). Decidido pelo Vinicius; publicado em `landing/index.html`
+(affiliacore.com.br) e refletido no `marketing/affiliacore/CAMPANHA-LANCAMENTO.md`
+e no `marketing/affiliacore/cookbook-nova-label.html`.
 
 | | Padrão | Fundador (3 primeiras agências) |
 |---|---|---|
-| **1º mês** — valor fechado, implantação inclusa | R$ 600 | R$ 300 |
-| **2º mês em diante** — % sobre a margem | a partir de 3% | mesma escada |
-| **Piso mensal** (do 2º mês em diante) | R$ 600 | R$ 300 |
+| **Implantação** (uma vez, na assinatura) | R$ 3.000 | R$ 1.500 |
+| **1ª mensalidade** (mês da implantação) | R$ 600 | R$ 300 |
+| **Mensalidade** (do 2º mês em diante) | R$ 2.500 | R$ 1.250 |
 
-- **Sumiu a taxa de implantação.** A implantação (instância, marca, domínio,
-  migração das taxas, onboarding) passa a ser inclusa no 1º mês — some a
-  barreira de entrada de R$ 3 mil.
-- **Base do %: MARGEM LÍQUIDA da agência** (comissão das casas − repasse aos
-  afiliados). Não é comissão bruta nem volume depositado. É o número que o
-  próprio painel calcula e audita.
-- **Cobra-se o MAIOR entre piso e percentual** → com 3% e piso R$ 600, o
-  percentual só ultrapassa o piso acima de **R$ 20 mil de margem no mês**.
-- **O % sobe por faixa de volume operado** (decisão explícita: maior volume →
-  maior %, invertido em relação ao desconto por volume usual). **As faixas
-  acima de 3% NÃO estão definidas** — a LP publica só "a partir de 3%" e o
-  degrau é fechado olhando os números do lead. **Definir a tabela interna é
-  pendência aberta** (sem ela, não cotar acima de 3%).
-- ⚠️ **Risco do modelo:** a base da fatura é um número que o CLIENTE
-  configura (o repasse). Inflar o repasse no painel reduz a margem e a conta
-  da AffiliaCore. Cobrar sobre comissão bruta não teria esse vetor →
-  endereçar no contrato do P5.2 (definição da base + direito de conferir).
+- **Por que voltou o fixo:** a **Infinity** — 1º cliente PAGANTE, contrato
+  fechado em 2026-07-30 — **recusou trabalhar com % sobre a receita/margem**.
+  O deal assinado é exatamente a coluna "fundador": R$ 1.500 de implantação,
+  R$ 300 de 1ª mensalidade e R$ 1.250/mês do 2º em diante. A tabela pública
+  foi ajustada pra que o contrato assinado FOSSE o preço de fundador, não uma
+  exceção fora da tabela.
+- **Volta a taxa de implantação** (R$ 3.000 / R$ 1.500), a mesma heurística
+  do benchmark original: a implantação é trabalho concentrado (instância,
+  marca, domínio, migração das taxas, onboarding) e cobrá-la separada
+  qualifica o lead — a v2 tinha zerado essa barreira e ela fazia falta.
+- **Fundador = metade de TUDO** (implantação, 1ª mensalidade e mensalidade),
+  travado enquanto for cliente. Regra simples de comunicar e de honrar.
+- **Economia da mensalidade:** ~R$ 250/mês é o custo de infra da instância
+  (Firebase/App Hosting) que a AffiliaCore cobre. No fundador, R$ 1.250 −
+  R$ 250 = **R$ 1.000 de margem por cliente/mês**; no padrão, R$ 2.250.
+- **Sumiu o % sobre a margem** e, com ele, o risco estrutural da v2: a base da
+  fatura era um número que o próprio CLIENTE configurava (o repasse), então
+  inflar o repasse no painel reduzia a conta da AffiliaCore. Preço fixo não
+  tem esse vetor — e vira argumento de venda ("a AffiliaCore não entra na sua
+  comissão; se você dobrar, a conta é a mesma").
+- ⚠️ **Trade-off aceito:** sem % não há upside automático em cliente grande.
+  O crescimento da receita passa a vir de **nº de instâncias**, não do tamanho
+  de cada uma. Se algum dia entrar um cliente de volume muito alto, a
+  negociação é caso a caso (ex.: mensalidade maior por SLA/integrações), não
+  percentual.
+- **Reajuste:** preço travado em contrato, reajuste só na renovação anual —
+  publicado na LP, então tem que valer no contrato do P5.2.
