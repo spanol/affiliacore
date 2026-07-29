@@ -9,12 +9,15 @@ import {
   ShieldCheck,
   RefreshCw,
   Copy,
-  Check
+  Check,
+  LifeBuoy
 } from 'lucide-react';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import firebaseConfig from '../../firebase-applet-config.json';
+import { fetchSupportContact, saveSupportContact } from '../services/supportService';
+import { formatSupportPhone, SUPPORT_LABEL_DEFAULT } from '../lib/supportContact';
 
 export default function Settings() {
   const { profile } = useAuth();
@@ -26,6 +29,54 @@ export default function Settings() {
 
   // Local state for Firebase Override (Display only or persist if requested)
   const [fbConfig, setFbConfig] = useState(JSON.stringify(firebaseConfig, null, 2));
+
+  // Contato de suporte (aba Suporte → WhatsApp do operador da label).
+  const [supportPhone, setSupportPhone] = useState('');
+  const [supportMessage, setSupportMessage] = useState('');
+  const [supportLabel, setSupportLabel] = useState(SUPPORT_LABEL_DEFAULT);
+  const [supportActive, setSupportActive] = useState(true);
+  const [supportSaving, setSupportSaving] = useState(false);
+  const [supportSaved, setSupportSaved] = useState(false);
+  const [supportError, setSupportError] = useState('');
+
+  useEffect(() => {
+    if (profile?.role !== 'admin') return;
+    fetchSupportContact()
+      .then((contact) => {
+        // Mostramos o número já formatado; o servidor devolve só dígitos.
+        setSupportPhone(formatSupportPhone(contact.phone));
+        setSupportMessage(contact.message || '');
+        setSupportLabel(contact.label || SUPPORT_LABEL_DEFAULT);
+        // Nunca configurado (sem telefone) → a caixa já vem marcada: quem digita
+        // o número e salva espera ver o item aparecer, não descobrir depois que
+        // faltava um toggle. Com telefone gravado, respeita o que está salvo.
+        setSupportActive(contact.phone ? contact.active : true);
+      })
+      .catch(() => {});
+  }, [profile]);
+
+  const handleSaveSupport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSupportSaving(true);
+    setSupportError('');
+    setSupportSaved(false);
+    try {
+      const saved = await saveSupportContact({
+        phone: supportPhone,
+        message: supportMessage,
+        label: supportLabel,
+        active: supportActive,
+      });
+      setSupportPhone(formatSupportPhone(saved.phone));
+      setSupportActive(saved.active);
+      setSupportSaved(true);
+      setTimeout(() => setSupportSaved(false), 3000);
+    } catch (err: any) {
+      setSupportError(err?.message || 'Falha ao salvar o contato de suporte.');
+    } finally {
+      setSupportSaving(false);
+    }
+  };
 
   useEffect(() => {
     async function loadSettings() {
@@ -154,6 +205,94 @@ export default function Settings() {
               >
                 {loading ? <RefreshCw size={14} className="animate-spin" /> : saveSuccess ? <Check size={14} /> : <Save size={14} />}
                 {saveSuccess ? 'Chave Salva!' : 'Salvar Configuração'}
+              </button>
+            </form>
+          </div>
+        </motion.div>
+
+        {/* Contato de suporte — vira a aba "Suporte" na barra lateral do afiliado */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl shadow-sm overflow-hidden hover:border-slate-300 dark:hover:border-neutral-700 transition-colors"
+        >
+          <div className="p-5 border-b border-slate-100 dark:border-neutral-800 flex items-center gap-3">
+            <span className="p-2 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700/60">
+              <LifeBuoy size={16} className="text-slate-900 dark:text-neutral-100" />
+            </span>
+            <h3 className="text-sm font-bold text-slate-800 dark:text-white tracking-tight">Suporte (WhatsApp)</h3>
+          </div>
+          <div className="p-6 space-y-6">
+            <p className="text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
+              O número cadastrado aqui vira o item <strong>Suporte</strong> na barra lateral dos afiliados, abrindo
+              a conversa direto no WhatsApp. Sem número, o item não aparece.
+            </p>
+
+            <form onSubmit={handleSaveSupport} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest ml-1 block">
+                    WhatsApp (com DDD)
+                  </label>
+                  <input
+                    type="tel"
+                    value={supportPhone}
+                    onChange={(e) => setSupportPhone(e.target.value)}
+                    placeholder="(11) 98888-7777"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all outline-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest ml-1 block">
+                    Rótulo no menu
+                  </label>
+                  <input
+                    type="text"
+                    value={supportLabel}
+                    onChange={(e) => setSupportLabel(e.target.value)}
+                    placeholder={SUPPORT_LABEL_DEFAULT}
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest ml-1 block">
+                  Mensagem pré-preenchida (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={supportMessage}
+                  onChange={(e) => setSupportMessage(e.target.value)}
+                  placeholder="Olá! Preciso de ajuda com minha conta."
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all outline-none"
+                />
+              </div>
+
+              <label className="flex items-center gap-3 text-xs font-medium text-slate-600 dark:text-neutral-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={supportActive}
+                  onChange={(e) => setSupportActive(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 dark:border-neutral-600 accent-accent-500"
+                />
+                Exibir o item de suporte no menu dos afiliados
+              </label>
+
+              {supportError && (
+                <div className="p-3 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-xl text-[11px] font-bold flex items-center gap-2 border border-red-100 dark:border-red-900/40">
+                  <AlertCircle size={14} />
+                  {supportError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={supportSaving}
+                className="w-full bg-slate-900 dark:bg-white text-white dark:text-neutral-900 py-3 rounded-full text-xs font-bold hover:opacity-90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+              >
+                {supportSaving ? <RefreshCw size={14} className="animate-spin" /> : supportSaved ? <Check size={14} /> : <Save size={14} />}
+                {supportSaved ? 'Contato Salvo!' : 'Salvar Contato de Suporte'}
               </button>
             </form>
           </div>

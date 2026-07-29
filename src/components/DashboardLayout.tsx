@@ -24,7 +24,9 @@ import {
   ScrollText,
   Handshake,
   Link2 as LinkIcon,
-  Scale
+  Scale,
+  Award,
+  LifeBuoy
 } from 'lucide-react';
 import { cn, humanizeName } from '../lib/utils';
 import { OTG_ENABLED, MARKETPLACE_ENABLED } from '../lib/instanceClient';
@@ -35,6 +37,8 @@ import ThemeToggle from './ThemeToggle';
 import DirectMessagePopup from './DirectMessagePopup';
 import { LOCAL_VERSION, LOCAL_COMMIT } from '../lib/version';
 import InstanceLogo from './InstanceLogo';
+import { fetchSupportContact } from '../services/supportService';
+import { buildWhatsappUrl, SUPPORT_CONTACT_EMPTY, type SupportContact } from '../lib/supportContact';
 
 export default function DashboardLayout() {
   const { profile } = useAuth();
@@ -43,6 +47,7 @@ export default function DashboardLayout() {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [specials, setSpecials] = useState<Record<string, SpecialAffiliate>>({});
+  const [supportContact, setSupportContact] = useState<SupportContact>(SUPPORT_CONTACT_EMPTY);
 
   // Carrega o registro de casas (backoffice) uma vez no boot da área autenticada e
   // popula o cache vivo de marcas — toda a UI (logos/filtros/breakdown por casa)
@@ -51,6 +56,12 @@ export default function DashboardLayout() {
     fetchHouses()
       .then((houses) => { if (houses.length) syncKnownBrandsFrom(houses); })
       .catch(() => {});
+  }, []);
+
+  // Contato de suporte da label (WhatsApp do operador). Sem contato configurado
+  // o item nem aparece — melhor ausente que apontando pra lugar nenhum.
+  useEffect(() => {
+    fetchSupportContact().then(setSupportContact).catch(() => {});
   }, []);
 
   // Trava o scroll do body enquanto o menu mobile está aberto — sem isso o scroll
@@ -91,9 +102,20 @@ export default function DashboardLayout() {
     navigate('/');
   };
 
-  const menuItems = [
-    { 
-      label: 'Geral', 
+  // `href` (link EXTERNO, ex.: o WhatsApp do suporte) é alternativa a `path`
+  // (rota interna) — o render escolhe <a> ou <Link> conforme o que vier.
+  interface MenuItem {
+    label: string;
+    path?: string;
+    href?: string;
+    icon: any;
+  }
+
+  const supportUrl = buildWhatsappUrl(supportContact);
+
+  const menuItems: Array<{ label: string; items: MenuItem[] }> = [
+    {
+      label: 'Geral',
       items: [
         // Dashboard: master → /admin; afiliado ESPECIAL → /network (dados gerais da
         // rede); afiliado comum → a própria visão de dados.
@@ -110,6 +132,9 @@ export default function DashboardLayout() {
         { label: 'Avisos', path: '/avisos', icon: Megaphone },
         // Ranking diário (gamificação): leaderboard de comissão do dia, todos os papéis.
         { label: 'Ranking', path: '/ranking', icon: Trophy },
+        // Conquistas (meta individual de faturamento): o afiliado acompanha o
+        // roadmap e solicita o prêmio; o admin cadastra os tiers e aprova.
+        { label: 'Conquistas', path: '/conquistas', icon: Award },
         // Item "Afiliados": o master vê a lista completa (/affiliates); o afiliado
         // ESPECIAL vê a lista da própria rede (/network/afiliados), espelhando o
         // master (Dashboard + Afiliados). O afiliado comum não tem este módulo.
@@ -137,6 +162,9 @@ export default function DashboardLayout() {
           // Rede de afiliados (upline N níveis) — árvore + lucro sobre equipe.
           { label: 'Rede', path: '/rede', icon: NetworkIcon },
           { label: 'Casas', path: '/casas', icon: Building2 },
+          // Triagem de links: as 5 visões (com/sem link, standby, sem resultado,
+          // produzindo) + o pool de links cunhados na casa e ainda sem dono.
+          { label: 'Links', path: '/links', icon: LinkIcon },
           // Marketplace de acordos (P2): opt-in por instância (default OFF → some na
           // Boost). Admin cria as ofertas + aprova as parcerias.
           ...(MARKETPLACE_ENABLED ? [{ label: 'Acordos', path: '/acordos', icon: Handshake }] : []),
@@ -160,6 +188,11 @@ export default function DashboardLayout() {
       label: 'Conta',
       items: [
         { label: 'Meu Perfil', path: '/profile', icon: User },
+        // Suporte: deep link pro WhatsApp cadastrado pelo operador da label. Só
+        // aparece quando há contato ativo (senão levaria a lugar nenhum).
+        ...(supportUrl
+          ? [{ label: supportContact.label || 'Suporte', href: supportUrl, icon: LifeBuoy }]
+          : []),
         // Jurídico versionado (Tier 1, modo soft) — visível a qualquer papel logado.
         { label: 'Termos', path: '/termos', icon: Scale },
       ]
@@ -181,24 +214,45 @@ export default function DashboardLayout() {
               {group.label}
             </h3>
             <div className="space-y-0.5">
-              {group.items.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-medium border border-transparent",
-                    isActive(item.path)
-                      ? "bg-accent-500/15 text-accent-500 font-bold border-accent-500/30 shadow-sm"
-                      : "text-slate-600 dark:text-neutral-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white hover:border-slate-200 dark:hover:border-neutral-800 hover:shadow-sm"
-                  )}
-                >
-                  <item.icon size={18} className={cn(
-                    isActive(item.path) ? "text-accent-500" : "text-slate-600 dark:text-neutral-300"
-                  )} />
-                  {item.label}
-                </Link>
-              ))}
+              {group.items.map((item) => {
+                // Item externo nunca fica "ativo": o usuário sai do app.
+                const active = !!item.path && isActive(item.path);
+                const itemClass = cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-medium border border-transparent",
+                  active
+                    ? "bg-accent-500/15 text-accent-500 font-bold border-accent-500/30 shadow-sm"
+                    : "text-slate-600 dark:text-neutral-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white hover:border-slate-200 dark:hover:border-neutral-800 hover:shadow-sm"
+                );
+                const iconClass = cn(active ? "text-accent-500" : "text-slate-600 dark:text-neutral-300");
+
+                if (item.href) {
+                  return (
+                    <a
+                      key={item.href}
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={itemClass}
+                    >
+                      <item.icon size={18} className={iconClass} />
+                      {item.label}
+                    </a>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path!}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={itemClass}
+                  >
+                    <item.icon size={18} className={iconClass} />
+                    {item.label}
+                  </Link>
+                );
+              })}
             </div>
           </div>
         ))}
@@ -272,6 +326,10 @@ export default function DashboardLayout() {
                 ? 'Avisos'
                 : location.pathname === '/ranking'
                 ? 'Ranking'
+                : location.pathname === '/conquistas'
+                ? 'Conquistas'
+                : location.pathname === '/links'
+                ? 'Triagem de Links'
                 : location.pathname === '/network/afiliados'
                   ? 'Meus Afiliados'
                   : location.pathname === '/network'

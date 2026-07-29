@@ -16,6 +16,8 @@ import Settings from './pages/Settings';
 import Contacts from './pages/Contacts';
 import Avisos from './pages/Avisos';
 import Ranking from './pages/Ranking';
+import Achievements from './pages/Achievements';
+import LinkTriage from './pages/LinkTriage';
 import AffiliatesList from './pages/AffiliatesList';
 import AffiliateDetails from './pages/AffiliateDetails';
 import SpecialDashboard from './pages/SpecialDashboard';
@@ -131,6 +133,9 @@ export default function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/avisos" element={<Avisos />} />
             <Route path="/ranking" element={<Ranking />} />
+            {/* Conquistas por meta individual: o afiliado acompanha o roadmap e
+                solicita o prêmio; o admin cadastra os tiers e decide a fila. */}
+            <Route path="/conquistas" element={<Achievements />} />
             {/* Jurídico versionado (Tier 1, modo soft): /termos é visível a qualquer
                 papel logado — não bloqueia nada, só visualiza/aceita. */}
             <Route path="/termos" element={<Terms />} />
@@ -172,6 +177,13 @@ export default function App() {
             <Route path="/casas" element={
               <ProtectedRoute role="admin">
                 <Houses />
+              </ProtectedRoute>
+            } />
+            {/* Triagem de links (portada da tela /regras do legado): as 5 visões
+                do dia a dia + o pool de links cunhados na casa e ainda sem dono. */}
+            <Route path="/links" element={
+              <ProtectedRoute role="admin">
+                <LinkTriage />
               </ProtectedRoute>
             } />
             {/* Marketplace de acordos (P2/P3): módulo opt-in por instância (default OFF

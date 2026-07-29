@@ -25,6 +25,9 @@ import { pullAnalytics, isOtgAnalyticsConfigured } from './otgAnalyticsPull';
 import { analyticsDocId, funnelKey, sanitizeFunnel, hasFunnelActivity } from './src/lib/analyticsDoc';
 import { buildVersionPayload, type AppVersion } from './src/lib/version';
 import { sanitizePrize, sanitizePrizePatch } from './src/lib/prizes';
+import { sanitizeTier, sanitizeTierPatch } from './src/lib/achievements';
+import { sanitizeSupportContact, SUPPORT_CONTACT_EMPTY } from './src/lib/supportContact';
+import { parseStandbyLinks } from './src/lib/linkTriage';
 import { buildResultsNotification, type ResultsNotificationVariant } from './src/lib/resultsNotification';
 import { normalizeDealInput, buildDealLabel, dealBrandKey, dealToBrandRates } from './src/lib/deal';
 import { canTransition, type PartnershipStatus } from './src/lib/partnership';
@@ -1501,6 +1504,291 @@ export function createApp(deps: ServerDeps) {
     }
   });
 
+  // --- Conquistas (achievement_tiers + achievement_requests) ----------------
+  // Premiação por META INDIVIDUAL do afiliado (CPAs e/ou comissão acumulada),
+  // portada do "Ranking de Conquistas" do legado. Não confundir com
+  // `ranking_prizes`, que premia POSIÇÃO no ranking diário.
+  //
+  // `achievement_tiers` é o catálogo (leitura por qualquer logado — é o roadmap
+  // que o afiliado persegue; escrita só aqui). `achievement_requests` guarda o
+  // pedido do afiliado + o snapshot dos números dele → server-only nas rules
+  // (expor a coleção vazaria ganho de um afiliado para os outros).
+  app.post('/api/achievement-tiers', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const parsed = sanitizeTier(req.body);
+      if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+      const docRef = await adminDb.collection('achievement_tiers').add({
+        ...parsed.value,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      await writeAuditLog(req, {
+        entityType: 'achievement_tier',
+        entityId: docRef.id,
+        entityLabel: parsed.value!.title,
+        action: 'achievement_tier.create',
+      });
+      return res.status(201).json({ id: docRef.id, ...parsed.value });
+    } catch (error: any) {
+      console.error('Error creating achievement tier:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno criando conquista.' });
+    }
+  });
+
+  app.patch('/api/achievement-tiers/:id', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const parsed = sanitizeTierPatch(req.body);
+      if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+      const ref = adminDb.collection('achievement_tiers').doc(String(req.params.id));
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: 'Conquista não encontrada.' });
+      const before = snap.data() as any;
+      // A regra "ao menos uma meta > 0" é do TIER, não do patch: só dá para
+      // validar combinando o patch com o que já está gravado.
+      const merged = { ...before, ...parsed.patch };
+      if (!(Number(merged.metaCpas) > 0) && !(Number(merged.metaCommission) > 0)) {
+        return res.status(400).json({ error: 'Defina ao menos uma meta (CPAs ou comissão em R$) maior que zero.' });
+      }
+      await ref.set(
+        { ...parsed.patch, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true },
+      );
+      const changes = diffChanges(before, parsed.patch, [
+        'title', 'subtitle', 'description', 'metaCpas', 'metaCommission', 'order', 'active',
+      ]);
+      if (changes.length > 0) {
+        await writeAuditLog(req, {
+          entityType: 'achievement_tier',
+          entityId: ref.id,
+          entityLabel: merged.title,
+          action: 'achievement_tier.update',
+          changes,
+        });
+      }
+      return res.json({ id: ref.id, updated: true });
+    } catch (error: any) {
+      console.error('Error updating achievement tier:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno atualizando conquista.' });
+    }
+  });
+
+  app.delete('/api/achievement-tiers/:id', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const id = String(req.params.id);
+      const snap = await adminDb.collection('achievement_tiers').doc(id).get();
+      await adminDb.collection('achievement_tiers').doc(id).delete();
+      await writeAuditLog(req, {
+        entityType: 'achievement_tier',
+        entityId: id,
+        entityLabel: (snap.data() as any)?.title ?? id,
+        action: 'achievement_tier.delete',
+      });
+      return res.json({ deleted: true });
+    } catch (error: any) {
+      console.error('Error deleting achievement tier:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno removendo conquista.' });
+    }
+  });
+
+  // O afiliado solicita o prêmio de um tier que atingiu. O snapshot enviado é
+  // DECLARATÓRIO (exibição para o admin) — a aprovação é humana, conferida
+  // contra os números do /admin, então um cliente mentindo no corpo não gera
+  // prêmio sozinho. Idempotente: pedido vivo (pendente/aprovado) → 409.
+  app.post('/api/achievement-requests', requireAuth, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const user = (req as any).user;
+      const affiliateId = String(user?.affiliateId ?? '').trim();
+      if (!affiliateId) {
+        return res.status(403).json({ error: 'Sua conta não está vinculada a um afiliado.' });
+      }
+      const tierId = String(req.body?.tierId ?? '').trim();
+      if (!tierId) return res.status(400).json({ error: 'tierId é obrigatório.' });
+
+      const tierSnap = await adminDb.collection('achievement_tiers').doc(tierId).get();
+      if (!tierSnap.exists) return res.status(404).json({ error: 'Conquista não encontrada.' });
+      const tier = tierSnap.data() as any;
+      if (tier?.active === false) return res.status(409).json({ error: 'Esta conquista não está mais disponível.' });
+
+      const dup = await adminDb
+        .collection('achievement_requests')
+        .where('affiliateId', '==', affiliateId)
+        .where('tierId', '==', tierId)
+        .get();
+      // Rejeitada não bloqueia: o afiliado pode pedir de novo (mesma regra de
+      // `canRequestTier`).
+      if (dup.docs.some((d) => (d.data() as any)?.status !== 'rejected')) {
+        return res.status(409).json({ error: 'Você já solicitou este prêmio.' });
+      }
+
+      const affSnap = await adminDb.collection('affiliates').doc(affiliateId).get();
+      const payload = {
+        tierId,
+        tierTitle: String(tier?.title ?? ''),
+        affiliateId,
+        affiliateName: (affSnap.exists ? (affSnap.data() as any)?.name : null) || user?.email || affiliateId,
+        status: 'pending',
+        snapshot: {
+          cpas: Number(req.body?.snapshot?.cpas) || 0,
+          commission: Number(req.body?.snapshot?.commission) || 0,
+        },
+        requestedByUid: user?.uid ?? null,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      const docRef = await adminDb.collection('achievement_requests').add(payload);
+      return res.status(201).json({ id: docRef.id, ...payload });
+    } catch (error: any) {
+      console.error('Error creating achievement request:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno solicitando prêmio.' });
+    }
+  });
+
+  // Admin vê todas; afiliado só as próprias (a coleção é server-only nas rules).
+  app.get('/api/achievement-requests', requireAuth, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const user = (req as any).user;
+      let query: admin.firestore.Query = adminDb.collection('achievement_requests');
+      if (user?.role !== 'admin') {
+        const affiliateId = String(user?.affiliateId ?? '').trim();
+        if (!affiliateId) return res.json({ requests: [] });
+        query = query.where('affiliateId', '==', affiliateId);
+      }
+      const snap = await query.get();
+      const requests = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+      return res.json({ requests });
+    } catch (error: any) {
+      console.error('Error listing achievement requests:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno listando solicitações.' });
+    }
+  });
+
+  app.patch('/api/achievement-requests/:id', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const status = String(req.body?.status ?? '').trim();
+      if (status !== 'approved' && status !== 'rejected') {
+        return res.status(400).json({ error: 'Status inválido — use approved ou rejected.' });
+      }
+      const ref = adminDb.collection('achievement_requests').doc(String(req.params.id));
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+      const before = snap.data() as any;
+      if (before?.status !== 'pending') {
+        return res.status(409).json({ error: 'Esta solicitação já foi decidida.' });
+      }
+      const note = String(req.body?.note ?? '').trim().slice(0, 300);
+      await ref.set(
+        {
+          status,
+          note,
+          decidedByUid: (req as any).user?.uid ?? null,
+          decidedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+
+      // Avisa o afiliado no sino (best-effort: sem login vinculado não há a quem
+      // entregar, e isso não pode derrubar a decisão do admin).
+      try {
+        const usersSnap = await adminDb
+          .collection('users')
+          .where('affiliateId', '==', String(before?.affiliateId ?? ''))
+          .get();
+        if (!usersSnap.empty) {
+          const batch = adminDb.batch();
+          const title = status === 'approved' ? 'Conquista aprovada! 🏆' : 'Solicitação de prêmio recusada';
+          const body =
+            status === 'approved'
+              ? `Seu prêmio "${before?.tierTitle ?? 'conquista'}" foi aprovado.${note ? ` ${note}` : ''}`
+              : `A solicitação do prêmio "${before?.tierTitle ?? 'conquista'}" não foi aprovada.${note ? ` ${note}` : ''}`;
+          usersSnap.forEach((u) => {
+            batch.set(adminDb!.collection('user_notifications').doc(), {
+              recipientUid: u.id,
+              affiliateId: before?.affiliateId ?? null,
+              type: status === 'approved' ? 'achievement_approved' : 'achievement_rejected',
+              title,
+              body,
+              readAt: null,
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          });
+          await batch.commit();
+        }
+      } catch (notifyError) {
+        console.error('Error notifying achievement decision:', notifyError);
+      }
+
+      await writeAuditLog(req, {
+        entityType: 'achievement_request',
+        entityId: ref.id,
+        entityLabel: `${before?.affiliateName ?? before?.affiliateId} — ${before?.tierTitle ?? ''}`,
+        action: status === 'approved' ? 'achievement_request.approve' : 'achievement_request.reject',
+        reason: note || undefined,
+      });
+      return res.json({ id: ref.id, status });
+    } catch (error: any) {
+      console.error('Error deciding achievement request:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno decidindo solicitação.' });
+    }
+  });
+
+  // --- Contato de suporte da instância (aba Suporte → WhatsApp do operador) ---
+  // Mora em `settings/support_contact`, e `settings` é admin-only nas rules
+  // (tem forma de credencial) — por isso o afiliado lê por AQUI, não direto.
+  app.get('/api/support-contact', requireAuth, async (_req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const snap = await adminDb.collection('settings').doc('support_contact').get();
+      if (!snap.exists) return res.json({ contact: SUPPORT_CONTACT_EMPTY });
+      const data = snap.data() as any;
+      return res.json({
+        contact: {
+          phone: String(data?.phone ?? ''),
+          message: String(data?.message ?? ''),
+          label: String(data?.label ?? SUPPORT_CONTACT_EMPTY.label),
+          active: !!data?.active,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error fetching support contact:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno lendo contato de suporte.' });
+    }
+  });
+
+  app.put('/api/support-contact', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const parsed = sanitizeSupportContact(req.body);
+      if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+      const ref = adminDb.collection('settings').doc('support_contact');
+      const before = (await ref.get()).data() ?? {};
+      await ref.set(
+        { ...parsed.value, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true },
+      );
+      const changes = diffChanges(before, parsed.value!, ['phone', 'message', 'label', 'active']);
+      if (changes.length > 0) {
+        await writeAuditLog(req, {
+          entityType: 'settings',
+          entityId: 'support_contact',
+          entityLabel: 'Contato de suporte',
+          action: 'support_contact.update',
+          changes,
+        });
+      }
+      return res.json({ contact: parsed.value });
+    } catch (error: any) {
+      console.error('Error saving support contact:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno salvando contato de suporte.' });
+    }
+  });
+
   // --- Mensagens diretas da gerência → afiliado (popup 1:1) -----------------
   // O admin envia escolhendo o afiliado; resolvemos o(s) login(s) vinculado(s)
   // (users.affiliateId) e gravamos `recipientUid` em cada mensagem — a leitura é
@@ -2735,6 +3023,163 @@ export function createApp(deps: ServerDeps) {
     } catch (e) {
       console.error('[affiliate-links] erro ao listar links:', e);
       return res.status(500).json({ error: 'Erro ao listar os links' });
+    }
+  });
+
+  // --- Pool de STANDBY + atribuição (triagem de links) ----------------------
+  // Links já cunhados na casa e ainda SEM DONO. Guardamos como doc de
+  // `affiliate_links` com `affiliateId: null` e `active: false`: o /go/:code
+  // recusa link inativo, então um link do pool nunca redireciona nem conta
+  // clique antes de ser atribuído a alguém.
+  app.post('/api/affiliate-links/standby', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      // O MESMO parser puro que a UI usa na pré-visualização — sem drift entre
+      // o que o admin vê antes de enviar e o que é gravado.
+      const { links, invalid } = parseStandbyLinks(String(req.body?.text ?? ''));
+      if (links.length === 0) {
+        return res.status(400).json({ error: 'Nenhum link válido — cole URLs http(s), uma por linha.', invalid });
+      }
+      const brandId = req.body?.brandId != null && String(req.body.brandId).trim() !== ''
+        ? String(req.body.brandId)
+        : null;
+
+      // Não recria o que já existe (o import costuma ser re-colado inteiro).
+      const existingSnap = await adminDb.collection('affiliate_links').get();
+      const existingUrls = new Set(
+        existingSnap.docs.map((d) => String((d.data() as any)?.registerUrl ?? '')).filter(Boolean),
+      );
+
+      const batch = adminDb.batch();
+      let created = 0;
+      let skipped = 0;
+      for (const item of links) {
+        if (existingUrls.has(item.registerUrl)) {
+          skipped++;
+          continue;
+        }
+        const code = crypto.randomBytes(6).toString('base64url');
+        batch.set(adminDb.collection('affiliate_links').doc(code), {
+          code,
+          affiliateId: null,
+          brandId,
+          registerUrl: item.registerUrl,
+          tag: item.tag || null,
+          active: false, // standby: só vira entregável ao ser atribuído
+          clicks: 0,
+          botClicks: 0,
+          createdByUid: (req as any).user?.uid ?? null,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        created++;
+      }
+      if (created > 0) await batch.commit();
+      await writeAuditLog(req, {
+        entityType: 'affiliate_link',
+        entityLabel: `Standby (${created} links)`,
+        action: 'link.standby_import',
+        metadata: { created, skipped, invalid: invalid.length, brandId },
+      });
+      return res.status(201).json({ created, skipped, invalid });
+    } catch (e) {
+      console.error('[affiliate-links] erro no import de standby:', e);
+      return res.status(500).json({ error: 'Erro ao importar os links de standby' });
+    }
+  });
+
+  // Atribui um link do pool a um afiliado (o "Pegar do Standby" do legado).
+  app.post('/api/affiliate-links/:code/assign', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const affiliateId = String(req.body?.affiliateId ?? '').trim();
+      if (!affiliateId) return res.status(400).json({ error: 'affiliateId é obrigatório.' });
+      const ref = adminDb.collection('affiliate_links').doc(String(req.params.code));
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: 'Link não encontrado.' });
+      const before = snap.data() as any;
+      const owner = String(before?.affiliateId ?? '').trim();
+      // Um link já distribuído carrega histórico de cliques de OUTRA pessoa —
+      // reatribuir misturaria as atribuições. Libere ao pool antes.
+      if (owner && owner !== affiliateId) {
+        return res.status(409).json({ error: 'Este link já pertence a outro afiliado. Libere-o para o standby antes.' });
+      }
+      if (!String(before?.registerUrl ?? '').trim()) {
+        return res.status(400).json({ error: 'Este link não tem URL de cadastro — não há para onde enviar o afiliado.' });
+      }
+      await ref.set(
+        {
+          affiliateId,
+          active: true,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      await writeAuditLog(req, {
+        entityType: 'affiliate',
+        entityId: affiliateId,
+        action: 'link.assign',
+        metadata: { code: ref.id, brandId: before?.brandId ?? null, tag: before?.tag ?? null },
+      });
+      return res.json({ code: ref.id, affiliateId, active: true });
+    } catch (e) {
+      console.error('[affiliate-links] erro ao atribuir link:', e);
+      return res.status(500).json({ error: 'Erro ao atribuir o link' });
+    }
+  });
+
+  // Devolve o link ao pool (o botão "Standby" de cada linha no legado).
+  app.post('/api/affiliate-links/:code/release', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const ref = adminDb.collection('affiliate_links').doc(String(req.params.code));
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: 'Link não encontrado.' });
+      const before = snap.data() as any;
+      await ref.set(
+        {
+          affiliateId: null,
+          active: false,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      await writeAuditLog(req, {
+        entityType: 'affiliate',
+        entityId: String(before?.affiliateId ?? '') || undefined,
+        action: 'link.release',
+        metadata: { code: ref.id, brandId: before?.brandId ?? null },
+      });
+      return res.json({ code: ref.id, released: true });
+    } catch (e) {
+      console.error('[affiliate-links] erro ao liberar link:', e);
+      return res.status(500).json({ error: 'Erro ao liberar o link' });
+    }
+  });
+
+  // Remove do pool. Só link SEM dono: apagar link distribuído destruiria o
+  // histórico de cliques já atribuído a alguém.
+  app.delete('/api/affiliate-links/:code', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const ref = adminDb.collection('affiliate_links').doc(String(req.params.code));
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: 'Link não encontrado.' });
+      const before = snap.data() as any;
+      if (String(before?.affiliateId ?? '').trim()) {
+        return res.status(409).json({ error: 'Este link pertence a um afiliado. Libere-o para o standby antes de remover.' });
+      }
+      await ref.delete();
+      await writeAuditLog(req, {
+        entityType: 'affiliate_link',
+        entityId: ref.id,
+        action: 'link.delete',
+        metadata: { registerUrl: before?.registerUrl ?? null },
+      });
+      return res.json({ deleted: true });
+    } catch (e) {
+      console.error('[affiliate-links] erro ao remover link:', e);
+      return res.status(500).json({ error: 'Erro ao remover o link' });
     }
   });
 

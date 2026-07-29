@@ -288,6 +288,37 @@ describe('auth_totp/{uid} (segredo do 2FA — ninguém lê pelo client)', () => 
 });
 
 // =============================================================================
+// achievement_requests — o pedido carrega o SNAPSHOT de ganhos do afiliado;
+// expor a coleção vazaria o ganho de um para os outros. O acesso legítimo é o
+// GET /api/achievement-requests, que escopa por papel.
+// =============================================================================
+describe('achievement_requests (solicitação de prêmio — server-only)', () => {
+  beforeEach(async () => {
+    await seedDoc('achievement_requests', 'R1', {
+      tierId: 'T1',
+      affiliateId: 'AFF-1',
+      status: 'pending',
+      snapshot: { cpas: 50, commission: 12000 },
+    });
+  });
+
+  it('client NÃO lê nem a própria solicitação pelo client (vai pelo endpoint escopado)', async () => {
+    await assertFails(getDoc(doc(asClient(), 'achievement_requests', 'R1')));
+    await assertFails(getDocs(collection(asClient(), 'achievement_requests')));
+  });
+
+  it('client NÃO escreve — senão aprovaria o próprio prêmio', async () => {
+    await assertFails(setDoc(doc(asClient(), 'achievement_requests', 'R1'), { status: 'approved' }));
+  });
+
+  it('nem o ADMIN decide direto: a decisão passa pelo servidor (trilha de auditoria + aviso)', async () => {
+    await seedAdmin();
+    await assertFails(getDoc(doc(asAdmin(), 'achievement_requests', 'R1')));
+    await assertFails(setDoc(doc(asAdmin(), 'achievement_requests', 'R1'), { status: 'approved' }));
+  });
+});
+
+// =============================================================================
 // Coleções admin-only — leitura/escrita do cliente sempre NEGADA
 // (PII de pagamento, logs, casas, resultados manuais, links, partner keys)
 // =============================================================================
@@ -333,6 +364,8 @@ describe('coleções legíveis por signed-in (escrita só admin)', () => {
     'special_affiliates',
     'notices',
     'daily_rankings',
+    // Catálogo de conquistas: é o roadmap que o afiliado persegue na tela dele.
+    'achievement_tiers',
   ];
 
   for (const col of SIGNED_IN_READ) {

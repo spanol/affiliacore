@@ -2209,3 +2209,441 @@ describe('2FA · TOTP (/api/auth/totp)', () => {
     await request(app).post('/api/auth/totp/verify').send({ code: '123456' }).expect(401);
   });
 });
+
+// =============================================================================
+// Conquistas (/api/achievement-tiers) — catálogo de premiação por META individual
+// =============================================================================
+describe('conquistas — catálogo (/api/achievement-tiers)', () => {
+  const seed = {
+    users: { 'admin-uid': { role: 'admin' }, 'client-uid': { role: 'client' } },
+  };
+
+  it('sem token -> 401; client -> 403 (requireAdmin fail-closed)', async () => {
+    await request(buildApp({ seed })).post('/api/achievement-tiers').send({ title: 'X', metaCpas: 1 }).expect(401);
+    await request(buildApp({ seed }))
+      .post('/api/achievement-tiers')
+      .set('Authorization', 'Bearer client-uid')
+      .send({ title: 'X', metaCpas: 1 })
+      .expect(403);
+  });
+
+  it('POST valido -> 201, grava saneado e aceita meta em pt-BR', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app)
+      .post('/api/achievement-tiers')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ title: '  Placa de 10K  ', subtitle: 'SILVER', metaCommission: '10.000,00' })
+      .expect(201);
+    expect(res.body).toMatchObject({ title: 'Placa de 10K', metaCommission: 10000, active: true });
+    const rows = [...(db.__store.get('achievement_tiers')?.values() ?? [])];
+    expect(rows[0]).toMatchObject({ title: 'Placa de 10K', subtitle: 'SILVER', metaCommission: 10000 });
+  });
+
+  it('POST sem meta nenhuma -> 400 e NAO grava (0 = ignorar, como no legado)', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/achievement-tiers')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ title: 'Sem meta', metaCpas: 0, metaCommission: 0 })
+      .expect(400);
+    expect(db.__store.get('achievement_tiers')?.size ?? 0).toBe(0);
+  });
+
+  it('POST grava trilha de auditoria', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/achievement-tiers')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ title: 'Placa', metaCpas: 50 })
+      .expect(201);
+    const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
+    expect(logs.some((l: any) => l.action === 'achievement_tier.create')).toBe(true);
+  });
+
+  it('PATCH que zera a UNICA meta -> 400 (validacao combinada com o doc atual)', async () => {
+    const db = makeFirestore({
+      ...seed,
+      achievement_tiers: { T1: { title: 'Placa', metaCpas: 0, metaCommission: 10000, active: true } },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .patch('/api/achievement-tiers/T1')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ metaCommission: 0 })
+      .expect(400);
+    expect(db.__store.get('achievement_tiers')?.get('T1')).toMatchObject({ metaCommission: 10000 });
+  });
+
+  it('PATCH parcial faz merge; tier inexistente -> 404', async () => {
+    const db = makeFirestore({
+      ...seed,
+      achievement_tiers: { T1: { title: 'Placa', metaCommission: 10000, active: true } },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .patch('/api/achievement-tiers/T1')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ active: false })
+      .expect(200);
+    expect(db.__store.get('achievement_tiers')?.get('T1')).toMatchObject({ title: 'Placa', active: false });
+    await request(app)
+      .patch('/api/achievement-tiers/NAO-EXISTE')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ active: false })
+      .expect(404);
+  });
+
+  it('DELETE remove a conquista', async () => {
+    const db = makeFirestore({ ...seed, achievement_tiers: { T1: { title: 'Placa', metaCpas: 10 } } });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).delete('/api/achievement-tiers/T1').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(db.__store.get('achievement_tiers')?.has('T1')).toBe(false);
+  });
+});
+
+// =============================================================================
+// Conquistas (/api/achievement-requests) — pedido do afiliado + decisao do admin
+// =============================================================================
+describe('conquistas — solicitacoes (/api/achievement-requests)', () => {
+  const seed = () => ({
+    users: {
+      'admin-uid': { role: 'admin' },
+      'client-uid': { role: 'client', affiliateId: 'AFF-1' },
+      'orfao-uid': { role: 'client' },
+      'outro-uid': { role: 'client', affiliateId: 'AFF-2' },
+    },
+    affiliates: { 'AFF-1': { name: 'Ana' } },
+    achievement_tiers: { T1: { title: 'Placa de 10K', metaCommission: 10000, active: true } },
+  });
+
+  it('afiliado solicita -> 201 com status pending e nome do mirror', async () => {
+    const db = makeFirestore(seed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app)
+      .post('/api/achievement-requests')
+      .set('Authorization', 'Bearer client-uid')
+      .send({ tierId: 'T1', snapshot: { cpas: 5, commission: 12000 } })
+      .expect(201);
+    expect(res.body).toMatchObject({ status: 'pending', affiliateId: 'AFF-1', affiliateName: 'Ana' });
+    const rows = [...(db.__store.get('achievement_requests')?.values() ?? [])];
+    expect(rows[0]).toMatchObject({ tierId: 'T1', tierTitle: 'Placa de 10K', status: 'pending' });
+  });
+
+  it('conta sem afiliado vinculado -> 403; tier inexistente -> 404; inativo -> 409', async () => {
+    const db = makeFirestore({
+      ...seed(),
+      achievement_tiers: { T1: { title: 'X', metaCpas: 1, active: false } },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/achievement-requests')
+      .set('Authorization', 'Bearer orfao-uid')
+      .send({ tierId: 'T1' })
+      .expect(403);
+    await request(app)
+      .post('/api/achievement-requests')
+      .set('Authorization', 'Bearer client-uid')
+      .send({ tierId: 'NAO-EXISTE' })
+      .expect(404);
+    await request(app)
+      .post('/api/achievement-requests')
+      .set('Authorization', 'Bearer client-uid')
+      .send({ tierId: 'T1' })
+      .expect(409);
+  });
+
+  it('pedido vivo bloqueia duplicata; REJEITADO libera novo pedido', async () => {
+    const db = makeFirestore({
+      ...seed(),
+      achievement_requests: { R1: { tierId: 'T1', affiliateId: 'AFF-1', status: 'pending' } },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/achievement-requests')
+      .set('Authorization', 'Bearer client-uid')
+      .send({ tierId: 'T1' })
+      .expect(409);
+
+    const db2 = makeFirestore({
+      ...seed(),
+      achievement_requests: { R1: { tierId: 'T1', affiliateId: 'AFF-1', status: 'rejected' } },
+    });
+    const app2 = createApp({ adminApp: makeAdminApp(), adminDb: db2 });
+    await request(app2)
+      .post('/api/achievement-requests')
+      .set('Authorization', 'Bearer client-uid')
+      .send({ tierId: 'T1' })
+      .expect(201);
+  });
+
+  it('GET escopa por papel: afiliado so ve as proprias; admin ve todas', async () => {
+    const db = makeFirestore({
+      ...seed(),
+      achievement_requests: {
+        R1: { tierId: 'T1', affiliateId: 'AFF-1', status: 'pending' },
+        R2: { tierId: 'T1', affiliateId: 'AFF-2', status: 'pending' },
+      },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const meu = await request(app)
+      .get('/api/achievement-requests')
+      .set('Authorization', 'Bearer client-uid')
+      .expect(200);
+    expect(meu.body.requests.map((r: any) => r.affiliateId)).toEqual(['AFF-1']);
+    const todas = await request(app)
+      .get('/api/achievement-requests')
+      .set('Authorization', 'Bearer admin-uid')
+      .expect(200);
+    expect(todas.body.requests).toHaveLength(2);
+  });
+
+  it('aprovar: grava decisao, notifica o afiliado e audita', async () => {
+    const db = makeFirestore({
+      ...seed(),
+      achievement_requests: {
+        R1: { tierId: 'T1', tierTitle: 'Placa de 10K', affiliateId: 'AFF-1', status: 'pending' },
+      },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .patch('/api/achievement-requests/R1')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ status: 'approved', note: 'Enviado pelos Correios' })
+      .expect(200);
+    expect(db.__store.get('achievement_requests')?.get('R1')).toMatchObject({ status: 'approved' });
+    const notifs = [...(db.__store.get('user_notifications')?.values() ?? [])];
+    expect(notifs).toHaveLength(1);
+    expect(notifs[0]).toMatchObject({ recipientUid: 'client-uid', type: 'achievement_approved' });
+    const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
+    expect(logs.some((l: any) => l.action === 'achievement_request.approve')).toBe(true);
+  });
+
+  it('client NAO decide (403); status invalido -> 400; ja decidida -> 409', async () => {
+    const db = makeFirestore({
+      ...seed(),
+      achievement_requests: {
+        R1: { tierId: 'T1', affiliateId: 'AFF-1', status: 'pending' },
+        R2: { tierId: 'T1', affiliateId: 'AFF-2', status: 'approved' },
+      },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .patch('/api/achievement-requests/R1')
+      .set('Authorization', 'Bearer client-uid')
+      .send({ status: 'approved' })
+      .expect(403);
+    await request(app)
+      .patch('/api/achievement-requests/R1')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ status: 'talvez' })
+      .expect(400);
+    await request(app)
+      .patch('/api/achievement-requests/R2')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ status: 'approved' })
+      .expect(409);
+    expect(db.__store.get('achievement_requests')?.get('R1')).toMatchObject({ status: 'pending' });
+  });
+});
+
+// =============================================================================
+// Contato de suporte (/api/support-contact) — WhatsApp do operador da label
+// =============================================================================
+describe('contato de suporte (/api/support-contact)', () => {
+  const seed = {
+    users: { 'admin-uid': { role: 'admin' }, 'client-uid': { role: 'client', affiliateId: 'AFF-1' } },
+  };
+
+  it('GET exige login e devolve vazio quando nunca configurado', async () => {
+    const app = buildApp({ seed });
+    await request(app).get('/api/support-contact').expect(401);
+    const res = await request(app).get('/api/support-contact').set('Authorization', 'Bearer client-uid').expect(200);
+    expect(res.body.contact).toMatchObject({ phone: '', active: false });
+  });
+
+  it('PUT do admin normaliza o telefone; o AFILIADO le pelo GET (settings e admin-only)', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .put('/api/support-contact')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ phone: '(11) 98888-7777', message: 'Preciso de ajuda', label: 'Suporte' })
+      .expect(200);
+    expect(db.__store.get('settings')?.get('support_contact')).toMatchObject({
+      phone: '5511988887777',
+      active: true,
+    });
+    const res = await request(app).get('/api/support-contact').set('Authorization', 'Bearer client-uid').expect(200);
+    expect(res.body.contact).toMatchObject({ phone: '5511988887777', message: 'Preciso de ajuda', active: true });
+  });
+
+  it('client NAO escreve (403); telefone invalido -> 400 e nao grava', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .put('/api/support-contact')
+      .set('Authorization', 'Bearer client-uid')
+      .send({ phone: '11988887777' })
+      .expect(403);
+    await request(app)
+      .put('/api/support-contact')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ phone: '123' })
+      .expect(400);
+    expect(db.__store.get('settings')?.has('support_contact') ?? false).toBe(false);
+  });
+
+  it('PUT audita a mudanca', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .put('/api/support-contact')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ phone: '11988887777' })
+      .expect(200);
+    const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
+    expect(logs.some((l: any) => l.action === 'support_contact.update')).toBe(true);
+  });
+});
+
+// =============================================================================
+// Triagem de links — pool de STANDBY, atribuicao e liberacao
+// =============================================================================
+describe('triagem de links — standby (/api/affiliate-links)', () => {
+  const seed = {
+    users: { 'admin-uid': { role: 'admin' }, 'client-uid': { role: 'client', affiliateId: 'AFF-1' } },
+  };
+
+  it('import do pool: grava SEM dono e INATIVO (o /go recusa link inativo)', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app)
+      .post('/api/affiliate-links/standby')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ text: 'https://go.aff.esportiva.bet/x?afp=infinitw291\nhttps://go.aff.esportiva.bet/x?afp=infinitw292' })
+      .expect(201);
+    expect(res.body).toMatchObject({ created: 2, skipped: 0 });
+    const rows = [...(db.__store.get('affiliate_links')?.values() ?? [])];
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ affiliateId: null, active: false, tag: 'infinitw291' });
+  });
+
+  it('re-colar o mesmo lote nao duplica (skipped) e linha invalida volta na resposta', async () => {
+    const db = makeFirestore({
+      ...seed,
+      affiliate_links: { c1: { code: 'c1', affiliateId: null, registerUrl: 'https://casa.bet/r?afp=a', active: false } },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app)
+      .post('/api/affiliate-links/standby')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ text: 'https://casa.bet/r?afp=a\nlixo-nao-url\nhttps://casa.bet/r?afp=b' })
+      .expect(201);
+    expect(res.body).toMatchObject({ created: 1, skipped: 1 });
+    expect(res.body.invalid).toEqual(['lixo-nao-url']);
+  });
+
+  it('texto sem nenhum link valido -> 400', async () => {
+    const app = buildApp({ seed });
+    await request(app)
+      .post('/api/affiliate-links/standby')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ text: 'nada aqui' })
+      .expect(400);
+  });
+
+  it('atribuir do standby: ganha dono e vira ATIVO', async () => {
+    const db = makeFirestore({
+      ...seed,
+      affiliate_links: { c1: { code: 'c1', affiliateId: null, registerUrl: 'https://casa.bet/r', active: false } },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/affiliate-links/c1/assign')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'AFF-1' })
+      .expect(200);
+    expect(db.__store.get('affiliate_links')?.get('c1')).toMatchObject({ affiliateId: 'AFF-1', active: true });
+    const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
+    expect(logs.some((l: any) => l.action === 'link.assign')).toBe(true);
+  });
+
+  it('atribuir link de OUTRO afiliado -> 409 (o historico de cliques e dele)', async () => {
+    const db = makeFirestore({
+      ...seed,
+      affiliate_links: { c1: { code: 'c1', affiliateId: 'AFF-9', registerUrl: 'https://casa.bet/r', active: true } },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/affiliate-links/c1/assign')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'AFF-1' })
+      .expect(409);
+    expect(db.__store.get('affiliate_links')?.get('c1')).toMatchObject({ affiliateId: 'AFF-9' });
+  });
+
+  it('atribuir link SEM destino -> 400 (nao ha para onde enviar)', async () => {
+    const db = makeFirestore({
+      ...seed,
+      affiliate_links: { c1: { code: 'c1', affiliateId: null, registerUrl: '', active: false } },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/affiliate-links/c1/assign')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'AFF-1' })
+      .expect(400);
+  });
+
+  it('liberar devolve ao pool (sem dono e inativo)', async () => {
+    const db = makeFirestore({
+      ...seed,
+      affiliate_links: { c1: { code: 'c1', affiliateId: 'AFF-1', registerUrl: 'https://casa.bet/r', active: true } },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).post('/api/affiliate-links/c1/release').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(db.__store.get('affiliate_links')?.get('c1')).toMatchObject({ affiliateId: null, active: false });
+  });
+
+  it('DELETE so remove link do POOL; com dono -> 409', async () => {
+    const db = makeFirestore({
+      ...seed,
+      affiliate_links: {
+        pool: { code: 'pool', affiliateId: null, registerUrl: 'https://casa.bet/r' },
+        vivo: { code: 'vivo', affiliateId: 'AFF-1', registerUrl: 'https://casa.bet/r' },
+      },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).delete('/api/affiliate-links/vivo').set('Authorization', 'Bearer admin-uid').expect(409);
+    await request(app).delete('/api/affiliate-links/pool').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(db.__store.get('affiliate_links')?.has('pool')).toBe(false);
+    expect(db.__store.get('affiliate_links')?.has('vivo')).toBe(true);
+  });
+
+  it('client nao mexe no pool (403 em import, assign, release e delete)', async () => {
+    const app = buildApp({
+      seed: { ...seed, affiliate_links: { c1: { code: 'c1', affiliateId: null, registerUrl: 'https://casa.bet/r' } } },
+    });
+    await request(app).post('/api/affiliate-links/standby').set('Authorization', 'Bearer client-uid').send({ text: 'https://casa.bet/r' }).expect(403);
+    await request(app).post('/api/affiliate-links/c1/assign').set('Authorization', 'Bearer client-uid').send({ affiliateId: 'AFF-1' }).expect(403);
+    await request(app).post('/api/affiliate-links/c1/release').set('Authorization', 'Bearer client-uid').expect(403);
+    await request(app).delete('/api/affiliate-links/c1').set('Authorization', 'Bearer client-uid').expect(403);
+  });
+
+  it('o pool NAO vaza para o afiliado no GET (filtro por affiliateId)', async () => {
+    const app = buildApp({
+      seed: {
+        ...seed,
+        affiliate_links: {
+          pool: { code: 'pool', affiliateId: null, registerUrl: 'https://casa.bet/r' },
+          meu: { code: 'meu', affiliateId: 'AFF-1', registerUrl: 'https://casa.bet/r' },
+        },
+      },
+    });
+    const res = await request(app).get('/api/affiliate-links').set('Authorization', 'Bearer client-uid').expect(200);
+    expect(res.body.links.map((l: any) => l.code)).toEqual(['meu']);
+  });
+});

@@ -1233,6 +1233,59 @@ export async function fetchAffiliateLinks(): Promise<AffiliateLink[]> {
   }
 }
 
+// --- Triagem de links: pool de standby, atribuição e liberação (admin) -------
+// O pool são links já cunhados na casa e ainda sem dono (`affiliateId: null`,
+// `active: false`) — o /go/:code recusa link inativo, então nada do pool
+// redireciona antes de ser atribuído. Ver src/lib/linkTriage.ts.
+
+export interface StandbyImportResult {
+  created: number;
+  skipped: number;
+  invalid: string[];
+}
+
+async function linkActionError(response: Response, fallback: string): Promise<never> {
+  const e = await response.json().catch(() => ({} as any));
+  throw new Error(e.error || e.message || fallback);
+}
+
+// Envia o TEXTO colado; o servidor reparseia com a mesma função pura que a UI
+// usou na pré-visualização — sem drift entre o que o admin vê e o que é gravado.
+export async function importStandbyLinks(text: string, brandId?: string | null): Promise<StandbyImportResult> {
+  const response = await authFetch('/api/affiliate-links/standby', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ text, brandId: brandId ?? null }),
+  });
+  if (!response.ok) await linkActionError(response, 'Falha ao importar os links.');
+  return response.json();
+}
+
+export async function assignAffiliateLink(code: string, affiliateId: string): Promise<void> {
+  const response = await authFetch(`/api/affiliate-links/${encodeURIComponent(code)}/assign`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ affiliateId }),
+  });
+  if (!response.ok) await linkActionError(response, 'Falha ao atribuir o link.');
+}
+
+export async function releaseAffiliateLink(code: string): Promise<void> {
+  const response = await authFetch(`/api/affiliate-links/${encodeURIComponent(code)}/release`, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) await linkActionError(response, 'Falha ao liberar o link.');
+}
+
+export async function deleteAffiliateLink(code: string): Promise<void> {
+  const response = await authFetch(`/api/affiliate-links/${encodeURIComponent(code)}`, {
+    method: 'DELETE',
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) await linkActionError(response, 'Falha ao remover o link.');
+}
+
 // --- Acordos (deals) + Parcerias (marketplace, P2) ---------------------------
 // Tudo mediado pelo servidor (Admin SDK + rules admin-only). O afiliado navega
 // ofertas e solicita/acompanha; o admin cria deals e aprova. Ver src/lib/deal.ts.
