@@ -59,6 +59,28 @@ export interface NetworkDrop {
   reason: NetworkDropReason;
 }
 
+// Agrupa os descartes por MOTIVO, do mais grave para o mais benigno. Existe porque
+// um descarte sistêmico produz uma linha por aresta: na migração da Infinity, com
+// `affiliate_configs` ainda vazio, as 141 arestas caíram por 'upline-inelegivel' e o
+// painel virou uma parede de 141 avisos idênticos — a causa (falta a taxa) sumia no
+// volume. Agrupado, a UI mostra "141 vínculos ignorados: upline sem taxa".
+const DROP_ORDER: NetworkDropReason[] = ['ciclo', 'auto-upline', 'upline-desconhecido', 'upline-inelegivel'];
+
+export function groupDropsByReason(
+  dropped: NetworkDrop[] | null | undefined
+): Array<{ reason: NetworkDropReason; items: NetworkDrop[] }> {
+  const by = new Map<NetworkDropReason, NetworkDrop[]>();
+  for (const d of Array.isArray(dropped) ? dropped : []) {
+    if (!d?.reason) continue;
+    if (!by.has(d.reason)) by.set(d.reason, []);
+    by.get(d.reason)!.push(d);
+  }
+  const conhecidos = DROP_ORDER.filter((r) => by.has(r)).map((r) => ({ reason: r, items: by.get(r)! }));
+  // motivo novo (se alguém adicionar um) não pode sumir da tela por não estar na ordem
+  const resto = [...by.keys()].filter((r) => !DROP_ORDER.includes(r)).map((r) => ({ reason: r, items: by.get(r)! }));
+  return [...conhecidos, ...resto];
+}
+
 export interface NetworkTree {
   ids: string[];                          // todos os nós conhecidos (ordem de entrada)
   uplineOf: Record<string, string>;       // aresta SANEADA filho → upline

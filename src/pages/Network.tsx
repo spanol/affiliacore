@@ -14,6 +14,7 @@ import {
   saveAffiliateUpline,
   buildNetworkNodes,
   buildNetworkTree,
+  groupDropsByReason,
   buildEligibleUpline,
   buildRootConfigMap,
   calcNetworkPayouts,
@@ -52,6 +53,8 @@ export default function Network() {
   const [uplines, setUplines] = useState<Record<string, string>>({});
   const [results, setResults] = useState<any[]>([]);
   const [manualRows, setManualRows] = useState<StoredManualRow[]>([]);
+  // Motivos de descarte expandidos no painel de anomalias (agrupado por motivo).
+  const [expandedDrops, setExpandedDrops] = useState<Set<string>>(() => new Set());
 
   const loadStructure = async () => {
     const [affs, cfgs, sp, ups] = await Promise.all([
@@ -197,15 +200,50 @@ export default function Network() {
                 <AlertTriangle size={14} /> Pontos de atenção na rede
               </h3>
               <ul className="space-y-1.5 text-[12px] text-amber-900/80 dark:text-amber-200/80">
-                {tree.dropped.map((d, i) => (
-                  <li key={`d${i}`}>
-                    <strong>{nameOf(d.affiliateId)}</strong>{' '}
-                    {d.reason === 'ciclo' && 'fechava um ciclo na rede — virou topo de estrutura.'}
-                    {d.reason === 'auto-upline' && 'apontava para si mesmo — vínculo ignorado.'}
-                    {d.reason === 'upline-desconhecido' && `tem upline fora do cadastro (#${d.uplineId}) — virou topo.`}
-                    {d.reason === 'upline-inelegivel' && `tem upline (${nameOf(d.uplineId)}) SEM taxa configurada — o vínculo não vale até configurar a comissão dele.`}
-                  </li>
-                ))}
+                {/* Agrupado por motivo: um descarte sistêmico (ex.: taxas ainda não
+                    configuradas) geraria uma linha por aresta e afogaria a causa. */}
+                {groupDropsByReason(tree.dropped).map((g) => {
+                  const linha = (d: typeof g.items[number]) => (
+                    <>
+                      <strong>{nameOf(d.affiliateId)}</strong>{' '}
+                      {d.reason === 'ciclo' && 'fechava um ciclo na rede — virou topo de estrutura.'}
+                      {d.reason === 'auto-upline' && 'apontava para si mesmo — vínculo ignorado.'}
+                      {d.reason === 'upline-desconhecido' && `tem upline fora do cadastro (#${d.uplineId}) — virou topo.`}
+                      {d.reason === 'upline-inelegivel' && `tem upline (${nameOf(d.uplineId)}) SEM taxa configurada — o vínculo não vale até configurar a comissão dele.`}
+                    </>
+                  );
+                  // Poucos: vale listar um a um, o nome é a informação útil.
+                  if (g.items.length <= 3) {
+                    return g.items.map((d, i) => <li key={`${g.reason}${i}`}>{linha(d)}</li>);
+                  }
+                  const aberto = expandedDrops.has(g.reason);
+                  return (
+                    <li key={g.reason}>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedDrops((s) => {
+                          const n = new Set(s);
+                          n.has(g.reason) ? n.delete(g.reason) : n.add(g.reason);
+                          return n;
+                        })}
+                        className="text-left underline decoration-dotted underline-offset-2 hover:opacity-80"
+                        aria-expanded={aberto}
+                      >
+                        <strong>{g.items.length} vínculos ignorados</strong>{' — '}
+                        {g.reason === 'ciclo' && 'fechavam ciclo na rede'}
+                        {g.reason === 'auto-upline' && 'apontavam para si mesmos'}
+                        {g.reason === 'upline-desconhecido' && 'upline fora do cadastro'}
+                        {g.reason === 'upline-inelegivel' && 'o upline ainda não tem taxa configurada (configure a comissão dos uplines para a rede valer)'}
+                        {' · '}{aberto ? 'ocultar' : 'ver quais'}
+                      </button>
+                      {aberto && (
+                        <ul className="mt-1.5 ml-4 space-y-1 list-disc marker:text-amber-500/60">
+                          {g.items.map((d, i) => <li key={`${g.reason}-x${i}`}>{linha(d)}</li>)}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
                 {payouts.anomalies.map((a, i) => (
                   <li key={`a${i}`}>
                     {a.kind === 'spread-negativo' ? (
