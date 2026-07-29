@@ -45,6 +45,18 @@ export interface HousePreset {
   // "Superbet" (o separador some), mas "Super Bet V2" não — é nome de instância do
   // painel legado da Infinity, não uma casa diferente.
   aliases?: string[];
+  // Como o ícone da casa é montado:
+  //   ausente  → monograma autoral sobre a cor da marca (buildHouseIconSvg)
+  //   'tile'   → logo oficial que JÁ vem com fundo próprio: preenche a moldura
+  //   'inset'  → logo oficial TRANSPARENTE: entra com respiro sobre a cor da marca
+  // Só recebe logo oficial quem passou nos 3 critérios objetivos de qualidade
+  // (≥64px, proporção ≤2:1, decodificável) — ver PESQUISA-PRESETS-CASAS.md §4.1.
+  officialIcon?: 'tile' | 'inset';
+  // Fundo sob uma logo 'inset'. Ausente = a cor da marca. Existe porque algumas
+  // logos transparentes são ESCURAS e desaparecem sobre a própria cor da casa —
+  // a Novibet mede 1.26:1 contra o navy dela. Mesma regra do monograma: escolhe-se
+  // o fundo que dá mais contraste, medido, não no olho.
+  insetBackdrop?: string;
 }
 
 // Contraste relativo (WCAG) — decide monograma claro ou escuro quando a casa não
@@ -81,17 +93,17 @@ export function monogramColor(preset: HousePreset): string {
 // presença nas docs do projeto), não alfabeticamente — a grade do seletor mostra as
 // mais prováveis primeiro.
 export const HOUSE_PRESETS: HousePreset[] = [
-  { slug: 'betano', name: 'Betano', monogram: 'B', color: '#ff3c00', colorSource: 'logo-oficial',
+  { slug: 'betano', name: 'Betano', monogram: 'B', officialIcon: 'tile', color: '#ff3c00', colorSource: 'logo-oficial',
     site: 'betano.bet.br', officialLogoUrl: 'https://www.betano.bet.br/assets/static/favicons/betano/apple-icon-180x180.png',
     legalEntity: 'Kaizen Gaming Brasil LTDA', spaPortaria: 'SPA/MF nº 246, de 07/02/2025' },
-  { slug: 'superbet', name: 'Superbet', monogram: 'S', color: '#fd0104', colorSource: 'logo-oficial',
+  { slug: 'superbet', name: 'Superbet', monogram: 'S', officialIcon: 'tile', color: '#fd0104', colorSource: 'logo-oficial',
     site: 'superbet.bet.br', officialLogoUrl: '/brands/superbet.png',
     legalEntity: 'SPRBT Interactive Brasil LTDA', spaPortaria: 'SPA/MF nº 2.090, de 30/12/2024',
     // "Super Bet V2" é como a casa aparece no painel legado da Infinity — mesma casa,
     // instância nova. Já cairia na regra de sufixo de versão; fica explícito por ser
     // nome real em produção. ("Super Bet" sem o V2 a normalização já resolve.)
     aliases: ['Super Bet V2'] },
-  { slug: 'sportingbet', name: 'Sportingbet', monogram: 'sb', color: '#003dc4', colorSource: 'logo-oficial',
+  { slug: 'sportingbet', name: 'Sportingbet', monogram: 'sb', officialIcon: 'tile', color: '#003dc4', colorSource: 'logo-oficial',
     site: 'sportingbet.bet.br', officialLogoUrl: '/brands/sportingbet.png',
     legalEntity: 'Ventmear Brasil S.A.', spaPortaria: 'SPA/MF nº 247, de 07/02/2025' },
   { slug: 'bet365', name: 'bet365', monogram: '365', color: '#126e51', accent: '#ffdf1b', colorSource: 'logo-oficial',
@@ -100,10 +112,10 @@ export const HOUSE_PRESETS: HousePreset[] = [
   { slug: 'betfair', name: 'Betfair', monogram: 'bf', color: '#ffb80c', accent: '#1e1e1e', colorSource: 'css-oficial',
     site: 'betfair.bet.br', officialLogoUrl: 'https://betfair.bet.br/favicon.ico',
     legalEntity: 'NSX Betfair Brasil S.A.', spaPortaria: 'SPA/MF nº 2.291, de 09/10/2025' },
-  { slug: 'betnacional', name: 'Betnacional', monogram: 'BN', color: '#131e32', accent: '#ebbd54', colorSource: 'logo-oficial',
+  { slug: 'betnacional', name: 'Betnacional', monogram: 'BN', officialIcon: 'tile', color: '#131e32', accent: '#ebbd54', colorSource: 'logo-oficial',
     site: 'betnacional.bet.br', officialLogoUrl: 'https://betnacional.bet.br/assets/skins/betnacional/favicon/apple-icon-180x180.png',
     legalEntity: 'NSX Brasil S.A.', spaPortaria: 'SPA/MF nº 1.814, de 15/08/2025' },
-  { slug: 'kto', name: 'KTO', monogram: 'KTO', color: '#da0000', colorSource: 'logo-oficial',
+  { slug: 'kto', name: 'KTO', monogram: 'KTO', officialIcon: 'tile', color: '#da0000', colorSource: 'logo-oficial',
     site: 'kto.bet.br', officialLogoUrl: 'https://static.kto.bet.br/lo/2026/07/06220509/kto-favicon-2-300x300.png',
     legalEntity: 'Apollo Operations LTDA', spaPortaria: 'SPA/MF nº 2.093, de 30/12/2024' },
   { slug: 'esportes-da-sorte', name: 'Esportes da Sorte', monogram: 'EdS', color: '#38e67d', accent: '#08301a', colorSource: 'logo-oficial',
@@ -113,17 +125,17 @@ export const HOUSE_PRESETS: HousePreset[] = [
   { slug: 'estrelabet', name: 'EstrelaBet', monogram: 'EB', color: '#ffd700', accent: '#1a1400', colorSource: 'css-oficial',
     site: 'estrelabet.bet.br',
     legalEntity: 'EB Intermediacoes e Jogos S.A.', spaPortaria: 'SPA/MF nº 1.762, de 13/08/2025' },
-  { slug: 'brazino777', name: 'Brazino777', monogram: '777', color: '#035d03', colorSource: 'logo-oficial',
+  { slug: 'brazino777', name: 'Brazino777', monogram: '777', officialIcon: 'tile', color: '#035d03', colorSource: 'logo-oficial',
     site: 'brazino777.bet.br', officialLogoUrl: 'https://www.brazino-cdnsrv-cst.org/build/images/favicons/apple-touch-icon-152x152.png',
     legalEntity: 'Futuras Apostas LTDA', spaPortaria: 'SPA/MF nº 466, de 10/03/2025' },
-  { slug: 'stake', name: 'Stake', monogram: 'St', color: '#1a2c38', accent: '#4bc4ff', colorSource: 'theme-color',
+  { slug: 'stake', name: 'Stake', monogram: 'St', officialIcon: 'tile', color: '#1a2c38', accent: '#4bc4ff', colorSource: 'theme-color',
     site: 'stake.bet.br', officialLogoUrl: 'https://stake.bet.br/favicon.ico',
     legalEntity: 'Stake Brazil LTDA', spaPortaria: 'SPA/MF nº 263, de 07/02/2025' },
-  { slug: 'bet7k', name: 'Bet7k', monogram: '7K', color: '#a1cd3d', accent: '#16182a', colorSource: 'css-oficial',
+  { slug: 'bet7k', name: 'Bet7k', monogram: '7K', officialIcon: 'tile', color: '#a1cd3d', accent: '#16182a', colorSource: 'css-oficial',
     site: '7k.bet.br', officialLogoUrl: 'https://7k.bet.br/pwa/apple-touch-icon-180x180.png',
     legalEntity: 'Ana Gaming Brasil S.A.', spaPortaria: 'SPA/MF nº 1.056, de 14/05/2025',
     aliases: ['7k'] }, // o domínio e a camisa do Vitória usam só "7k"
-  { slug: '7games', name: '7Games', monogram: '7G', color: '#1b1b1b', accent: '#f5d76e', colorSource: 'css-oficial',
+  { slug: '7games', name: '7Games', monogram: '7G', officialIcon: 'tile', color: '#1b1b1b', accent: '#f5d76e', colorSource: 'css-oficial',
     site: '7games.bet.br', officialLogoUrl: 'https://7games.bet.br/apple-touch-icon.png',
     legalEntity: 'OIG Gaming Brazil LTDA', spaPortaria: 'SPA/MF nº 2.096, de 30/12/2024' },
   { slug: 'vbet', name: 'Vbet', monogram: 'V', color: '#d80d83', colorSource: 'logo-oficial',
@@ -132,14 +144,15 @@ export const HOUSE_PRESETS: HousePreset[] = [
   { slug: 'h2bet', name: 'H2bet', monogram: 'H2', color: '#77148e', accent: '#24cfa4', colorSource: 'css-oficial',
     site: 'h2.bet.br',
     legalEntity: 'H2 Licensed LTDA', spaPortaria: 'SPA/MF nº 253, de 07/02/2025' },
-  { slug: 'vivasorte', name: 'Viva Sorte', monogram: 'VS', color: '#ff7912', accent: '#1a243d', colorSource: 'css-oficial',
+  { slug: 'vivasorte', name: 'Viva Sorte', monogram: 'VS', officialIcon: 'tile', color: '#ff7912', accent: '#1a243d', colorSource: 'css-oficial',
     site: 'vivasorte.bet.br', officialLogoUrl: 'https://cn.vivasorte.bet.br/assets/icons/apple-touch-icon.png',
     legalEntity: 'Jogo Principal LTDA', spaPortaria: 'SPA/MF nº 262, de 18/02/2025',
     aliases: ['Viva Sorte Bet'] }, // grafia usada no patrocínio do Athletico
-  { slug: 'novibet', name: 'Novibet', monogram: 'N', color: '#0a1324', accent: '#29a8ac', colorSource: 'theme-color',
+  // Logo escura: 1.26:1 contra o navy da marca, 14.7:1 contra o branco (medido).
+  { slug: 'novibet', name: 'Novibet', monogram: 'N', officialIcon: 'inset', insetBackdrop: '#ffffff', color: '#0a1324', accent: '#29a8ac', colorSource: 'theme-color',
     site: 'novibet.bet.br', officialLogoUrl: 'https://novibet.bet.br/assets/images/logos/apple-touch-icon-180x180.png',
     legalEntity: 'NVBT Gaming LTDA', spaPortaria: 'SPA/MF nº 249, de 07/02/2025' },
-  { slug: 'pixbet', name: 'Pixbet', monogram: 'px', color: '#ccff00', accent: '#12200a', colorSource: 'theme-color',
+  { slug: 'pixbet', name: 'Pixbet', monogram: 'px', officialIcon: 'tile', color: '#ccff00', accent: '#12200a', colorSource: 'theme-color',
     site: 'pixbet.bet.br', officialLogoUrl: 'https://pixbet.bet.br/assets/brands/pixbet/favicons/apple-touch-icon.png',
     legalEntity: 'Pixbet Soluções Tecnológicas LTDA', spaPortaria: 'SPA/MF nº 2.326, de 14/10/2025' },
   { slug: 'blaze', name: 'Blaze', monogram: 'BZ', color: '#131521', accent: '#e60026', colorSource: 'theme-color',
@@ -157,13 +170,16 @@ export const HOUSE_PRESETS: HousePreset[] = [
   { slug: 'br4bet', name: 'BR4BET', monogram: 'BR4', color: '#12b530', accent: '#04240c', colorSource: 'theme-color',
     site: 'br4.bet.br',
     legalEntity: 'Sabiá Administração LTDA', spaPortaria: 'SPA/MF nº 399, de 24/02/2025' },
+  // SEM logo oficial de propósito: o único asset disponível é uma arte FOTOGRÁFICA
+  // (leão), que vira borrão a 36px — e mede 2.98:1 contra o preto da marca, abaixo
+  // do piso de 3:1. O monograma dourado sobre preto é a identidade dela e é nítido.
   { slug: 'betmgm', name: 'BetMGM', monogram: 'MGM', color: '#0b0b0b', accent: '#b19661', colorSource: 'logo-oficial',
     site: 'betmgm.bet.br', officialLogoUrl: 'https://betmgm.bet.br/apple-touch-icon.png',
     legalEntity: 'Boa Lion S.A.', spaPortaria: 'SPA/MF nº 2.098, de 30/12/2024' },
   { slug: 'lotogreen', name: 'Lotogreen', monogram: 'LG', color: '#1dbf24', accent: '#04240c', colorSource: 'theme-color',
     site: 'lotogreen.bet.br', officialLogoUrl: 'https://cometa-s3-images-loto-public.s3.ca-central-1.amazonaws.com/settings/logo.png',
     legalEntity: 'Sabiá Administração LTDA', spaPortaria: 'SPA/MF nº 399, de 24/02/2025' },
-  { slug: 'mcgames', name: 'MC Games', monogram: 'MC', color: '#171d25', accent: '#f4b942', colorSource: 'theme-color',
+  { slug: 'mcgames', name: 'MC Games', monogram: 'MC', officialIcon: 'tile', color: '#171d25', accent: '#f4b942', colorSource: 'theme-color',
     site: 'mcgames.bet.br',
     legalEntity: 'Sistema Lotérico de Pernambuco LTDA', spaPortaria: 'SPA/MF nº 2.007, de 09/09/2025' },
 ];
@@ -218,15 +234,57 @@ export function buildHouseIconSvg(preset: HousePreset): string {
   ].join('');
 }
 
-// base64 isomórfico (btoa no browser, Buffer no Node dos testes/gerador). O SVG é
-// ASCII por construção, então a codificação latin1 do btoa é segura aqui.
-const toBase64 = (s: string): string =>
-  typeof btoa === 'function' ? btoa(s) : Buffer.from(s, 'binary').toString('base64');
+// Moldura para a LOGO OFICIAL da casa. Mesma caixa 64×64 e mesmo raio do ícone
+// autoral — é isso que mantém a lista uniforme mesmo misturando as duas origens
+// (o conjunto de logos oficiais, cru, tem proporção e respiro diferentes em cada
+// casa; ver PESQUISA-PRESETS-CASAS.md §4.1).
+//
+// 'tile'  → a logo já traz fundo próprio (Betano, Superbet, KTO...): preenche a
+//           moldura e é recortada pelo raio, sem cor por baixo.
+// 'inset' → a logo é transparente (Novibet, BetMGM): ganha respiro sobre a cor de
+//           marca medida, senão sumiria no tema escuro do app.
+export function buildHouseLogoSvg(preset: HousePreset, pngBase64: string): string {
+  const id = `hl-${preset.slug}`;
+  const href = `data:image/png;base64,${pngBase64}`;
+  const open = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="${esc(preset.name)}">`;
+  if (preset.officialIcon === 'tile') {
+    return [
+      open,
+      `<defs><clipPath id="${id}"><rect width="64" height="64" rx="14"/></clipPath></defs>`,
+      `<image href="${href}" width="64" height="64" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`,
+      `</svg>`,
+    ].join('');
+  }
+  return [
+    open,
+    `<rect width="64" height="64" rx="14" fill="${preset.insetBackdrop ?? preset.color}"/>`,
+    `<image href="${href}" x="9" y="9" width="46" height="46" preserveAspectRatio="xMidYMid meet"/>`,
+    `</svg>`,
+  ].join('');
+}
 
-// Data URL do ícone no formato que `uploadHouseLogo` (server.ts) já aceita —
-// é assim que o preset entra pelo MESMO caminho do upload manual, sem rota nova.
+// base64 isomórfico (btoa no browser, Buffer no Node dos testes/gerador). Passa pelo
+// TextEncoder antes: `btoa` só aceita latin1 e estouraria em qualquer caractere
+// acentuado que venha a entrar num nome de casa.
+const toBase64 = (s: string): string => {
+  if (typeof btoa !== 'function') return Buffer.from(s, 'utf8').toString('base64');
+  const bytes = new TextEncoder().encode(s);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+};
+
+// Empacota um SVG no formato que `uploadHouseLogo` (server.ts) já aceita — é assim
+// que o preset entra pelo MESMO caminho do upload manual, sem rota nova.
+export function svgToDataUrl(svg: string): string {
+  return `data:image/svg+xml;base64,${toBase64(svg)}`;
+}
+
+// Data URL do ícone AUTORAL. Atenção: para casa com `officialIcon`, o SVG real
+// embute a logo oficial e NÃO é derivável do catálogo — a UI busca o asset gerado
+// (housePresetIconPath) em vez de chamar isto. Aqui fica o fallback.
 export function buildHouseIconDataUrl(preset: HousePreset): string {
-  return `data:image/svg+xml;base64,${toBase64(buildHouseIconSvg(preset))}`;
+  return svgToDataUrl(buildHouseIconSvg(preset));
 }
 
 // Caminho do SVG estático equivalente (gerado por scripts/gen-house-icons.ts).

@@ -24,8 +24,15 @@ vivo pelas casas do backend.
 
 A subpasta `presets/` tem **26 ícones SVG gerados** (um por casa conhecida e
 autorizada pelo SPA/MF), oferecidos na grade "Usar um preset de casa" do modal de
-`/casas`. Eles **não são as logos oficiais** — são monogramas sobre a **cor de marca
-medida** no site oficial de cada casa (método em `PESQUISA-PRESETS-CASAS.md`).
+`/casas`. O conjunto é **híbrido**: **13 embutem a logo oficial** da casa e **13 são
+monogramas autorais** sobre a cor de marca medida, pras casas cuja logo não passou nos
+critérios de qualidade (≥64px, proporção ≤2:1, decodificável, contraste ≥3:1) — método
+e a lista de cada grupo em `PESQUISA-PRESETS-CASAS.md` §4.1–4.2.
+
+As logos oficiais **normalizadas** ficam em `scripts/house-logos/<slug>.png` (fonte do
+gerador, fora de `public/` porque só o SVG final é servido). Toda logo entra na mesma
+moldura 64×64 do ícone autoral — é isso que mantém a lista uniforme misturando as duas
+origens.
 
 Não edite esses arquivos à mão: a fonte de verdade é `src/lib/housePresets.ts` e eles
 são regerados por `npm run icons:casas`. Um teste compara os arquivos com o catálogo,

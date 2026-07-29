@@ -158,11 +158,51 @@ que faz escanear rápido é a uniformidade (mesma silhueta, mesmo peso óptico),
 justamente isso que o conjunto oficial não tem. O autoral perde em reconhecimento
 individual e ganha em leitura de lista.
 
-**Decisão:** manter o autoral como base e deixar a troca por casa na mão do admin —
-que é o desenho que já existe. O ganho concreto do experimento foi enriquecer
-`officialLogoUrl`: de 6 para **19 casas** com link direto verificado, então "baixar a
-logo oficial" no seletor agora resolve pra maioria. Ficaram sem link as 5 sem logo +
-EstrelaBet (só banner) + MC Games (a URL tem hash de deploy, quebra no próximo build).
+**Decisão (revista em 29/07):** o conjunto passou a ser **híbrido** — logo oficial
+onde ela existe e serve, autoral no resto. O problema da falta de sistema foi
+resolvido na MOLDURA, não descartando as logos: toda logo oficial é embutida na
+**mesma caixa 64×64 com o mesmo raio** do ícone autoral, então a lista continua
+uniforme mesmo misturando as duas origens. Ver §4.2.
+
+## 4.2 O conjunto híbrido (13 oficiais + 13 autorais)
+
+Cada logo oficial é normalizada (PNG RGBA, moldura transparente cortada) e embutida
+no SVG do preset como data URI. Dois modos, decididos pela **cobertura opaca medida**
+na própria arte:
+
+- **`tile`** (≥90% opaca — a logo já traz fundo próprio): preenche a moldura e é
+  recortada pelo raio. É o caso da maioria (Betano, Superbet, KTO...).
+- **`inset`** (transparente): entra com respiro sobre um fundo, e **o fundo é
+  escolhido por contraste medido**, igual à regra do monograma.
+
+### Critérios objetivos para uma logo oficial ser aceita
+
+Nada de "escolhi a olho". Uma logo coletada só vira ícone se passar em todos:
+
+1. **Decodificável** — PNG não-interlaçado ou ICO. Reprovou **Blaze** (PNG Adam7) e
+   **EstrelaBet** (WebP).
+2. **≥ 64px no menor lado** — abaixo disso borra ao ampliar. Reprovou **bet365** (31px),
+   **Vbet** (32px) e **Esportes da Sorte** (16px).
+3. **Proporção ≤ 2:1** — wordmark deitado vira tarja fina num ícone quadrado.
+   Reprovou **Aposta Ganha** (1976×782 ≈ 2,5:1).
+4. **Contraste ≥ 3:1** entre a tinta média da logo e o fundo (mesmo piso WCAG do
+   monograma). Reprovou **BetMGM**: 2,98:1 contra o preto da marca — e o único asset
+   dele é arte **fotográfica** (um leão), que vira borrão a 36px. **Novibet** media
+   1,26:1 contra o navy dela, mas 14,7:1 contra o branco → passou com fundo claro.
+
+**Resultado:** 13 com logo oficial (Betano, Superbet, Sportingbet, Betnacional, KTO,
+Brazino777, Stake, Bet7k, 7Games, Viva Sorte, Pixbet, MC Games, Novibet) e 13
+autorais (bet365, Betfair, Esportes da Sorte, EstrelaBet, Vbet, H2bet, Blaze, Betsson,
+F12.Bet, Aposta Ganha, BR4BET, BetMGM, Lotogreen).
+
+As artes-fonte ficam em **`scripts/house-logos/<slug>.png`** (168 kB no total), fora
+de `public/` porque são material do gerador — quem é servido é só o SVG final. Trocar
+uma logo é substituir o PNG e rodar `npm run icons:casas`; o teste anti-drift cobre os
+dois caminhos, e o gerador **falha alto** se um preset declarar `officialIcon` sem a
+arte correspondente.
+
+O `officialLogoUrl` também foi enriquecido no caminho: de 6 para **19 casas** com link
+verificado, então "baixar a logo oficial" no seletor resolve mesmo pras autorais.
 
 ## 5. Como usar
 

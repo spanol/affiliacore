@@ -25,6 +25,7 @@ import { parseSpreadsheetFile, downloadResultsTemplate, isExcelFile } from '../l
 import { humanizeName } from '../lib/utils';
 import {
   HOUSE_PRESETS, HousePreset, buildHouseIconDataUrl, housePresetIconPath, houseLogoOrPreset,
+  svgToDataUrl,
 } from '../lib/housePresets';
 import { fetchEurBrlRate, eurToBrl, formatBrl, getCachedEurBrlQuote, EurBrlQuote } from '../lib/currency';
 import EntityAuditHistory from '../components/EntityAuditHistory';
@@ -377,13 +378,22 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
   // do preset é fixado à mão porque o autoSlug do nome divergiria em alguns casos —
   // "F12.Bet" viraria "f12-bet", e o slug é o id do documento). Ao EDITAR, mexe só
   // no ícone: nome e slug já estão em uso por dados históricos.
-  const applyPreset = (preset: HousePreset) => {
+  const applyPreset = async (preset: HousePreset) => {
     setPresetSlug(preset.slug);
-    setLogoBase64(buildHouseIconDataUrl(preset));
     if (!editing) {
       setName(preset.name);
       setSlugTouched(true);
       setSlug(preset.slug);
+    }
+    // Casa com logo OFICIAL tem o SVG com a arte embutida — não dá pra remontar a
+    // partir do catálogo. Buscamos o asset gerado (mesma origem, ~10kb, cacheado) e
+    // só caímos no monograma se o fetch falhar.
+    try {
+      const res = await fetch(housePresetIconPath(preset));
+      if (!res.ok) throw new Error(String(res.status));
+      setLogoBase64(svgToDataUrl(await res.text()));
+    } catch {
+      setLogoBase64(buildHouseIconDataUrl(preset));
     }
   };
 

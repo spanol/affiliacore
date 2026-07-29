@@ -1,10 +1,11 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
   HOUSE_PRESETS,
   getHousePreset,
   buildHouseIconSvg,
+  buildHouseLogoSvg,
   buildHouseIconDataUrl,
   housePresetIconPath,
   monogramColor,
@@ -226,15 +227,40 @@ describe('fallback de logo por preset', () => {
 describe('assets estáticos em public/brands/presets', () => {
   const repoRoot = resolve(__dirname, '../..');
 
+  // Reproduz os DOIS caminhos do gerador: logo oficial embutida (quando o preset
+  // declara officialIcon) e monograma autoral (quando não declara).
+  const expectedSvg = (p: (typeof HOUSE_PRESETS)[number]): string => {
+    if (!p.officialIcon) return buildHouseIconSvg(p);
+    const png = resolve(repoRoot, `scripts/house-logos/${p.slug}.png`);
+    return buildHouseLogoSvg(p, readFileSync(png).toString('base64'));
+  };
+
   it('existe um .svg por preset, idêntico ao que o catálogo gera', () => {
     const stale: string[] = [];
     const missing: string[] = [];
     for (const p of HOUSE_PRESETS) {
       const file = resolve(repoRoot, `public${housePresetIconPath(p)}`);
       if (!existsSync(file)) { missing.push(p.slug); continue; }
-      if (readFileSync(file, 'utf8').trim() !== buildHouseIconSvg(p)) stale.push(p.slug);
+      if (readFileSync(file, 'utf8').trim() !== expectedSvg(p)) stale.push(p.slug);
     }
     expect(missing, 'faltando — rode: npm run icons:casas').toEqual([]);
     expect(stale, 'desatualizado — rode: npm run icons:casas').toEqual([]);
+  });
+
+  // `officialIcon` sem a arte correspondente faria o gerador estourar. Melhor o
+  // teste apontar a casa exata do que ler um stack trace do script.
+  it('toda casa com officialIcon tem a logo normalizada no repo', () => {
+    const semArte = HOUSE_PRESETS
+      .filter((p) => p.officialIcon)
+      .filter((p) => !existsSync(resolve(repoRoot, `scripts/house-logos/${p.slug}.png`)))
+      .map((p) => p.slug);
+    expect(semArte).toEqual([]);
+  });
+
+  it('não sobra logo de casa que deixou de usar ícone oficial', () => {
+    const dir = resolve(repoRoot, 'scripts/house-logos');
+    const declaradas = new Set(HOUSE_PRESETS.filter((p) => p.officialIcon).map((p) => `${p.slug}.png`));
+    const orfas = readdirSync(dir).filter((f) => f.endsWith('.png') && !declaradas.has(f));
+    expect(orfas).toEqual([]);
   });
 });
