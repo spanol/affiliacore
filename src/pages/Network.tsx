@@ -25,7 +25,7 @@ import {
   NetworkRow,
 } from '../services/affiliateService';
 import { StoredManualRow } from '../lib/houseResults';
-import { getKnownBrands } from '../lib/brand';
+import { getKnownBrands, buildBrandIdOf } from '../lib/brand';
 import DateRangePicker from '../components/DateRangePicker';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
 import { humanizeName, cn } from '../lib/utils';
@@ -88,13 +88,19 @@ export default function Network() {
     return (id: string) => humanizeName(m[String(id)] || `#${id}`);
   }, [affiliates]);
 
+  // Resolvedor afiliado→casa. SEM ele, a elegibilidade cai em `rateStatus(cfg,
+  // undefined)`, que só enxerga a taxa de TOPO — quem tem apenas taxa POR CASA
+  // (`byBrand`, o caso de toda instância de casas manuais) seria lido como "sem
+  // taxa" e perderia a aresta. [[brandIdOf]]
+  const brandIdOf = useMemo(() => buildBrandIdOf(affiliates), [affiliates]);
+
   // Árvore saneada: aresta explícita (affiliate_uplines) + vínculo derivado dos
   // especiais ativos. Upline sem taxa configurada perde a aresta (ausência ≠ R$ 0).
   const tree = useMemo(
     () => buildNetworkTree(buildNetworkNodes({ ids: affiliates, specials, uplines }), {
-      isEligibleUpline: buildEligibleUpline(configs),
+      isEligibleUpline: buildEligibleUpline(configs, brandIdOf),
     }),
-    [affiliates, specials, uplines, configs]
+    [affiliates, specials, uplines, configs, brandIdOf]
   );
 
   // Linhas de produção no shape da rede (OTG + manuais atribuídas), com o mesmo

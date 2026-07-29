@@ -21,7 +21,7 @@ import CampaignBreakdown from '../components/CampaignBreakdown';
 import AffiliatePerformanceChart from '../components/AffiliatePerformanceChart';
 import BrandFilter from '../components/BrandFilter';
 import BrandLogo from '../components/BrandLogo';
-import { getBrandName, uniqueBrands, ALL_BRANDS, getKnownBrandName, getBrandMeta, getKnownBrands } from '../lib/brand';
+import { getBrandName, uniqueBrands, ALL_BRANDS, getKnownBrandName, getBrandMeta, getKnownBrands, buildBrandIdOf } from '../lib/brand';
 import { OTG_ENABLED } from '../lib/instanceClient';
 import { withKnownBrandNames } from '../lib/knownHouses';
 import { StoredManualRow, aggregateByHouse, emptyMetrics, addMetrics } from '../lib/houseResults';
@@ -269,13 +269,18 @@ export default function AdminDashboard() {
   // vínculo derivado de `special_affiliates` (retrocompat: o especial de hoje é uma
   // rede de 2 níveis). Um upline SEM taxa configurada perde a aresta — ausência de
   // config ≠ R$ 0, e a estrutura inteira sairia de graça. [[REDE-AFILIADOS.md]]
+  // Afiliado → casa, na MESMA chave que o cálculo por casa usa (`id ?? slug`).
+  const brandIdOf = useMemo(() => buildBrandIdOf(affiliates), [affiliates]);
+
   const network = useMemo(
     () =>
       buildNetworkTree(
         buildNetworkNodes({ ids: affiliates, specials, uplines }),
-        { isEligibleUpline: buildEligibleUpline(configs) }
+        // brandIdOf é obrigatório aqui: sem ele a elegibilidade só olha a taxa de
+        // TOPO e quem tem apenas `byBrand` (casas manuais) some da rede.
+        { isEligibleUpline: buildEligibleUpline(configs, brandIdOf) }
       ),
-    [affiliates, specials, uplines, configs]
+    [affiliates, specials, uplines, configs, brandIdOf]
   );
 
   const profit = useMemo(

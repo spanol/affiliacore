@@ -31,7 +31,14 @@ export function buildBrandIdOf(affiliates: any[]): (affiliateId: string) => stri
   for (const a of Array.isArray(affiliates) ? affiliates : []) {
     const id = String(a?.id ?? a?._id ?? '');
     if (!id) continue;
-    const bid = a?.brand?.id ?? getBrandMeta(getBrandName(a))?.id;
+    const meta = getBrandMeta(getBrandName(a));
+    // `id ?? slug` — a MESMA chave que `brandKeyOf` usa no cálculo por casa
+    // (calcManualHouseNetProfit). Casa MANUAL não tem `id` (isso é o brandId da
+    // OTG), então parar em `meta.id` deixava o afiliado de casa manual SEM
+    // brandId: o `byBrand[slug]` dele nunca era encontrado, e numa instância
+    // OTG-free isso derrubava a rede inteira por "upline sem taxa" mesmo com as
+    // taxas gravadas (migração da Infinity, 2026-07-28).
+    const bid = a?.brand?.id ?? meta?.id ?? meta?.slug;
     if (bid) map[id] = String(bid);
   }
   return (id: string) => map[String(id)];
