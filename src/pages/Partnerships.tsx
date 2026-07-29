@@ -8,6 +8,7 @@ import {
 } from '../services/affiliateService';
 import { fetchHouses } from '../services/houseService';
 import { useToast } from '../contexts/ToastContext';
+import { houseLogoOrPreset } from '../lib/housePresets';
 import { cn } from '../lib/utils';
 
 type Tab = 'available' | 'mine';
@@ -48,7 +49,9 @@ export default function Partnerships() {
       allLinks.forEach((l) => { lmap[l.code] = l; });
       setLinks(lmap);
       const map: Record<string, string | null> = {};
-      (houses as any[]).forEach((h) => { map[String(h.id)] = h.logo ?? null; });
+      (houses as any[]).forEach((h) => {
+        map[String(h.id)] = houseLogoOrPreset(h.logo, h.slug, h.id, h.name);
+      });
       setLogos(map);
     } catch {
       push({ type: 'error', message: 'Erro ao carregar as parcerias.' });

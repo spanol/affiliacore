@@ -3,6 +3,8 @@
 // para que filtros/badges funcionem automaticamente quando a OTG liberar outras
 // marcas (ex.: SportingBet). O campo `brand` pode vir como objeto {name} ou string.
 
+import { houseLogoOrPreset } from './housePresets';
+
 export const ALL_BRANDS = '__all__';
 
 // Nome da marca de um afiliado, tolerando os vários shapes da API.
@@ -128,8 +130,13 @@ export function getBrandMeta(idOrName?: string | null): BrandMeta | null {
 }
 
 // Caminho da logo de uma casa (ou null → a UI usa o avatar de inicial).
+// Sem logo gravada, cai no ícone do preset da casa conhecida (housePresets) — é o
+// que faz as casas criadas ANTES dos presets aparecerem com ícone sem migração.
+// Resolve pelo meta (slug/nome canônico) e também pela chave crua, p/ casar mesmo
+// quando a casa não está no registro vivo.
 export function getBrandLogo(idOrName?: string | null): string | null {
-  return getBrandMeta(idOrName)?.logo ?? null;
+  const meta = getBrandMeta(idOrName);
+  return houseLogoOrPreset(meta?.logo, meta?.slug, meta?.name, idOrName);
 }
 
 // Nome CANÔNICO de uma casa conhecida (ex.: "SportingBet"), casando por qualquer

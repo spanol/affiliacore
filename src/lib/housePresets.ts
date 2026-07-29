@@ -217,8 +217,47 @@ export function buildHouseIconDataUrl(preset: HousePreset): string {
   return `data:image/svg+xml;base64,${toBase64(buildHouseIconSvg(preset))}`;
 }
 
-// Caminho do SVG estático equivalente (gerado por scripts/gen-house-icons.mjs).
+// Caminho do SVG estático equivalente (gerado por scripts/gen-house-icons.ts).
 // Serve pra prévia na grade do seletor sem inflar o bundle com 26 data URLs.
 export function housePresetIconPath(preset: HousePreset): string {
   return `/brands/presets/${preset.slug}.svg`;
+}
+
+// Chave de casamento casa↔preset: minúsculo, sem acento e sem separador. Faz
+// "Esportes da Sorte", "esportes-da-sorte" e "EsportesDaSorte" caírem na mesma
+// chave — e é o que permite casar o NOME digitado pelo admin com o slug do preset
+// ("F12.Bet" → "f12bet", "BR4BET" → "br4bet").
+const matchKey = (s?: string | null): string =>
+  String(s ?? '')
+    .normalize('NFD').replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+
+// Acha o preset de uma casa por qualquer das chaves (slug, id do doc, nome).
+export function findHousePresetFor(...keys: (string | null | undefined)[]): HousePreset | null {
+  for (const k of keys) {
+    const key = matchKey(k);
+    if (!key) continue;
+    const hit = HOUSE_PRESETS.find((p) => matchKey(p.slug) === key || matchKey(p.name) === key);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+// Logo a EXIBIR para uma casa. Precedência: a logo GRAVADA vence sempre (upload do
+// admin) → senão o ícone do preset da casa conhecida → senão null (a UI cai no
+// avatar de inicial, como era antes).
+//
+// Por que a resolução é de EXIBIÇÃO e não uma migração de dados: casas criadas antes
+// dos presets têm `logo: null` gravado, e o seletor só preenche o formulário de
+// criar/editar — ou seja, elas nunca ganhariam ícone sozinhas. Resolver aqui vale
+// retroativamente pra toda instância, sem escrita no Firestore, sem custo de Storage
+// e sem migração: no dia em que o admin subir a logo oficial, ela simplesmente vence.
+export function houseLogoOrPreset(
+  stored: string | null | undefined,
+  ...keys: (string | null | undefined)[]
+): string | null {
+  if (stored) return stored;
+  const preset = findHousePresetFor(...keys);
+  return preset ? housePresetIconPath(preset) : null;
 }

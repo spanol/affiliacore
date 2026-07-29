@@ -24,7 +24,7 @@ import { canImport, buildImportPayload } from '../lib/houseImport';
 import { parseSpreadsheetFile, downloadResultsTemplate, isExcelFile } from '../lib/xlsx';
 import { humanizeName } from '../lib/utils';
 import {
-  HOUSE_PRESETS, HousePreset, buildHouseIconDataUrl, housePresetIconPath,
+  HOUSE_PRESETS, HousePreset, buildHouseIconDataUrl, housePresetIconPath, houseLogoOrPreset,
 } from '../lib/housePresets';
 import { fetchEurBrlRate, eurToBrl, formatBrl, getCachedEurBrlQuote, EurBrlQuote } from '../lib/currency';
 import EntityAuditHistory from '../components/EntityAuditHistory';
@@ -231,13 +231,16 @@ export default function Houses() {
 }
 
 // Logo da casa: renderiza a URL direto (Storage/asset) com fallback de inicial.
+// Sem logo gravada, usa o ícone do preset da casa conhecida — casas criadas antes
+// dos presets também aparecem coloridas, sem ninguém precisar reeditá-las.
 function HouseLogo({ house, size = 40 }: { house: House; size?: number }) {
   const [failed, setFailed] = useState(false);
   const dim = { width: size, height: size } as React.CSSProperties;
-  if (house.logo && !failed) {
+  const logo = houseLogoOrPreset(house.logo, house.slug, house.id, house.name);
+  if (logo && !failed) {
     return (
       <img
-        src={house.logo}
+        src={logo}
         alt={house.name}
         style={dim}
         onError={() => setFailed(true)}

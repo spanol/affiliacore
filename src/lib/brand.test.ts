@@ -94,9 +94,20 @@ describe('registro de casas (B6 · logo + casa conhecida)', () => {
     expect(getBrandMeta(null)).toBeNull();
   });
 
-  it('getBrandLogo devolve o caminho do asset, null se desconhecida', () => {
+  it('getBrandLogo devolve o caminho do asset gravado', () => {
     expect(getBrandLogo('clsuperbet000001')).toBe('/brands/superbet.png');
-    expect(getBrandLogo('Betano')).toBeNull();
+  });
+
+  // Antes esta linha esperava null p/ 'Betano'. Mudou de propósito: casa conhecida
+  // SEM logo gravada agora cai no ícone do preset, senão as casas criadas antes dos
+  // presets nunca ganhariam ícone (era o bug relatado depois do rollout).
+  it('sem logo gravada, cai no ícone do preset da casa conhecida', () => {
+    expect(getBrandLogo('Betano')).toBe('/brands/presets/betano.svg');
+  });
+
+  it('devolve null p/ casa que não é conhecida nem tem preset', () => {
+    expect(getBrandLogo('Casa Inventada XYZ')).toBeNull();
+    expect(getBrandLogo('')).toBeNull();
   });
 
   it('toda casa-semente tem slug, name e logo', () => {

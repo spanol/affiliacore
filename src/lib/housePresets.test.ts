@@ -9,6 +9,8 @@ import {
   housePresetIconPath,
   monogramColor,
   contrastRatio,
+  findHousePresetFor,
+  houseLogoOrPreset,
 } from './housePresets';
 
 // A MESMA regex que `uploadHouseLogo` (server.ts) usa pra aceitar o upload — se o
@@ -130,6 +132,48 @@ describe('data URL do preset (caminho de upload)', () => {
     for (const p of HOUSE_PRESETS) {
       expect(buildHouseIconDataUrl(p).length, p.name).toBeLessThan(4096);
     }
+  });
+});
+
+// Resolução de EXIBIÇÃO: casas criadas antes dos presets têm `logo: null` gravado e
+// o seletor só mexe no formulário de criar/editar — sem este fallback elas nunca
+// ganhariam ícone (foi o que aconteceu no rollout).
+describe('fallback de logo por preset', () => {
+  it('casa por slug, por id do doc ou por nome', () => {
+    expect(findHousePresetFor('betano')?.name).toBe('Betano');
+    expect(findHousePresetFor('Betano')?.slug).toBe('betano');
+    expect(findHousePresetFor(null, undefined, 'bet365')?.slug).toBe('bet365');
+  });
+
+  it('ignora acento, caixa e separador ao casar nome com slug', () => {
+    // o admin digita o nome; o catálogo guarda o slug — as duas grafias têm que bater
+    expect(findHousePresetFor('Esportes da Sorte')?.slug).toBe('esportes-da-sorte');
+    expect(findHousePresetFor('esportesdasorte')?.slug).toBe('esportes-da-sorte');
+    expect(findHousePresetFor('F12.Bet')?.slug).toBe('f12bet');
+    expect(findHousePresetFor('BR4BET')?.slug).toBe('br4bet');
+    expect(findHousePresetFor('MC Games')?.slug).toBe('mcgames');
+    // "SportingBet" é o nome canônico no repo; o preset registra "Sportingbet"
+    expect(findHousePresetFor('SportingBet')?.slug).toBe('sportingbet');
+  });
+
+  it('não casa casa desconhecida', () => {
+    expect(findHousePresetFor('Casa Inventada XYZ')).toBeNull();
+    expect(findHousePresetFor('', null, undefined)).toBeNull();
+  });
+
+  // Invariante: o upload do admin é a verdade. O preset só preenche o VAZIO.
+  it('a logo gravada sempre vence o preset', () => {
+    expect(houseLogoOrPreset('https://storage/house-logos/betano-123.png', 'betano'))
+      .toBe('https://storage/house-logos/betano-123.png');
+  });
+
+  it('sem logo gravada devolve o ícone do preset', () => {
+    expect(houseLogoOrPreset(null, 'betano')).toBe('/brands/presets/betano.svg');
+    expect(houseLogoOrPreset(undefined, null, 'KTO')).toBe('/brands/presets/kto.svg');
+  });
+
+  it('sem logo e sem preset devolve null (a UI cai no avatar de inicial)', () => {
+    expect(houseLogoOrPreset(null, 'casa-inventada')).toBeNull();
   });
 });
 
