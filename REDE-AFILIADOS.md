@@ -182,3 +182,71 @@ os ganhos de quem está acima dele.
 5. **Trilha de auditoria da aresta**: `POST /api/affiliate-uplines` ainda não grava `audit_logs`. Mudar upline
    muda dinheiro — deveria ser auditado como `config.update`. É a próxima dívida óbvia.
 6. **ISS por casa** (5% / 2% / 2% no legado) — ortogonal a esta feature, segue em aberto no doc de migração.
+
+## 9. Desenho: aposentar o `special_affiliates` como estrutura paralela (2026-07-29)
+
+**Pergunta que originou:** por que um pai de rede não é simplesmente um "afiliado especial"?
+
+**Resposta curta: para DINHEIRO, já é.** `composeAdminProfit` faz
+`{...subToSpecialConfig, ...buildRootConfigMap(network, configs)}` — a árvore VENCE e o vínculo de especial
+sobra só como fallback de quem não está nela. E `uplineMapFromSpecials` já deriva arestas do modelo antigo,
+então a hierarquia de 2 níveis virou árvore **sem migração de dado**.
+
+O que `special_affiliates` ainda faz sozinho são duas coisas que não são hierarquia:
+
+| Responsabilidade | Onde vive hoje |
+|---|---|
+| **Papel/acesso** — `users/{uid}.isSpecial`, espelhado pelo servidor em 3 pontos (`PATCH /affiliates/:id`, vínculo de login, `accept-invite`). Destrava `/network`, `/network/afiliados`, `AffiliateDetails` de terceiro, o roteamento `clientHome` e a audiência `specials` dos avisos. | `server.ts:749,1015,2430` · `App.tsx:45,241` · `SpecialDashboard.tsx:227` · `noticeService.ts:79` |
+| **Escopo (barreira de IDOR)** — o conjunto que o não-admin pode ler sai de `special.subAffiliateIds`. | `src/lib/scope.ts:92` · `server.ts:674,1096,1232,2512,3515` |
+
+### O gap de privacidade que a migração FECHA
+
+As duas coleções guardam a mesma estrutura comercial com regras opostas:
+
+```
+special_affiliates  → allow read: if isSignedIn();   // qualquer logado lê a rede INTEIRA
+affiliate_uplines   → allow read, write: if isAdmin();
+```
+
+E o comentário da própria `firestore.rules` justifica o admin-only da aresta dizendo que ela "revela a
+estrutura comercial da rede inteira" — que é exatamente o que a outra porta entrega a qualquer afiliado
+logado. Isso existe porque o `SpecialDashboard` lê `specials[ownId].subAffiliateIds` **no client**. Mover a
+resolução de escopo para o servidor (que já é o padrão de todo dado sensível — ver `affiliate_configs`)
+permite fechar `special_affiliates` para admin-only.
+
+### ⚠️ A decisão que NÃO pode ser silenciosa: profundidade
+
+Hoje o especial enxerga `subAffiliateIds` = **1 nível**. Trocar isso pela subárvore da rede o faz enxergar
+**N níveis** — na Infinity, medida em 3 níveis, um pai de nível 1 passaria a ver netos que hoje não vê.
+**Isso é ampliação de visibilidade, não refactor mecânico.** Quem fizer a troca "óbvia" (`subAffiliateIds` →
+`descendantsOf`) vaza dado sem perceber. Proposta: `visibilityDepth` no registro de papel, **default 1** na
+migração (regressão-zero), com o master podendo abrir para a subárvore inteira por afiliado.
+
+### Alvo
+
+- `affiliate_uplines/{id}` = **fonte única da hierarquia** (já é, na prática).
+- `special_affiliates/{id}` deixa de guardar hierarquia e passa a guardar **só o papel**:
+  `{ active, visibilityDepth }`. `subAffiliateIds` vira DERIVADO da árvore (`descendantsOf` com o corte de
+  profundidade) e sai do documento.
+- Mantém-se o nome das coleções — o churn fica no conteúdo, não no roteamento nem nas rules existentes.
+
+### Fases (cada uma isolada e reversível)
+
+1. **Escopo pela árvore, com profundidade 1.** `resolveScopedAffiliateIds` passa a receber a subárvore
+   cortada em 1 nível em vez de `subAffiliateIds`. Saída esperada: **conjunto idêntico** para toda rede que
+   hoje é de 2 níveis. Trava: o property test de não-vazamento (`scope.property.test.ts`, R4) roda contra as
+   duas fontes e exige igualdade. É a fase de maior risco — é a barreira de IDOR.
+2. **Servidor devolve a sub-rede.** `SpecialDashboard` para de ler `special_affiliates` no client e passa a
+   consumir um endpoint escopado (espelha `GET /api/affiliate-configs`).
+3. **Fechar a rule** de `special_affiliates` para admin-only. Só é seguro depois da 2.
+4. **`visibilityDepth`** no registro + controle no `/admin`. Só aqui a visibilidade pode aumentar, por
+   escolha explícita do master.
+5. **`subAffiliateIds` sai do documento**; `uplineMapFromSpecials` vira código morto e é removido junto.
+
+### Riscos e rollback
+
+- **Fase 1 é a única que mexe em segurança.** Rollback = reverter o commit; nenhum dado muda de forma até a 5.
+- Fases 1–4 não escrevem nada em `special_affiliates`, então convivem com o dado atual — dá para parar em
+  qualquer ponto.
+- Dívida que vale resolver junto: `POST /api/affiliate-uplines` **ainda não grava `audit_logs`** (§8.5).
+  Se a aresta passa a definir também ACESSO, além de dinheiro, auditar deixa de ser opcional.
