@@ -24,7 +24,8 @@ import BrandLogo from '../components/BrandLogo';
 import { getBrandName, uniqueBrands, ALL_BRANDS, getKnownBrandName, getBrandMeta, getKnownBrands, buildBrandIdOf } from '../lib/brand';
 import { OTG_ENABLED } from '../lib/instanceClient';
 import { withKnownBrandNames } from '../lib/knownHouses';
-import { StoredManualRow, aggregateByHouse, emptyMetrics, addMetrics } from '../lib/houseResults';
+import { StoredManualRow, aggregateByHouse, aggregateByAffiliate, emptyMetrics, addMetrics } from '../lib/houseResults';
+import { buildAffiliatePerformance, indexPerformanceById } from '../lib/adminAffiliatePerformance';
 import { fetchHouses, syncKnownBrandsFrom } from '../services/houseService';
 import { fetchEurBrlRate, getCachedEurBrlRate } from '../lib/currency';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
@@ -173,14 +174,23 @@ export default function AdminDashboard() {
     return m;
   }, [affiliates]);
 
+  // Base ÚNICA das visões por afiliado (gráfico + rankings): OTG + casas MANUAIS.
+  // Antes cada uma lia só `scopedResults`, então numa instância OTG-free o gráfico
+  // ficava em "sem dados" e os rankings zerados com o headline cheio. O merge é
+  // aqui, no consumidor — NUNCA dentro de fetchAllResults, senão `totals` e
+  // `composeAdminProfit` (que já somam o manual por fora) contariam duas vezes.
+  const affiliatePerf = useMemo(
+    () => buildAffiliatePerformance(scopedResults, aggregateByAffiliate(manualScoped), nameById),
+    [scopedResults, manualScoped, nameById],
+  );
+  const perfById = useMemo(() => indexPerformanceById(affiliatePerf), [affiliatePerf]);
+
   // Rankings de afiliados (comissão da casa = total_commission, visão do master).
   // Top especiais → por comissão da REDE (própria + subs). Top subs → comissão própria,
   // com o especial a que pertencem.
   const { topSpecials, topSubs } = useMemo(() => {
-    const byId: Record<string, any> = {};
-    scopedResults.forEach((r) => { byId[String(r.affiliate_id ?? r.id ?? '')] = r; });
-    const nameOf = (id: string) => humanizeName(byId[id]?.label || byId[id]?.name || nameById[id] || `#${id}`);
-    const comm = (id: string) => Number(byId[id]?.total_commission || 0);
+    const nameOf = (id: string) => perfById[id]?.name || humanizeName(nameById[id] || `#${id}`);
+    const comm = (id: string) => perfById[id]?.commission ?? 0;
     const active = Object.values(specials).filter((s) => s.active);
 
     const topSpecials = active
@@ -204,7 +214,7 @@ export default function AdminDashboard() {
       .slice(0, 5);
 
     return { topSpecials, topSubs };
-  }, [scopedResults, specials, nameById]);
+  }, [perfById, specials, nameById]);
 
   // Totais (financeiro + funil) derivados dos results no escopo da marca + o
   // agregado das casas MANUAIS (que não estão em `results` p/ não contaminar a
@@ -384,20 +394,14 @@ export default function AdminDashboard() {
     { label: 'CPA Qualificado', value: totals.qualifiedCpa.toLocaleString('pt-BR'), icon: Target },
   ];
 
-  // Prepare data for the chart - top affiliates by commission (no escopo da marca)
-  const chartData = [...scopedResults]
-    .sort((a, b) => (b.total_commission || 0) - (a.total_commission || 0))
-    .map(item => {
-      // A API externa nomeia o afiliado em `label` (e o id em `id`); sem isso as
-      // barras do gráfico ficavam rotuladas "---".
-      const label = humanizeName(String(item.affiliate_name || item.name || item.label || item.affiliate_id || item.id || '---'));
-      return {
-        name: label,
-        Comissão: item.total_commission || 0,
-        CPA: item.cpa || 0,
-        REV: item.rvs || 0,
-      };
-    });
+  // Barras do gráfico — já vêm mescladas (OTG + manual) e ordenadas por comissão
+  // de `affiliatePerf`; aqui só renomeamos p/ as chaves que o recharts plota.
+  const chartData = affiliatePerf.map((r) => ({
+    name: r.name,
+    Comissão: r.commission,
+    CPA: r.cpa,
+    REV: r.rev,
+  }));
 
   return (
     <div className="space-y-8 pb-20">
