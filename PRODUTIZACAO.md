@@ -501,6 +501,42 @@ dark:bg-brand`, lógica invertida — mapear mudaria pixel da Boost) e `Terms.ts
 ⚠️ **Operador:** BUILD como as demais — a Infinity só fica roxa no **próximo
 rollout**.
 
+## 🌗 LP theme-aware + toggle público (2026-07-28)
+
+A landing nasceu dark-only (herança do scaffold do designer): ~93 classes
+escuras hardcoded, ignorando o `ThemeContext` que já envolvia o app inteiro.
+Agora ela **segue o mesmo tema do app** — preferência salva > `VITE_BRAND_THEME`
+> SO, sem exceção — e tem o toggle na nav.
+
+- **`ThemeToggle`** (`src/components/ThemeToggle.tsx`) foi EXTRAÍDO do
+  `DashboardLayout` (era inline) e é usado nos dois lugares: o pedido foi "o
+  mesmo switch da dashboard", então tem que ser o mesmo componente, não uma
+  cópia que diverge depois. `compact` esconde o rótulo (nav da LP).
+- **Convenção do par claro/escuro** (a mesma de `Login`/`DashboardLayout`):
+  superfície `slate-50`/branco ↔ `neutral-950`/`900`; texto
+  `slate-900`/`600`/`400` ↔ `white`/`neutral-400`/`500`; borda `slate-200` ↔
+  `neutral-800`; CTA `--color-auth-*` ↔ `--color-lp-*`.
+- **3 tokens novos** só para o claro da LP: `--color-lp-icon-light`,
+  `--color-lp-glow-light`, `--color-lp-halo-light` (um glow branco sobre
+  `slate-50` seria invisível). No claro os detalhes saem de degraus mais
+  ESCUROS da ramp (600, não 400) e os alphas são menores — fundo claro não
+  absorve a cor como o preto. O CTA claro reusa `--color-auth-*`, então **LP
+  clara e login claro mostram o mesmo botão**.
+- `.glow-white`/`.bg-grid-white` viraram `.glow-lp`/`.bg-grid-lp` e trocam de
+  tinta por `.dark` (CSS cru — `@variant dark` só vale em classe gerada).
+- **`HeroDashboardMock` deixou de ser dark-only**: no claro reproduz o `/admin`
+  claro, então o hero mostra de verdade o que o afiliado vai ver.
+- O logo da marca é claro (feito p/ fundo escuro): no claro leva `invert`, o
+  mesmo tratamento que o card de Login já usava.
+- **`src/test/setup.ts` ganhou stub de `window.matchMedia`** (guardado por
+  `typeof window`, porque o setup roda também nos testes `environment: node`).
+  Sem ele NENHUM teste conseguia renderizar o `ThemeProvider`.
+
+⚠️ **Operador:** como a LP passou a seguir o SO, visitante com SO claro vê a
+landing CLARA. Foi decisão consciente (consistência com o app); se algum cliente
+quiser a porta de entrada sempre escura, o caminho é `VITE_BRAND_THEME=dark` no
+yaml da instância.
+
 ## 💰 Modelo de preço vigente (v2 — no ar desde 2026-07-25)
 
 Substitui a precificação de referência do topo do doc (setup R$ 3–8 mil +

@@ -22,8 +22,24 @@ import { useToast } from '../contexts/ToastContext';
 import { BRAND } from '../lib/brandingClient';
 import HeroDashboardMock from '../components/HeroDashboardMock';
 import HomePrizesSection from '../components/HomePrizesSection';
+import ThemeToggle from '../components/ThemeToggle';
 
+// P5.6 — a LP virou theme-aware: nasceu dark-only e agora segue o MESMO
+// ThemeContext do app (preferência salva > VITE_BRAND_THEME > SO), com o toggle
+// na nav. Convenções do par claro/escuro, iguais às do Login/DashboardLayout:
+//   superfície  slate-50/branco   ← → neutral-950/900
+//   texto       slate-900/600/400 ← → white/neutral-400/500
+//   borda       slate-200         ← → neutral-800
+//   CTA         --color-auth-*    ← → --color-lp-*   (os dois seguem o accent)
+// O logo da marca é claro (feito p/ fundo escuro), então no claro leva `invert`
+// — mesmo tratamento do card de Login.
 const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`;
+
+// Classe do CTA sólido da LP. Claro = o MESMO botão do card de auth; escuro = o
+// branco (ou accent) da landing. Centralizada porque se repete em 5 pontos e
+// divergir um deles é exatamente o bug que a Infinity reclamou.
+const ctaClass =
+  'bg-auth-cta text-auth-cta-text hover:bg-auth-cta-hover dark:bg-lp-cta dark:text-lp-cta-text dark:hover:bg-lp-cta-hover';
 
 // Casas de apostas parceiras (logos em /public/boost-home/partners).
 // `size` é a altura por logo (Tailwind) — BetMGM e Lottu têm mais margem dentro
@@ -79,42 +95,46 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-400 font-sans selection:bg-white selection:text-neutral-950">
+    <div className="min-h-screen bg-slate-50 text-slate-600 dark:bg-neutral-950 dark:text-neutral-400 font-sans selection:bg-slate-900 selection:text-white dark:selection:bg-white dark:selection:text-neutral-950 transition-colors duration-300">
       {/* Dynamic background */}
-      <div className="fixed inset-0 z-0 pointer-events-none bg-grid-white opacity-[0.03]" />
-      <div className="fixed top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-lp-glow blur-[120px] pointer-events-none" />
-      <div className="fixed bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-lp-glow blur-[120px] pointer-events-none" />
+      <div className="fixed inset-0 z-0 pointer-events-none bg-grid-lp opacity-[0.03]" />
+      <div className="fixed top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-lp-glow-light dark:bg-lp-glow blur-[120px] pointer-events-none" />
+      <div className="fixed bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-lp-glow-light dark:bg-lp-glow blur-[120px] pointer-events-none" />
 
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-glass-chrome-dark backdrop-blur-glass-medium border-b border-neutral-800/50">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-glass-chrome dark:bg-glass-chrome-dark backdrop-blur-glass-medium border-b border-slate-200 dark:border-neutral-800/50">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <img src={BRAND.logoUrl} alt={BRAND.shortName} className="h-6 w-auto" />
+            <img src={BRAND.logoUrl} alt={BRAND.shortName} className="h-6 w-auto invert dark:invert-0" />
           </Link>
 
           <div className="hidden md:flex items-center gap-4">
+            <ThemeToggle compact />
             <Link
               to="/login"
-              className="text-sm font-medium text-white hover:opacity-80 transition-opacity px-4 py-2"
+              className="text-sm font-medium text-slate-900 dark:text-white hover:opacity-80 transition-opacity px-4 py-2"
             >
               Entrar
             </Link>
             <Link
               to="/register"
-              className="px-6 py-2.5 rounded-full bg-lp-cta text-lp-cta-text font-bold text-sm hover:bg-lp-cta-hover transition-colors"
+              className={cn('px-6 py-2.5 rounded-full font-bold text-sm transition-colors', ctaClass)}
             >
               Cadastrar
             </Link>
           </div>
 
-          <button
-            type="button"
-            className="md:hidden p-2 text-neutral-400 hover:text-white"
-            aria-label="Abrir menu"
-            onClick={() => setIsMobileMenuOpen((open) => !open)}
-          >
-            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+          <div className="flex items-center gap-2 md:hidden">
+            <ThemeToggle compact />
+            <button
+              type="button"
+              className="p-2 text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white"
+              aria-label="Abrir menu"
+              onClick={() => setIsMobileMenuOpen((open) => !open)}
+            >
+              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
         </div>
 
         <AnimatePresence>
@@ -123,19 +143,19 @@ export default function Home() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="md:hidden bg-neutral-900 border-b border-neutral-800 overflow-hidden"
+              className="md:hidden bg-white dark:bg-neutral-900 border-b border-slate-200 dark:border-neutral-800 overflow-hidden"
             >
               <div className="p-6 flex flex-col gap-4">
                 <Link
                   to="/login"
-                  className="text-base font-medium py-3 border-b border-neutral-800 text-left text-white"
+                  className="text-base font-medium py-3 border-b border-slate-200 dark:border-neutral-800 text-left text-slate-900 dark:text-white"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Entrar
                 </Link>
                 <Link
                   to="/register"
-                  className="mt-2 px-5 py-3 rounded-xl bg-lp-cta text-lp-cta-text text-center font-bold"
+                  className={cn('mt-2 px-5 py-3 rounded-xl text-center font-bold', ctaClass)}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Cadastrar
@@ -156,16 +176,17 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-5xl md:text-7xl font-bold tracking-tighter text-white max-w-4xl leading-[1.1]"
+            className="text-5xl md:text-7xl font-bold tracking-tighter text-slate-900 dark:text-white max-w-4xl leading-[1.1]"
           >
-            Escala inteligente <span className="text-neutral-400">para Afiliados</span>
+            Escala inteligente{' '}
+            <span className="text-slate-400 dark:text-neutral-400">para Afiliados</span>
           </motion.h1>
 
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="mt-6 text-lg md:text-xl text-neutral-400 max-w-2xl leading-relaxed"
+            className="mt-6 text-lg md:text-xl text-slate-600 dark:text-neutral-400 max-w-2xl leading-relaxed"
           >
             Conecte-se a um ecossistema com dados, tecnologia e ferramentas que escalam sua
             operação de verdade.
@@ -179,7 +200,10 @@ export default function Home() {
           >
             <Link
               to="/register"
-              className="px-8 py-4 rounded-full bg-lp-cta text-lp-cta-text font-semibold hover:bg-lp-cta-hover transition-colors flex items-center justify-center gap-2 shadow-xl shadow-lp-cta/10 group"
+              className={cn(
+                'px-8 py-4 rounded-full font-semibold transition-colors flex items-center justify-center gap-2 shadow-xl shadow-auth-cta/20 dark:shadow-lp-cta/10 group',
+                ctaClass,
+              )}
             >
               Quero ser um Afiliado
               <MoveRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -195,9 +219,9 @@ export default function Home() {
             transition={{ duration: 0.8, delay: 0.5 }}
             className="mt-24 w-full relative"
           >
-            <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-transparent to-transparent z-10 pointer-events-none" />
-            <div className="rounded-2xl md:rounded-[2rem] border border-neutral-800/60 bg-glass-frame-dark p-2 md:p-3 backdrop-blur-glass-strong shadow-2xl relative overflow-hidden glow-lp">
-              <div className="rounded-xl overflow-hidden border border-neutral-700/50 bg-neutral-950">
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-50 dark:from-neutral-950 via-transparent to-transparent z-10 pointer-events-none" />
+            <div className="rounded-2xl md:rounded-[2rem] border border-slate-200 dark:border-neutral-800/60 bg-white/70 dark:bg-glass-frame-dark p-2 md:p-3 backdrop-blur-glass-strong shadow-2xl relative overflow-hidden glow-lp">
+              <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-neutral-700/50 bg-white dark:bg-neutral-950">
                 <HeroDashboardMock />
               </div>
             </div>
@@ -205,29 +229,29 @@ export default function Home() {
         </section>
 
         {/* Stats */}
-        <section className="max-w-7xl mx-auto px-6 py-24 border-b border-neutral-800/50">
+        <section className="max-w-7xl mx-auto px-6 py-24 border-b border-slate-200 dark:border-neutral-800/50">
           <div className="w-full max-w-[1300px] mx-auto mb-16 text-center">
-            <h3 className="text-2xl md:text-3xl font-bold text-white mb-3 flex items-center justify-center">
+            <h3 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white mb-3 flex items-center justify-center">
               Para Afiliados
             </h3>
-            <p className="text-lg text-neutral-400">
+            <p className="text-lg text-slate-600 dark:text-neutral-400">
               que querem escalar com controle, margem e velocidade.
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-            <StatCard icon={<Users className="w-6 h-6 text-lp-icon" />} value="+12.000" label="Afiliados" />
+            <StatCard icon={<Users className={statIconClass} />} value="+12.000" label="Afiliados" />
             <StatCard
-              icon={<MonitorPlay className="w-6 h-6 text-lp-icon" />}
+              icon={<MonitorPlay className={statIconClass} />}
               value="+200k/mês"
               label="Usuários Cadastrados"
             />
             <StatCard
-              icon={<ArrowRightLeft className="w-6 h-6 text-lp-icon" />}
+              icon={<ArrowRightLeft className={statIconClass} />}
               value="+120k/mês"
               label="FTDs"
             />
             <StatCard
-              icon={<Target className="w-6 h-6 text-lp-icon" />}
+              icon={<Target className={statIconClass} />}
               value="+100k/mês"
               label="CPAs Qualificados"
             />
@@ -241,9 +265,10 @@ export default function Home() {
         <section id="sobre" className="max-w-7xl mx-auto px-6 py-24 md:py-32">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
-              Afiliados de alta performance <span className="text-neutral-500">estão migrando</span>
+              Afiliados de alta performance{' '}
+              <span className="text-slate-400 dark:text-neutral-500">estão migrando</span>
             </h2>
-            <p className="text-neutral-400 text-lg max-w-2xl mx-auto">
+            <p className="text-slate-600 dark:text-neutral-400 text-lg max-w-2xl mx-auto">
               Operações amadoras perdem dinheiro com ferramentas genéricas. A {BRAND.shortName} foi construída
               para quem busca controle absoluto.
             </p>
@@ -252,7 +277,7 @@ export default function Home() {
           <div className="grid md:grid-cols-2 gap-12 lg:gap-24 items-center">
             {/* Generic tools */}
             <div className="space-y-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-white/5 border border-white/10 text-neutral-400 text-sm font-semibold uppercase tracking-wider mb-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-slate-900/5 dark:bg-white/5 border border-slate-900/10 dark:border-white/10 text-slate-500 dark:text-neutral-400 text-sm font-semibold uppercase tracking-wider mb-2">
                 Ferramentas Genéricas
               </div>
               <ul className="space-y-6">
@@ -262,9 +287,9 @@ export default function Home() {
                   'Decisões lentas por falta de visibilidade',
                   'Dependência de plataformas de terceiros',
                 ].map((item) => (
-                  <li key={item} className="flex items-start gap-4 text-neutral-500">
-                    <div className="w-6 h-6 rounded-full bg-neutral-900 flex items-center justify-center shrink-0 mt-0.5 border border-neutral-800">
-                      <X className="w-4 h-4 text-neutral-500" />
+                  <li key={item} className="flex items-start gap-4 text-slate-400 dark:text-neutral-500">
+                    <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-neutral-900 flex items-center justify-center shrink-0 mt-0.5 border border-slate-200 dark:border-neutral-800">
+                      <X className="w-4 h-4 text-slate-400 dark:text-neutral-500" />
                     </div>
                     <span className="text-lg">{item}</span>
                   </li>
@@ -272,11 +297,11 @@ export default function Home() {
               </ul>
             </div>
 
-            {/* Boost standard */}
-            <div className="bg-neutral-900 rounded-3xl p-8 lg:p-12 border border-neutral-800 shadow-2xl relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-white/10 transition-colors duration-500" />
+            {/* Padrão da instância */}
+            <div className="bg-white dark:bg-neutral-900 rounded-3xl p-8 lg:p-12 border border-slate-200 dark:border-neutral-800 shadow-2xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-slate-900/5 dark:bg-white/5 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-slate-900/10 dark:group-hover:bg-white/10 transition-colors duration-500" />
 
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-white/5 border border-white/10 text-neutral-200 text-sm font-semibold uppercase tracking-wider mb-8 relative">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-slate-900/5 dark:bg-white/5 border border-slate-900/10 dark:border-white/10 text-slate-700 dark:text-neutral-200 text-sm font-semibold uppercase tracking-wider mb-8 relative">
                 O Padrão {BRAND.shortName}
               </div>
 
@@ -295,12 +320,12 @@ export default function Home() {
                   { title: 'Account Manager', desc: 'Suporte 24h para apoio estratégico e eficaz.' },
                 ].map((item) => (
                   <li key={item.title} className="flex items-start gap-4">
-                    <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center shrink-0 mt-0.5 border border-white/10 text-white">
+                    <div className="w-8 h-8 rounded-full bg-slate-900/5 dark:bg-white/5 flex items-center justify-center shrink-0 mt-0.5 border border-slate-900/10 dark:border-white/10 text-slate-900 dark:text-white">
                       <ChevronRight className="w-4 h-4" />
                     </div>
                     <div>
-                      <h4 className="text-lg font-semibold text-white">{item.title}</h4>
-                      <p className="text-neutral-400 mt-1">{item.desc}</p>
+                      <h4 className="text-lg font-semibold text-slate-900 dark:text-white">{item.title}</h4>
+                      <p className="text-slate-600 dark:text-neutral-400 mt-1">{item.desc}</p>
                     </div>
                   </li>
                 ))}
@@ -312,15 +337,15 @@ export default function Home() {
         {/* Core features */}
         <section
           id="funcionalidades"
-          className="py-24 md:py-32 bg-neutral-900/50 border-y border-neutral-800/50"
+          className="py-24 md:py-32 bg-white/60 dark:bg-neutral-900/50 border-y border-slate-200 dark:border-neutral-800/50"
         >
           <div className="max-w-7xl mx-auto px-6">
             <div className="max-w-3xl mb-16">
               <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-6">
                 A {BRAND.shortName} centraliza seus dados e{' '}
-                <span className="text-neutral-500">entrega inteligência</span>
+                <span className="text-slate-400 dark:text-neutral-500">entrega inteligência</span>
               </h2>
-              <p className="text-xl text-neutral-400 leading-relaxed">
+              <p className="text-xl text-slate-600 dark:text-neutral-400 leading-relaxed">
                 Decisões que realmente impactam o seu resultado só acontecem com as ferramentas
                 certas na mão.
               </p>
@@ -328,28 +353,28 @@ export default function Home() {
 
             <div className="grid md:grid-cols-2 gap-6 lg:gap-8">
               {/* <FeatureCard
-                icon={<Lock className="w-5 h-5 text-neutral-400" />}
+                icon={<Lock className={featureIconClass} />}
                 title="Autenticação e Controle de Acesso"
                 desc="Segurança avançada com acessos granulares e personalizados."
                 image={asset('boost-home/feature-1.webp')}
                 delay={0.1}
               />
               <FeatureCard
-                icon={<Users className="w-5 h-5 text-neutral-400" />}
+                icon={<Users className={featureIconClass} />}
                 title="Gestão de Usuários"
                 desc="Controle total sobre parceiros, sub-afiliados e equipes."
                 image={asset('boost-home/feature-2.webp')}
                 delay={0.2}
               />
               <FeatureCard
-                icon={<BarChart3 className="w-5 h-5 text-neutral-400" />}
+                icon={<BarChart3 className={featureIconClass} />}
                 title="Dashboards Otimizados"
                 desc="Dados precisos na palma da sua mão, em tempo real, para leitura rápida."
                 image={asset('boost-home/feature-3.webp')}
                 delay={0.3}
               />
               <FeatureCard
-                icon={<ShieldCheck className="w-5 h-5 text-neutral-400" />}
+                icon={<ShieldCheck className={featureIconClass} />}
                 title="Modo Administrativo Contextual"
                 desc="Gestão estratégica focada nos fluxos críticos do iGaming."
                 image={asset('boost-home/feature-4.png')}
@@ -364,24 +389,27 @@ export default function Home() {
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight leading-tight mb-6">
             Escala real para afiliados de performance.
             <br className="hidden md:block" />
-            <span className="text-neutral-500">
+            <span className="text-slate-400 dark:text-neutral-500">
               Mais controle, mais clareza e decisões mais rápidas para transformar dados em
               crescimento.
             </span>
           </h2>
 
-          <div className="mt-12 p-8 md:p-12 rounded-3xl bg-gradient-to-br from-neutral-900 to-neutral-900/50 border border-neutral-800 shadow-xl flex flex-col md:flex-row items-center justify-between gap-8 text-left">
+          <div className="mt-12 p-8 md:p-12 rounded-3xl bg-gradient-to-br from-white to-white/50 dark:from-neutral-900 dark:to-neutral-900/50 border border-slate-200 dark:border-neutral-800 shadow-xl flex flex-col md:flex-row items-center justify-between gap-8 text-left">
             <div>
-              <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center mb-6">
-                <Target className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 bg-slate-900/5 dark:bg-white/5 rounded-xl flex items-center justify-center mb-6">
+                <Target className="w-6 h-6 text-slate-900 dark:text-white" />
               </div>
-              <h3 className="text-2xl font-bold text-white mb-2">Opera com volume significativo?</h3>
-              <p className="text-neutral-400">Busca controle, estabilidade e transparência.</p>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Opera com volume significativo?</h3>
+              <p className="text-slate-600 dark:text-neutral-400">Busca controle, estabilidade e transparência.</p>
             </div>
 
           <Link
               to="/register"
-              className="shrink-0 w-full md:w-auto px-8 py-4 rounded-xl bg-lp-cta text-lp-cta-text font-bold text-lg text-center hover:bg-lp-cta-hover transition-transform active:scale-95"
+              className={cn(
+                'shrink-0 w-full md:w-auto px-8 py-4 rounded-xl font-bold text-lg text-center transition-transform active:scale-95',
+                ctaClass,
+              )}
             >
               Aplicar para Parceria
             </Link>
@@ -391,41 +419,41 @@ export default function Home() {
         {/* Application form */}
         {/* <section
           id="contato"
-          className="max-w-7xl mx-auto px-6 pt-16 pb-24 border-t border-neutral-800/50"
+          className="max-w-7xl mx-auto px-6 pt-16 pb-24 border-t border-slate-200 dark:border-neutral-800/50"
         >
           <div className="grid lg:grid-cols-2 gap-16 lg:gap-24">
             <div>
               <img
                 src={BRAND.logoUrl}
                 alt={BRAND.shortName}
-                className="h-9 w-auto mb-8"
+                className="h-9 w-auto mb-8 invert dark:invert-0"
               />
               <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-6">
                 Seja agora um
                 <br />
-                <span className="text-white">Afiliado {BRAND.shortName}</span>
+                <span className="text-slate-900 dark:text-white">Afiliado {BRAND.shortName}</span>
               </h2>
-              <p className="text-lg text-neutral-400 mb-8 max-w-md">
+              <p className="text-lg text-slate-600 dark:text-neutral-400 mb-8 max-w-md">
                 Nosso time analisará o seu perfil. Preencha os dados abaixo e entraremos em contato
                 se houver fit.
               </p>
             </div>
 
-            <div className="bg-glass-frame-dark rounded-3xl border border-neutral-800 p-8 pt-10 relative overflow-hidden backdrop-blur-glass-soft">
+            <div className="bg-white dark:bg-glass-frame-dark rounded-3xl border border-slate-200 dark:border-neutral-800 p-8 pt-10 relative overflow-hidden backdrop-blur-glass-soft">
               {status === 'success' ? (
                 <div className="flex flex-col items-center justify-center text-center min-h-[420px] gap-5">
-                  <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
-                    <CheckCircle2 className="w-8 h-8 text-white" />
+                  <div className="w-16 h-16 rounded-2xl bg-slate-900/5 dark:bg-white/5 border border-slate-900/10 dark:border-white/10 flex items-center justify-center">
+                    <CheckCircle2 className="w-8 h-8 text-slate-900 dark:text-white" />
                   </div>
-                  <h3 className="text-2xl font-bold text-white">Aplicação enviada!</h3>
-                  <p className="text-neutral-400 max-w-sm">
+                  <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Aplicação enviada!</h3>
+                  <p className="text-slate-600 dark:text-neutral-400 max-w-sm">
                     Recebemos os seus dados. Nosso time vai analisar o seu perfil e entrar em
                     contato se houver fit.
                   </p>
                   <button
                     type="button"
                     onClick={() => setStatus('idle')}
-                    className="mt-2 text-sm font-medium text-white hover:opacity-80 transition-opacity"
+                    className="mt-2 text-sm font-medium text-slate-900 dark:text-white hover:opacity-80 transition-opacity"
                   >
                     Enviar outra aplicação
                   </button>
@@ -501,7 +529,7 @@ export default function Home() {
                   </Field>
 
                   {status === 'error' && (
-                    <p className="text-sm font-medium text-red-400">
+                    <p className="text-sm font-medium text-red-600 dark:text-red-400">
                       Não foi possível enviar a sua aplicação. Tente novamente.
                     </p>
                   )}
@@ -509,7 +537,10 @@ export default function Home() {
                   <button
                     type="submit"
                     disabled={status === 'submitting'}
-                    className="w-full px-8 py-4 rounded-xl bg-lp-cta text-lp-cta-text font-bold text-lg hover:bg-lp-cta-hover transition-colors flex justify-center items-center gap-2 mt-4 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className={cn(
+                      'w-full px-8 py-4 rounded-xl font-bold text-lg transition-colors flex justify-center items-center gap-2 mt-4 disabled:opacity-60 disabled:cursor-not-allowed',
+                      ctaClass,
+                    )}
                   >
                     {status === 'submitting' ? (
                       <>
@@ -527,9 +558,9 @@ export default function Home() {
         </section> */}
 
         {/* Casas de apostas parceiras */}
-        {/* <section className="max-w-7xl mx-auto px-6 py-24 border-t border-neutral-800/50">
+        {/* <section className="max-w-7xl mx-auto px-6 py-24 border-t border-slate-200 dark:border-neutral-800/50">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-white">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
               Casas de apostas parceiras
             </h2>
           </div>
@@ -556,20 +587,20 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-neutral-800/50 bg-neutral-900/30">
+      <footer className="relative z-10 border-t border-slate-200 dark:border-neutral-800/50 bg-white/50 dark:bg-neutral-900/30">
         <div className="max-w-7xl mx-auto px-6 py-12 flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-3">
-            <img src={BRAND.logoUrl} alt={BRAND.shortName} className="h-6 w-auto opacity-80" />
-            <span className="font-display font-medium text-sm text-neutral-500">
+            <img src={BRAND.logoUrl} alt={BRAND.shortName} className="h-6 w-auto opacity-80 invert dark:invert-0" />
+            <span className="font-display font-medium text-sm text-slate-400 dark:text-neutral-500">
               &copy; {new Date().getFullYear()} {BRAND.shortName}
             </span>
           </div>
 
-          <div className="flex gap-6 text-sm text-neutral-500">
-            <Link to="/login" className="hover:text-white transition-colors">
+          <div className="flex gap-6 text-sm text-slate-400 dark:text-neutral-500">
+            <Link to="/login" className="hover:text-slate-900 dark:hover:text-white transition-colors">
               Entrar
             </Link>
-            <Link to="/register" className="hover:text-white transition-colors">
+            <Link to="/register" className="hover:text-slate-900 dark:hover:text-white transition-colors">
               Cadastrar
             </Link>
           </div>
@@ -580,12 +611,15 @@ export default function Home() {
 }
 
 const inputClass =
-  'w-full px-4 py-3 rounded-xl bg-neutral-950/50 border border-neutral-800 focus:border-lp-focus focus:ring-1 focus:ring-lp-focus outline-none transition-all text-white placeholder:text-neutral-600';
+  'w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-neutral-950/50 border border-slate-200 dark:border-neutral-800 focus:border-auth-cta dark:focus:border-lp-focus focus:ring-1 focus:ring-auth-cta dark:focus:ring-lp-focus outline-none transition-all text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-neutral-600';
+
+const statIconClass = 'w-6 h-6 text-lp-icon-light dark:text-lp-icon';
+const featureIconClass = 'w-5 h-5 text-lp-icon-light dark:text-lp-icon';
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium text-neutral-300">{label}</label>
+      <label className="text-sm font-medium text-slate-700 dark:text-neutral-300">{label}</label>
       {children}
     </div>
   );
@@ -597,14 +631,14 @@ function StatCard({ icon, value, label }: { icon: ReactNode; value: string; labe
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      className="flex flex-col gap-3 p-6 rounded-2xl bg-neutral-900/50 border border-neutral-800/50 group hover:border-neutral-700 hover:bg-neutral-800/50 transition-all"
+      className="flex flex-col gap-3 p-6 rounded-2xl bg-white dark:bg-neutral-900/50 border border-slate-200 dark:border-neutral-800/50 group hover:border-slate-300 dark:hover:border-neutral-700 hover:bg-slate-50 dark:hover:bg-neutral-800/50 transition-all"
     >
-      <div className="w-12 h-12 rounded-xl bg-neutral-800/50 flex items-center justify-center border border-neutral-700/50 group-hover:scale-110 transition-transform">
+      <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-neutral-800/50 flex items-center justify-center border border-slate-200 dark:border-neutral-700/50 group-hover:scale-110 transition-transform">
         {icon}
       </div>
       <div>
-        <div className="text-3xl font-display font-bold text-white mb-1">{value}</div>
-        <div className="text-sm text-neutral-400 font-medium">{label}</div>
+        <div className="text-3xl font-display font-bold text-slate-900 dark:text-white mb-1">{value}</div>
+        <div className="text-sm text-slate-600 dark:text-neutral-400 font-medium">{label}</div>
       </div>
     </motion.div>
   );
@@ -629,17 +663,17 @@ function FeatureCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ delay }}
-      className="rounded-3xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-colors flex flex-col h-full group overflow-hidden"
+      className="rounded-3xl bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 hover:border-slate-300 dark:hover:border-neutral-700 transition-colors flex flex-col h-full group overflow-hidden"
     >
       <div className="p-8 pb-6">
-        <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-6 group-hover:bg-white/10 transition-colors border border-white/5">
+        <div className="w-12 h-12 rounded-xl bg-slate-900/5 dark:bg-white/5 flex items-center justify-center mb-6 group-hover:bg-slate-900/10 dark:group-hover:bg-white/10 transition-colors border border-slate-900/5 dark:border-white/5">
           {icon}
         </div>
-        <h3 className="text-xl font-bold text-white mb-3">{title}</h3>
-        <p className="text-neutral-400 leading-relaxed">{desc}</p>
+        <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">{title}</h3>
+        <p className="text-slate-600 dark:text-neutral-400 leading-relaxed">{desc}</p>
       </div>
       <div className="mt-auto px-8">
-        <div className="rounded-t-xl border-x border-t border-neutral-800/60 bg-neutral-950/40 overflow-hidden">
+        <div className="rounded-t-xl border-x border-t border-slate-200 dark:border-neutral-800/60 bg-slate-50 dark:bg-neutral-950/40 overflow-hidden">
           <img
             src={image}
             alt={title}

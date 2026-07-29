@@ -17,6 +17,26 @@ class IntersectionObserverStub {
 }
 (globalThis as any).IntersectionObserver ??= IntersectionObserverStub;
 
+// jsdom também não implementa matchMedia, que o ThemeProvider consulta p/ o
+// `prefers-color-scheme` (fallback de quem não tem tema salvo nem
+// VITE_BRAND_THEME). Sem este stub NENHUM teste consegue renderizar o
+// ThemeProvider. Responde sempre "não prefere escuro": determinístico, e quem
+// precisar do outro caminho seta `localStorage.theme` no próprio teste.
+// O guard é obrigatório: este setup roda TAMBÉM nos testes com
+// `// @vitest-environment node` (server.ts, instanceTheming), onde não há window.
+if (typeof window !== 'undefined') {
+  window.matchMedia ??= ((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener() {},
+    removeListener() {},
+    addEventListener() {},
+    removeEventListener() {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
 afterEach(() => {
   cleanup();
 });

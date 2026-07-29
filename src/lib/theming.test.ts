@@ -189,6 +189,9 @@ describe('tokens das superfícies públicas (--color-lp-* / --color-auth-*)', ()
     '--color-lp-focus',
     '--color-lp-glow',
     '--color-lp-halo',
+    '--color-lp-icon-light',
+    '--color-lp-glow-light',
+    '--color-lp-halo-light',
   ];
   const AUTH_VARS = ['--color-auth-cta', '--color-auth-cta-text', '--color-auth-cta-hover'];
   const publicVarsOf = (vars: Record<string, string>) =>
@@ -245,12 +248,30 @@ describe('tokens das superfícies públicas (--color-lp-* / --color-auth-*)', ()
       .toBeLessThan(lightnessOf(cssVars['--color-auth-cta']));
   });
 
-  it('glow e halo saem translúcidos (são blobs/box-shadow, não fills)', () => {
+  it('glow e halo saem translúcidos nos dois temas (são blobs/box-shadow, não fills)', () => {
     const { cssVars } = resolveThemeTokens({ VITE_BRAND_ACCENT: '#8332B9' });
-    for (const name of ['--color-lp-glow', '--color-lp-halo']) {
+    const alphaOf = (hsl: string) => {
       // hsl(H S% L% / A) — sem o alpha o blob viraria um disco chapado no fundo.
-      expect(cssVars[name], name).toMatch(/^hsl\([\d.]+ [\d.]+% [\d.]+% \/ 0\.\d+\)$/);
+      const m = /^hsl\([\d.]+ [\d.]+% [\d.]+% \/ (0\.\d+)\)$/.exec(hsl);
+      if (!m) throw new Error(`sem alpha: ${hsl}`);
+      return parseFloat(m[1]);
+    };
+    for (const name of ['--color-lp-glow', '--color-lp-halo', '--color-lp-glow-light', '--color-lp-halo-light']) {
+      expect(() => alphaOf(cssVars[name]), name).not.toThrow();
     }
+    // Sobre fundo claro o mesmo tom "pesa" mais: o par claro tem que ser mais
+    // transparente que o escuro, senão vira mancha na LP clara.
+    expect(alphaOf(cssVars['--color-lp-glow-light']))
+      .toBeLessThan(alphaOf(cssVars['--color-lp-glow']));
+    expect(alphaOf(cssVars['--color-lp-halo-light']))
+      .toBeLessThan(alphaOf(cssVars['--color-lp-halo']));
+  });
+
+  it('no CLARO os detalhes usam degraus mais ESCUROS da ramp (contraste sobre slate-50)', () => {
+    const { cssVars } = resolveThemeTokens({ VITE_BRAND_ACCENT: '#8332B9' });
+    // o ícone do tema escuro é o accent-400 (claro); o do tema claro, o 600.
+    expect(lightnessOf(cssVars['--color-lp-icon-light']))
+      .toBeLessThan(lightnessOf(cssVars['--color-lp-icon']));
   });
 });
 

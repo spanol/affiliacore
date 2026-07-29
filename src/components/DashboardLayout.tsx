@@ -11,9 +11,7 @@ import {
   Settings, 
   LogOut, 
   Menu, 
-  X, 
-  Sun,
-  Moon,
+  X,
   Users,
   Crown,
   Network as NetworkIcon,
@@ -33,13 +31,14 @@ import { OTG_ENABLED, MARKETPLACE_ENABLED } from '../lib/instanceClient';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from '../contexts/ThemeContext';
 import NotificationBell from './NotificationBell';
+import ThemeToggle from './ThemeToggle';
 import DirectMessagePopup from './DirectMessagePopup';
 import { LOCAL_VERSION, LOCAL_COMMIT } from '../lib/version';
 import { BRAND } from '../lib/brandingClient';
 
 export default function DashboardLayout() {
   const { profile } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -287,23 +286,7 @@ export default function DashboardLayout() {
           </h2>
           <div className="flex items-center gap-4">
             <NotificationBell />
-            <button
-              onClick={toggleTheme}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-neutral-300 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white border border-transparent dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 transition-all shadow-sm"
-              title={theme === 'light' ? 'Mudar para tema escuro' : 'Mudar para tema claro'}
-            >
-              {theme === 'light' ? (
-                <>
-                  <Moon size={14} className="text-slate-600 dark:text-neutral-400" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">Tema Escuro</span>
-                </>
-              ) : (
-                <>
-                  <Sun size={14} className="text-amber-500" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">Tema Claro</span>
-                </>
-              )}
-            </button>
+            <ThemeToggle />
             <button
               onClick={() => setIsMobileMenuOpen(true)}
               className="lg:hidden p-2 text-slate-500 dark:text-neutral-400 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg"

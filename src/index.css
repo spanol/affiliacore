@@ -64,6 +64,14 @@
   --color-lp-glow: rgb(255 255 255 / 0.05); /* blobs desfocados do fundo */
   --color-lp-halo: rgb(255 255 255 / 0.2); /* box-shadow do frame do hero */
 
+  /* Metade CLARA da LP (P5.6: a landing virou theme-aware). O CTA claro reusa
+     os --color-auth-* abaixo — LP e login mostram o MESMO botão no claro — e
+     aqui ficam só os detalhes exclusivos da landing, que no claro precisam de
+     tinta escura (um glow branco sobre fundo slate-50 seria invisível). */
+  --color-lp-icon-light: #475569; /* slate-600 */
+  --color-lp-glow-light: rgb(15 23 42 / 0.04);
+  --color-lp-halo-light: rgb(15 23 42 / 0.1);
+
   /* Telas de auth (Login/Register/ForgotPassword/ResetPassword/InviteAccept):
      o card CLARO. O modo escuro delas reusa os --color-lp-* acima (mesmo papel:
      marca sobre fundo escuro), por isso aqui só existe a metade clara. Defaults
@@ -110,13 +118,23 @@
 /* Custom utilities for the Boost landing page (dark "neutral-950" design).
    Ported additively from the designer scaffold (src/Lp/src/index.css). */
 @layer utilities {
-  /* Halo do frame do hero. Segue --color-lp-halo (branco por default, accent da
-     instância quando declarado) — por isso não se chama mais `glow-white`. */
+  /* Halo do frame do hero e grade de fundo. Ambos trocam de tinta com o tema
+     (no claro precisam ser escuros) e seguem o accent da instância via
+     --color-lp-halo* — por isso não se chamam mais `glow-white`/`bg-grid-white`.
+     Escritos com o seletor `.dark` explícito porque são CSS cru, não utilities
+     do Tailwind (o `@variant dark` só vale dentro de `@apply`/classes geradas). */
   .glow-lp {
+    box-shadow: 0 0 40px -10px var(--color-lp-halo-light);
+  }
+  .dark .glow-lp {
     box-shadow: 0 0 40px -10px var(--color-lp-halo);
   }
-  .bg-grid-white {
+  .bg-grid-lp {
     background-size: 40px 40px;
+    background-image: linear-gradient(to right, rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+  }
+  .dark .bg-grid-lp {
     background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
       linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
   }

@@ -158,6 +158,10 @@ export interface ThemeTokens {
 // como névoa sobre o preto, um roxo saturado a 5% simplesmente some.
 const LP_GLOW_ALPHA = 0.2;
 const LP_HALO_ALPHA = 0.35;
+// Metade CLARA da LP: sobre slate-50 o mesmo tom precisa de MENOS alpha que
+// sobre preto p/ não virar uma mancha (fundo claro não "absorve" a cor).
+const LP_GLOW_LIGHT_ALPHA = 0.12;
+const LP_HALO_LIGHT_ALPHA = 0.25;
 
 /**
  * Tokens das superfícies públicas derivados do accent da instância. Hex
@@ -176,7 +180,13 @@ export function buildPublicTokens(hex: unknown): Record<string, string> | null {
     '--color-lp-focus': hslCss(steps['400']),
     '--color-lp-glow': hslCss(steps['500'], LP_GLOW_ALPHA),
     '--color-lp-halo': hslCss(steps['400'], LP_HALO_ALPHA),
-    // Card de auth, metade CLARA (a escura reusa os --color-lp-* acima).
+    // Metade CLARA da LP: no claro os degraus escuros da ramp é que têm
+    // contraste (o 400 sobre slate-50 quase some).
+    '--color-lp-icon-light': hslCss(steps['600']),
+    '--color-lp-glow-light': hslCss(steps['500'], LP_GLOW_LIGHT_ALPHA),
+    '--color-lp-halo-light': hslCss(steps['500'], LP_HALO_LIGHT_ALPHA),
+    // CTA das superfícies CLARAS — card de auth E landing no tema claro (a
+    // escura das duas reusa os --color-lp-* acima).
     '--color-auth-cta': hslCss(steps['500']),
     '--color-auth-cta-text': ramp.contrast,
     '--color-auth-cta-hover': hslCss(steps['600']),
