@@ -1,24 +1,46 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 376 110" role="img" aria-label="Infinity">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 376 110" role="img" aria-label="Infinity Affiliates">
   <!-- Logo Infinity COLORIDO para fundo CLARO (contrato, proposta, apresentação).
-       Roxo mais fechado que a versão dark (o lavanda claro sumiria no branco) e
-       wordmark em ameixa escura. NÃO usar como BRAND.logoUrl — ver logo.svg. -->
+       Roxo mais fechado que a versão dark (o lavanda claro sumiria no branco) e a
+       alça direita fecha em PRETO, como na referência do cliente p/ fundo claro.
+       O wordmark vai em ameixa escura: a referência mandou o wordmark BRANCO, que
+       no branco fica invisível — aqui ele é escuro p/ o arquivo ser utilizável.
+       NÃO usar como BRAND.logoUrl — ver logo.svg. Geometria/máscara: idem logo.svg. -->
   <defs>
-    <linearGradient id="infL" x1="6%" y1="92%" x2="94%" y2="6%">
+    <linearGradient id="infLloop" gradientUnits="userSpaceOnUse" x1="8" y1="86" x2="60" y2="34">
       <stop offset="0%"   stop-color="#5B1E86" />
       <stop offset="50%"  stop-color="#8332B9" />
       <stop offset="100%" stop-color="#A855F7" />
     </linearGradient>
+    <linearGradient id="infLring" gradientUnits="userSpaceOnUse" x1="60" y1="86" x2="112" y2="30">
+      <stop offset="0%"   stop-color="#4C1D95" />
+      <stop offset="100%" stop-color="#0A0A0A" />
+    </linearGradient>
+    <linearGradient id="infLarrow" gradientUnits="userSpaceOnUse" x1="49" y1="71" x2="112" y2="8">
+      <stop offset="0%"   stop-color="#6D28D9" />
+      <stop offset="50%"  stop-color="#A855F7" />
+      <stop offset="100%" stop-color="#C084FC" />
+    </linearGradient>
+    <mask id="infCutL" maskUnits="userSpaceOnUse" x="-10" y="-10" width="150" height="130">
+      <rect x="-10" y="-10" width="150" height="130" fill="#ffffff" />
+      <g fill="#000000" stroke="#000000" stroke-linecap="round" stroke-linejoin="round">
+        <path fill="none" stroke-width="17" d="M45.86 74.14 L99 21" />
+        <path stroke-width="5" d="M113.85 6.15 L111.02 33.02 L86.98 8.98 Z" />
+      </g>
+    </mask>
   </defs>
 
-  <g transform="translate(6.68, 10.61) scale(0.88)" fill="none" stroke="url(#infL)" stroke-width="13" stroke-linecap="round">
-    <path d="M60 60 C60 47, 47 34, 34 34 C21 34, 8 47, 8 60 C8 73, 21 86, 34 86
-             C47 86, 60 73, 60 60 C60 47, 73 34, 86 34 C99 34, 112 47, 112 60
-             C112 73, 99 86, 86 86 C73 86, 60 73, 60 60 Z" />
-    <path d="M84 34 C96 32, 100 29, 106 24" />
-    <path d="M121.6 8.4 L116.6 34.6 L95.4 13.4 Z" fill="#8332B9" stroke="none" />
+  <g transform="translate(8.65, 10.62) scale(0.9)" fill="none" stroke-width="13" stroke-linejoin="round">
+    <g mask="url(#infCutL)">
+      <path stroke="url(#infLring)" d="M60 60 C60 47, 73 34, 86 34 C99 34, 112 47, 112 60
+               C112 73, 99 86, 86 86 C73 86, 60 73, 60 60 Z" />
+      <path stroke="url(#infLloop)" d="M60 60 C60 47, 47 34, 34 34 C21 34, 8 47, 8 60
+               C8 73, 21 86, 34 86 C47 86, 60 73, 60 60 Z" />
+    </g>
+    <path stroke="url(#infLarrow)" stroke-linecap="round" d="M45.86 74.14 L99 21" />
+    <path fill="url(#infLarrow)" stroke="none" d="M113.85 6.15 L111.02 33.02 L86.98 8.98 Z" />
   </g>
 
-  <g transform="translate(132, 35)" fill="#1A1024">
+  <g transform="translate(130, 22)" fill="#1A1024">
     <path transform="translate(0,0)"   d="M0 0 H11 V40 H0 Z" />
     <path transform="translate(18,0)"  d="M0 0 H11 L23 24.5 V0 H34 V40 H23 L11 15.5 V40 H0 Z" />
     <path transform="translate(59,0)"  d="M0 0 H28 V11 H11 V16.5 H24 V27.5 H11 V40 H0 Z" />
@@ -27,5 +49,20 @@
     <path transform="translate(153,0)" d="M0 0 H11 V40 H0 Z" />
     <path transform="translate(171,0)" d="M0 0 H32 V11 H21.5 V40 H10.5 V11 H0 Z" />
     <path transform="translate(204,0)" d="M0 0 H11.5 L16 10.5 L20.5 0 H32 L21.5 24 V40 H10.5 V24 Z" />
+  </g>
+
+  <g fill="none" stroke="#1A1024" stroke-opacity="0.78" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M156.5 88 L161.5 74 L166.5 88 M158.2 83.2 H164.8" />
+    <path d="M179.3 88 V74 H187.3 M179.3 81 H185.8" />
+    <path d="M200.1 88 V74 H208.1 M200.1 81 H206.6" />
+    <path d="M220.9 74 V88" />
+    <path d="M233.7 74 V88 H241.2" />
+    <path d="M254 74 V88" />
+    <path d="M266.8 88 L271.8 74 L276.8 88 M268.5 83.2 H275.1" />
+    <path d="M289.6 74 H298.6 M294.1 74 V88" />
+    <path d="M318.9 74 H311.4 V88 H318.9 M311.4 81 H317.4" />
+    <path d="M339.3 77 C339.3 74.6, 337.3 74, 335.7 74 C333.5 74, 331.7 75.2, 331.7 77.4
+             C331.7 79.6, 333.5 80.4, 335.7 81 C337.9 81.6, 339.7 82.4, 339.7 84.6
+             C339.7 86.8, 337.9 88, 335.7 88 C333.7 88, 332.1 87.4, 332.1 85" />
   </g>
 </svg>

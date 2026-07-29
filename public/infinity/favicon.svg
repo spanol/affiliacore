@@ -1,21 +1,42 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 110" role="img" aria-label="Infinity">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 110" role="img" aria-label="Infinity Affiliates">
   <!-- Favicon Infinity — só o símbolo (o wordmark seria ilegível a 16px), colorido
-       sobre o canvas escuro da marca. Favicon NÃO sofre `invert`, então pode ter cor. -->
+       sobre o canvas escuro da marca. Favicon NÃO sofre `invert`, então pode ter cor.
+       Geometria e máscara idênticas ao logo.svg (ver o comentário lá): alças tangentes
+       fechadas + fita de crescimento a 45° recortada das alças, saindo em seta. -->
   <defs>
-    <linearGradient id="infF" x1="8%" y1="90%" x2="92%" y2="8%">
-      <stop offset="0%"   stop-color="#7A2FB0" />
-      <stop offset="48%"  stop-color="#A855F7" />
-      <stop offset="100%" stop-color="#D8B4FE" />
+    <linearGradient id="infFloop" gradientUnits="userSpaceOnUse" x1="8" y1="86" x2="60" y2="34">
+      <stop offset="0%"   stop-color="#5B21B6" />
+      <stop offset="55%"  stop-color="#8B3FE0" />
+      <stop offset="100%" stop-color="#A855F7" />
     </linearGradient>
+    <linearGradient id="infFring" gradientUnits="userSpaceOnUse" x1="60" y1="86" x2="112" y2="30">
+      <stop offset="0%"   stop-color="#7A3AB8" />
+      <stop offset="100%" stop-color="#2C1145" />
+    </linearGradient>
+    <linearGradient id="infFarrow" gradientUnits="userSpaceOnUse" x1="49" y1="71" x2="112" y2="8">
+      <stop offset="0%"   stop-color="#7C3AED" />
+      <stop offset="45%"  stop-color="#C084FC" />
+      <stop offset="100%" stop-color="#F3E8FF" />
+    </linearGradient>
+    <mask id="infCutF" maskUnits="userSpaceOnUse" x="-10" y="-10" width="150" height="130">
+      <rect x="-10" y="-10" width="150" height="130" fill="#ffffff" />
+      <g fill="#000000" stroke="#000000" stroke-linecap="round" stroke-linejoin="round">
+        <path fill="none" stroke-width="17" d="M45.86 74.14 L99 21" />
+        <path stroke-width="5" d="M113.85 6.15 L111.02 33.02 L86.98 8.98 Z" />
+      </g>
+    </mask>
   </defs>
 
   <rect width="110" height="110" rx="26" fill="#120B18" />
 
-  <g transform="translate(8.88, 17.21) scale(0.749)" fill="none" stroke="url(#infF)" stroke-width="13" stroke-linecap="round">
-    <path d="M60 60 C60 47, 47 34, 34 34 C21 34, 8 47, 8 60 C8 73, 21 86, 34 86
-             C47 86, 60 73, 60 60 C60 47, 73 34, 86 34 C99 34, 112 47, 112 60
-             C112 73, 99 86, 86 86 C73 86, 60 73, 60 60 Z" />
-    <path d="M84 34 C96 32, 100 29, 106 24" />
-    <path d="M121.6 8.4 L116.6 34.6 L95.4 13.4 Z" fill="#D8B4FE" stroke="none" />
+  <g transform="translate(8.18, 16.5) scale(0.78)" fill="none" stroke-width="13" stroke-linejoin="round">
+    <g mask="url(#infCutF)">
+      <path stroke="url(#infFring)" d="M60 60 C60 47, 73 34, 86 34 C99 34, 112 47, 112 60
+               C112 73, 99 86, 86 86 C73 86, 60 73, 60 60 Z" />
+      <path stroke="url(#infFloop)" d="M60 60 C60 47, 47 34, 34 34 C21 34, 8 47, 8 60
+               C8 73, 21 86, 34 86 C47 86, 60 73, 60 60 Z" />
+    </g>
+    <path stroke="url(#infFarrow)" stroke-linecap="round" d="M45.86 74.14 L99 21" />
+    <path fill="url(#infFarrow)" stroke="none" d="M113.85 6.15 L111.02 33.02 L86.98 8.98 Z" />
   </g>
 </svg>

@@ -1,23 +1,51 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 376 110" role="img" aria-label="Infinity">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 376 110" role="img" aria-label="Infinity Affiliates">
   <!-- Logo Infinity — MONO BRANCO DE PROPÓSITO. O app aplica `invert dark:invert-0`
        (DashboardLayout, Login, Register, InviteAccept, Forgot/ResetPassword): branco
        vira preto no tema claro e segue branco no escuro. NÃO colorir este arquivo —
        invert sobre o roxo #8332B9 devolve verde-amarelado. Versões coloridas em
        logo-color-dark.svg / logo-color-light.svg (marketing, social, documento).
-       Marca: lemniscata de duas alças fechadas (r=26, centros 34/86) com a fita
-       ramificando no topo da alça direita numa seta de crescimento a 45°.
-       Wordmark desenhado em curvas — INFINITY só tem hastes retas, então sai
-       exato sem depender de fonte instalada. -->
 
-  <g transform="translate(6.68, 10.61) scale(0.88)" fill="none" stroke="#ffffff" stroke-width="13" stroke-linecap="round">
-    <path d="M60 60 C60 47, 47 34, 34 34 C21 34, 8 47, 8 60 C8 73, 21 86, 34 86
-             C47 86, 60 73, 60 60 C60 47, 73 34, 86 34 C99 34, 112 47, 112 60
-             C112 73, 99 86, 86 86 C73 86, 60 73, 60 60 Z" />
-    <path d="M84 34 C96 32, 100 29, 106 24" />
-    <path d="M121.6 8.4 L116.6 34.6 L95.4 13.4 Z" fill="#ffffff" stroke="none" />
+       Marca (revisão pedida pelo cliente, 2026-07-28): lemniscata de duas alças
+       TANGENTES (r=26, centros 34 e 86, encosto em 60,60) com a FITA DE CRESCIMENTO
+       cortando o conjunto a 45° — nasce dentro da alça esquerda, passa pelo encosto,
+       atravessa o vazio da alça direita e sai em seta acima dela. O eixo da fita é
+       x+y=120, que por construção passa no encosto (60,60) E no topo da alça direita
+       (86,34); é isso que faz a fita "sair" da lemniscata em vez de cruzá-la a esmo.
+
+       A sobreposição fita×alças é resolvida por MÁSCARA (`infCutM`), não por cor: as
+       alças (círculos FECHADOS) são recortadas com 2 de folga em volta da fita, e a
+       fita é desenhada por cima. É o que permite o MESMO desenho servir em mono
+       (aqui) e em cor — branco sobre branco não tem contraste e, sem o recorte, a
+       marca vira um caroço sólido: a corda 60,60→86,34 encosta no arco superior-
+       esquerdo da alça direita, então as duas formas SEMPRE se sobrepõem.
+       Mexeu na fita? Replique o path IDÊNTICO dentro da máscara (só muda a largura:
+       13 no traço visível, 17 na máscara = 2 de folga por lado).
+
+       Wordmark INFINITY desenhado em curvas (só hastes retas, sai exato sem depender
+       de fonte instalada); AFFILIATES é monolinha traçada, com tracking largo. -->
+
+  <defs>
+    <mask id="infCutM" maskUnits="userSpaceOnUse" x="-10" y="-10" width="150" height="130">
+      <rect x="-10" y="-10" width="150" height="130" fill="#ffffff" />
+      <g fill="#000000" stroke="#000000" stroke-linecap="round" stroke-linejoin="round">
+        <path fill="none" stroke-width="17" d="M45.86 74.14 L99 21" />
+        <path stroke-width="5" d="M113.85 6.15 L111.02 33.02 L86.98 8.98 Z" />
+      </g>
+    </mask>
+  </defs>
+
+  <g transform="translate(8.65, 10.62) scale(0.9)" fill="none" stroke="#ffffff" stroke-width="13" stroke-linejoin="round">
+    <g mask="url(#infCutM)">
+      <path d="M60 60 C60 47, 73 34, 86 34 C99 34, 112 47, 112 60
+               C112 73, 99 86, 86 86 C73 86, 60 73, 60 60 Z" />
+      <path d="M60 60 C60 47, 47 34, 34 34 C21 34, 8 47, 8 60
+               C8 73, 21 86, 34 86 C47 86, 60 73, 60 60 Z" />
+    </g>
+    <path stroke-linecap="round" d="M45.86 74.14 L99 21" />
+    <path fill="#ffffff" stroke="none" d="M113.85 6.15 L111.02 33.02 L86.98 8.98 Z" />
   </g>
 
-  <g transform="translate(132, 35)" fill="#ffffff">
+  <g transform="translate(130, 22)" fill="#ffffff">
     <path transform="translate(0,0)"   d="M0 0 H11 V40 H0 Z" />
     <path transform="translate(18,0)"  d="M0 0 H11 L23 24.5 V0 H34 V40 H23 L11 15.5 V40 H0 Z" />
     <path transform="translate(59,0)"  d="M0 0 H28 V11 H11 V16.5 H24 V27.5 H11 V40 H0 Z" />
@@ -26,5 +54,20 @@
     <path transform="translate(153,0)" d="M0 0 H11 V40 H0 Z" />
     <path transform="translate(171,0)" d="M0 0 H32 V11 H21.5 V40 H10.5 V11 H0 Z" />
     <path transform="translate(204,0)" d="M0 0 H11.5 L16 10.5 L20.5 0 H32 L21.5 24 V40 H10.5 V24 Z" />
+  </g>
+
+  <g fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M156.5 88 L161.5 74 L166.5 88 M158.2 83.2 H164.8" />
+    <path d="M179.3 88 V74 H187.3 M179.3 81 H185.8" />
+    <path d="M200.1 88 V74 H208.1 M200.1 81 H206.6" />
+    <path d="M220.9 74 V88" />
+    <path d="M233.7 74 V88 H241.2" />
+    <path d="M254 74 V88" />
+    <path d="M266.8 88 L271.8 74 L276.8 88 M268.5 83.2 H275.1" />
+    <path d="M289.6 74 H298.6 M294.1 74 V88" />
+    <path d="M318.9 74 H311.4 V88 H318.9 M311.4 81 H317.4" />
+    <path d="M339.3 77 C339.3 74.6, 337.3 74, 335.7 74 C333.5 74, 331.7 75.2, 331.7 77.4
+             C331.7 79.6, 333.5 80.4, 335.7 81 C337.9 81.6, 339.7 82.4, 339.7 84.6
+             C339.7 86.8, 337.9 88, 335.7 88 C333.7 88, 332.1 87.4, 332.1 85" />
   </g>
 </svg>
