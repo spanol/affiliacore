@@ -1,8 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 110" role="img" aria-label="Infinity Affiliates">
   <!-- Favicon Infinity — só o símbolo (o wordmark seria ilegível a 16px), colorido
        sobre o tile escuro da marca. Favicon NÃO sofre `invert`, então pode ter cor.
-       A marca é a FINAL do cliente, paths e gradientes VERBATIM de mark.svg
-       (kit claude.ai/design 9041822a, 2026-07-29), só re-escalada pro tile. -->
+       Geometria VERBATIM de mark.svg (kit claude.ai/design 9041822a, 2026-07-29),
+       re-escalada pro tile — mas com a CARTELA FECHADA do favicon: a haste clara
+       com shine do kit, a 16–20px, virava uma coluna brilhante entre dois anéis e
+       dava leitura constrangedora (feedback 2026-07-29). Aqui a seta fica na MESMA
+       família de roxo dos anéis (só a ponta clareia p/ ler como seta) e o shine
+       branco NÃO entra. Não reintroduza o gradiente claro do kit neste arquivo. -->
   <defs>
     <linearGradient id="inf" x1="60" y1="90" x2="340" y2="210" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#A855F7" />
@@ -10,14 +14,9 @@
       <stop offset="1" stop-color="#4A1D8A" />
     </linearGradient>
     <linearGradient id="arw" x1="165" y1="190" x2="299" y2="38" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#8B5CF6" />
-      <stop offset=".45" stop-color="#C084FC" />
+      <stop offset="0" stop-color="#6D28D9" />
+      <stop offset=".7" stop-color="#8B3FE0" />
       <stop offset="1" stop-color="#A855F7" />
-    </linearGradient>
-    <linearGradient id="shine" x1="166" y1="120" x2="234" y2="180" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#fff" stop-opacity="0" />
-      <stop offset=".5" stop-color="#fff" stop-opacity=".55" />
-      <stop offset="1" stop-color="#fff" stop-opacity="0" />
     </linearGradient>
   </defs>
 
@@ -27,7 +26,6 @@
     <path d="M 165,189.7 L 235,110.3 A 60 60 0 1 1 235,189.7 L 165,110.3 A 60 60 0 1 0 165,189.7 Z" fill="none" stroke="url(#inf)" stroke-width="42" stroke-linejoin="round" />
     <path d="M 165,189.7 L 235,110.3 A 60 60 0 1 1 235,189.7 L 165,110.3 A 60 60 0 1 0 165,189.7 Z" fill="none" stroke="#fff" stroke-opacity=".10" stroke-width="10" stroke-linejoin="round" />
     <path d="M 165,189.7 L 262.8,78.8" fill="none" stroke="url(#arw)" stroke-width="42" />
-    <path d="M 165,189.7 L 262.8,78.8" fill="none" stroke="url(#shine)" stroke-width="42" />
     <path d="M 232.8,52.3 L 299.2,37.5 L 292.8,105.2 Z" fill="url(#arw)" />
   </g>
 </svg>
