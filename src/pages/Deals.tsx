@@ -204,7 +204,11 @@ export default function Deals() {
 
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !saving && setModal(null)}>
-          <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200 dark:border-neutral-800 w-full max-w-lg p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          {/* max-h + scroll próprio: sem isso, num painel mais alto que a
+              janela o `items-center` do pai joga metade do modal p/ FORA da
+              viewport e nem topo nem rodapé ficam alcançáveis (não há scroll
+              nenhum). Mesma correção do LegalAdmin. */}
+          <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200 dark:border-neutral-800 w-full max-w-lg p-6 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">{modal.id ? 'Editar acordo' : 'Novo acordo'}</h2>
               <button onClick={() => setModal(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white"><X size={18} /></button>

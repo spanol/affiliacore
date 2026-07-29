@@ -296,7 +296,16 @@ export default function DashboardLayout() {
           </div>
         </header>
 
-        <div className="relative z-10 p-6 lg:p-8 flex-1 overflow-x-hidden">
+        {/* NÃO devolva o `z-10` aqui. `relative` + z-index numérico cria um
+            STACKING CONTEXT, e todo modal renderizado pela página (o <Outlet/>
+            vive aqui dentro) fica preso nele: o `z-50` do overlay passa a valer
+            10 no documento e o header acima (z-20) pinta POR CIMA — em modal
+            alto isso enfiava a barra de título do modal embaixo do header, e o
+            scrim não escurecia o cabeçalho. Com `relative` puro (z-index auto)
+            o conteúdo continua acima do glow ambiente (que é z-0 e vem ANTES na
+            ordem do DOM, o que já basta na camada de pintura) e os modais
+            escapam para o nível do documento. */}
+        <div className="relative p-6 lg:p-8 flex-1 overflow-x-hidden">
           <Outlet />
         </div>
       </main>
