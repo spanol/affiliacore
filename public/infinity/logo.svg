@@ -1,53 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 424 110" role="img" aria-label="Infinity Affiliates">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 484 110" role="img" aria-label="Infinity Affiliates">
   <!-- Logo Infinity — MONO BRANCO DE PROPÓSITO. O app aplica `invert dark:invert-0`
        (DashboardLayout, Login, Register, InviteAccept, Forgot/ResetPassword): branco
-       vira preto no tema claro e segue branco no escuro. NÃO colorir este arquivo —
-       invert sobre o roxo #8332B9 devolve verde-amarelado. As versões coloridas
-       (logo-color-dark/light.svg) são os lockups EMPILHADOS = referência do cliente;
-       este é o lockup HORIZONTAL, exclusivo do app (a 30px de altura o empilhado
-       seria ilegível).
+       vira preto no tema claro e segue branco no escuro. NÃO colorir este arquivo.
 
-       Marca idêntica à dos coloridos (ver o comentário técnico no logo-color-dark):
-       anéis ENTRELAÇADOS r=26 centros 34/82, fita de crescimento no eixo x+y=118
-       saindo em seta com entalhe. Em mono não existe tom pra separar as
-       sobreposições, então o entrelace é por MÁSCARA (a versão 1-cor do weave):
-       `mCutA` recorta o anel ESQUERDO em volta da fita+seta; `mCutB` recorta o anel
-       DIREITO em volta da fita+seta E do anel esquerdo (esquerdo passa por cima,
-       como na ordem de pintura dos coloridos). Folga = 2.5 por lado (fita 10 → corte 15; a seta corta com stroke 7 pra não
-       sobrar lasca do anel entre a fita e a base da seta). Mexeu em qualquer path? Replique o path IDÊNTICO dentro das máscaras.
+       Lockup HORIZONTAL exclusivo do app (a 30px de altura o lockup empilhado final
+       seria ilegível). A MARCA é a FINAL do cliente, copiada VERBATIM do kit
+       (claude.ai/design 9041822a, 2026-07-29 — ver mono-white.svg): lemniscata em
+       UM path só (diagonais cruzando + dois arcos r=60, stroke 42) cuja diagonal
+       continua como haste da seta (mesma linha, mesma largura — por isso se funde),
+       silhueta sólida sem vãos. Não reintroduza máscara/weave: o mono final é chapado.
 
-       Wordmark INFINITY em curvas com scale(1.2,1) (peso/largura da referência);
-       AFFILIATES monolinha stroke 3.2 com tracking constante (gap 21). -->
+       O wordmark do kit é <text font-family="Archivo"> — SVG carregado via <img>
+       NÃO baixa webfont (cairia em Arial), então aqui o wordmark segue DESENHADO EM
+       CURVAS (INFINITY com scale(1.2,1) ≈ peso/largura do Archivo 900; AFFILIATES
+       monolinha com tracking largo). A diferença pro Archivo real é invisível na
+       escala do app; quem precisa do texto fiel usa os lockups finais coloridos. -->
 
-  <defs>
-    <mask id="mCutA" maskUnits="userSpaceOnUse" x="-10" y="-10" width="150" height="130">
-      <rect x="-10" y="-10" width="150" height="130" fill="#ffffff" />
-      <g fill="#000000" stroke="#000000" stroke-linecap="round" stroke-linejoin="round">
-        <path fill="none" stroke-width="15" d="M47 71 L89 29" />
-        <path stroke-width="7" d="M104 14 L94.8 41.6 L89.8 28.2 L76.4 23.2 Z" />
-      </g>
-    </mask>
-    <mask id="mCutB" maskUnits="userSpaceOnUse" x="-10" y="-10" width="150" height="130">
-      <rect x="-10" y="-10" width="150" height="130" fill="#ffffff" />
-      <g fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round">
-        <path stroke-width="15" d="M47 71 L89 29" />
-        <path fill="#000000" stroke-width="7" transform="translate(91.25,26.75) scale(1.3) translate(-91.25,-26.75)" d="M104 14 L94.8 41.6 L89.8 28.2 L76.4 23.2 Z" />
-        <path stroke-width="15" d="M60 60 C60 45.64 48.36 34 34 34 C19.64 34 8 45.64 8 60
-                 C8 74.36 19.64 86 34 86 C48.36 86 60 74.36 60 60 Z" />
-      </g>
-    </mask>
-  </defs>
-
-  <g transform="translate(5, -5) scale(1)" fill="none" stroke="#ffffff" stroke-width="10" stroke-linejoin="round">
-    <path mask="url(#mCutB)" d="M108 60 C108 45.64 96.36 34 82 34 C67.64 34 56 45.64 56 60
-             C56 74.36 67.64 86 82 86 C96.36 86 108 74.36 108 60 Z" />
-    <path mask="url(#mCutA)" d="M60 60 C60 45.64 48.36 34 34 34 C19.64 34 8 45.64 8 60
-             C8 74.36 19.64 86 34 86 C48.36 86 60 74.36 60 60 Z" />
-    <path stroke-linecap="round" d="M47 71 L89 29" />
-    <path fill="#ffffff" stroke="none" d="M104 14 L94.8 41.6 L89.8 28.2 L76.4 23.2 Z" />
+  <g fill="none" stroke="#ffffff" transform="translate(-14.16, -14.39) scale(0.517)">
+    <path d="M 165,189.7 L 235,110.3 A 60 60 0 1 1 235,189.7 L 165,110.3 A 60 60 0 1 0 165,189.7 Z" stroke-width="42" stroke-linejoin="round" />
+    <path d="M 165,189.7 L 262.8,78.8" stroke-width="42" />
+    <path d="M 232.8,52.3 L 299.2,37.5 L 292.8,105.2 Z" fill="#ffffff" stroke="none" />
   </g>
 
-  <g transform="translate(128, 22)">
+  <g transform="translate(186, 22)">
     <g transform="scale(1.2, 1)" fill="#ffffff">
       <path transform="translate(0,0)"   d="M0 0 H11 V40 H0 Z" />
       <path transform="translate(18,0)"  d="M0 0 H11 L23 24.5 V0 H34 V40 H23 L11 15.5 V40 H0 Z" />
@@ -60,7 +35,7 @@
     </g>
   </g>
 
-  <g transform="translate(140.9, 74)" fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+  <g transform="translate(198.9, 74)" fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
     <path transform="translate(0,0)"     d="M0 14 L5 0 L10 14 M1.8 9.6 H8.2" />
     <path transform="translate(31,0)"    d="M0 14 V0 H8 M0 7.2 H6.4" />
     <path transform="translate(60,0)"    d="M0 14 V0 H8 M0 7.2 H6.4" />
@@ -71,5 +46,5 @@
     <path transform="translate(190.5,0)" d="M0 0 H9 M4.5 0 V14" />
     <path transform="translate(220.5,0)" d="M8 0 H0 V14 H8 M0 7.2 H6" />
     <path transform="translate(249.5,0)" d="M7.6 3 C7.6 0.6 5.6 0 4 0 C1.8 0 0 1.2 0 3.4 C0 5.6 1.8 6.4 4 7 C6.2 7.6 8 8.4 8 10.6 C8 12.8 6.2 14 4 14 C2 14 0.4 13.4 0.4 11" />
-  </g>
+    </g>
 </svg>
