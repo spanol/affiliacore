@@ -282,7 +282,11 @@ repasse de um **neto** — mudando o spread do gerente do meio sem que ele soube
 2. ✅ **Servidor devolve a sub-rede.** `GET /api/special-affiliates` (requireAuth) escopa por papel:
    admin recebe o mapa inteiro; o especial recebe só o próprio registro + o dos subs. `fetchSpecialAffiliates`
    manteve a assinatura — os 8 call sites não mudaram.
-3. ✅ **Rule fechada** para `read, write: if isAdmin()`.
+3. ⏸️ **Rule ENCENADA, não aplicada.** O `firestore.rules` mantém `read: if isSignedIn()` de
+   propósito, com o alvo (`read, write: if isAdmin()`) documentado no próprio arquivo. Fechar a
+   leitura só é seguro DEPOIS que `GET /api/special-affiliates` está no ar na instância — fechar
+   antes deixa todo especial sem ver equipe (aconteceu em prod no Boost em 2026-07-30, rules
+   deployadas antes do push). O predeploy hook do `firebase.json` agora barra essa ordem.
 4. ↔️ **Profundidade** virou a flag `fromNetwork` (subárvore inteira) em vez de um inteiro. Um
    `visibilityDepth` intermediário continua possível se algum cliente pedir.
 5. ⬜ `subAffiliateIds` **continua no documento** para quem NÃO é `fromNetwork` (o modelo de 2 níveis

@@ -83,16 +83,25 @@ service cloud.firestore {
     // B3 · Afiliado especial: marca o especial + sub-rede + taxa da sub-rede.
     // Só o master (admin) escreve; leitura liberada a signed-in (o especial
     // precisa ler a própria sub-rede; escopo fino fica no proxy/servidor).
-    // Registro do afiliado especial (papel + sub-rede). SECURITY: leitura admin-only
-    // — era `read: isSignedIn()` e qualquer afiliado logado lia o organograma
-    // comercial inteiro (quem gerencia quem), exatamente o que o comentário de
-    // `affiliate_uplines` logo abaixo justifica proteger. Enquanto a coleção estava
-    // vazia era vazamento teórico; ao registrar os gerentes da rede migrada viraria
-    // real. O client agora lê por `GET /api/special-affiliates`, que escopa por
-    // papel (admin = tudo; especial = próprio registro + subs). Espelha
-    // affiliate_configs. Ver §9 do REDE-AFILIADOS.md.
+    // Registro do afiliado especial (papel + sub-rede).
+    //
+    // ⚠️ ESTA REGRA ESTÁ ACOPLADA AO CÓDIGO — leia antes de fechá-la. O alvo é
+    // `read, write: if isAdmin()`: a coleção guarda o organograma comercial (quem
+    // gerencia quem), exatamente o que o comentário de `affiliate_uplines` logo
+    // abaixo justifica proteger, e com os gerentes da rede migrada dentro dela o
+    // vazamento deixa de ser teórico. MAS a leitura só pode fechar depois que
+    // `GET /api/special-affiliates` estiver NO AR na instância: é ele que alimenta
+    // a tela do especial. Fechar antes = todo afiliado especial loga e não vê
+    // equipe nenhuma (acontecido em prod no Boost, 2026-07-30 — rules deployadas
+    // antes do push do código).
+    //
+    // A ordem correta é: push do código → build do App Hosting no ar → conferir →
+    // só então `firebase deploy --only firestore:rules`. O predeploy hook do
+    // `firebase.json` (scripts/predeploy/check-rules-code-sync.cjs) verifica isso
+    // e barra o deploy fora de ordem.
     match /special_affiliates/{affiliateId} {
-      allow read, write: if isAdmin();
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     // Rede de afiliados · aresta filho→upline (N níveis). Quem é upline de quem

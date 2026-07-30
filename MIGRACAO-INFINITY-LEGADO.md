@@ -437,8 +437,11 @@ Os dois caminhos da §8 foram fundidos: em vez de povoar `subAffiliateIds` com u
 subárvore, o registro do especial ganhou a flag **`fromNetwork`** e o servidor **deriva a sub-rede da
 árvore a cada leitura**. Detalhe do desenho e das armadilhas em `REDE-AFILIADOS.md` §9 (bloco ENTREGUE).
 
-O **pré-requisito de privacidade foi cumprido antes** de qualquer escrita: `special_affiliates` agora é
-`read, write: if isAdmin()`, e a tela do especial lê por `GET /api/special-affiliates` (escopado por papel).
+**Pré-requisito de privacidade — meio caminho:** a tela do especial já lê por
+`GET /api/special-affiliates` (escopado por papel), então o client não depende mais de ler a coleção.
+O **fecho da rule** (`read, write: if isAdmin()`) ficou ENCENADO, não aplicado: virou o passo 5 do
+runbook abaixo, e só depois do código no ar. Fechar antes derruba a tela de todo afiliado especial —
+foi o que aconteceu no Boost em 2026-07-30, com as rules deployadas antes do push.
 
 **Como registrar um gerente (o Maurício é o piloto de 1):**
 
@@ -446,6 +449,9 @@ O **pré-requisito de privacidade foi cumprido antes** de qualquer escrita: `spe
 2. Ligue **Ativar como afiliado especial** e **Sub-rede automática**.
 3. Confira a prévia — ela lista, pelo nome, a equipe que ele passará a enxergar.
 4. Salve. O `isSpecial` é espelhado no login dele pelo servidor; no próximo acesso ele cai na `/network`.
+5. **Só então** feche a rule de `special_affiliates` (`allow read, write: if isAdmin()` — o alvo está
+   escrito no próprio `firestore.rules`) e rode `firebase deploy --only firestore:rules`. Mova a linha
+   correspondente de `SIGNED_IN_READ` para `ADMIN_ONLY` em `test/rules/firestore-rules.spec.ts`.
 
 Na Infinity o passo 3 é decisivo: como `special_affiliates` está **vazia** e as **141 arestas** já estão
 em `affiliate_uplines`, nenhum sub está pendurado por lista manual → o aviso âmbar de "N afiliados SAEM
