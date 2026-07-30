@@ -185,6 +185,13 @@ os ganhos de quem está acima dele.
 
 ## 9. Desenho: aposentar o `special_affiliates` como estrutura paralela (2026-07-29)
 
+> **Medido em produção (Infinity, 2026-07-30):** este desenho deixou de ser refinamento e virou
+> lacuna funcional. A instância tem **141 arestas** em `affiliate_uplines` e `special_affiliates`
+> **VAZIA** — então os **19 topos de estrutura** logam e não veem equipe nenhuma, porque a tela do
+> afiliado ainda decide por `isSpecial`. Ver §8 do `MIGRACAO-INFINITY-LEGADO.md`. E, antes de povoar
+> a coleção como paliativo, a rule `allow read: if isSignedIn()` precisa fechar para `isAdmin()`:
+> com dados dentro, ela vira vazamento de organograma para qualquer afiliado logado.
+
 **Pergunta que originou:** por que um pai de rede não é simplesmente um "afiliado especial"?
 
 **Resposta curta: para DINHEIRO, já é.** `composeAdminProfit` faz

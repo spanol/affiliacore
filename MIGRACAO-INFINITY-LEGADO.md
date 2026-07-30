@@ -400,3 +400,33 @@ Um banco por casa · o fallback silencioso de `?db=` para `main` · Universidade
 Planilha de pagamentos (Super Bet V2, modo estrutura) e o dump das tabelas ficaram **fora do repo**, no scratchpad
 da sessão, por conterem PII (nome, e-mail, WhatsApp, Instagram, chave PIX). **Não commitar.**
 Este documento contém apenas agregados e schema.
+
+---
+
+## 8. ⚠️ A rede migrou, mas nenhum gerente vê a equipe (medido 2026-07-30)
+
+**Estado:** `affiliate_uplines` tem as **141 arestas** da estrutura; `special_affiliates` está **VAZIA**.
+A tela de equipe do afiliado (`/network`, `SpecialDashboard`) é liberada por `profile.isSpecial`, que
+espelha `special_affiliates/{affiliateId}.active === true`. Resultado: os **19 topos de estrutura** da
+Infinity logam e veem só a produção individual. A rede que migramos é visível apenas no `/rede` (admin).
+
+Descoberto ao converter o login do Maurício (`infinitw02`) de admin para afiliado: ele pediu o "perfil de
+gerente" e não havia o que mostrar.
+
+**Duas formas de fechar:**
+
+1. **Paliativo** — criar `special_affiliates/{id}` com `active: true` e `subAffiliateIds` derivado da
+   subárvore do afiliado em `affiliate_uplines` (a lista é DERIVÁVEL, não se digita). Cobre os 19 sem
+   mexer em código. ⚠️ `subAffiliateIds` é lido hoje como **1 nível**; pôr a subárvore inteira na lista dá
+   ao gerente a visão completa, que é o que ele espera.
+2. **Definitivo** — o desenho do §9 do `REDE-AFILIADOS.md`: o servidor devolve a sub-rede a partir da
+   árvore e `special_affiliates` deixa de guardar hierarquia.
+
+**🔒 PRÉ-REQUISITO DE PRIVACIDADE (vale para os dois caminhos).** A rule hoje é
+`match /special_affiliates/{id} { allow read: if isSignedIn() }` — ou seja, **qualquer afiliado logado
+lê a estrutura de equipe de todos**. Popular a coleção com os 19 gerentes transforma um vazamento
+teórico (coleção vazia) em vazamento real de organograma comercial. Fechar para `isAdmin()` (o §9 já
+propõe) **antes** de povoar, e mover a leitura do `SpecialDashboard` para o servidor.
+
+**Próximo passo acordado:** registrar o Maurício como especial (piloto de 1), com a subárvore dele, e só
+então decidir se replica para os outros 18.
