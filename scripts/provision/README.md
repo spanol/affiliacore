@@ -158,6 +158,32 @@ disparar o 1º rollout (push ou `firebase apphosting:rollouts:create <backend-id
 App Hosting → **Adicionar domínio** → apontar DNS do cliente → aguardar cert.
 Atualizar a URL do job do Scheduler se ele foi criado antes do domínio.
 
+## 6.1 · E-mail de redefinição de senha (console) — FAZER DEPOIS DO DOMÍNIO
+
+Sem estes 3 ajustes, o cliente recebe um e-mail **em inglês**, assinado *"Your
+`<project-id>` team"*, e **a senha é trocada numa página do Google**
+(`<project-id>.firebaseapp.com/__/auth/action`), com o domínio dele entrando só
+como `continueUrl`. Medido na Infinity em 2026-07-30.
+
+O app **já tem** a tela (`/reset-password` lê `oobCode` → `verifyPasswordResetCode`
+→ `confirmPasswordReset`). O que falta é o Firebase mandar o link para ela:
+
+1. **Authentication → Templates → Redefinição de senha → editar → "Personalizar
+   URL de ação"** → `https://<dominio-do-cliente>/reset-password`.
+   ⚠️ A URL de ação é **do projeto inteiro**, não do template. Hoje é seguro
+   porque o app só usa `resetPassword` (não existe `sendEmailVerification` em
+   lugar nenhum). **Se algum dia entrar verificação de e-mail, a tela precisa
+   passar a olhar o `mode` da query** — senão o link de verificação cai numa tela
+   que só sabe redefinir senha.
+2. **Idioma do template** → Português. (É o `lang=en` que aparece na URL.)
+3. **Configurações do projeto → Geral → "Nome exibido publicamente"** →
+   marca do cliente. É daí que sai o `<project-id>` no corpo do e-mail.
+
+Fica de fora por não ser configuração: o remetente
+`noreply@<project-id>.firebaseapp.com`. Trocar exige **SMTP próprio**
+(Authentication → Templates → configurações de SMTP) com domínio de envio do
+cliente. Decisão comercial, não bloqueia o go-live.
+
 ## 7 · Smoke test de aceite (na instância nova, como o admin bootstrapado)
 
 - [ ] Login + troca de senha forçada funcionam; sidebar mostra a MARCA do cliente (logo/título).
@@ -167,6 +193,9 @@ Atualizar a URL do job do Scheduler se ele foi criado antes do domínio.
 - [ ] Comissão: configurar CPA/REV → log `config.update` na `/auditoria`.
 - [ ] `/ranking`: gerar o dia com dados importados → entradas > 0; popup-lembrete chega no admin master.
 - [ ] `POST /api/internal/daily-ranking` sem header → 401 (503 = secret faltando).
+- [ ] **"Esqueci minha senha" com um e-mail REAL**: o link abre `/reset-password` no
+      domínio do cliente (não em `firebaseapp.com`), o texto está em português e o
+      remetente não expõe o `project-id`. Ver §6.1.
 
 ## Instância DEMO (P5.3 · fim-de-funil, acesso controlado)
 
