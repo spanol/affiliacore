@@ -29,9 +29,17 @@ const { resolve } = require('node:path');
 // Instância por projeto Firebase. Instância nova entra AQUI (o playbook de
 // provisionamento manda registrar) — projeto desconhecido barra o deploy de
 // propósito: sem base URL não há como verificar, e passar batido reabre o incidente.
+//
+// ⚠️ Cada backend tem seu PRÓPRIO repo de origem: `agencia-boost-app` builda do
+// `spanol-boost` (separado em 2026-07-28), não deste. Push aqui NÃO chega lá — por
+// isso a verificação é por instância, contra a URL real, e não por commit local.
+// `null` = projeto sem app servindo (só Hosting estático / Firestore), então não há
+// endpoint para verificar e a regra pode fechar sem quebrar tela nenhuma.
 const INSTANCES = {
   'agencia-boost-app': 'https://agencyboost.com.br',
   'infinity-affiliacore': 'https://infinityaffiliates.agency',
+  // Landing + leads (Firebase Hosting estático). Sem backend App Hosting.
+  affiliacore: null,
 };
 
 // Acoplamentos regra→endpoint. `closed` é o trecho que só aparece quando a regra
@@ -101,6 +109,11 @@ async function endpointIsLive(base, path) {
       'Não consegui identificar o projeto alvo (GCLOUD_PROJECT vazio).',
       'Rode pelo firebase CLI com --project <id>, ou exporte GCLOUD_PROJECT.',
     ]);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(INSTANCES, projectId) && INSTANCES[projectId] === null) {
+    console.log(`· ${projectId} não serve app (só Hosting/Firestore) — nada a verificar`);
+    return;
   }
 
   const base = INSTANCES[projectId];
