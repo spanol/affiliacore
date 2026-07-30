@@ -966,6 +966,32 @@ describe('create-user enum de role (R25)', () => {
       .send({ name: 'X', email: 'x@y.com', password: 'secret123', role: 'client' })
       .expect(200);
     expect(res.body.uid).toBe('new-c');
+    expect(res.body.created).toBe(true);
+  });
+
+  // Incidente Infinity (30/07/2026): a conta do e-mail JA' existia (autocadastro do
+  // proprio usuario) e a rota devolveu so' o uid, indistinguivel de criacao. Quem
+  // chamou tratou como conta nova e depois a excluiu, derrubando o acesso de quem
+  // ja' usava. Reaproveitar e' correto; esconder que reaproveitou, nao.
+  it('e-mail JA existente → 200 com created:false (e a senha do corpo NAO e aplicada)', async () => {
+    const app = createApp({
+      adminApp: makeAdminApp({
+        createUser: () => {
+          const e: any = new Error('já existe');
+          e.code = 'auth/email-already-exists';
+          throw e;
+        },
+        getUserByEmail: () => ({ uid: 'uid-existente' }),
+      }),
+      adminDb: makeFirestore(seed),
+    });
+    const res = await request(app)
+      .post('/api/create-user')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ name: 'X', email: 'ja@existe.com', password: 'nova-senha', role: 'admin' })
+      .expect(200);
+    expect(res.body.uid).toBe('uid-existente');
+    expect(res.body.created).toBe(false);
   });
 });
 

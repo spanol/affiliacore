@@ -939,6 +939,14 @@ export function createApp(deps: ServerDeps) {
         return res.status(400).json({ error: 'Papel inválido. Use "admin" ou "client".' });
       }
       let userRecord: admin.auth.UserRecord;
+      // `created` distingue conta NOVA de conta REAPROVEITADA. A rota sempre
+      // devolveu só o uid, e quem chamava não tinha como saber que o e-mail já
+      // existia — o que fez uma conta em uso (autocadastro do próprio usuário)
+      // ser tratada como recém-criada na Infinity em 30/07/2026, e depois
+      // excluída. Reaproveitar continua sendo o comportamento certo (idempotência);
+      // o que faltava era DIZER. ⚠️ Reaproveitar NÃO troca a senha: o password do
+      // corpo é ignorado quando o e-mail já existe.
+      let created = true;
 
       try {
         userRecord = await adminApp.auth().createUser({
@@ -949,6 +957,7 @@ export function createApp(deps: ServerDeps) {
       } catch (error: any) {
         if (error.code === 'auth/email-already-exists') {
           userRecord = await adminApp.auth().getUserByEmail(normalizedEmail);
+          created = false;
         } else {
           throw error;
         }
@@ -978,10 +987,11 @@ export function createApp(deps: ServerDeps) {
           role: normalizedRole,
           affiliateId: affiliateId ? String(affiliateId) : null,
           mustChangePassword: !!mustChangePassword,
+          created,
         },
       });
 
-      return res.json({ uid: userRecord.uid });
+      return res.json({ uid: userRecord.uid, created });
     } catch (error: any) {
       console.error('Error creating auth user:', error);
       return res.status(500).json({ error: error.message || 'Erro interno criando usuário.' });
