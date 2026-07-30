@@ -208,6 +208,10 @@ export interface SpecialLike {
   affiliateId?: string;
   active?: boolean;
   subAffiliateIds?: unknown[];
+  // Registro cuja sub-rede é DERIVADA da árvore (lib/specialNetwork). Não é fonte
+  // de hierarquia: a lista dele tem N níveis, então virar aresta achataria a
+  // estrutura (neto → gerente do topo) e mudaria o custo da agência.
+  fromNetwork?: boolean;
 }
 export function uplineMapFromSpecials(
   specials: Record<string, SpecialLike> | null | undefined,
@@ -217,6 +221,7 @@ export function uplineMapFromSpecials(
   const map: UplineMap = {};
   for (const [key, s] of Object.entries(specials || {})) {
     if (!s) continue;
+    if (s.fromNetwork === true) continue; // a hierarquia dele já está em affiliate_uplines
     if (activeOnly && s.active !== true) continue;
     const parent = String(s.affiliateId ?? key);
     for (const sub of Array.isArray(s.subAffiliateIds) ? s.subAffiliateIds : []) {

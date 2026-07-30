@@ -6,7 +6,7 @@ import { useToast } from '../contexts/ToastContext';
 import {
   fetchSpecialAffiliates,
   fetchAffiliates,
-  fetchAllResults,
+  fetchResultsForAffiliates,
   fetchManualResults,
   fetchAffiliateConfigs,
   saveSubAffiliateConfig,
@@ -23,6 +23,10 @@ import { DateRange, getDefaultRange } from '../lib/dateRange';
 import { cn, humanizeName } from '../lib/utils';
 
 const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+// Sub que ele VÊ mas não repassa (neto na rede N níveis): quem define a comissão é
+// o gerente logo acima dele. Ver "visão ≠ dinheiro" em src/lib/specialNetwork.ts.
+const INDIRECT_HINT = 'Indicado indireto — a comissão dele é definida por quem está acima dele na rede.';
 
 // Passo 3 · Lista de sub-afiliados do afiliado especial — espelha o "Afiliados" do
 // master, capado à própria rede. Cada sub abre a AffiliateDetails escopada
@@ -56,16 +60,22 @@ export default function SpecialSubAffiliates() {
     if (!ownId) return;
     try {
       setLoading(true);
-      const [specials, rows, cfgs, poolData, manual] = await Promise.all([
-        fetchSpecialAffiliates(),
-        fetchAllResults(range),
+      // A rede precisa ser conhecida ANTES dos resultados: as métricas por sub saem
+      // de `fetchResultsForAffiliates`, que funde OTG + casas MANUAIS. Antes era
+      // `fetchAllResults` (OTG puro) e, numa instância OTG-free, a tabela inteira
+      // saía ZERADA com o selo "com produção" ao lado — o manual só alimentava o
+      // selo. Mesmo merge do SpecialDashboard. [[CLAUDE.md · merge OTG+manual]]
+      const specials = await fetchSpecialAffiliates();
+      const mine = specials[ownId] || null;
+      const networkIds = [ownId, ...((mine?.subAffiliateIds || []).map(String))];
+      const [rows, cfgs, poolData, manual] = await Promise.all([
+        fetchResultsForAffiliates(networkIds, range),
         fetchAffiliateConfigs(),
         fetchAffiliates().catch(() => []),
         // Casas MANUAIS entram na atividade: sem isto, numa instância OTG-free
         // todo sub aparecia como parado. `fetchManualResults` já degrada p/ [].
         fetchManualResults(range).catch(() => []),
       ]);
-      const mine = specials[ownId] || null;
       setSpecial(mine);
       setResults(Array.isArray(rows) ? rows : []);
       setManualRows(Array.isArray(manual) ? manual : []);
@@ -109,20 +119,42 @@ export default function SpecialSubAffiliates() {
     [results, manualRows]
   );
 
+  // Quem ele REPASSA (indicados diretos) ⊆ quem ele VÊ. Numa rede de N níveis a
+  // equipe visível inclui netos, mas a comissão deles é definida pelo gerente do
+  // meio — o servidor recusa (403) e a tela não pode oferecer o campo. O conjunto
+  // vem RESOLVIDO do servidor; sem ele (modelo antigo) todo sub é direto.
+  const directIds = useMemo(
+    () => new Set((special?.directSubAffiliateIds ?? special?.subAffiliateIds ?? []).map(String)),
+    [special]
+  );
+
   // Enriquece cada sub com nome, marca e atividade (produção no período) para
   // alimentar busca/filtros sem recomputar dentro do .map de renderização.
+  // Nome pelo MIRROR `affiliates` quando a linha de resultado não traz (é o caso de
+  // toda instância OTG-free): sem isto a equipe do gerente aparecia como uma lista
+  // de ids crus (`#boost_9e63...`).
+  const nameFromPool = useMemo(() => {
+    const map: Record<string, string> = {};
+    (pool || []).forEach((a: any) => {
+      const aid = String(a?.id ?? a?._id ?? '');
+      const nm = a?.name || a?.label || '';
+      if (aid && nm) map[aid] = String(nm);
+    });
+    return map;
+  }, [pool]);
+
   const subs = useMemo(() => subIds.map((id) => {
     const r = rowById(id) || {};
     const producing = producingIds.has(String(id));
     return {
       id,
       row: r,
-      name: humanizeName(r.affiliate_name || r.name || r.label || `#${id}`),
+      name: humanizeName(r.affiliate_name || r.name || r.label || nameFromPool[id] || `#${id}`),
       brand: getBrandName(r),
       producing,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [special, results, producingIds]);
+  }), [special, results, producingIds, nameFromPool]);
 
   const availableBrands = useMemo(() => uniqueBrands(subs.map((s) => s.row)), [subs]);
 
@@ -294,6 +326,7 @@ export default function SpecialSubAffiliates() {
                       // Seu ganho = spread (taxa própria − taxa do sub) sobre a produção
                       // dele, na taxa POR CASA (byBrand) do sub — no-op sem override (R10).
                       const spread = calcAffiliatePayout(r, ownConfig, brandIdOf(id)) - calcAffiliatePayout(r, configs[id], brandIdOf(id));
+                      const canEdit = directIds.has(id);
                       return (
                         <tr
                           key={id}
@@ -318,7 +351,9 @@ export default function SpecialSubAffiliates() {
                                 type="number" min="0" max={ownConfig.cpaValue || 0} step="0.01"
                                 value={subEdits[id]?.cpaValue ?? 0}
                                 onChange={(e) => handleSubChange(id, 'cpaValue', e.target.value)}
-                                className="w-24 pl-7 pr-2 py-1.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
+                                disabled={!canEdit}
+                                title={canEdit ? undefined : INDIRECT_HINT}
+                                className="w-24 pl-7 pr-2 py-1.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white disabled:opacity-40 disabled:cursor-not-allowed"
                               />
                             </div>
                           </td>
@@ -329,7 +364,9 @@ export default function SpecialSubAffiliates() {
                                 type="number" min="0" max={ownConfig.revPercentage || 0} step="0.1"
                                 value={subEdits[id]?.revPercentage ?? 0}
                                 onChange={(e) => handleSubChange(id, 'revPercentage', e.target.value)}
-                                className="w-24 pl-6 pr-2 py-1.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
+                                disabled={!canEdit}
+                                title={canEdit ? undefined : INDIRECT_HINT}
+                                className="w-24 pl-6 pr-2 py-1.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white disabled:opacity-40 disabled:cursor-not-allowed"
                               />
                             </div>
                           </td>
@@ -337,8 +374,8 @@ export default function SpecialSubAffiliates() {
                             <div className="flex items-center justify-end gap-2">
                               <button
                                 onClick={() => handleSaveSub(id)}
-                                disabled={savingSub === id}
-                                title="Salvar comissão"
+                                disabled={savingSub === id || !canEdit}
+                                title={canEdit ? 'Salvar comissão' : INDIRECT_HINT}
                                 className="p-2 rounded-lg bg-accent-50 text-accent-600 hover:bg-accent-500 hover:text-accent-contrast dark:bg-accent-900/10 dark:text-accent-400 dark:hover:bg-accent-500 dark:hover:text-accent-contrast transition-all disabled:opacity-50"
                               >
                                 {savingSub === id ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
@@ -363,6 +400,7 @@ export default function SpecialSubAffiliates() {
               <div className="md:hidden divide-y divide-slate-100 dark:divide-neutral-800">
                 {filteredSubs.map(({ id, row: r, name, producing }) => {
                   const spread = calcAffiliatePayout(r, ownConfig) - calcAffiliatePayout(r, configs[id]);
+                  const canEdit = directIds.has(id);
                   const stats = [
                     { label: 'Cadastros', value: (r.registrations || 0).toLocaleString('pt-BR') },
                     { label: 'Depósitos', value: (r.first_deposits || 0).toLocaleString('pt-BR') },
@@ -400,8 +438,14 @@ export default function SpecialSubAffiliates() {
                       </div>
                       <div className="pt-3 border-t border-slate-100 dark:border-neutral-800">
                         <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-2">
-                          Comissão do sub <span className="normal-case font-medium">(teto: R$ {ownConfig.cpaValue}/CPA · {ownConfig.revPercentage}% REV)</span>
+                          Comissão do sub{' '}
+                          <span className="normal-case font-medium">
+                            {canEdit ? `(teto: R$ ${ownConfig.cpaValue}/CPA · ${ownConfig.revPercentage}% REV)` : '(indicado indireto)'}
+                          </span>
                         </p>
+                        {!canEdit && (
+                          <p className="mb-2 text-[10px] text-slate-500 dark:text-neutral-400">{INDIRECT_HINT}</p>
+                        )}
                         <div className="flex items-center gap-2">
                           <div className="relative flex-1">
                             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 dark:text-neutral-500">R$</span>
@@ -409,7 +453,8 @@ export default function SpecialSubAffiliates() {
                               type="number" min="0" max={ownConfig.cpaValue || 0} step="0.01"
                               value={subEdits[id]?.cpaValue ?? 0}
                               onChange={(e) => handleSubChange(id, 'cpaValue', e.target.value)}
-                              className="w-full pl-7 pr-2 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
+                              disabled={!canEdit}
+                              className="disabled:opacity-40 disabled:cursor-not-allowed w-full pl-7 pr-2 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
                             />
                           </div>
                           <div className="relative flex-1">
@@ -418,12 +463,13 @@ export default function SpecialSubAffiliates() {
                               type="number" min="0" max={ownConfig.revPercentage || 0} step="0.1"
                               value={subEdits[id]?.revPercentage ?? 0}
                               onChange={(e) => handleSubChange(id, 'revPercentage', e.target.value)}
-                              className="w-full pl-6 pr-2 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
+                              disabled={!canEdit}
+                              className="disabled:opacity-40 disabled:cursor-not-allowed w-full pl-6 pr-2 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
                             />
                           </div>
                           <button
                             onClick={() => handleSaveSub(id)}
-                            disabled={savingSub === id}
+                            disabled={savingSub === id || !canEdit}
                             className="p-2 rounded-lg bg-accent-50 text-accent-600 hover:bg-accent-500 hover:text-accent-contrast dark:bg-accent-900/10 dark:text-accent-400 dark:hover:bg-accent-500 dark:hover:text-accent-contrast transition-all disabled:opacity-50"
                           >
                             {savingSub === id ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}

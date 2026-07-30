@@ -1,9 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
-import { Crown, X, Save, Loader2, Search } from 'lucide-react';
+import { Crown, X, Save, Loader2, Search, Network as NetworkIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { saveSpecialAffiliate, SpecialAffiliate } from '../services/affiliateService';
+import {
+  saveSpecialAffiliate,
+  fetchAffiliateUplines,
+  buildScopeTree,
+  descendantsOf,
+  SpecialAffiliate,
+  UplineMap,
+} from '../services/affiliateService';
 import { useToast } from '../contexts/ToastContext';
 
 interface AffiliateLite {
@@ -32,9 +39,52 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
   const existing = specials[espId];
 
   const [active, setActive] = useState(existing?.active ?? false);
-  const [subs, setSubs] = useState<string[]>(existing?.subAffiliateIds ?? []);
+  // Sub-rede AUTOMÁTICA: em vez de uma lista escolhida à mão, o servidor deriva a
+  // subárvore do afiliado em `affiliate_uplines` a cada leitura. É o modo dos
+  // gerentes vindos da rede migrada — a lista à mão rotaria a cada aresta nova.
+  const [fromNetwork, setFromNetwork] = useState(existing?.fromNetwork ?? false);
+  const [subs, setSubs] = useState<string[]>(existing?.fromNetwork ? [] : (existing?.subAffiliateIds ?? []));
+  const [uplines, setUplines] = useState<UplineMap | null>(null);
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // A árvore só é buscada quando o modo automático entra em cena (endpoint admin).
+  useEffect(() => {
+    if (!fromNetwork || uplines) return;
+    fetchAffiliateUplines().then(setUplines).catch(() => setUplines({}));
+  }, [fromNetwork, uplines]);
+
+  // Prévia do que o gerente passará a enxergar. Mesma função pura que o servidor
+  // usa para resolver o escopo — a tela não reimplementa a derivação.
+  // ⚠️ Simula o estado PÓS-save: o registro DESTE afiliado sai das fontes de
+  // hierarquia, porque salvar em modo automático apaga a lista dele. Sem isso a
+  // prévia contaria os vínculos que o próprio save vai desfazer (medido na demo:
+  // mostrava 6, salvaria 4).
+  const specialsAfterSave = useMemo(() => {
+    const rest: Record<string, SpecialAffiliate> = { ...specials };
+    delete rest[espId];
+    return rest;
+  }, [specials, espId]);
+
+  const derivedSubs = useMemo(() => {
+    if (!fromNetwork || !uplines) return [];
+    const tree = buildScopeTree({
+      uplines,
+      specials: specialsAfterSave,
+      ids: allAffiliates.map((a) => String(a.id)),
+    });
+    return descendantsOf(tree, espId);
+  }, [fromNetwork, uplines, specialsAfterSave, allAffiliates, espId]);
+
+  // Quem estava vinculado SÓ pela lista manual e não tem upline na árvore: ligar o
+  // modo automático os solta da estrutura — e isso MUDA O CUSTO DA AGÊNCIA (viram
+  // topo de estrutura própria e passam a ser pagos pela taxa própria, não pela do
+  // gerente). Nunca deixe isso acontecer em silêncio.
+  const orphans = useMemo(() => {
+    if (!fromNetwork || !uplines) return [];
+    const derived = new Set(derivedSubs);
+    return (existing?.subAffiliateIds ?? []).map(String).filter((id) => !derived.has(id));
+  }, [fromNetwork, uplines, derivedSubs, existing]);
 
   const toggleSub = (subId: string) =>
     setSubs((prev) => (prev.includes(subId) ? prev.filter((s) => s !== subId) : [...prev, subId]));
@@ -44,8 +94,16 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
   );
   const takenByOthers = new Set<string>();
   Object.values(specials).forEach((s) => {
+    // Especial com sub-rede derivada NÃO "toma" ninguém: a subárvore dele se
+    // sobrepõe à dos gerentes abaixo por construção (é uma cascata, não uma
+    // partição). Contar isso bloquearia promover o gerente do meio.
+    if (s.fromNetwork) return;
     if (String(s.affiliateId) !== espId && s.active) s.subAffiliateIds.forEach((id) => takenByOthers.add(String(id)));
   });
+  const nameOf = (id: string) => {
+    const a = allAffiliates.find((x) => String(x.id) === id);
+    return a?.name || a?.label || `#${id}`;
+  };
   const q = search.toLowerCase();
   const eligible = allAffiliates.filter((a) => {
     const id = String(a.id);
@@ -63,7 +121,8 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
       await saveSpecialAffiliate({
         affiliateId: espId,
         active,
-        subAffiliateIds: active ? subs : [],
+        fromNetwork: active && fromNetwork,
+        subAffiliateIds: active && !fromNetwork ? subs : [],
       });
       push({ type: 'success', message: active ? 'Afiliado especial salvo.' : 'Afiliado especial desativado.' });
       onSaved?.();
@@ -120,6 +179,67 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
                 dele é o spread sobre a taxa própria.
               </p>
 
+              <label className="flex items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-neutral-800/40 border border-slate-100 dark:border-neutral-800 cursor-pointer">
+                <div>
+                  <p className="text-sm font-bold text-slate-800 dark:text-neutral-100 flex items-center gap-1.5">
+                    <NetworkIcon size={14} className="text-accent-500" /> Sub-rede automática
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5">
+                    Segue a árvore da <span className="font-semibold">/rede</span>: ele vê toda a
+                    estrutura abaixo dele, e quem entrar depois aparece sozinho.
+                  </p>
+                </div>
+                <input type="checkbox" checked={fromNetwork} onChange={(e) => setFromNetwork(e.target.checked)} className="w-5 h-5 accent-accent-500" />
+              </label>
+
+              {fromNetwork ? (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest">Equipe derivada da árvore</p>
+                    <span className="text-[10px] font-bold text-accent-600 dark:text-accent-400">
+                      {uplines ? `${derivedSubs.length} afiliado(s)` : 'carregando…'}
+                    </span>
+                  </div>
+                  <div className="max-h-52 overflow-y-auto rounded-xl border border-slate-100 dark:border-neutral-800 divide-y divide-slate-100 dark:divide-neutral-800">
+                    {!uplines ? (
+                      <p className="p-4 text-center text-[11px] text-slate-400 dark:text-neutral-500 flex items-center justify-center gap-2">
+                        <Loader2 size={12} className="animate-spin" /> Lendo a árvore…
+                      </p>
+                    ) : derivedSubs.length === 0 ? (
+                      <p className="p-4 text-center text-[11px] text-slate-400 dark:text-neutral-500">
+                        Ninguém abaixo dele na árvore. Defina os uplines em <span className="font-semibold">/rede</span> antes de ativar este modo.
+                      </p>
+                    ) : derivedSubs.map((sid) => (
+                      <div key={sid} className="flex items-center gap-3 px-3 py-2.5">
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-xs font-semibold text-slate-700 dark:text-neutral-200 truncate">{nameOf(sid)}</span>
+                          <span className="block text-[10px] font-mono text-slate-400 dark:text-neutral-500">#{sid}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {orphans.length > 0 && (
+                    <div className="mt-2 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2.5">
+                      <p className="font-bold mb-1">
+                        {orphans.length} afiliado(s) SAEM da estrutura ao salvar
+                      </p>
+                      <p>
+                        {orphans.map(nameOf).join(', ')} — estavam vinculados só por esta lista, sem
+                        upline na <span className="font-semibold">/rede</span>. Sem a aresta, cada um
+                        volta a ser topo de estrutura própria e passa a ser pago pela taxa dele, não
+                        pela do gerente: <span className="font-semibold">isso muda o custo da agência</span>.
+                        Defina o upline deles em <span className="font-semibold">/rede</span> antes de salvar.
+                      </p>
+                    </div>
+                  )}
+
+                  <p className="mt-2 text-[11px] text-slate-500 dark:text-neutral-400 bg-slate-50 dark:bg-neutral-800/40 border border-slate-100 dark:border-neutral-800 rounded-xl px-3 py-2.5">
+                    Ele <span className="font-semibold">enxerga</span> toda a estrutura abaixo, mas só
+                    define a comissão de quem indicou <span className="font-semibold">diretamente</span> —
+                    a de quem está mais abaixo é do gerente do meio.
+                  </p>
+                </div>
+              ) : (
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest">Sub-afiliados</p>
@@ -153,6 +273,7 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
                   })}
                 </div>
               </div>
+              )}
             </>
           )}
         </div>

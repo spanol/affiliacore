@@ -34,6 +34,7 @@ import { canTransition, type PartnershipStatus } from './src/lib/partnership';
 import { normalizeLegalDocInput, computeNextVersion } from './src/lib/legal';
 import { canTransitionWithdrawal, normalizeWithdrawalAmount, type WithdrawalStatus } from './src/lib/withdrawal';
 import { buildNetworkTree, resolveRepasseCap, exceedsRepasseCap } from './src/lib/network';
+import { resolveSpecialSubIds, resolveDirectSubIds, isDirectDownline, type SpecialRecord } from './src/lib/specialNetwork';
 import {
   BACKUP_CODE_COUNT,
   buildOtpauthUrl,
@@ -653,6 +654,87 @@ export function createApp(deps: ServerDeps) {
     }
   });
 
+  // --- Registro do afiliado especial · resolução ÚNICA (papel + sub-rede) ------
+  // Toda barreira de escopo do não-admin (proxy externo, configs, analytics, casas
+  // manuais) sai daqui. Antes cada rota lia `special_affiliates/{id}` e usava
+  // `subAffiliateIds` cru; com a rede N-níveis a lista pode ser DERIVADA da árvore
+  // (`fromNetwork`), e derivar em 6 lugares divergiria. Ver src/lib/specialNetwork.ts.
+  const readUplineMap = async (): Promise<Record<string, string>> => {
+    const snap = await adminDb!.collection('affiliate_uplines').get();
+    const out: Record<string, string> = {};
+    snap.forEach((d) => {
+      const up = (d.data() as any)?.uplineId;
+      if (up) out[d.id] = String(up);
+    });
+    return out;
+  };
+
+  const readSpecialsMap = async (): Promise<Record<string, SpecialRecord>> => {
+    const snap = await adminDb!.collection('special_affiliates').get();
+    const out: Record<string, SpecialRecord> = {};
+    snap.forEach((d) => {
+      const data = (d.data() as any) ?? {};
+      out[d.id] = { ...data, affiliateId: d.id };
+    });
+    return out;
+  };
+
+  // Devolve o registro do especial com a sub-rede já RESOLVIDA (derivada da árvore
+  // quando `fromNetwork`, senão a lista gravada). `withSubs: false` pula as duas
+  // leituras extras quando o chamador só quer saber se é especial ativo.
+  const resolveSpecialRecord = async (
+    affiliateId: string,
+    opts: { withSubs?: boolean } = {}
+  ): Promise<SpecialRecord | null> => {
+    const affId = String(affiliateId || '');
+    if (!affId || !adminDb) return null;
+    const snap = await adminDb.collection('special_affiliates').doc(affId).get();
+    if (!snap.exists) return null;
+    const record: SpecialRecord = { ...(snap.data() as any), affiliateId: affId };
+    if (opts.withSubs === false) return record;
+    const [uplines, specials] = await Promise.all([readUplineMap(), readSpecialsMap()]);
+    return { ...record, subAffiliateIds: resolveSpecialSubIds(affId, record, { uplines, specials }) };
+  };
+
+  // Leitura do registro de especial pelo CLIENT (a rule é admin-only: o doc revela
+  // a estrutura comercial da rede). Admin recebe o mapa inteiro; o não-admin recebe
+  // só o próprio registro + o dos subs dele — o mesmo escopo do proxy externo, para
+  // que a tela do especial (/network) continue funcionando sem ler o Firestore.
+  app.get('/api/special-affiliates', requireAuth, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const user = (req as any).user;
+      const [uplines, stored] = await Promise.all([readUplineMap(), readSpecialsMap()]);
+      const resolved: Record<string, any> = {};
+      for (const [id, record] of Object.entries(stored)) {
+        const ctx = { uplines, specials: stored };
+        resolved[id] = {
+          ...record,
+          active: record.active === true,
+          fromNetwork: record.fromNetwork === true,
+          subAffiliateIds: resolveSpecialSubIds(id, record, ctx),
+          // Quem ele REPASSA (filhos diretos) ⊆ quem ele VÊ. A tela precisa dos dois
+          // para não oferecer um campo de taxa que o POST recusa com 403.
+          directSubAffiliateIds: resolveDirectSubIds(id, record, ctx),
+        };
+      }
+      if (user?.role === 'admin') return res.json({ specials: resolved });
+
+      const ownId = user?.affiliateId ? String(user.affiliateId) : '';
+      if (!ownId) return res.json({ specials: {} });
+      const own = resolved[ownId];
+      if (!own || own.active !== true) return res.json({ specials: {} });
+      const scoped: Record<string, any> = { [ownId]: own };
+      for (const sub of own.subAffiliateIds as string[]) {
+        if (resolved[sub]) scoped[sub] = resolved[sub];
+      }
+      return res.json({ specials: scoped });
+    } catch (error: any) {
+      console.error('[special-affiliates] get:', error);
+      return res.status(500).json({ error: error.message || 'Erro ao carregar afiliados especiais.' });
+    }
+  });
+
   // B3 · Afiliado especial define a comissão de um sub-afiliado da própria sub-rede.
   // `affiliate_configs` é admin-only nas rules; este endpoint grava via Admin SDK
   // após validar que o caller é o especial DAQUELE sub. COM teto: a taxa do sub não
@@ -674,11 +756,22 @@ export function createApp(deps: ServerDeps) {
       const rev = Number(revPercentage) || 0;
       if (cpa < 0 || rev < 0) return res.status(400).json({ error: 'Valores não podem ser negativos.' });
 
-      const specialSnap = await adminDb.collection('special_affiliates').doc(callerAffiliateId).get();
-      const special = specialSnap.exists ? (specialSnap.data() as any) : null;
+      const special = await resolveSpecialRecord(callerAffiliateId);
       if (!resolveIsSpecial(special)) return res.status(403).json({ error: 'Você não é um afiliado especial ativo.' });
-      const subs = Array.isArray(special.subAffiliateIds) ? special.subAffiliateIds.map((s: any) => String(s)) : [];
+      const subs = (special!.subAffiliateIds ?? []).map((s: any) => String(s));
       if (!subs.includes(subId)) return res.status(403).json({ error: 'Este afiliado não pertence à sua sub-rede.' });
+
+      // VISÃO ≠ DINHEIRO. A sub-rede que o especial LÊ tem N níveis (ele enxerga a
+      // equipe inteira), mas a taxa ele só define para o filho DIRETO: quem paga o
+      // neto é o gerente do meio, e mexer nessa taxa por cima mudaria o spread dele
+      // sem que ele soubesse. Regressão-zero no modelo de 2 níveis, onde
+      // `subAffiliateIds` JÁ é a lista de filhos diretos. Ver lib/specialNetwork.
+      const [uplines, specials] = await Promise.all([readUplineMap(), readSpecialsMap()]);
+      if (!isDirectDownline(subId, callerAffiliateId, { uplines, specials })) {
+        return res.status(403).json({
+          error: 'Este afiliado não é seu indicado direto — a comissão dele é definida por quem está acima dele na rede.',
+        });
+      }
 
       // Teto = taxa própria do especial (affiliate_configs do callerAffiliateId). A
       // taxa do sub não pode passar do teto (senão o spread do upline fica negativo).
@@ -737,14 +830,21 @@ export function createApp(deps: ServerDeps) {
   app.post('/api/special-affiliates', requireAdmin, async (req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     try {
-      const { affiliateId, active, subAffiliateIds } = req.body ?? {};
+      const { affiliateId, active, subAffiliateIds, fromNetwork } = req.body ?? {};
       const affId = affiliateId != null ? String(affiliateId).trim() : '';
       if (!affId) return res.status(400).json({ error: 'affiliateId é obrigatório.' });
       const isActive = active === true;
-      const subs = Array.isArray(subAffiliateIds) ? subAffiliateIds.map((s: any) => String(s)) : [];
+      // Modo DERIVADO: a sub-rede sai da árvore (`affiliate_uplines`) a cada leitura
+      // e a lista NÃO é gravada — uma lista congelada rotaria em silêncio a cada
+      // aresta nova, e o gerente deixaria de ver quem entrou na equipe dele depois.
+      const derived = isActive && fromNetwork === true;
+      const subs = derived
+        ? []
+        : (Array.isArray(subAffiliateIds) ? subAffiliateIds.map((s: any) => String(s)) : []);
 
       await adminDb.collection('special_affiliates').doc(affId).set({
         active: isActive,
+        fromNetwork: derived,
         subAffiliateIds: isActive ? subs : [],
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
@@ -761,7 +861,24 @@ export function createApp(deps: ServerDeps) {
         await batch.commit();
       }
 
-      return res.json({ affiliateId: affId, active: isActive, subAffiliateIds: isActive ? subs : [], linkedUsers: usersSnap.size });
+      // A resposta devolve a sub-rede EFETIVA (derivada, quando for o caso) — é o
+      // que o admin precisa ver para confirmar quantas pessoas o gerente passou a
+      // enxergar.
+      const effectiveSubs = isActive
+        ? (derived
+            ? resolveSpecialSubIds(affId, { active: true, fromNetwork: true }, {
+                uplines: await readUplineMap(),
+                specials: await readSpecialsMap(),
+              })
+            : subs)
+        : [];
+      return res.json({
+        affiliateId: affId,
+        active: isActive,
+        fromNetwork: derived,
+        subAffiliateIds: effectiveSubs,
+        linkedUsers: usersSnap.size,
+      });
     } catch (error: any) {
       console.error('Error saving special affiliate:', error);
       return res.status(500).json({ error: error.message || 'Erro interno salvando afiliado especial.' });
@@ -773,16 +890,8 @@ export function createApp(deps: ServerDeps) {
   // da Infinity praticava (4). A aresta é EXPLÍCITA e sobrevive ao sync do mirror
   // `affiliates`. Server-only (rule admin-only): quem é upline de quem determina
   // dinheiro (o "lucro sobre equipe"), então nem leitura vai direto ao Firestore.
-  // Ver REDE-AFILIADOS.md e src/lib/network.ts.
-  const readUplineMap = async (): Promise<Record<string, string>> => {
-    const snap = await adminDb!.collection('affiliate_uplines').get();
-    const out: Record<string, string> = {};
-    snap.forEach((d) => {
-      const up = (d.data() as any)?.uplineId;
-      if (up) out[d.id] = String(up);
-    });
-    return out;
-  };
+  // Ver REDE-AFILIADOS.md e src/lib/network.ts. (`readUplineMap` é o helper
+  // compartilhado definido junto do resolvedor de especial, mais acima.)
 
   app.get('/api/affiliate-uplines', requireAdmin, async (_req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
@@ -1028,8 +1137,7 @@ export function createApp(deps: ServerDeps) {
       // isSpecial espelha special_affiliates (existe e ativo). resolveIsSpecial unifica
       // a regra (active === true) — antes este site usava `active !== false` e divergia
       // dos demais quando o doc não tinha o campo `active`. [[R7]]
-      const specialSnap = await adminDb.collection('special_affiliates').doc(affId).get();
-      const isSpecial = resolveIsSpecial(specialSnap.exists ? (specialSnap.data() as any) : null);
+      const isSpecial = resolveIsSpecial(await resolveSpecialRecord(affId, { withSubs: false }));
 
       // Lê o doc atual ANTES do set p/ a auditoria registrar o antes→depois real
       // de affiliateId/isSpecial (mudança de vínculo/escopo).
@@ -1106,10 +1214,9 @@ export function createApp(deps: ServerDeps) {
       // Própria config + (se especial ativo) as da sub-rede — mesmo escopo do proxy.
       const ids = new Set<string>([ownId]);
       try {
-        const specialSnap = await adminDb.collection('special_affiliates').doc(ownId).get();
-        const special = specialSnap.exists ? (specialSnap.data() as any) : null;
-        if (resolveIsSpecial(special) && Array.isArray(special.subAffiliateIds)) {
-          special.subAffiliateIds.forEach((s: any) => ids.add(String(s)));
+        const special = await resolveSpecialRecord(ownId);
+        if (resolveIsSpecial(special)) {
+          (special!.subAffiliateIds ?? []).forEach((s: any) => ids.add(String(s)));
         }
       } catch (e) {
         console.error('Erro ao carregar sub-rede p/ configs:', e);
@@ -1242,10 +1349,9 @@ export function createApp(deps: ServerDeps) {
 
       const ids = new Set<string>([ownId]);
       try {
-        const specialSnap = await adminDb.collection('special_affiliates').doc(ownId).get();
-        const special = specialSnap.exists ? (specialSnap.data() as any) : null;
-        if (resolveIsSpecial(special) && Array.isArray(special.subAffiliateIds)) {
-          special.subAffiliateIds.forEach((s: any) => ids.add(String(s)));
+        const special = await resolveSpecialRecord(ownId);
+        if (resolveIsSpecial(special)) {
+          (special!.subAffiliateIds ?? []).forEach((s: any) => ids.add(String(s)));
         }
       } catch (e) {
         console.error('Erro ao carregar sub-rede p/ analytics:', e);
@@ -2727,8 +2833,7 @@ export function createApp(deps: ServerDeps) {
       // Se este afiliado já foi marcado como especial ANTES de aceitar o convite,
       // espelha isSpecial no doc novo — senão ele se cadastra sem acesso à /network
       // (bug recorrente do especial sem flag). Resolvido pelo affiliateId do convite.
-      const specialSnap = await adminDb.collection('special_affiliates').doc(affId).get();
-      const isSpecial = resolveIsSpecial(specialSnap.exists ? (specialSnap.data() as any) : null);
+      const isSpecial = resolveIsSpecial(await resolveSpecialRecord(affId, { withSubs: false }));
 
       let userRecord: admin.auth.UserRecord;
       try {
@@ -2807,8 +2912,7 @@ export function createApp(deps: ServerDeps) {
         let special: any = null;
         if (adminDb && endpoint === 'results' && !id && user?.affiliateId) {
           try {
-            const specialSnap = await adminDb.collection('special_affiliates').doc(String(user.affiliateId)).get();
-            special = specialSnap.exists ? (specialSnap.data() as any) : null;
+            special = await resolveSpecialRecord(String(user.affiliateId));
           } catch (e) {
             console.error('Erro ao carregar sub-rede do afiliado especial:', e);
           }
@@ -3967,8 +4071,7 @@ export function createApp(deps: ServerDeps) {
         let special: any = null;
         if (user?.affiliateId) {
           try {
-            const specialSnap = await adminDb.collection('special_affiliates').doc(String(user.affiliateId)).get();
-            special = specialSnap.exists ? (specialSnap.data() as any) : null;
+            special = await resolveSpecialRecord(String(user.affiliateId));
           } catch (e) {
             console.error('Erro ao carregar sub-rede do afiliado especial:', e);
           }

@@ -83,9 +83,16 @@ service cloud.firestore {
     // B3 · Afiliado especial: marca o especial + sub-rede + taxa da sub-rede.
     // Só o master (admin) escreve; leitura liberada a signed-in (o especial
     // precisa ler a própria sub-rede; escopo fino fica no proxy/servidor).
+    // Registro do afiliado especial (papel + sub-rede). SECURITY: leitura admin-only
+    // — era `read: isSignedIn()` e qualquer afiliado logado lia o organograma
+    // comercial inteiro (quem gerencia quem), exatamente o que o comentário de
+    // `affiliate_uplines` logo abaixo justifica proteger. Enquanto a coleção estava
+    // vazia era vazamento teórico; ao registrar os gerentes da rede migrada viraria
+    // real. O client agora lê por `GET /api/special-affiliates`, que escopa por
+    // papel (admin = tudo; especial = próprio registro + subs). Espelha
+    // affiliate_configs. Ver §9 do REDE-AFILIADOS.md.
     match /special_affiliates/{affiliateId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
 
     // Rede de afiliados · aresta filho→upline (N níveis). Quem é upline de quem

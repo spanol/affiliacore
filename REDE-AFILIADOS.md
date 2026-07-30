@@ -257,3 +257,51 @@ migração (regressão-zero), com o master podendo abrir para a subárvore intei
   qualquer ponto.
 - Dívida que vale resolver junto: `POST /api/affiliate-uplines` **ainda não grava `audit_logs`** (§8.5).
   Se a aresta passa a definir também ACESSO, além de dinheiro, auditar deixa de ser opcional.
+
+### ✅ ENTREGUE (2026-07-30) — `fromNetwork`: a sub-rede derivada da árvore
+
+O desenho acima foi implementado com uma diferença: em vez de `visibilityDepth` numérico, o
+registro ganhou a flag **`fromNetwork`**, e o par visão/dinheiro foi separado explicitamente.
+
+**Núcleo puro:** `src/lib/specialNetwork.ts` (+ teste colocado).
+
+| Pergunta | Resposta | Função |
+|---|---|---|
+| O que ele **VÊ** | a subárvore INTEIRA (N níveis) | `resolveSpecialSubIds` |
+| De quem ele define a **TAXA** | só o filho **DIRETO** | `isDirectDownline` / `resolveDirectSubIds` |
+
+A separação não é cosmética: `subAffiliateIds` também é a lista que `POST /api/special/sub-config`
+aceita. Dar a subárvore inteira sem restringir a escrita deixaria o gerente do topo mexer no
+repasse de um **neto** — mudando o spread do gerente do meio sem que ele soubesse.
+
+**O que mudou, por fase do plano acima:**
+
+1. ✅ **Escopo pela árvore.** As 6 leituras diretas de `special_affiliates` no `server.ts` viraram um
+   helper único, `resolveSpecialRecord`, que resolve a sub-rede antes de devolver. `resolveScopedAffiliateIds`
+   não mudou — recebe a lista já resolvida.
+2. ✅ **Servidor devolve a sub-rede.** `GET /api/special-affiliates` (requireAuth) escopa por papel:
+   admin recebe o mapa inteiro; o especial recebe só o próprio registro + o dos subs. `fetchSpecialAffiliates`
+   manteve a assinatura — os 8 call sites não mudaram.
+3. ✅ **Rule fechada** para `read, write: if isAdmin()`.
+4. ↔️ **Profundidade** virou a flag `fromNetwork` (subárvore inteira) em vez de um inteiro. Um
+   `visibilityDepth` intermediário continua possível se algum cliente pedir.
+5. ⬜ `subAffiliateIds` **continua no documento** para quem NÃO é `fromNetwork` (o modelo de 2 níveis
+   do Boost). `uplineMapFromSpecials` segue vivo e cobre esses.
+
+**Derivação ao VIVO, não congelada.** No modo `fromNetwork` a lista não é gravada (`subAffiliateIds: []`)
+e é recalculada a cada leitura. Congelar faria a equipe do gerente rotar em silêncio a cada aresta nova.
+
+**⚠️ Um registro `fromNetwork` NÃO é fonte de hierarquia.** `uplineMapFromSpecials` e
+`buildSubToSpecialConfig` pulam esses registros: a lista derivada tem N níveis e, se voltasse a virar
+aresta, achataria a estrutura (neto → gerente do topo) e mudaria o custo da agência. Quem cobre esse
+caso é `buildRootConfigMap`, que sai da árvore de verdade.
+
+**⚠️ ARMADILHA DO OPERADOR (medida na demo).** Ligar o modo automático num especial que já existia
+**solta da estrutura** todo sub que estava vinculado *só* pela lista manual, sem aresta em
+`affiliate_uplines` — cada um vira topo próprio e passa a ser pago pela taxa dele, não pela do gerente.
+Medido: lucro da agência 11.559,00 → 11.884,30, com o delta saindo INTEIRO do "lucro sobre equipe"
+(1.250,10 → 924,80) e o repasse direto intocado. Depois de criar as duas arestas na `/rede`, voltou
+exato ao baseline. Por isso o modal **avisa em âmbar e nomeia quem sairia** antes de salvar.
+
+**Dívida que continua aberta:** o teto de repasse no caminho do admin (`PATCH /api/affiliate-configs/:id`).
+`POST /api/affiliate-uplines` **já audita** (`network.set_upline`/`clear_upline`) — a §8.5 está desatualizada.

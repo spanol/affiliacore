@@ -555,6 +555,135 @@ describe('POST /api/special/sub-config — taxa do sub também vira config.updat
 });
 
 // =============================================================================
+// Especial com sub-rede DERIVADA da árvore (fromNetwork) — visão N níveis,
+// escrita de taxa só no filho DIRETO. Ver src/lib/specialNetwork.ts e §9 do
+// REDE-AFILIADOS.md.
+// =============================================================================
+describe('special_affiliates com fromNetwork — visão N níveis, dinheiro 1 nível', () => {
+  // topo → GER (o gerente) → LID → PONTA
+  const seed = {
+    users: {
+      'ger-uid': { role: 'client', affiliateId: 'GER', name: 'Gerente' },
+      'admin-uid': { role: 'admin', name: 'Master' },
+      'plain-uid': { role: 'client', affiliateId: 'PONTA', name: 'Ponta' },
+    },
+    special_affiliates: { GER: { active: true, fromNetwork: true, subAffiliateIds: [] } },
+    affiliate_uplines: {
+      GER: { uplineId: 'TOPO' },
+      LID: { uplineId: 'GER' },
+      PONTA: { uplineId: 'LID' },
+      OUTRO: { uplineId: 'TOPO' },
+    },
+    affiliate_configs: {
+      GER: { cpaValue: 400, revPercentage: 30 },
+      LID: { affiliateId: 'LID', cpaValue: 100, revPercentage: 10 },
+      PONTA: { affiliateId: 'PONTA', cpaValue: 50, revPercentage: 5 },
+    },
+    affiliates: { LID: { id: 'LID', name: 'Lider' }, PONTA: { id: 'PONTA', name: 'Ponta' } },
+  };
+  const mk = () => {
+    const db = makeFirestore(seed);
+    return { db, app: createApp({ adminApp: makeAdminApp(), adminDb: db }) };
+  };
+
+  it('GET devolve a subárvore INTEIRA do gerente (o doc não guarda lista)', async () => {
+    const { app } = mk();
+    const resp = await request(app)
+      .get('/api/special-affiliates')
+      .set('Authorization', 'Bearer ger-uid')
+      .expect(200);
+    expect(resp.body.specials.GER.fromNetwork).toBe(true);
+    expect([...resp.body.specials.GER.subAffiliateIds].sort()).toEqual(['LID', 'PONTA']);
+    // ...e a tela recebe, separado, quem ele pode REPASSAR (só o filho direto).
+    expect(resp.body.specials.GER.directSubAffiliateIds).toEqual(['LID']);
+  });
+
+  it('GET não vaza o organograma: o gerente não vê o ramo irmão nem quem está acima', async () => {
+    const { app } = mk();
+    const resp = await request(app)
+      .get('/api/special-affiliates')
+      .set('Authorization', 'Bearer ger-uid')
+      .expect(200);
+    const visto = resp.body.specials.GER.subAffiliateIds as string[];
+    expect(visto).not.toContain('TOPO');
+    expect(visto).not.toContain('OUTRO');
+  });
+
+  it('GET: afiliado comum (não especial) recebe mapa VAZIO', async () => {
+    const { app } = mk();
+    const resp = await request(app)
+      .get('/api/special-affiliates')
+      .set('Authorization', 'Bearer plain-uid')
+      .expect(200);
+    expect(resp.body.specials).toEqual({});
+  });
+
+  it('GET: admin recebe o mapa inteiro, já resolvido', async () => {
+    const { app } = mk();
+    const resp = await request(app)
+      .get('/api/special-affiliates')
+      .set('Authorization', 'Bearer admin-uid')
+      .expect(200);
+    expect([...resp.body.specials.GER.subAffiliateIds].sort()).toEqual(['LID', 'PONTA']);
+  });
+
+  it('define a taxa do FILHO DIRETO → 200', async () => {
+    const { db, app } = mk();
+    await request(app)
+      .post('/api/special/sub-config')
+      .set('Authorization', 'Bearer ger-uid')
+      .send({ subAffiliateId: 'LID', cpaValue: 150, revPercentage: 10 })
+      .expect(200);
+    expect(db.__store.get('affiliate_configs')?.get('LID')?.cpaValue).toBe(150);
+  });
+
+  it('define a taxa do NETO → 403, mesmo ele estando na sub-rede que o gerente VÊ', async () => {
+    const { db, app } = mk();
+    const resp = await request(app)
+      .post('/api/special/sub-config')
+      .set('Authorization', 'Bearer ger-uid')
+      .send({ subAffiliateId: 'PONTA', cpaValue: 999, revPercentage: 10 })
+      .expect(403);
+    expect(resp.body.error).toContain('direto');
+    // O spread do gerente do meio (LID) fica intacto.
+    expect(db.__store.get('affiliate_configs')?.get('PONTA')?.cpaValue).toBe(50);
+  });
+
+  it('POST fromNetwork grava a FLAG e lista vazia, e responde com a sub-rede efetiva', async () => {
+    const db = makeFirestore({
+      users: { 'admin-uid': { role: 'admin' }, 'ger-uid': { role: 'client', affiliateId: 'GER' } },
+      affiliate_uplines: seed.affiliate_uplines,
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const resp = await request(app)
+      .post('/api/special-affiliates')
+      .set('Authorization', 'Bearer admin-uid')
+      // manda uma lista à mão junto: o modo derivado tem que IGNORAR
+      .send({ affiliateId: 'GER', active: true, fromNetwork: true, subAffiliateIds: ['X9'] })
+      .expect(200);
+    const doc = db.__store.get('special_affiliates')?.get('GER');
+    expect(doc.fromNetwork).toBe(true);
+    expect(doc.subAffiliateIds).toEqual([]); // lista congelada rotaria a cada aresta nova
+    expect([...resp.body.subAffiliateIds].sort()).toEqual(['LID', 'PONTA']);
+    // e o papel foi espelhado no login vinculado
+    expect(db.__store.get('users')?.get('ger-uid')?.isSpecial).toBe(true);
+  });
+
+  it('o proxy externo escopa pela subárvore derivada (IDOR)', async () => {
+    const { fetchImpl, calls } = captureFetch();
+    const app = buildApp({ seed, fetchImpl });
+    await request(app)
+      .get('/api/external/results?affiliateIds=GER,LID,PONTA,OUTRO')
+      .set('Authorization', 'Bearer ger-uid')
+      .expect(200);
+    const sent = decodeURIComponent(calls[0] ?? '');
+    expect(sent).toContain('GER');
+    expect(sent).toContain('PONTA'); // neto: dentro do escopo de LEITURA
+    expect(sent).not.toContain('OUTRO'); // ramo irmão: fora
+  });
+});
+
+// =============================================================================
 // Rede de afiliados — aresta filho→upline (affiliate_uplines), admin-only
 // =============================================================================
 describe('/api/affiliate-uplines — rede de afiliados (N níveis)', () => {

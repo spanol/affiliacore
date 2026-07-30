@@ -338,6 +338,10 @@ describe('coleções admin-only (servidor via Admin SDK; client direto negado)',
     // equipe" pago junto com o repasse direto) e revela a estrutura comercial da
     // rede inteira → server-only, nem leitura de signed-in. [[REDE-AFILIADOS.md]]
     'affiliate_uplines',
+    // Registro do especial: guarda a MESMA estrutura comercial da aresta acima
+    // (quem gerencia quem) — era signed-in-read e foi fechado ao registrar os
+    // gerentes da rede migrada. A tela do especial lê por GET /api/special-affiliates.
+    'special_affiliates',
     // settings/external_api tem FORMA de credencial → leitura admin-only (audit
     // 2026-06-24, espelha R5). Antes era signed-in-read; o doc é credential-shaped.
     'settings',
@@ -361,7 +365,6 @@ describe('coleções admin-only (servidor via Admin SDK; client direto negado)',
 describe('coleções legíveis por signed-in (escrita só admin)', () => {
   const SIGNED_IN_READ = [
     'affiliates',
-    'special_affiliates',
     'notices',
     'daily_rankings',
     // Catálogo de conquistas: é o roadmap que o afiliado persegue na tela dele.

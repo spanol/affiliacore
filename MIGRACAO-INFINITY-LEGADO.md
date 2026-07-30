@@ -430,3 +430,32 @@ propõe) **antes** de povoar, e mover a leitura do `SpecialDashboard` para o ser
 
 **Próximo passo acordado:** registrar o Maurício como especial (piloto de 1), com a subárvore dele, e só
 então decidir se replica para os outros 18.
+
+### ✅ Caminho escolhido (2026-07-30): o paliativo virou o definitivo
+
+Os dois caminhos da §8 foram fundidos: em vez de povoar `subAffiliateIds` com uma cópia congelada da
+subárvore, o registro do especial ganhou a flag **`fromNetwork`** e o servidor **deriva a sub-rede da
+árvore a cada leitura**. Detalhe do desenho e das armadilhas em `REDE-AFILIADOS.md` §9 (bloco ENTREGUE).
+
+O **pré-requisito de privacidade foi cumprido antes** de qualquer escrita: `special_affiliates` agora é
+`read, write: if isAdmin()`, e a tela do especial lê por `GET /api/special-affiliates` (escopado por papel).
+
+**Como registrar um gerente (o Maurício é o piloto de 1):**
+
+1. `/admin` → **Afiliados Especiais** (ou a ficha do afiliado) → **Gerir sub-rede**.
+2. Ligue **Ativar como afiliado especial** e **Sub-rede automática**.
+3. Confira a prévia — ela lista, pelo nome, a equipe que ele passará a enxergar.
+4. Salve. O `isSpecial` é espelhado no login dele pelo servidor; no próximo acesso ele cai na `/network`.
+
+Na Infinity o passo 3 é decisivo: como `special_affiliates` está **vazia** e as **141 arestas** já estão
+em `affiliate_uplines`, nenhum sub está pendurado por lista manual → o aviso âmbar de "N afiliados SAEM
+da estrutura" **não deve aparecer**. Se aparecer, pare: significa que alguém foi vinculado por fora da
+árvore, e salvar mudaria o custo da agência.
+
+**O que o Maurício vê:** a equipe inteira abaixo dele (N níveis) com métricas OTG **+ casas manuais**
+fundidas — o que, numa instância OTG-free como a Infinity, é a única fonte que existe. Ele define a
+comissão apenas de quem indicou **diretamente**; nos demais o campo aparece desabilitado, explicando que
+a taxa é do gerente do meio.
+
+**Depois do piloto:** replicar para os outros 18 topos é repetir os passos 1–4 por afiliado. A decisão de
+replicar é do operador — cada gerente que ganha a visão passa a enxergar a produção nominal da equipe.

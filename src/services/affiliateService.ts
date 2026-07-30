@@ -50,6 +50,8 @@ export {
   calcNetworkPayouts, buildRootConfigMap, descendantsOf, flattenTree, groupDropsByReason,
 } from '../lib/network';
 export type { NetworkTree, NetworkRow, NetworkPayoutResult, UplineMap } from '../lib/network';
+// Ponte especial ↔ árvore (sub-rede derivada). Núcleo PURO em lib/specialNetwork.
+export { buildScopeTree, resolveSpecialSubIds, isDirectDownline, isNetworkDerived } from '../lib/specialNetwork';
 
 // Acordos (deals) + parcerias (marketplace, P2). Re-exporta os puros p/ as páginas
 // importarem tudo do service (mesmo padrão do núcleo de comissão acima).
@@ -295,7 +297,13 @@ export async function saveAffiliateBrandRates(
 export interface SpecialAffiliate {
   affiliateId: string;
   active: boolean;
+  // Sub-rede EFETIVA. Quando `fromNetwork`, vem DERIVADA da árvore pelo servidor
+  // (N níveis) e não está gravada no doc — ver src/lib/specialNetwork.ts.
   subAffiliateIds: string[];
+  // Subconjunto de `subAffiliateIds` cuja comissão ele PODE definir (filhos diretos
+  // na árvore). Ver "visão ≠ dinheiro" em src/lib/specialNetwork.ts.
+  directSubAffiliateIds?: string[];
+  fromNetwork?: boolean;
   // @deprecated — o teto do master foi removido (o especial seta a rede livremente).
   // Mantidos opcionais só para compat com docs antigos; não são mais escritos/lidos.
   networkCpaValue?: number;
@@ -303,21 +311,33 @@ export interface SpecialAffiliate {
   updatedAt?: any;
 }
 
+// Vai pelo SERVIDOR, não direto no Firestore: `special_affiliates` guarda a
+// estrutura comercial da rede (quem gerencia quem) e a rule é admin-only. O
+// servidor escopa por papel — admin recebe o mapa inteiro; o afiliado especial
+// recebe só o próprio registro + o dos subs dele — e resolve a sub-rede derivada da
+// árvore. Mesmo padrão de `affiliate_configs`. Assinatura preservada: os 8 call
+// sites não mudaram.
 export async function fetchSpecialAffiliates(): Promise<Record<string, SpecialAffiliate>> {
   try {
-    const snap = await getDocs(collection(db, 'special_affiliates'));
+    const response = await authFetch('/api/special-affiliates');
+    if (!response.ok) return {};
+    const json = await response.json();
+    const raw = (json?.specials ?? {}) as Record<string, any>;
     const out: Record<string, SpecialAffiliate> = {};
-    snap.forEach((d) => {
-      const data = d.data() as any;
-      out[d.id] = {
-        affiliateId: d.id,
-        active: !!data.active,
-        subAffiliateIds: Array.isArray(data.subAffiliateIds) ? data.subAffiliateIds.map(String) : [],
-        networkCpaValue: Number(data.networkCpaValue) || 0,
-        networkRevPercentage: Number(data.networkRevPercentage) || 0,
-        updatedAt: data.updatedAt ?? null,
+    for (const [id, data] of Object.entries(raw)) {
+      out[id] = {
+        affiliateId: id,
+        active: !!data?.active,
+        subAffiliateIds: Array.isArray(data?.subAffiliateIds) ? data.subAffiliateIds.map(String) : [],
+        directSubAffiliateIds: Array.isArray(data?.directSubAffiliateIds)
+          ? data.directSubAffiliateIds.map(String)
+          : undefined,
+        fromNetwork: data?.fromNetwork === true,
+        networkCpaValue: Number(data?.networkCpaValue) || 0,
+        networkRevPercentage: Number(data?.networkRevPercentage) || 0,
+        updatedAt: data?.updatedAt ?? null,
       };
-    });
+    }
     return out;
   } catch (error) {
     console.error('Error fetching special affiliates:', error);
@@ -337,7 +357,10 @@ export async function saveSpecialAffiliate(data: SpecialAffiliate): Promise<void
     body: JSON.stringify({
       affiliateId: String(data.affiliateId),
       active: !!data.active,
-      subAffiliateIds: (data.subAffiliateIds ?? []).map(String),
+      // `fromNetwork` manda o servidor DERIVAR a sub-rede da árvore a cada leitura;
+      // nesse modo a lista não é gravada (senão rotaria a cada aresta nova).
+      fromNetwork: data.fromNetwork === true,
+      subAffiliateIds: data.fromNetwork === true ? [] : (data.subAffiliateIds ?? []).map(String),
     }),
   });
   if (!response.ok) {
@@ -986,6 +1009,10 @@ export function buildSubToSpecialConfig(
   const map: Record<string, AffiliateConfig> = {};
   for (const s of Object.values(specials || {})) {
     if (!s) continue;
+    // Especial com sub-rede DERIVADA da árvore não entra aqui: a lista dele tem N
+    // níveis e cobraria o neto à taxa do topo por este atalho, em vez de pela
+    // cascata. Quem cobre esse caso é `buildRootConfigMap` (sai da árvore real).
+    if (s.fromNetwork) continue;
     if (activeOnly && !s.active) continue;
     const parent = configs[String(s.affiliateId)];
     if (!parent) continue; // sem taxa do especial não há como cobrar a rede
