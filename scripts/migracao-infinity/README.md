@@ -13,9 +13,13 @@ Contexto, inventário e riscos: **`MIGRACAO-INFINITY-LEGADO.md`** na raiz.
 > os 146 itens da 1ª casa viraram 27 afiliados; a Stake achou 18 dos 19 já criados). **Convite de acesso
 > NÃO foi gerado** — ninguém recebeu login, é migração histórica.
 >
-> **⚠️ FALTA o passo 5 (taxas por afiliado).** Sem `affiliate_configs`, o repasse é 0 e o
-> "lucro líquido da agência" do `/admin` exibe a comissão inteira (R$ 36.830) como lucro.
-> O real é **R$ 36.830 − R$ 33.540 = R$ 3.290**. Enquanto o passo 5 não rodar, esse número está inflado.
+> **✅ Passo 5 (taxas por afiliado) EXECUTADO** — conferido na instância em 2026-07-30:
+> **193 pares (afiliado, casa)** em `affiliate_configs.byBrand` (super-bet-v2 137 · stake 38 ·
+> esportiva-bet 18), de 148 afiliados. O "lucro líquido" do `/admin` está correto (R$ 3.290, não
+> os R$ 36.830 de comissão bruta). Rodou pela fase 3 do conversor (`--only taxas`).
+>
+> **✅ Links da Esportiva migrados** em 2026-07-30 pela fase 4 (`--only links`): 11 links
+> atribuídos, conferidos e idempotentes. Ver a seção da fase 4 abaixo.
 
 ## Os arquivos
 
