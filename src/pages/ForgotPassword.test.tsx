@@ -50,6 +50,10 @@ describe('ForgotPassword', () => {
     expect(authArg).toBeDefined();
     expect(emailArg).toBe('teste@empresa.com');
     expect(settingsArg).toMatchObject({ handleCodeInApp: true });
-    expect(String(settingsArg.url)).toContain('/reset-password');
+    // continueUrl = para onde o usuário vai DEPOIS de trocar a senha. Tem que ser
+    // /login: /reset-password sem `oobCode` na query exibe "link inválido", ou seja,
+    // erro no fim de um fluxo que deu certo.
+    expect(String(settingsArg.url)).toContain('/login');
+    expect(String(settingsArg.url)).not.toContain('/reset-password');
   });
 });

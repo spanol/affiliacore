@@ -108,12 +108,24 @@ export function normalizeAuthEmail(email: string): string {
   return String(email || '').trim().toLowerCase();
 }
 
+// `url` aqui é o **continueUrl**: para onde o Firebase manda o usuário DEPOIS de
+// concluir a ação, não onde a ação acontece. Quem processa o `oobCode` é a página
+// do handler — por padrão a do Google (`<project>.firebaseapp.com/__/auth/action`),
+// e só vira a NOSSA `/reset-password` quando o projeto tem "URL de ação
+// personalizada" configurada no console (Authentication → Templates).
+//
+// Por isso o destino é `/login`: apontar para `/reset-password` mandava quem
+// acabou de trocar a senha para uma tela que, sem `oobCode` na query, exibe
+// "Link de redefinição inválido ou incompleto" — erro no fim de um fluxo que deu
+// certo (medido na Infinity em 2026-07-30). Com a URL de ação personalizada o
+// e-mail já leva direto à nossa tela COM o código, e este continueUrl deixa de
+// ser usado; `/login` está correto nos dois mundos.
 export function buildPasswordResetSettings() {
   const origin = typeof window !== 'undefined' && window.location?.origin
     ? window.location.origin
     : '';
   return {
-    url: `${origin}/reset-password`,
+    url: `${origin}/login`,
     handleCodeInApp: true,
   };
 }
