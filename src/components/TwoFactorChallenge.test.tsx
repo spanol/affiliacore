@@ -28,7 +28,7 @@ const json = (body: any, ok = true) => ({ ok, status: ok ? 200 : 400, json: asyn
 beforeEach(() => {
   vi.clearAllMocks();
   h.getIdToken.mockResolvedValue('token-novo');
-  h.refreshMfa.mockResolvedValue(undefined);
+  h.refreshMfa.mockResolvedValue(true); // sessão liberada (claim já no token novo)
 });
 
 describe('TwoFactorChallenge', () => {
@@ -46,6 +46,23 @@ describe('TwoFactorChallenge', () => {
     expect(JSON.parse(init.body)).toEqual({ code: '123456' });
     expect(h.getIdToken).toHaveBeenCalledWith(true); // claims novas só no token seguinte
     expect(h.refreshMfa).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /confirmar código/i })).toBeEnabled();
+    expect(screen.queryByText(/ainda não liberou/i)).not.toBeInTheDocument();
+  });
+
+  // Código certo mas a claim ainda não veio no token: sem aviso, o formulário só
+  // "pisca" e o usuário fica preso achando que errou o código.
+  it('código aceito sem liberar a sessão: avisa em vez de piscar em silêncio', async () => {
+    h.authFetch.mockResolvedValue(json({ verified: true, usedBackupCode: false, backupCodesRemaining: 10 }));
+    h.refreshMfa.mockResolvedValue(false);
+
+    render(<TwoFactorChallenge />);
+    fireEvent.change(screen.getByLabelText(/código do autenticador/i), { target: { value: '123456' } });
+    await act(async () => {
+      fireEvent.submit(screen.getByLabelText(/código do autenticador/i).closest('form')!);
+    });
+
+    expect(screen.getByText(/ainda não liberou/i)).toBeInTheDocument();
   });
 
   it('código errado: mostra o erro do servidor, limpa o campo e NÃO libera a sessão', async () => {

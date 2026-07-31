@@ -22,7 +22,13 @@ export default function TwoFactorChallenge() {
     setError('');
     try {
       await verifyTotpCode(code.trim());
-      await refreshMfa();
+      // O servidor aceitou, mas quem libera a tela é a claim no token seguinte. Se ela
+      // ainda não veio, diga — em silêncio o formulário só "pisca" e o usuário fica
+      // preso achando que digitou errado (o código já foi consumido, então é o próximo).
+      if (!(await refreshMfa())) {
+        setError('Código aceito, mas a sessão ainda não liberou. Aguarde o próximo código e tente novamente.');
+        setCode('');
+      }
     } catch (err: any) {
       setError(err?.message || 'Código inválido. Tente novamente.');
       setCode('');

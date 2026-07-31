@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { onAuthStateChanged, onIdTokenChanged, User } from 'firebase/auth';
 import { doc, getDocFromServer, onSnapshot } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { mfaPending as mfaPendingFromClaims, type MfaClaims } from '../lib/mfaSession';
@@ -21,8 +21,12 @@ interface AuthContextType {
   loading: boolean;
   /** 2FA ligado e ainda não confirmado NESTA sessão → o app mostra o desafio. */
   mfaPending: boolean;
-  /** Rechecar após digitar o código (renova o token p/ pegar as claims novas). */
-  refreshMfa: () => Promise<void>;
+  /**
+   * Rechecar após digitar o código (renova o token p/ pegar as claims novas).
+   * Devolve `true` quando a sessão FOI liberada — o desafio usa isso p/ não virar
+   * um beco silencioso se a claim ainda não estiver no token.
+   */
+  refreshMfa: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -30,7 +34,7 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   loading: true,
   mfaPending: false,
-  refreshMfa: async () => {},
+  refreshMfa: async () => false,
 });
 
 // Lê as claims do ID token. Este cálculo é de UX: quem ENFORÇA o 2FA é o servidor
@@ -51,6 +55,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [mfaPending, setMfaPending] = useState(false);
+  // "Já sabemos se ESTA sessão precisa do segundo fator?" Enquanto for false o app
+  // não pode renderizar rota autenticada — ver o comentário do portão, abaixo.
+  const [mfaResolved, setMfaResolved] = useState(false);
+
+  const resolveMfa = useCallback(async (currentUser: User | null) => {
+    const pending = await readMfaPending(currentUser);
+    setMfaPending(pending);
+    setMfaResolved(true);
+    return !pending;
+  }, []);
 
   // Rechecagem após digitar o código: renova o ID token (as claims novas só entram
   // no token seguinte) e recalcula o estado.
@@ -61,15 +75,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // sem rede/token: cai na leitura abaixo, que já é tolerante
     }
-    setMfaPending(await readMfaPending(currentUser ?? null));
-  }, []);
+    return resolveMfa(currentUser ?? null);
+  }, [resolveMfa]);
+
+  // `mfaPending` é função do TOKEN, não do estado de autenticação. Assinar também o
+  // onIdTokenChanged faz QUALQUER renovação recalcular o estado: a que o desafio
+  // dispara ao aceitar o código e a proativa do SDK. Sem isso, uma leitura de claims
+  // que falhou por rede (fail-open, abaixo) só se corrigia com F5.
+  useEffect(() => onIdTokenChanged(auth, (currentUser) => { void resolveMfa(currentUser); }), [resolveMfa]);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
-      setMfaPending(await readMfaPending(currentUser));
+
+      // PORTÃO: feche ANTES de qualquer await. A leitura das claims é assíncrona e o
+      // React renderiza no meio dela — sem isto o ProtectedRoute via {user: novo,
+      // profile: antigo, loading: false, mfaPending: false} e entregava o painel:
+      // o desafio de 2FA só aparecia depois de um F5, e na troca de conta o papel
+      // vinha do usuário anterior (R14). Os dois sintomas são a MESMA janela.
+      if (currentUser) {
+        // R14: na TROCA de conta (A→B), até o profile do novo usuário chegar, não
+        // exponha o perfil/loading do anterior — senão o ProtectedRoute roteia com o
+        // papel errado. Volta a "carregando" e limpa o perfil obsoleto; o snapshot
+        // abaixo seta os dois. (No 1º login já é o estado inicial; updates de profile
+        // NÃO repassam aqui, só o snapshot.)
+        setProfile(null);
+        setLoading(true);
+        setMfaResolved(false);
+      }
+
+      await resolveMfa(currentUser);
 
       if (unsubscribeProfile) {
         unsubscribeProfile();
@@ -77,13 +114,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (currentUser) {
-        // R14: na TROCA de conta (A→B), até o profile do novo usuário chegar, não
-        // exponha o perfil/loading do anterior — senão o ProtectedRoute roteia com o
-        // papel errado (user=B, profile=A, loading=false). Volta a "carregando" e
-        // limpa o perfil obsoleto; o snapshot abaixo seta os dois. (No 1º login já é
-        // o estado inicial; updates de profile NÃO repassam aqui, só o snapshot.)
-        setProfile(null);
-        setLoading(true);
         const path = `users/${currentUser.uid}`;
         try {
           const docRef = doc(db, 'users', currentUser.uid);
@@ -118,10 +148,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         unsubscribeProfile();
       }
     };
-  }, []);
+  }, [resolveMfa]);
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, mfaPending, refreshMfa }}>
+    <AuthContext.Provider
+      value={{ user, profile, loading: loading || !mfaResolved, mfaPending, refreshMfa }}
+    >
       {children}
     </AuthContext.Provider>
   );

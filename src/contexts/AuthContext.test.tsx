@@ -10,6 +10,8 @@ import { AuthProvider, useAuth } from './AuthContext';
 const h = vi.hoisted(() => ({
   authCallbacks: [] as any[],
   authUnsub: vi.fn(),
+  tokenCallbacks: [] as any[],
+  tokenUnsub: vi.fn(),
   snapshotRegs: [] as Array<{ onNext: any; onError: any; unsub: any }>,
   handleFirestoreError: vi.fn(),
 }));
@@ -18,6 +20,10 @@ vi.mock('firebase/auth', () => ({
   onAuthStateChanged: (_auth: any, cb: any) => {
     h.authCallbacks.push(cb);
     return h.authUnsub;
+  },
+  onIdTokenChanged: (_auth: any, cb: any) => {
+    h.tokenCallbacks.push(cb);
+    return h.tokenUnsub;
   },
 }));
 vi.mock('firebase/firestore', () => ({
@@ -64,11 +70,18 @@ async function fireSnapshot(idx: number, snap: any) {
     h.snapshotRegs[idx].onNext(snap);
   });
 }
+/** Dispara o listener de TOKEN (renovação de ID token), sem tocar no estado de auth. */
+async function fireToken(user: any) {
+  await act(async () => {
+    await h.tokenCallbacks[h.tokenCallbacks.length - 1](user);
+  });
+}
 const docExists = (data: any) => ({ exists: () => true, data: () => data });
 const docMissing = { exists: () => false, data: () => undefined };
 
 beforeEach(() => {
   h.authCallbacks.length = 0;
+  h.tokenCallbacks.length = 0;
   h.snapshotRegs.length = 0;
   vi.clearAllMocks();
 });
@@ -192,6 +205,65 @@ describe('AuthProvider · 2FA pendente', () => {
   it('falha ao ler as claims NÃO tranca a tela (o servidor segue barrando)', async () => {
     render(<AuthProvider><MfaConsumer /></AuthProvider>);
     await fireAuth({ uid: 'u1', getIdTokenResult: async () => { throw new Error('offline'); } });
+    expect(mfa()).toBe('false');
+  });
+
+  // A leitura das claims é ASSÍNCRONA: entre o `setUser` e a resposta existe uma
+  // janela em que o React pode renderizar. Se o portão não estiver fechado nessa
+  // janela, o ProtectedRoute vê {user setado, mfaPending false, loading false} e
+  // entrega o painel — o desafio só aparecia depois de um F5 (o bug relatado).
+  it('login: não expõe sessão autenticada enquanto o 2FA não resolve', async () => {
+    render(<AuthProvider><Consumer /><MfaConsumer /></AuthProvider>);
+    await fireAuth(null); // app carregado e deslogado → loading já é false
+    expect(state()).toEqual({ loading: 'false', user: 'null', role: 'null' });
+
+    let entregaClaims!: (v: any) => void;
+    const claimsLentas = new Promise<any>((resolve) => { entregaClaims = resolve; });
+    // dispara o login SEM esperar a leitura das claims (é o meio da janela)
+    await act(async () => {
+      void h.authCallbacks[h.authCallbacks.length - 1]({ uid: 'u1', getIdTokenResult: () => claimsLentas });
+    });
+
+    expect(state().user).toBe('u1');
+    expect(state().loading).toBe('true'); // portão fechado: nada de painel ainda
+
+    await act(async () => {
+      entregaClaims({ claims: { totpEnabled: true, auth_time: 1000 } });
+      await claimsLentas;
+    });
+    expect(mfa()).toBe('true');
+  });
+
+  // R14 sob a mesma janela: na troca A→B o perfil de A não pode vazar para B.
+  it('troca de conta: o perfil anterior some ANTES da leitura das claims', async () => {
+    render(<AuthProvider><Consumer /><MfaConsumer /></AuthProvider>);
+    await fireAuth(userWithClaims('A', { auth_time: 1000 }));
+    await fireSnapshot(0, docExists({ role: 'admin', uid: 'A' }));
+    expect(state()).toEqual({ loading: 'false', user: 'A', role: 'admin' });
+
+    const claimsLentas = new Promise<any>(() => {}); // nunca resolve
+    await act(async () => {
+      void h.authCallbacks[h.authCallbacks.length - 1]({ uid: 'B', getIdTokenResult: () => claimsLentas });
+    });
+    expect(state()).toEqual({ loading: 'true', user: 'B', role: 'null' });
+  });
+
+  // `mfaPending` é função do TOKEN, não do estado de auth: toda renovação recalcula.
+  it('renovação de token recalcula o 2FA (leitura que falhou se corrige sem F5)', async () => {
+    render(<AuthProvider><MfaConsumer /></AuthProvider>);
+    await fireAuth({ uid: 'u1', getIdTokenResult: async () => { throw new Error('offline'); } });
+    expect(mfa()).toBe('false');
+
+    await fireToken(userWithClaims('u1', { totpEnabled: true, auth_time: 1000 }));
+    expect(mfa()).toBe('true');
+  });
+
+  it('código aceito: o token novo libera a sessão sem reload', async () => {
+    render(<AuthProvider><MfaConsumer /></AuthProvider>);
+    await fireAuth(userWithClaims('u1', { totpEnabled: true, auth_time: 1000 }));
+    expect(mfa()).toBe('true');
+
+    await fireToken(userWithClaims('u1', { totpEnabled: true, mfaAuthTime: 1000, auth_time: 1000 }));
     expect(mfa()).toBe('false');
   });
 });
