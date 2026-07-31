@@ -200,7 +200,7 @@ describe('resolveAffiliates / buildAffiliateLookup', () => {
     expect(res.rows).toHaveLength(2);
     expect(res.rows[0].affiliateId).toBe('123');
     expect(res.rows[1].affiliateId).toBeNull(); // agregado
-    expect(res.unresolved).toEqual([{ line: 4, token: 'Fulano', email: '', name: 'Fulano' }]);
+    expect(res.unresolved).toEqual([{ line: 4, token: 'Fulano', tag: '', email: '', name: 'Fulano' }]);
   });
 
   it('cruza por e-mail mesmo com nome divergente (e-mail tem prioridade)', () => {
@@ -229,7 +229,7 @@ describe('resolveAffiliates / buildAffiliateLookup', () => {
     ]).rows;
     const res = resolveAffiliates(parsed, lk);
     expect(res.rows.map((r) => r.affiliateId)).toEqual(['A', 'B', null]);
-    expect(res.unresolved).toEqual([{ line: 5, token: 'nao@x.com', email: 'nao@x.com', name: 'NaoExiste' }]);
+    expect(res.unresolved).toEqual([{ line: 5, token: 'nao@x.com', tag: '', email: 'nao@x.com', name: 'NaoExiste' }]);
   });
 
   it('buildAffiliateLookup aceita múltiplos e-mails por afiliado (OTG + login)', () => {

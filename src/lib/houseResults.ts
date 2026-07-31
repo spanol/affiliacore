@@ -39,13 +39,17 @@ export interface StoredManualRow extends Metrics {
 
 // Chaves de coluna reconhecidas (cabeçalho). `email` é coluna própria (matching
 // por e-mail de login, mais confiável que nome/id) — ver resolveAffiliates.
-export type ColumnKey = 'date' | 'affiliate' | 'email' | MetricKey;
+export type ColumnKey = 'date' | 'affiliate' | 'email' | 'tag' | MetricKey;
 
 // Aliases de coluna (case/acento-insensitive). chave canônica -> apelidos aceitos.
 const COLUMN_ALIASES: Record<ColumnKey, string[]> = {
-  date: ['data', 'date', 'dia'],
+  date: ['data', 'date', 'dia', 'periodo'],
   affiliate: ['afiliado', 'affiliate', 'affiliate_id', 'afiliado_id', 'id', 'nome', 'name'],
   email: ['email', 'e-mail', 'mail', 'login', 'email_login', 'email_de_login'],
+  // Tag de rastreio da CASA (o relatório dela agrupa por ela, não por e-mail):
+  // `afp` na Esportiva/Income Access, `btag` na Affilka, `subid` genérico. Mesma
+  // família de `TAG_PARAMS` em lib/linkTriage — lá extraída da URL, aqui é coluna.
+  tag: ['tag', 'afp', 'afp2', 'source_id', 'sourceid', 'source', 'subid', 'sub_id', 'btag', 'clickid'],
   registrations: ['cadastros', 'cadastro', 'registrations', 'registros', 'reg'],
   first_deposits: ['ftd', 'first_deposits', 'primeiros_depositos', 'primeiro_deposito', 'pd'],
   qualified_cpa: ['cpa', 'cpa_qualificado', 'qualified_cpa', 'cpaq', 'cpa_qualif'],
@@ -145,6 +149,7 @@ export interface ParsedRow extends Metrics {
   date: string;        // ISO
   affiliate: string;   // token cru (id ou nome); '' = agregado da casa
   email: string;       // e-mail (token de cruzamento preferencial); '' = ausente
+  tag: string;         // tag de rastreio da casa (afp/btag/subid); '' = ausente
 }
 
 export interface ParseError {
@@ -229,8 +234,9 @@ export function parseResultsRows(grid: string[][]): ParseResult {
     }
     const affiliate = result.columns.affiliate !== undefined ? cellAt(cells, result.columns.affiliate).trim() : '';
     const email = result.columns.email !== undefined ? cellAt(cells, result.columns.email).trim() : '';
+    const tag = result.columns.tag !== undefined ? cellAt(cells, result.columns.tag).trim() : '';
 
-    const row: ParsedRow = { line: lineNo, date: iso, affiliate, email, ...emptyMetrics() };
+    const row: ParsedRow = { line: lineNo, date: iso, affiliate, email, tag, ...emptyMetrics() };
     let bad = '';
     for (const k of METRIC_KEYS) {
       const col = result.columns[k];
@@ -276,27 +282,38 @@ export interface ResolvedRow extends Metrics {
 }
 export interface ResolveResult {
   rows: ResolvedRow[];
-  // token = e-mail OU afiliado cru (o que existir, e-mail tem prioridade). email/name
-  // vêm da linha p/ a UI montar o "Cadastrar na Boost" sem re-juntar com o parse.
-  unresolved: { line: number; token: string; email?: string; name?: string }[];
+  // token = tag OU e-mail OU afiliado cru (nessa ordem de prioridade). tag/email/name
+  // vêm da linha p/ a UI montar o "Cadastrar na Boost" / "Vincular tag" sem
+  // re-juntar com o parse.
+  unresolved: { line: number; token: string; tag?: string; email?: string; name?: string }[];
 }
 
 export type AffiliateLookup = (token: string) => { id: string; label?: string } | null;
+
+// Traço/travessão é como as casas escrevem "sem valor" no export (a Esportiva usa
+// `—`). Sem isso a linha sem tag viraria um token literal e nunca casaria.
+const EMPTY_TOKENS = new Set(['—', '–', '-', '--', 'n/a', 'null']);
+const cleanToken = (raw: unknown): string => {
+  const s = String(raw ?? '').trim();
+  return EMPTY_TOKENS.has(s.toLowerCase()) ? '' : s;
+};
 
 export function resolveAffiliates(parsed: ParsedRow[], lookup: AffiliateLookup): ResolveResult {
   const out: ResolveResult = { rows: [], unresolved: [] };
   for (const p of parsed) {
     const base = { line: p.line, date: p.date, ...metricsOf(p) };
-    const email = (p.email ?? '').trim();
-    const affiliate = (p.affiliate ?? '').trim();
-    if (!email && !affiliate) {
+    const tag = cleanToken(p.tag);
+    const email = cleanToken(p.email);
+    const affiliate = cleanToken(p.affiliate);
+    if (!tag && !email && !affiliate) {
       out.rows.push({ ...base, affiliateId: null }); // agregado da casa
       continue;
     }
-    // e-mail primeiro (mais confiável), depois id/nome.
-    const hit = (email && lookup(email)) || (affiliate && lookup(affiliate)) || null;
+    // TAG primeiro: é a chave que a própria casa usa para atribuir, e é exata.
+    // Depois e-mail (login), e só então id/nome.
+    const hit = (tag && lookup(tag)) || (email && lookup(email)) || (affiliate && lookup(affiliate)) || null;
     if (!hit) {
-      out.unresolved.push({ line: p.line, token: email || affiliate, email, name: affiliate });
+      out.unresolved.push({ line: p.line, token: tag || email || affiliate, tag, email, name: affiliate });
       continue;
     }
     out.rows.push({ ...base, affiliateId: hit.id, affiliateLabel: hit.label });
