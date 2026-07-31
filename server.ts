@@ -3369,6 +3369,8 @@ export function createApp(deps: ServerDeps) {
       dataSource: data.dataSource === 'manual' ? 'manual' : 'otg',
       defaultCpa: Number.isFinite(Number(data.defaultCpa)) ? Number(data.defaultCpa) : null,
       defaultRev: Number.isFinite(Number(data.defaultRev)) ? Number(data.defaultRev) : null,
+      // Alíquota de ISS retida no repasse ao afiliado. VARIA POR CASA (ver src/lib/tax.ts).
+      issPercent: Number.isFinite(Number(data.issPercent)) ? Number(data.issPercent) : null,
     };
   };
 
@@ -3417,6 +3419,7 @@ export function createApp(deps: ServerDeps) {
         dataSource: dataSource === 'otg' ? 'otg' : 'manual',
         defaultCpa: numOrNull(req.body?.defaultCpa),
         defaultRev: numOrNull(req.body?.defaultRev),
+        issPercent: numOrNull(req.body?.issPercent),
         createdByUid: (req as any).user?.uid ?? null,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -3454,13 +3457,14 @@ export function createApp(deps: ServerDeps) {
       const numOrNull = (v: any) => (v == null || v === '' ? null : (Number.isFinite(Number(v)) ? Number(v) : null));
       if (body.defaultCpa !== undefined) patch.defaultCpa = numOrNull(body.defaultCpa);
       if (body.defaultRev !== undefined) patch.defaultRev = numOrNull(body.defaultRev);
+      if (body.issPercent !== undefined) patch.issPercent = numOrNull(body.issPercent);
       if (body.logoBase64) patch.logo = await uploadHouseLogo((snap.data() as any)?.slug ?? ref.id, String(body.logoBase64));
       else if (body.logo === null) patch.logo = null;
       await ref.set(patch, { merge: true });
       // Auditoria: só os campos que de fato mudaram (antes→depois). 'logo' marcada à
       // parte (não logamos o base64/URL inteiro — só que houve troca).
       const changes = diffChanges(snap.data() as any, patch,
-        ['name', 'brandId', 'registerUrlTemplate', 'active', 'order', 'dataSource', 'defaultCpa', 'defaultRev']);
+        ['name', 'brandId', 'registerUrlTemplate', 'active', 'order', 'dataSource', 'defaultCpa', 'defaultRev', 'issPercent']);
       if ('logo' in patch) changes.push({ field: 'logo', before: '(anterior)', after: patch.logo ? '(nova)' : null });
       if (changes.length) {
         await writeAuditLog(req, {

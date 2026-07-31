@@ -6,9 +6,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import {
   fetchMyPaymentProfile, saveMyPaymentProfile, PaymentProfile,
-  fetchAffiliateResults, fetchAffiliateConfigs, calcAffiliatePayout, AffiliateConfig,
+  fetchAffiliateResultsByBrand, fetchAffiliateConfigs, AffiliateConfig,
   fetchWithdrawals, requestWithdrawal, WithdrawalRequest, WITHDRAWAL_STATUS_LABEL, sumWithdrawalsByStatus,
 } from '../services/affiliateService';
+import { fetchHouses } from '../services/houseService';
+import { computeNetPayout, issRateMap, type NetPayout } from '../lib/tax';
 import DateRangePicker from '../components/DateRangePicker';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
 import { cn } from '../lib/utils';
@@ -47,7 +49,8 @@ export default function Financeiro() {
   });
 
   const [range, setRange] = useState<DateRange>(getDefaultRange());
-  const [earned, setEarned] = useState(0);
+  // Apuração do período já decomposta em bruto / ISS / líquido (src/lib/tax.ts).
+  const [earned, setEarned] = useState<NetPayout>({ lines: [], gross: 0, iss: 0, net: 0 });
   const [loadingEarned, setLoadingEarned] = useState(true);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [loadingWithdrawals, setLoadingWithdrawals] = useState(true);
@@ -86,20 +89,25 @@ export default function Financeiro() {
   };
   useEffect(() => { loadWithdrawals(); }, []);
 
-  // Comissão apurada no período (mesmo cálculo do resto do app — calcAffiliatePayout,
-  // taxa de topo do afiliado; sem filtro por casa aqui, é a visão agregada).
+  // Comissão apurada no período, POR CASA — e não agregada. Duas razões:
+  //  (1) o ISS varia por casa, então a retenção só fecha linha a linha;
+  //  (2) a taxa `byBrand` do afiliado só é respeitada com o brandId em mãos (a
+  //      visão agregada anterior ignorava o override e mostrava saldo errado
+  //      para quem tem taxa diferente por casa).
+  // `fetchAffiliateResultsByBrand` já funde OTG + casas manuais, como toda visão
+  // por-afiliado deve fazer.
   useEffect(() => {
     if (!profile?.affiliateId) { setLoadingEarned(false); return; }
     let active = true;
     setLoadingEarned(true);
     Promise.all([
-      fetchAffiliateResults(profile.affiliateId, range).catch(() => []),
+      fetchAffiliateResultsByBrand(profile.affiliateId, range).catch(() => []),
       fetchAffiliateConfigs().catch(() => ({} as Record<string, AffiliateConfig>)),
-    ]).then(([results, configs]) => {
+      fetchHouses().catch(() => []),
+    ]).then(([brandRows, configs, houses]) => {
       if (!active) return;
-      const rows: any[] = Array.isArray(results) ? results : (results ? [results] : []);
       const config = configs[profile.affiliateId!] || null;
-      setEarned(rows.reduce((sum, r) => sum + calcAffiliatePayout(r, config), 0));
+      setEarned(computeNetPayout(brandRows as any[], config, issRateMap(houses as any[])));
     }).finally(() => { if (active) setLoadingEarned(false); });
     return () => { active = false; };
   }, [profile?.affiliateId, range.startDate, range.endDate]);
@@ -181,8 +189,16 @@ export default function Financeiro() {
       {/* Cards da carteira */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-2xl p-4">
-          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500"><DollarSign size={12} /> Apurado no período</div>
-          <p className="text-xl font-black text-slate-900 dark:text-white mt-1">{loadingEarned ? <Loader2 size={18} className="animate-spin" /> : fmt(earned)}</p>
+          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500"><DollarSign size={12} /> A receber no período</div>
+          <p className="text-xl font-black text-slate-900 dark:text-white mt-1">{loadingEarned ? <Loader2 size={18} className="animate-spin" /> : fmt(earned.net)}</p>
+          {/* O afiliado recebe o LÍQUIDO. Mostrar só o bruto criava a expectativa
+              errada — foi assim que o painel legado gerou cobrança. O bruto e a
+              retenção ficam à vista, e só aparecem quando há ISS de fato. */}
+          {!loadingEarned && earned.iss > 0 && (
+            <p className="text-[10px] text-slate-400 dark:text-neutral-500 mt-1 leading-relaxed">
+              bruto {fmt(earned.gross)} · ISS −{fmt(earned.iss)}
+            </p>
+          )}
         </div>
         <div className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-2xl p-4">
           <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-amber-500"><Clock size={12} /> Pendente</div>

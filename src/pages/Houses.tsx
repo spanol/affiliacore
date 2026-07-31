@@ -359,6 +359,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
   // comissão pela cotação ao vivo (não regravamos o valor quando o câmbio mexe).
   const [defaultCpa, setDefaultCpa] = useState<string>(house?.defaultCpa != null ? String(house.defaultCpa) : '');
   const [defaultRev, setDefaultRev] = useState<string>(house?.defaultRev != null ? String(house.defaultRev) : '');
+  const [issPercent, setIssPercent] = useState<string>(house?.issPercent != null ? String(house.issPercent) : '');
   const [eurQuote, setEurQuote] = useState<EurBrlQuote>(() => getCachedEurBrlQuote());
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [presetSlug, setPresetSlug] = useState<string | null>(null);
@@ -426,6 +427,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
         dataSource,
         defaultCpa: defaultCpa.trim() === '' ? null : Math.trunc(Number(defaultCpa)), // EUR inteiro
         defaultRev: defaultRev.trim() === '' ? null : Number(defaultRev),
+        issPercent: issPercent.trim() === '' ? null : Number(issPercent),
         ...(logoBase64 ? { logoBase64 } : {}),
       };
       if (editing && house) {
@@ -589,6 +591,25 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                 </div>
               </Field>
             )}
+
+            {/* ISS vale para QUALQUER casa (OTG ou manual): o repasse ao afiliado é
+                tributado independentemente da origem do resultado. Por isso fica
+                fora do bloco de taxas padrão, que só existe p/ casa manual. */}
+            <Field label="ISS retido no repasse (%)">
+              <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-3 items-start">
+                <input
+                  type="number" inputMode="decimal" min="0" max="100" step="any"
+                  value={issPercent}
+                  onChange={(e) => setIssPercent(e.target.value)}
+                  placeholder="ex.: 5"
+                  className={inputCls}
+                />
+                <p className="text-[11px] text-slate-500 dark:text-neutral-400 leading-relaxed sm:pt-3">
+                  A alíquota <b>varia por casa</b>. Em branco = <b>sem retenção</b> — o afiliado
+                  recebe o repasse bruto. O extrato dele mostra bruto, ISS e líquido separados.
+                </p>
+              </div>
+            </Field>
 
             <label className="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 dark:bg-neutral-800/40 border border-slate-100 dark:border-neutral-800 cursor-pointer">
               <span className="text-sm font-semibold text-slate-700 dark:text-neutral-200 flex items-center gap-2">

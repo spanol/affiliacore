@@ -21,6 +21,9 @@ export interface House {
   // `comissao` importada. CPA em R$, REV em %. Só relevante p/ casas 'manual'.
   defaultCpa?: number | null;
   defaultRev?: number | null;
+  // ISS retido no repasse ao afiliado, em % — VARIA POR CASA (5% / 2% / 2% no
+  // legado da Infinity). Ausente = sem retenção. Núcleo em `src/lib/tax.ts`.
+  issPercent?: number | null;
 }
 
 // Campos editáveis no backoffice. `logoBase64` (data URL) sobe a logo nova; se
@@ -35,6 +38,7 @@ export interface HouseInput {
   dataSource?: 'otg' | 'manual';
   defaultCpa?: number | null;
   defaultRev?: number | null;
+  issPercent?: number | null;
   logoBase64?: string | null;
 }
 
