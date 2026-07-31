@@ -1,5 +1,9 @@
 <!doctype html>
-<html lang="en">
+<!-- lang="pt-BR": a UI é toda em português. Com lang="en" o Chrome via "página em
+     inglês, usuário em pt-BR" e disparava a TRADUÇÃO AUTOMÁTICA, que traduz até o
+     nome da marca no <title> ("Infinity" → "infinidade", queixa do cliente em
+     2026-07-31). Todo o resto do repo (landing/, public/) já declarava pt-BR. -->
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,7 +12,10 @@
          compartilhado por todas as instâncias. -->
     <link rel="icon" type="image/svg+xml" sizes="110x110" href="/affiliacore/favicon.svg" />
     <link rel="shortcut icon" href="/affiliacore/favicon.svg" />
-    <title>AffiliaCore</title>
+    <!-- translate="no": cinto e suspensório p/ quem FORÇA a tradução mesmo com o
+         lang certo. applyBrandToDocument só troca o TEXTO do título (document.title),
+         então o atributo daqui sobrevive à marca da instância. -->
+    <title translate="no">AffiliaCore</title>
   </head>
   <body>
     <div id="root"></div>

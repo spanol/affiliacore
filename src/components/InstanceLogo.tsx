@@ -22,13 +22,16 @@ interface InstanceLogoProps {
 }
 
 export default function InstanceLogo({ className, alt = BRAND.shortName }: InstanceLogoProps) {
+  // translate="no": o `alt` default é o nome da marca, e o tradutor do navegador
+  // traduz atributo também — leitor de tela ouviria "infinidade". Mesma razão do
+  // <BrandName/>.
   if (BRAND.logoLightUrl && BRAND.logoDarkUrl) {
     return (
       <>
-        <img src={BRAND.logoLightUrl} alt={alt} className={cn('dark:hidden', className)} />
+        <img src={BRAND.logoLightUrl} alt={alt} translate="no" className={cn('dark:hidden', className)} />
         <img src={BRAND.logoDarkUrl} alt="" aria-hidden="true" className={cn('hidden dark:block', className)} />
       </>
     );
   }
-  return <img src={BRAND.logoUrl} alt={alt} className={cn('invert dark:invert-0', className)} />;
+  return <img src={BRAND.logoUrl} alt={alt} translate="no" className={cn('invert dark:invert-0', className)} />;
 }

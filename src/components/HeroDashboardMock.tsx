@@ -15,6 +15,7 @@ import { cn } from '../lib/utils';
 import { BRAND } from '../lib/brandingClient';
 import { OTG_ENABLED } from '../lib/instanceClient';
 import InstanceLogo from './InstanceLogo';
+import BrandName from './BrandName';
 
 // LP hero: miniatura VIVA da dashboard — substitui o screenshot estático da
 // Boost (a arte antiga aparecia âmbar/BOOST em qualquer instância). Montada
@@ -104,7 +105,7 @@ export default function HeroDashboardMock() {
           <span className="w-4 h-4 md:w-5 md:h-5 rounded-full bg-accent-500/20 text-accent-400 text-[6px] md:text-[7px] font-bold flex items-center justify-center">
             AD
           </span>
-          <span className="text-[6px] md:text-[8px] text-slate-500 dark:text-neutral-400 truncate">Admin · {BRAND.shortName}</span>
+          <span className="text-[6px] md:text-[8px] text-slate-500 dark:text-neutral-400 truncate">Admin · <BrandName /></span>
         </div>
       </div>
 

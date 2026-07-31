@@ -19,7 +19,7 @@ import {
 import { cn } from '../lib/utils';
 import { createContactInquiry, type ContactInquiryInput } from '../services/contactService';
 import { useToast } from '../contexts/ToastContext';
-import { BRAND } from '../lib/brandingClient';
+import BrandName from '../components/BrandName';
 import HeroDashboardMock from '../components/HeroDashboardMock';
 import HomePrizesSection from '../components/HomePrizesSection';
 import ThemeToggle from '../components/ThemeToggle';
@@ -270,7 +270,7 @@ export default function Home() {
               <span className="text-slate-400 dark:text-neutral-500">estão migrando</span>
             </h2>
             <p className="text-slate-600 dark:text-neutral-400 text-lg max-w-2xl mx-auto">
-              Operações amadoras perdem dinheiro com ferramentas genéricas. A {BRAND.shortName} foi construída
+              Operações amadoras perdem dinheiro com ferramentas genéricas. A <BrandName /> foi construída
               para quem busca controle absoluto.
             </p>
           </div>
@@ -303,7 +303,7 @@ export default function Home() {
               <div className="absolute top-0 right-0 w-64 h-64 bg-slate-900/5 dark:bg-white/5 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-slate-900/10 dark:group-hover:bg-white/10 transition-colors duration-500" />
 
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-slate-900/5 dark:bg-white/5 border border-slate-900/10 dark:border-white/10 text-slate-700 dark:text-neutral-200 text-sm font-semibold uppercase tracking-wider mb-8 relative">
-                O Padrão {BRAND.shortName}
+                O Padrão <BrandName />
               </div>
 
               <ul className="space-y-6 relative">
@@ -343,7 +343,7 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-6">
             <div className="max-w-3xl mb-16">
               <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-6">
-                A {BRAND.shortName} centraliza seus dados e{' '}
+                A <BrandName /> centraliza seus dados e{' '}
                 <span className="text-slate-400 dark:text-neutral-500">entrega inteligência</span>
               </h2>
               <p className="text-xl text-slate-600 dark:text-neutral-400 leading-relaxed">
@@ -428,7 +428,7 @@ export default function Home() {
               <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-6">
                 Seja agora um
                 <br />
-                <span className="text-slate-900 dark:text-white">Afiliado {BRAND.shortName}</span>
+                <span className="text-slate-900 dark:text-white">Afiliado <BrandName /></span>
               </h2>
               <p className="text-lg text-slate-600 dark:text-neutral-400 mb-8 max-w-md">
                 Nosso time analisará o seu perfil. Preencha os dados abaixo e entraremos em contato
@@ -589,7 +589,7 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <InstanceLogo className="h-6 w-auto opacity-80" />
             <span className="font-display font-medium text-sm text-slate-400 dark:text-neutral-500">
-              &copy; {new Date().getFullYear()} {BRAND.shortName}
+              &copy; {new Date().getFullYear()} <BrandName />
             </span>
           </div>
 
