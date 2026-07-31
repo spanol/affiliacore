@@ -284,7 +284,35 @@ O XLSX de Pagamentos (21 colunas) foi baixado e parseado; serve para **conferir 
   aterrissa em `esportiva.bet.br/?src=…&utm_source=544865&ext_marker=infinity&afp=teste01`.
 - **⚠️ O relatório atrasa ~1 dia.** Em 27/07 a última linha era 26/07, e o clique de teste não moveu o
   contador de visitas do dia. **Toda rotina manual lê D−1** — um piloto de 1 semana só fecha no 8º dia.
-- **⚠️ GARGALO CONFIRMADO: hoje não existe atribuição por afiliado nesta conta.** Os **quatro** eixos
+- **✅ CORRIGIDO EM 31/07/2026 — A ATRIBUIÇÃO POR AFILIADO EXISTE E FUNCIONA.** O bloco abaixo
+  ("gargalo confirmado") era **erro de leitura**: no Relatório de Mídia, **`Source ID` e `AFP` são
+  dimensões DIFERENTES**. O `Source ID` está vazio mesmo; a tag `infinitw###` vive no **`AFP`**,
+  que a doc do TAP também chama de `afp` no `group_by`. Agrupando por `Time (Dia) + AFP`,
+  julho/2026 devolve **74 linhas com tag** (contra 28 colapsadas) e CPA atribuído por afiliado.
+  Os dois probes de teste estão lá (`infinitw298` em 29/07, `teste01` em 28/07).
+
+  **Julho/2026 (export CSV do próprio painel) — 5 tags respondem por 100% do CPA:**
+
+  | AFP | Visitas | Registros | FTDs | QFTDs | CPA | RevShare |
+  |---|---:|---:|---:|---:|---:|---:|
+  | `infinitw280` | 122 | 29 | 23 | 23 | R$ 2.760,00 | R$ 22,48 |
+  | `infinitw292` | 60 | 18 | 13 | 12 | R$ 1.440,00 | R$ 13,55 |
+  | `infinitw02` | 35 | 13 | 9 | 8 | R$ 960,00 | R$ 11,00 |
+  | `infinitw193` | 74 | 11 | 3 | 3 | R$ 360,00 | R$ 14,26 |
+  | `infinitw01` | 11 | 1 | 1 | 1 | R$ 120,00 | −R$ 92,13 |
+  | *(sem tag)* | 12 | 3 | 0 | 0 | R$ 0,00 | −R$ 144,38 |
+  | **Total** | | | | **47** | **R$ 5.640,00** | **−R$ 175,22** |
+
+  Confere com o card de QFTDs do dashboard (47) e com 47 × R$ 120. Há 7 tags com visita e zero
+  conversão (`infinitw45`, `infinitw298`, `infinitw299`, `infinitw280tem`, `infinitw280gay`,
+  `infi`, `teste01`) — **variantes digitadas à mão exigem regra de apelido no casamento**, senão
+  viram balde órfão. As linhas *(sem tag)* são tráfego sem dono e vão pro agregado da casa.
+
+  **Não há pedido a fazer à casa sobre captura de tag.** O acesso à API segue bloqueado por
+  Cloudflare, mas virou otimização: o botão **"Exportar dados"** entrega o CSV hoje.
+  ⚠️ Ao parsear no Windows, use `InvariantCulture` — culture pt-BR lê `"120.00"` como 12000.
+
+- **⚠️ [SUPERADO — ver acima] GARGALO CONFIRMADO: hoje não existe atribuição por afiliado nesta conta.** Os **quatro** eixos
   possíveis foram verificados e **todos estão vazios**:
   1. `Source ID` (o `afp`) — vazio em 01/05→31/07/2026;
   2. `Child Affiliate` — vazio no mesmo período;
