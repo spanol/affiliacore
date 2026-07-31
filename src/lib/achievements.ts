@@ -195,6 +195,25 @@ export function totalsFromBrandRows(
   return { cpas, commission };
 }
 
+// Prévia do card no admin: totais SINTÉTICOS derivados da própria meta, para o
+// admin ver como o prêmio aparece antes de salvar. Não são dados de afiliado
+// nenhum — a fração é ilustrativa e a UI rotula como exemplo.
+export type PreviewState = 'progress' | 'unlocked';
+export const PREVIEW_FRACTION = 0.65;
+
+export function previewTotals(
+  tier: Pick<AchievementTier, 'metaCpas' | 'metaCommission'>,
+  state: PreviewState,
+): AchievementTotals {
+  const fraction = state === 'unlocked' ? 1 : PREVIEW_FRACTION;
+  return {
+    // CPA é contagem inteira; arredondar para baixo garante que só o estado
+    // 'unlocked' desbloqueia (um round() poderia empatar com a meta).
+    cpas: Math.floor(num(tier.metaCpas) * fraction),
+    commission: num(tier.metaCommission) * fraction,
+  };
+}
+
 export interface TierProgress {
   fraction: number; // 0..1 — menor fração entre as metas definidas
   unlocked: boolean; // todas as metas definidas atingidas

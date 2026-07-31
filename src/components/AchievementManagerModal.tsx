@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
-import { Award, X, Save, Loader2, Trash2, Pencil, Plus, ImageIcon } from 'lucide-react';
+import { Award, X, Save, Loader2, Trash2, Pencil, Plus, ImageIcon, Gift, Lock } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useToast } from '../contexts/ToastContext';
 import {
@@ -12,7 +12,11 @@ import {
   sanitizeTier,
   sortTiers,
   tierMetaLabel,
+  parseMetaValue,
+  previewTotals,
+  type PreviewState,
 } from '../lib/achievements';
+import AchievementCard from './AchievementCard';
 import {
   AchievementTierDoc,
   createAchievementTier,
@@ -45,6 +49,7 @@ export default function AchievementManagerModal({ tiers, onClose }: Props) {
   const [saving, setSaving] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [previewState, setPreviewState] = useState<PreviewState>('progress');
 
   const resetForm = () => {
     setEditingId(null);
@@ -129,6 +134,21 @@ export default function AchievementManagerModal({ tiers, onClose }: Props) {
   };
 
   const sorted = sortTiers(tiers);
+
+  // Prévia ao vivo: o card que o AFILIADO vai ver, montado do form ainda não
+  // salvo. Metas vêm de `parseMetaValue` (mesmo parser do save), então o que a
+  // prévia desenha é o que vai ser gravado.
+  const previewTier = {
+    title: title.trim() || 'Título do prêmio',
+    subtitle: subtitle.trim(),
+    description: description.trim(),
+    imageUrl,
+    metaCpas: parseMetaValue(metaCpas) ?? 0,
+    metaCommission: parseMetaValue(metaCommission) ?? 0,
+    active,
+  };
+  const preview = previewTotals(previewTier, previewState);
+  const previewUnlocked = previewState === 'unlocked';
 
   const inputClass =
     'w-full px-4 py-3 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all outline-none';
@@ -259,6 +279,58 @@ export default function AchievementManagerModal({ tiers, onClose }: Props) {
                     </button>
                   )}
                 </div>
+              </div>
+
+              {/* Prévia do card — o admin desenha o prêmio vendo o resultado */}
+              <div className="pt-1">
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <label className={labelClass + ' mb-0'}>Prévia (como o afiliado vê)</label>
+                  <div className="flex gap-1 shrink-0">
+                    {(
+                      [
+                        ['progress', 'Em progresso'],
+                        ['unlocked', 'Desbloqueado'],
+                      ] as Array<[PreviewState, string]>
+                    ).map(([state, label]) => (
+                      <button
+                        key={state}
+                        type="button"
+                        onClick={() => setPreviewState(state)}
+                        className={cn(
+                          'px-2.5 py-1 rounded-full text-[10px] font-bold transition-all border',
+                          previewState === state
+                            ? 'bg-slate-900 dark:bg-white text-white dark:text-neutral-900 border-transparent'
+                            : 'bg-white dark:bg-neutral-800 text-slate-500 dark:text-neutral-400 border-slate-200 dark:border-neutral-700',
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="max-w-[300px] mx-auto">
+                  <AchievementCard
+                    tier={previewTier}
+                    totals={preview}
+                    showProgress
+                    footer={
+                      <span
+                        className={cn(
+                          'w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-xs font-bold',
+                          previewUnlocked
+                            ? 'bg-accent-500 text-accent-contrast shadow-sm shadow-accent-500/20'
+                            : 'bg-slate-100 dark:bg-neutral-800 text-slate-400 dark:text-neutral-500',
+                        )}
+                      >
+                        {previewUnlocked ? <Gift size={14} /> : <Lock size={13} />}
+                        {previewUnlocked ? 'Solicitar prêmio' : 'Bloqueado'}
+                      </span>
+                    }
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 dark:text-neutral-500 text-center mt-2">
+                  Progresso ilustrativo — cada afiliado vê o próprio número.
+                </p>
               </div>
 
               <div className="flex items-center justify-between gap-3">

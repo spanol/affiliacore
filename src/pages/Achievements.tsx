@@ -29,6 +29,7 @@ import {
   type AffiliateConfig,
 } from '../services/affiliateService';
 import AchievementManagerModal from '../components/AchievementManagerModal';
+import AchievementCard from '../components/AchievementCard';
 
 const formatBRL = (v: number) =>
   `R$ ${(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -275,8 +276,6 @@ export default function Achievements() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visibleTiers.map((tier, idx) => {
-            const progress = tierProgress(tier, totals);
-            const pct = Math.round(progress.fraction * 100);
             const existing = requestForTier(myRequests, tier.id);
             const canRequest = !!affiliateId && canRequestTier(tier, totals, myRequests);
 
@@ -286,73 +285,16 @@ export default function Achievements() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(idx * 0.04, 0.3) }}
-                className={cn(
-                  'p-6 rounded-2xl border shadow-sm flex flex-col gap-4 transition-all',
-                  progress.unlocked
-                    ? 'bg-accent-500/5 border-accent-500/30'
-                    : 'bg-white dark:bg-neutral-900/60 border-slate-200/70 dark:border-neutral-800',
-                  !tier.active && 'opacity-60',
-                )}
+                className="flex"
               >
-                <div className="flex items-start gap-3">
-                  {tier.imageUrl ? (
-                    <img
-                      src={tier.imageUrl}
-                      alt=""
-                      className="w-14 h-14 rounded-xl object-cover border border-slate-200 dark:border-neutral-700 shrink-0"
-                    />
-                  ) : (
-                    <span
-                      className={cn(
-                        'w-14 h-14 rounded-xl flex items-center justify-center shrink-0 border',
-                        progress.unlocked
-                          ? 'bg-accent-500/15 border-accent-500/30 text-accent-500'
-                          : 'bg-slate-50 dark:bg-neutral-800/60 border-slate-100 dark:border-neutral-700/60 text-slate-300 dark:text-neutral-600',
-                      )}
-                    >
-                      {progress.unlocked ? <Trophy size={22} /> : <Lock size={20} />}
-                    </span>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-black text-slate-900 dark:text-white truncate">{tier.title}</p>
-                    {tier.subtitle && (
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-accent-600 dark:text-accent-400 mt-0.5 truncate">
-                        {tier.subtitle}
-                      </p>
-                    )}
-                    <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-1">
-                      Meta: {tierMetaLabel(tier)}
-                    </p>
-                  </div>
-                  {!tier.active && isAdmin && (
-                    <span className="shrink-0 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-neutral-800 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500">
-                      Inativa
-                    </span>
-                  )}
-                </div>
-
-                {tier.description && (
-                  <p className="text-[11px] text-slate-500 dark:text-neutral-400 leading-relaxed">{tier.description}</p>
-                )}
-
-                {affiliateId && (
-                  <div className="mt-auto space-y-2">
-                    <div className="h-2 rounded-full bg-slate-100 dark:bg-neutral-800 overflow-hidden">
-                      <div
-                        className={cn('h-full rounded-full transition-all', progress.unlocked ? 'bg-accent-500' : 'bg-accent-500/50')}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 dark:text-neutral-500">
-                      <span>{pct}%</span>
-                      <span>
-                        {tier.metaCommission
-                          ? `${formatBRL(totals.commission)} / ${formatBRL(tier.metaCommission)}`
-                          : `${totals.cpas} / ${tier.metaCpas} CPAs`}
-                      </span>
-                    </div>
-
-                    {existing ? (
+                <AchievementCard
+                  tier={tier}
+                  totals={totals}
+                  showProgress={!!affiliateId}
+                  showInactiveBadge={isAdmin}
+                  className="flex-1"
+                  footer={
+                    existing ? (
                       <span
                         className={cn(
                           'w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-xs font-bold',
@@ -384,9 +326,9 @@ export default function Achievements() {
                         )}
                         {canRequest ? 'Solicitar prêmio' : 'Bloqueado'}
                       </button>
-                    )}
-                  </div>
-                )}
+                    )
+                  }
+                />
               </motion.div>
             );
           })}

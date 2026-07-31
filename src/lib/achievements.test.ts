@@ -11,6 +11,8 @@ import {
   requestForTier,
   canRequestTier,
   tierMetaLabel,
+  previewTotals,
+  PREVIEW_FRACTION,
   TIER_IMAGE_MAX_CHARS,
   type AchievementTier,
 } from './achievements';
@@ -235,5 +237,32 @@ describe('tierMetaLabel', () => {
     expect(tierMetaLabel({ metaCpas: 50, metaCommission: 0 })).toBe('50 CPAs');
     expect(tierMetaLabel({ metaCpas: 0, metaCommission: 10_000 })).toBe('R$ 10.000,00');
     expect(tierMetaLabel({ metaCpas: 50, metaCommission: 10_000 })).toBe('50 CPAs + R$ 10.000,00');
+  });
+});
+
+describe('previewTotals (prévia do card no admin)', () => {
+  it("'unlocked' desbloqueia o tier; 'progress' não", () => {
+    const t = tier({ metaCpas: 0, metaCommission: 10_000 });
+    expect(tierProgress(t, previewTotals(t, 'unlocked')).unlocked).toBe(true);
+    expect(tierProgress(t, previewTotals(t, 'progress')).unlocked).toBe(false);
+  });
+
+  it('CPA é contagem inteira e nunca empata com a meta em progresso', () => {
+    // 1 CPA × 0,65 arredondaria para 1 com round() — e desbloquearia sozinho.
+    const t = tier({ metaCpas: 1, metaCommission: 0 });
+    expect(previewTotals(t, 'progress').cpas).toBe(0);
+    expect(tierProgress(t, previewTotals(t, 'progress')).unlocked).toBe(false);
+    expect(previewTotals(t, 'unlocked').cpas).toBe(1);
+  });
+
+  it('usa a fração ilustrativa na comissão', () => {
+    const t = tier({ metaCpas: 0, metaCommission: 10_000 });
+    expect(previewTotals(t, 'progress').commission).toBe(10_000 * PREVIEW_FRACTION);
+  });
+
+  it('tier sem meta nenhuma não quebra (zera os totais)', () => {
+    const t = tier({ metaCpas: 0, metaCommission: 0 });
+    expect(previewTotals(t, 'unlocked')).toEqual({ cpas: 0, commission: 0 });
+    expect(tierProgress(t, previewTotals(t, 'unlocked')).unlocked).toBe(false);
   });
 });
