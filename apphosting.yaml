@@ -38,7 +38,9 @@ env:
   # P3/P4.1 (produtização): marca por instância. Os defaults do repo são a marca do
   # PRODUTO (AffiliaCore); cada instância declara os VITE_BRAND_* no seu
   # apphosting.<ambiente>.yaml (ver scripts/provision/README.md). A marca Boost da
-  # instância do Carlos vive em apphosting.boost.yaml (ambiente `boost`, associado
+  # instância do Carlos SAIU deste repo (2026-07-30): a label foi entregue com a
+  # codebase própria (`spanol/boost`) e o backend dela builda de lá. O que sobra aqui
+  # é o base + as labels vivas. (Antes: apphosting.boost.yaml, ambiente `boost`, associado
   # ao backend boost-agency-server no console em 2026-07-05).
 
   # TEMA — INTENCIONALMENTE AUSENTE DAQUI (2026-07-28). O base é herdado por

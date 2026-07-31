@@ -580,3 +580,31 @@ e no `marketing/affiliacore/cookbook-nova-label.html`.
   percentual.
 - **Reajuste:** preço travado em contrato, reajuste só na renovação anual —
   publicado na LP, então tem que valer no contrato do P5.2.
+
+## 🚪 A Boost saiu do repo (2026-07-30)
+
+O Carlos decidiu **recolher a label com a codebase**: a Boost passou a viver no repo
+próprio `spanol/boost`, e o backend App Hosting `boost-agency-server` (projeto
+`agencia-boost-app`) builda **de lá** — verificado por
+`firebase apphosting:backends:list --project agencia-boost-app`, que mostra
+`Repository: spanol-boost`. Deixa de ser a "instância nº 0" deste repo.
+
+**Removido:** `apphosting.boost.yaml`. As referências a ele nos comentários do
+`apphosting.yaml`/`apphosting.demo.yaml`/`branding.ts` foram reescritas.
+
+**Os dois testes que citavam a Boost sobreviveram como CONTRATO, não como caso
+particular** — a regra que eles guardam vale para qualquer label:
+- `theming.test.ts`: env de tema com `''` ou `'none'` equivale a ausente (o "des-set").
+- `instanceTheming.test.ts`: label sem accent não emite `--color-lp-*`/`--color-auth-*`
+  (superfície pública fica pixel-idêntica). Agora testado contra o base + um accent
+  `'none'`, em vez de ler o yaml que saiu. `LABELS` = `['infinity', 'previsao']`.
+
+**⚠️ O risco que a saída deixou, e que foi fechado junto.** O `.firebaserc` tinha
+`"default": "agencia-boost-app"` — ou seja, um `firebase deploy --only firestore:rules`
+digitado aqui publicava no projeto de um cliente **cujo código vem de outro repo**. Foi
+exatamente assim que, em 30/07, as rules fecharam na frente da build e todo afiliado
+especial da Boost ficou sem ver equipe. Agora:
+- **não existe mais alias `default`** — todo comando exige `--project` explícito
+  (aliases: `infinity`, `www`);
+- o predeploy hook tem `agencia-boost-app` como **`blocked`**, com a mensagem dizendo
+  que as rules dela se deployam do repo dela.

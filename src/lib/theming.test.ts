@@ -106,11 +106,12 @@ describe('resolveThemeTokens', () => {
     expect(resolveThemeTokens({ VITE_BRAND_ACCENT: 'não-é-hex' }).cssVars).toEqual({});
   });
 
-  it('CONTRATO do pin da Boost (P5.1): envs de tema com string vazia OU "none" equivalem a ausentes', () => {
-    // O apphosting.yaml BASE define o tema AffiliaCore; o apphosting.boost.yaml
-    // "des-seta" com 'none' (string não-hex — mais segura que '' no env do App
-    // Hosting) p/ a Boost cair nos defaults do index.css (amber/neutral/navy).
-    // Se não-hex deixar de significar "ausente", a Boost muda de cara em prod.
+  it('CONTRATO do "des-set" (P5.1): envs de tema com string vazia OU "none" equivalem a ausentes', () => {
+    // Uma instância anula um tema herdado do base gravando 'none' (string não-hex —
+    // mais segura que '' no env do App Hosting) e cai nos defaults do index.css
+    // (amber/neutral/navy). Nasceu do pin da Boost, que já saiu deste repo, mas o
+    // contrato vale p/ qualquer label: se não-hex deixar de significar "ausente",
+    // toda instância que des-seta muda de cara em prod.
     for (const unset of ['', 'none']) {
       const { cssVars } = resolveThemeTokens({
         VITE_BRAND_ACCENT: unset,

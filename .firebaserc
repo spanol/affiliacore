@@ -1,6 +1,16 @@
 {
+  "_comment": [
+    "SEM alias `default` de PROPÓSITO — todo comando exige --project explícito.",
+    "O default apontava para `agencia-boost-app` (a Boost), e a Boost SAIU deste repo",
+    "em 2026-07-30: a codebase dela virou `spanol/boost` e o backend builda de lá.",
+    "Com o default velho, um `firebase deploy --only firestore:rules` digitado aqui",
+    "publicava no projeto de um CLIENTE cujo código vem de outro lugar — foi assim que",
+    "as rules fecharam na frente da build em 30/07 e todo afiliado especial da Boost",
+    "ficou sem ver equipe. Escolher a instância na mão é a fricção que evita isso.",
+    "Uso: firebase deploy --only firestore:rules --project infinity"
+  ],
   "projects": {
-    "default": "agencia-boost-app",
+    "infinity": "infinity-affiliacore",
     "www": "affiliacore"
   }
 }

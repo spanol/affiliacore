@@ -30,16 +30,25 @@ const { resolve } = require('node:path');
 // provisionamento manda registrar) — projeto desconhecido barra o deploy de
 // propósito: sem base URL não há como verificar, e passar batido reabre o incidente.
 //
-// ⚠️ Cada backend tem seu PRÓPRIO repo de origem: `agencia-boost-app` builda do
-// `spanol-boost` (separado em 2026-07-28), não deste. Push aqui NÃO chega lá — por
-// isso a verificação é por instância, contra a URL real, e não por commit local.
-// `null` = projeto sem app servindo (só Hosting estático / Firestore), então não há
-// endpoint para verificar e a regra pode fechar sem quebrar tela nenhuma.
+// Cada backend tem seu PRÓPRIO repo de origem, então "eu dei push" não prova nada
+// sobre uma instância: a verificação é contra a URL REAL dela.
+//
+// Valores: string = base URL a sondar · null = projeto sem app servindo (só Hosting
+// estático / Firestore), nada a verificar · { blocked } = projeto que não se deploya
+// mais daqui.
 const INSTANCES = {
-  'agencia-boost-app': 'https://agencyboost.com.br',
   'infinity-affiliacore': 'https://infinityaffiliates.agency',
   // Landing + leads (Firebase Hosting estático). Sem backend App Hosting.
   affiliacore: null,
+  // A Boost saiu deste repo em 2026-07-30: a label foi entregue ao Carlos com a
+  // codebase própria (`spanol/boost`) e o backend `boost-agency-server` builda de lá.
+  // Deployar as rules DAQUI publicaria um ruleset que não corresponde ao código que
+  // roda lá — exatamente o incidente de 30/07.
+  'agencia-boost-app': {
+    blocked:
+      'a Boost saiu deste repo (codebase própria em `spanol/boost`).\n' +
+      '     As rules dela se deployam DE LÁ, junto do código que roda no backend dela.',
+  },
 };
 
 // Acoplamentos regra→endpoint. `closed` é o trecho que só aparece quando a regra
@@ -111,12 +120,18 @@ async function endpointIsLive(base, path) {
     ]);
   }
 
-  if (Object.prototype.hasOwnProperty.call(INSTANCES, projectId) && INSTANCES[projectId] === null) {
+  const entry = INSTANCES[projectId];
+
+  if (entry && typeof entry === 'object' && entry.blocked) {
+    fail([`Projeto [1m${projectId}[0m não se deploya mais deste repo:`, '', `     ${entry.blocked}`]);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(INSTANCES, projectId) && entry === null) {
     console.log(`· ${projectId} não serve app (só Hosting/Firestore) — nada a verificar`);
     return;
   }
 
-  const base = INSTANCES[projectId];
+  const base = entry;
   if (!base) {
     fail([
       `Projeto \x1b[1m${projectId}\x1b[0m não está no mapa de instâncias.`,

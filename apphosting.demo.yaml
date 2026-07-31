@@ -61,7 +61,7 @@ env:
   # VITE_OTG_ENABLED=false o servidor nunca lê nenhuma delas.
   # (Validar no 1º rollout: a premissa é que o yaml por ambiente substitui a
   # entrada inteira da variável — secret: → value:. Plano B: remover as OTG do
-  # base e declará-las só no apphosting.boost.yaml.)
+  # base e declará-las só no yaml da label.)
   - variable: AFFILIATE_API_KEY
     value: 'unused'
     availability:

@@ -9,7 +9,7 @@
 // P4.1 (inversão, 2026-07-05): ausência de TODAS → marca do PRODUTO,
 // **AffiliaCore** (domínio affiliacore.com.br — com DOIS "f" — registrado pelo
 // Vinicius). O repo é o produto; a instância Boost do Carlos fica pinada por env
-// (apphosting.yaml base + apphosting.boost.yaml). Não reintroduza "Boost" como
+// (apphosting.yaml base + o yaml da label). Não reintroduza "Boost" como
 // default aqui.
 // Puro e sem import.meta (o server importa daqui); o client usa brandingClient.ts.
 

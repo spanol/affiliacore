@@ -23,8 +23,11 @@ const THEME_ENVS = [
   'VITE_BRAND_THEME',
 ] as const;
 
-/** Instâncias de CLIENTE (label). `demo` é a vitrine do produto, não é label. */
-const LABELS = ['boost', 'infinity', 'previsao'] as const;
+/** Instâncias de CLIENTE (label). `demo` é a vitrine do produto, não é label.
+ *  `boost` saiu daqui em 2026-07-30: a label foi entregue ao Carlos com a codebase
+ *  própria (repo `spanol/boost`), e o backend dele builda de lá — o yaml não vive
+ *  mais neste repo. Ver PRODUTIZACAO.md. */
+const LABELS = ['infinity', 'previsao'] as const;
 
 /** Envs `- variable: X` + `value: Y` de um apphosting yaml (entradas `secret:` são ignoradas). */
 function readEnv(file: string): Record<string, string> {
@@ -73,12 +76,17 @@ describe('tema por instância (apphosting.*.yaml)', () => {
     expect(cssVars['--color-auth-cta']).toBe(cssVars['--color-accent-500']);
   });
 
-  it('a superfície pública da Boost segue SEM cor de marca (label sem accent = pixel-idêntica)', () => {
-    // Os --color-lp-*/--color-auth-* nascem branco/neutral/navy no index.css. A
-    // Boost pina o accent em 'none', então nada é emitido e a landing + as telas
-    // de auth dela não mudam um pixel.
-    const { cssVars } = resolveThemeTokens(merged('boost'));
-    expect(Object.keys(cssVars).filter((v) => /^--color-(lp|auth)-/.test(v))).toEqual([]);
+  it('label SEM accent não pinta a superfície pública (fica pixel-idêntica)', () => {
+    // Os --color-lp-*/--color-auth-* nascem branco/neutral/navy no index.css e só
+    // são emitidos por quem declara accent. Uma instância que herda o base e não
+    // declara nada — ou que "des-seta" com 'none' — não muda um pixel na landing
+    // nem nas telas de auth. (Era o caso da Boost, que já saiu deste repo; o
+    // contrato vale p/ qualquer label nova que entre sem cor definida.)
+    const herdado = readEnv('apphosting.yaml');
+    for (const env of [{ ...herdado }, { ...herdado, VITE_BRAND_ACCENT: 'none' }]) {
+      const { cssVars } = resolveThemeTokens(env);
+      expect(Object.keys(cssVars).filter((v) => /^--color-(lp|auth)-/.test(v))).toEqual([]);
+    }
   });
 
   it('a DEMO (vitrine do produto) segue no ember AffiliaCore', () => {
