@@ -34,6 +34,10 @@ const ACTION_LABELS: Record<string, string> = {
   'affiliate.sync': 'Sincronizou afiliados (OTG)',
   'affiliate.create_boost': 'Criou afiliado nativo (na plataforma)',
   'affiliate.link_email': 'Vinculou e-mail a afiliado',
+  // Tag de rastreio do relatório da casa (?afp=): define de quem é o resultado que
+  // a casa atribuiu àquela tag — muda o repasse, então entra na trilha.
+  'affiliate.link_tag': 'Vinculou tag a afiliado',
+  'affiliate.unlink_tag': 'Desvinculou tag de afiliado',
   'invite.create': 'Gerou convite',
   'house.create': 'Criou casa',
   'house.update': 'Editou casa',

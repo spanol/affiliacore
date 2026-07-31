@@ -80,6 +80,18 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Alias de TAG de rastreio -> affiliateId. Doc id = tag normalizada (`infinitw02`).
+    // O relatório da CASA (Esportiva/TAP) não conhece e-mail: ele agrupa pela tag que
+    // viaja no link (`?afp=`). Quando a tag não sai de um link nosso (variante digitada
+    // à mão no painel da casa), o admin liga tag→afiliado uma vez no import de /casas e
+    // fica salvo. Guarda a mesma coisa que `affiliate_links`: quem fatura sob qual tag.
+    // Mediado pelo servidor (/api/tag-aliases). Espelha affiliate_email_aliases.
+    // Coleção NOVA (nasce fechada) — nenhum build anterior a lia direto, então não há
+    // acoplamento de ORDEM DE DEPLOY a declarar no predeploy hook.
+    match /affiliate_tag_aliases/{tagKey} {
+      allow read, write: if isAdmin();
+    }
+
     // B3 · Afiliado especial: marca o especial + sub-rede + taxa da sub-rede.
     // Só o master (admin) escreve; leitura liberada a signed-in (o especial
     // precisa ler a própria sub-rede; escopo fino fica no proxy/servidor).

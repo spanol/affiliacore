@@ -17,8 +17,10 @@
 import {
   emptyMetrics,
   addMetrics,
+  cleanToken,
   type Metrics,
   type ResolvedRow,
+  type ResolveResult,
   type AffiliateLookup,
 } from './houseResults';
 import { extractTagFromUrl } from './linkTriage';
@@ -27,8 +29,12 @@ import { extractTagFromUrl } from './linkTriage';
 
 // Tags são digitadas à mão no painel da casa: `infinitw02`, `INFINITW02`,
 // ` infinitw02 ` são a mesma coisa. Case e espaço não distinguem ninguém.
+//
+// Passa pelo `cleanToken` de `houseResults` (mesma tabela de "sem valor" que a
+// resolução usa): a Esportiva escreve `—` na linha sem tag, e sem isso o resumo
+// exibiria um traço como se fosse uma tag pendente vinculável a alguém.
 export function normalizeTag(raw: unknown): string {
-  return String(raw ?? '').trim().toLowerCase();
+  return cleanToken(raw).toLowerCase();
 }
 
 // --- Adaptador do export da casa --------------------------------------------
@@ -60,6 +66,11 @@ const REQUIRED_HEADERS = ['periodo', 'afp', 'qftds'];
 export interface AdaptResult {
   grid: string[][]; // pronto para `parseResultsCsv`/`parseResultsRows`
   ok: boolean;
+  // O arquivo É o relatório da casa (tem a coluna AFP), mesmo quando `ok` é false
+  // por faltar coluna. A tela usa isto para não cair calada no parser genérico: lá
+  // `afp` também é apelido de tag, mas `cpa` viraria CONTAGEM — o bug de dinheiro
+  // que este adaptador existe para impedir. Detectado ⇒ mostra o erro e não importa.
+  detected: boolean;
   error?: string;
   mapped: string[]; // colunas reconhecidas (para a UI mostrar o que entrou)
   ignored: string[]; // colunas descartadas
@@ -74,15 +85,17 @@ export function adaptHouseTagReport(grid: string[][]): AdaptResult {
   const rows = Array.isArray(grid) ? grid : [];
   const headerIdx = rows.findIndex((cells) => (cells ?? []).some((c) => String(c ?? '').trim() !== ''));
   if (headerIdx === -1) {
-    return { grid: [], ok: false, error: 'Arquivo vazio.', mapped: [], ignored: [] };
+    return { grid: [], ok: false, detected: false, error: 'Arquivo vazio.', mapped: [], ignored: [] };
   }
 
   const header = (rows[headerIdx] ?? []).map((c) => stripHeader(String(c ?? '')));
+  const detected = header.includes('afp');
   const missing = REQUIRED_HEADERS.filter((h) => !header.includes(h));
   if (missing.length) {
     return {
       grid: [],
       ok: false,
+      detected,
       error:
         'Este arquivo não parece o relatório da casa agrupado por tag. ' +
         'Exporte o Relatório de Mídia agrupando por Dia + AFP.',
@@ -108,7 +121,7 @@ export function adaptHouseTagReport(grid: string[][]): AdaptResult {
     out.push(picks.map((p) => String(cells[p.from] ?? '')));
   }
 
-  return { grid: out, ok: true, mapped: picks.map((p) => p.to), ignored };
+  return { grid: out, ok: true, detected: true, mapped: picks.map((p) => p.to), ignored };
 }
 
 // --- Índice tag -> afiliado --------------------------------------------------
@@ -116,6 +129,10 @@ export function adaptHouseTagReport(grid: string[][]): AdaptResult {
 export interface TagSourceLink {
   affiliateId?: string | null;
   registerUrl?: string | null;
+  // Tag EXPLÍCITA do doc (o import de standby aceita "Coluna A: Link, Coluna B: Tag",
+  // e nesse caso a URL pode não trazer `?afp=`). Vence a extraída da URL — é a mesma
+  // precedência do `parseStandbyLinks`.
+  tag?: string | null;
   brandId?: string | null;
 }
 
@@ -147,7 +164,7 @@ export function buildTagIndex(
   for (const link of Array.isArray(links) ? links : []) {
     const affiliateId = String(link?.affiliateId ?? '').trim();
     if (!affiliateId) continue; // link do pool (standby) não atribui nada
-    const tag = normalizeTag(extractTagFromUrl(String(link?.registerUrl ?? '')));
+    const tag = normalizeTag(link?.tag) || normalizeTag(extractTagFromUrl(String(link?.registerUrl ?? '')));
     if (!tag || index.has(tag)) continue;
     index.set(tag, { affiliateId, origin: 'link' });
   }
@@ -271,4 +288,20 @@ export function tagImportTotals(summaries: TagSummary[] | null | undefined): Tag
  */
 export function attributedRows(resolved: ResolvedRow[] | null | undefined): ResolvedRow[] {
   return (Array.isArray(resolved) ? resolved : []).filter((r) => !!r.affiliateId);
+}
+
+/**
+ * Gatilho do botão "Importar" no modo TAG.
+ *
+ * Diferente do `canImport` do template próprio, tag pendente **não bloqueia**: no
+ * relatório da casa é normal chegar tag sem dono conhecido (o admin ainda vai
+ * perguntar de quem é), e travar tudo por causa dela deixaria de fora o que já está
+ * atribuído. O que entra é só `attributedRows`; o resíduo fica visível na tela com o
+ * total, e entra quando alguém der dono a ele. Erro de FORMATO segue bloqueando.
+ */
+export function canImportTagReport(
+  analysis: ResolveResult | null,
+  parseErrors: ReadonlyArray<unknown>,
+): boolean {
+  return !!analysis && parseErrors.length === 0 && attributedRows(analysis.rows).length > 0;
 }

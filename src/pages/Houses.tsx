@@ -4,7 +4,7 @@ import { Navigate } from 'react-router-dom';
 import {
   Building2, Plus, Loader2, Pencil, Trash2, X, Upload, Link2, Check, Power,
   Table2, AlertTriangle, FileSpreadsheet, Cloud, Calendar, Download, Sparkles,
-  ChevronDown, ExternalLink,
+  ChevronDown, ExternalLink, Tag,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -14,11 +14,16 @@ import {
 } from '../services/houseService';
 import {
   fetchAffiliates, fetchRegisteredUsers, fetchEmailAliases, createBoostAffiliates, createEmailAlias,
+  fetchAffiliateLinks, fetchTagAliases, createTagAlias, deleteTagAlias,
 } from '../services/affiliateService';
 import {
-  parseResultsCsv, parseResultsRows, resolveAffiliates, buildAffiliateLookup,
-  ParseResult, StoredManualRow, TEMPLATE_HEADERS, TEMPLATE_EXAMPLE_ROWS,
+  csvToGrid, parseResultsRows, resolveAffiliates, buildAffiliateLookup, composeLookup,
+  ParsedRow, StoredManualRow, TEMPLATE_HEADERS, TEMPLATE_EXAMPLE_ROWS,
 } from '../lib/houseResults';
+import {
+  adaptHouseTagReport, buildTagIndex, tagLookup, summarizeByTag, tagImportTotals,
+  attributedRows, canImportTagReport, TagSummary,
+} from '../lib/houseTagImport';
 import { buildImportRoster } from '../lib/boostAffiliate';
 import { canImport, buildImportPayload } from '../lib/houseImport';
 import { parseSpreadsheetFile, downloadResultsTemplate, isExcelFile } from '../lib/xlsx';
@@ -694,13 +699,16 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
   const { push } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [roster, setRoster] = useState<Parameters<typeof buildAffiliateLookup>[0]>([]);
+  const [links, setLinks] = useState<{ affiliateId?: string | null; registerUrl?: string | null; tag?: string | null }[]>([]);
+  const [tagAliases, setTagAliases] = useState<{ tag: string; affiliateId: string }[]>([]);
   const [existing, setExisting] = useState<StoredManualRow[]>([]);
   const [text, setText] = useState('');
-  const [fileResult, setFileResult] = useState<ParseResult | null>(null); // planilha Excel parseada
+  const [fileGrid, setFileGrid] = useState<string[][] | null>(null); // planilha Excel (matriz crua)
   const [fileName, setFileName] = useState('');
   const [sheetInfo, setSheetInfo] = useState<{ sheetName: string; sheetNames: string[]; matched: boolean } | null>(null);
   const [reading, setReading] = useState(false);
   const [analysis, setAnalysis] = useState<ReturnType<typeof resolveAffiliates> | null>(null);
+  const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]); // linhas cruas (resumo por tag)
   const [parseErrors, setParseErrors] = useState<{ line: number; message: string }[]>([]);
   const [importing, setImporting] = useState(false);
   const [loadingMeta, setLoadingMeta] = useState(true);
@@ -708,8 +716,28 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
   const [generateInvite, setGenerateInvite] = useState(false);
   const [linkingLine, setLinkingLine] = useState<number | null>(null); // qual não-resolvido está sendo vinculado
   const [linkQuery, setLinkQuery] = useState('');
+  const [linkingTag, setLinkingTag] = useState<string | null>(null);   // qual tag está sendo vinculada
+  const [tagQuery, setTagQuery] = useState('');
+  const [savingTag, setSavingTag] = useState(false);
+  const [tagMode, setTagMode] = useState(false);                        // arquivo = relatório da casa por tag
 
-  const lookup = useMemo(() => buildAffiliateLookup(roster), [roster]);
+  // Nome do afiliado (p/ rotular a tag já resolvida sem re-consultar o roster).
+  const nameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of roster as any[]) if (r?.id && r?.name) m.set(String(r.id), String(r.name));
+    return m;
+  }, [roster]);
+
+  // Índice tag -> afiliado: links já emitidos (a tag sai da registerUrl) + apelidos
+  // salvos, com o apelido sobrepondo o link.
+  const tagIndex = useMemo(() => buildTagIndex(links, tagAliases), [links, tagAliases]);
+
+  // O lookup do import compõe as duas chaves NESSA ordem: TAG primeiro (é a chave que
+  // a própria casa usa para atribuir, e é exata), roster por e-mail/nome depois.
+  const lookup = useMemo(
+    () => composeLookup(tagLookup(tagIndex, (id) => nameById.get(id)), buildAffiliateLookup(roster)),
+    [tagIndex, nameById, roster],
+  );
 
   const loadMeta = async () => {
     setLoadingMeta(true);
@@ -717,14 +745,19 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
       // Roster de cruzamento (Boost-first): nome vem do mirror `affiliates` (OTG +
       // nativos Boost); e-mails vêm dos logins da plataforma + dos aliases admin.
       // Assim casa por e-mail mesmo quem não tem id na OTG, bastando ter cadastro Boost.
-      const [affs, users, aliases, rows] = await Promise.all([
+      // Links + apelidos de tag alimentam o cruzamento por TAG (relatório da casa).
+      const [affs, users, aliases, rows, linkList, tags] = await Promise.all([
         fetchAffiliates(),
         fetchRegisteredUsers(),
         fetchEmailAliases(),
         fetchHouseResults({ houseSlug: house.slug }),
+        fetchAffiliateLinks(),
+        fetchTagAliases(),
       ]);
       setRoster(buildImportRoster(affs as any, users as any, aliases as any));
       setExisting(Array.isArray(rows) ? rows : []);
+      setLinks(Array.isArray(linkList) ? (linkList as any) : []);
+      setTagAliases(Array.isArray(tags) ? (tags as any) : []);
     } catch {
       push({ type: 'error', message: 'Não foi possível carregar afiliados/resultados.' });
     } finally {
@@ -735,15 +768,23 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
   // Afiliados existentes p/ o "Vincular a existente" (nome + e-mails p/ desambiguar
   // homônimos — ex.: dois "Thales" distintos no roster). A busca casa por nome, id OU
   // e-mail, então o operador pode colar o próprio e-mail da linha pra achar o dono.
-  const linkOptions = useMemo(() => {
-    const q = linkQuery.trim().toLowerCase();
-    return (roster as any[])
-      .filter((r) => r.name && String(r.name).trim())
-      .map((r) => ({ id: r.id as string, name: humanizeName(String(r.name)), emails: (r.emails as string[]) || [] }))
+  const allOptions = useMemo(
+    () =>
+      (roster as any[])
+        .filter((r) => r.name && String(r.name).trim())
+        .map((r) => ({ id: r.id as string, name: humanizeName(String(r.name)), emails: (r.emails as string[]) || [] }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+    [roster],
+  );
+  const filterOptions = (query: string) => {
+    const q = query.trim().toLowerCase();
+    return allOptions
       .filter((r) => !q || r.name.toLowerCase().includes(q) || r.id.toLowerCase().includes(q) || r.emails.some((e) => e.toLowerCase().includes(q)))
-      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
       .slice(0, 30);
-  }, [roster, linkQuery]);
+  };
+  const linkOptions = useMemo(() => filterOptions(linkQuery), [allOptions, linkQuery]);
+  // Mesma busca, para o seletor de dono da TAG.
+  const tagOptions = useMemo(() => filterOptions(tagQuery), [allOptions, tagQuery]);
 
   // Cadastra os não-resolvidos como afiliados nativos Boost (nome+email+casa) e
   // reanalisa — as linhas passam a casar na hora.
@@ -779,16 +820,73 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
     }
   };
 
+  // Vincula uma TAG do relatório da casa a um afiliado (apelido persistente: o
+  // próximo upload já casa sozinho). Recarrega o índice e a análise refaz na hora.
+  const handleLinkTag = async (tag: string, affiliateId: string) => {
+    if (!tag) return;
+    setSavingTag(true);
+    try {
+      await createTagAlias(tag, affiliateId, house.slug);
+      push({ type: 'success', message: `Tag ${tag} vinculada.` });
+      setLinkingTag(null); setTagQuery('');
+      await loadMeta();
+    } catch (e: any) {
+      push({ type: 'error', message: e?.message || 'Erro ao vincular a tag.' });
+    } finally {
+      setSavingTag(false);
+    }
+  };
+
+  // Desfaz um apelido (só apelido — vínculo que veio do link é desfeito na triagem).
+  const handleUnlinkTag = async (tag: string) => {
+    try {
+      await deleteTagAlias(tag);
+      push({ type: 'success', message: `Vínculo da tag ${tag} removido.` });
+      await loadMeta();
+    } catch (e: any) {
+      push({ type: 'error', message: e?.message || 'Erro ao desvincular.' });
+    }
+  };
+
   useEffect(() => { loadMeta(); /* eslint-disable-next-line */ }, [house.slug]);
 
-  // Reanalisa sempre que a planilha Excel, o texto colado ou o roster mudam. A
+  // Reanalisa sempre que a planilha Excel, o texto colado ou o índice mudam. A
   // planilha tem prioridade sobre o texto colado quando ambos existem.
+  //
+  // Antes de parsear, tenta ADAPTAR o arquivo como relatório da casa agrupado por tag
+  // (Esportiva/TAP). Detectado e completo → cabeçalho canônico pelo mapa explícito.
+  // Detectado e INCOMPLETO → erro, sem cair no parser genérico: lá a coluna "CPA" do
+  // export (R$ 2.760,00) entraria como CONTAGEM de CPAs e inflaria o repasse.
   useEffect(() => {
-    const parsed = fileResult ?? (text.trim() ? parseResultsCsv(text) : null);
-    if (!parsed) { setAnalysis(null); setParseErrors([]); return; }
+    const grid = fileGrid ?? (text.trim() ? csvToGrid(text) : null);
+    if (!grid) { setAnalysis(null); setParsedRows([]); setParseErrors([]); setTagMode(false); return; }
+    const adapted = adaptHouseTagReport(grid);
+    if (adapted.detected && !adapted.ok) {
+      setTagMode(true); setAnalysis(null); setParsedRows([]);
+      setParseErrors([{ line: 0, message: adapted.error || 'Relatório por tag incompleto.' }]);
+      return;
+    }
+    const parsed = parseResultsRows(adapted.ok ? adapted.grid : grid);
+    setTagMode(adapted.ok);
+    setParsedRows(parsed.rows);
     setParseErrors(parsed.errors.map((e) => ({ line: e.line, message: e.message })));
     setAnalysis(resolveAffiliates(parsed.rows, lookup));
-  }, [fileResult, text, lookup]);
+  }, [fileGrid, text, lookup]);
+
+  // Resumo por tag (só no modo relatório-da-casa): pendentes primeiro e por DINHEIRO,
+  // com o total de conferência atribuído + sem vínculo == total do arquivo.
+  const tagSummaries = useMemo<TagSummary[]>(
+    () => (tagMode ? summarizeByTag(parsedRows, tagIndex) : []),
+    [tagMode, parsedRows, tagIndex],
+  );
+  const tagTotals = useMemo(() => tagImportTotals(tagSummaries), [tagSummaries]);
+
+  // O que de fato vai ser gravado (e o que a prévia mostra). No modo tag, o resíduo
+  // sem dono fica de fora — ver o aviso em handleImport.
+  const previewRows = useMemo(
+    () => (analysis ? (tagMode ? attributedRows(analysis.rows) : analysis.rows) : []),
+    [analysis, tagMode],
+  );
 
   // Excel (.xlsx/.xls) -> matriz -> parser puro; .csv/.txt -> texto na caixa de colar.
   // Em workbooks com 1 aba por casa, seleciona a aba que bate com esta casa.
@@ -799,7 +897,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
       try {
         const { grid, sheetName, sheetNames, matched } = await parseSpreadsheetFile(file, house.name);
         setText('');
-        setFileResult(parseResultsRows(grid));
+        setFileGrid(grid); // matriz CRUA: o adaptador do relatório da casa decide o parse
         setFileName(file.name);
         setSheetInfo({ sheetName, sheetNames, matched });
       } catch {
@@ -812,7 +910,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
     // CSV/texto: cai na caixa de colar (parser de texto, tolerante a pt-BR).
     const reader = new FileReader();
     reader.onload = () => {
-      setFileResult(null);
+      setFileGrid(null);
       setFileName('');
       setSheetInfo(null);
       setText(typeof reader.result === 'string' ? reader.result : '');
@@ -820,22 +918,28 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
     reader.readAsText(file);
   };
 
-  const clearFile = () => { setFileResult(null); setFileName(''); setSheetInfo(null); };
+  const clearFile = () => { setFileGrid(null); setFileName(''); setSheetInfo(null); };
 
   const onTypeText = (v: string) => { clearFile(); setText(v); };
 
-  const canImportFile = canImport(analysis, parseErrors);
+  // No modo TAG a tag pendente não bloqueia (só o que tem dono é gravado); no template
+  // próprio, afiliado não-encontrado segue bloqueando pra não gravar atribuição fantasma.
+  const canImportFile = tagMode ? canImportTagReport(analysis, parseErrors) : canImport(analysis, parseErrors);
 
   const handleImport = async () => {
     if (!analysis || !canImportFile) return;
     setImporting(true);
     try {
-      const rows = buildImportPayload(analysis);
+      // ⚠️ No modo tag, o resíduo sem dono NÃO vira linha agregada: o agregado do dia
+      // descarta as atribuídas do mesmo casa|dia, e gravá-lo apagaria do total da casa
+      // justamente o que foi atribuído. Ele fica de fora até alguém dar dono à tag.
+      const rows = buildImportPayload(tagMode ? { ...analysis, rows: attributedRows(analysis.rows) } : analysis);
       const res = await importHouseResults(house.slug, rows);
       push({ type: 'success', message: `Importado: ${res.imported} linhas em ${res.dates.length} dia(s).` });
       setText('');
       clearFile();
       setAnalysis(null);
+      setParsedRows([]);
       await loadMeta();
     } catch (e: any) {
       push({ type: 'error', message: e?.message || 'Erro ao importar.' });
@@ -907,6 +1011,10 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
               <p className="font-bold text-slate-600 dark:text-neutral-300 mb-1">Colunas (cabeçalho obrigatório):</p>
               <code className="block font-mono text-[10px] text-slate-500 dark:text-neutral-400">data; afiliado; email; cadastros; ftd; cpa; rev; deposito; comissao</code>
               <p className="mt-1.5">• <b>data</b> obrigatória — preencha só na 1ª linha do dia (as de baixo herdam). • <b>email</b> = cruzamento com o afiliado (login na plataforma ou e-mail OTG); <b>email e afiliado vazios = agregado da casa</b>. • datas/números pt-BR aceitos.</p>
+              <p className="mt-1.5 flex items-start gap-1.5 text-slate-500 dark:text-neutral-400">
+                <Tag size={12} className="shrink-0 mt-0.5" />
+                <span>Ou suba o <b>relatório da própria casa</b> (ex.: Relatório de Mídia agrupado por <b>Dia + AFP</b>) — ele é reconhecido sozinho e o cruzamento passa a ser pela <b>tag</b>.</span>
+              </p>
             </div>
 
             {/* Entrada — subir planilha Excel (principal) */}
@@ -968,7 +1076,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2 text-[11px] font-bold">
                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    <Check size={12} /> {analysis.rows.length} linha(s) ok
+                    <Check size={12} /> {previewRows.length} linha(s) {tagMode ? 'a importar' : 'ok'}
                   </span>
                   {parseErrors.length > 0 && (
                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
@@ -977,7 +1085,15 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                   )}
                   {analysis.unresolved.length > 0 && (
                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                      <AlertTriangle size={12} /> {analysis.unresolved.length} afiliado(s) não encontrado(s)
+                      <AlertTriangle size={12} />
+                      {tagMode
+                        ? `${tagTotals.pendingTags} tag(s) sem vínculo`
+                        : `${analysis.unresolved.length} afiliado(s) não encontrado(s)`}
+                    </span>
+                  )}
+                  {tagMode && (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-accent-500/10 text-accent-600 dark:text-accent-400 border border-accent-500/20">
+                      <Tag size={12} /> Relatório da casa (por tag)
                     </span>
                   )}
                 </div>
@@ -989,7 +1105,100 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                   </div>
                 )}
 
-                {analysis.unresolved.length > 0 && (
+                {/* Tags do relatório da casa: a casa atribui por tag (?afp=), não por
+                    e-mail. As conhecidas (link emitido ou apelido salvo) já vêm com dono;
+                    as demais aparecem com o DINHEIRO em jogo e o seletor de afiliado. */}
+                {tagMode && tagSummaries.length > 0 && (
+                  <div className="rounded-xl bg-slate-50 dark:bg-neutral-800/40 border border-slate-100 dark:border-neutral-800 p-3 space-y-2">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-600 dark:text-neutral-200">Tags do relatório</p>
+                      <p className="text-[11px] text-slate-500 dark:text-neutral-400">
+                        Vincule cada tag ao afiliado dono — fica salvo e os próximos relatórios casam sozinhos.
+                        Tag sem vínculo <b>não é importada</b> (nada é atribuído por engano). Descobriu de quem é
+                        depois? Vincule e <b>suba o mesmo arquivo de novo</b> — o dia é reescrito com o que estiver vinculado.
+                      </p>
+                    </div>
+
+                    {/* Conferência: atribuído + sem vínculo == total do arquivo. */}
+                    <div className="flex flex-wrap gap-2 text-[11px] font-bold">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        Atribuído {formatBrl(tagTotals.attributed.total_commission)} · {tagTotals.attributed.qualified_cpa} CPA
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-500/10 text-slate-500 dark:text-neutral-400 border border-slate-500/20">
+                        Sem vínculo {formatBrl(tagTotals.unattributed.total_commission)} · {tagTotals.unattributed.qualified_cpa} CPA
+                      </span>
+                    </div>
+
+                    <div className="space-y-1 max-h-60 overflow-y-auto">
+                      {tagSummaries.map((s) => (
+                        <div key={s.tag || '__sem_tag__'} className="rounded-lg bg-white/70 dark:bg-neutral-900/40 border border-slate-100 dark:border-neutral-800 px-2 py-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="min-w-0 truncate text-[11px] text-slate-600 dark:text-neutral-300">
+                              <span className="font-mono font-bold text-slate-700 dark:text-neutral-200">
+                                {s.tag || 'sem tag'}
+                              </span>
+                              <span className="text-slate-400 dark:text-neutral-500">
+                                {' '}· {formatBrl(s.total_commission)} · {s.qualified_cpa} CPA · {s.days} dia(s)
+                              </span>
+                              {s.affiliateId && (
+                                <span className="text-emerald-600 dark:text-emerald-400">
+                                  {' '}→ {humanizeName(nameById.get(s.affiliateId) || s.affiliateId)}
+                                  <span className="text-slate-400 dark:text-neutral-500"> ({s.origin === 'alias' ? 'vínculo salvo' : 'link'})</span>
+                                </span>
+                              )}
+                            </span>
+                            {!s.tag ? (
+                              <span className="shrink-0 text-[11px] text-slate-400 dark:text-neutral-500">fica de fora</span>
+                            ) : s.origin === 'alias' ? (
+                              <button
+                                onClick={() => handleUnlinkTag(s.tag)}
+                                className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-slate-400 dark:text-neutral-500 hover:text-red-500"
+                              >
+                                <X size={11} /> Desfazer
+                              </button>
+                            ) : s.affiliateId ? null : (
+                              <button
+                                onClick={() => { setLinkingTag(linkingTag === s.tag ? null : s.tag); setTagQuery(''); }}
+                                className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-accent-600 dark:text-accent-400 hover:underline"
+                              >
+                                <Link2 size={11} /> {linkingTag === s.tag ? 'Cancelar' : 'Vincular'}
+                              </button>
+                            )}
+                          </div>
+                          {linkingTag === s.tag && (
+                            <div className="mt-1.5">
+                              <input
+                                value={tagQuery}
+                                onChange={(e) => setTagQuery(e.target.value)}
+                                placeholder="Buscar afiliado…"
+                                className="w-full px-2 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-[11px] text-slate-900 dark:text-white focus:outline-none focus:border-accent-500"
+                              />
+                              <div className="mt-1 max-h-32 overflow-y-auto rounded-lg border border-slate-100 dark:border-neutral-800">
+                                {tagOptions.length === 0 ? (
+                                  <p className="px-2 py-1.5 text-[11px] text-slate-400 dark:text-neutral-500">Nenhum afiliado encontrado.</p>
+                                ) : tagOptions.map((o) => (
+                                  <button
+                                    key={o.id}
+                                    disabled={savingTag}
+                                    onClick={() => handleLinkTag(s.tag, o.id)}
+                                    className="block w-full text-left px-2 py-1.5 text-[11px] text-slate-600 dark:text-neutral-300 hover:bg-accent-500/10 disabled:opacity-50"
+                                  >
+                                    {o.name}
+                                    {o.emails.length > 0 && (
+                                      <span className="text-slate-400 dark:text-neutral-500"> ({o.emails.join(', ')})</span>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!tagMode && analysis.unresolved.length > 0 && (
                   <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 p-3 space-y-2">
                     <div>
                       <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300">Afiliados não encontrados na plataforma</p>
@@ -1058,7 +1267,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                   </div>
                 )}
 
-                {analysis.rows.length > 0 && (
+                {previewRows.length > 0 && (
                   <div className="rounded-xl border border-slate-100 dark:border-neutral-800 overflow-hidden">
                     <table className="w-full text-[11px]">
                       <thead className="bg-slate-50 dark:bg-neutral-800/40 text-slate-400 dark:text-neutral-500">
@@ -1069,7 +1278,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                         </tr>
                       </thead>
                       <tbody>
-                        {analysis.rows.slice(0, 8).map((r, i) => (
+                        {previewRows.slice(0, 8).map((r, i) => (
                           <tr key={i} className="border-t border-slate-100 dark:border-neutral-800">
                             <td className="px-2 py-1.5 font-mono text-slate-600 dark:text-neutral-300">{r.date}</td>
                             <td className="px-2 py-1.5 text-slate-600 dark:text-neutral-300">
@@ -1087,8 +1296,8 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                         ))}
                       </tbody>
                     </table>
-                    {analysis.rows.length > 8 && (
-                      <p className="px-2 py-1.5 text-[10px] text-slate-400 dark:text-neutral-500 border-t border-slate-100 dark:border-neutral-800">+{analysis.rows.length - 8} linha(s)…</p>
+                    {previewRows.length > 8 && (
+                      <p className="px-2 py-1.5 text-[10px] text-slate-400 dark:text-neutral-500 border-t border-slate-100 dark:border-neutral-800">+{previewRows.length - 8} linha(s)…</p>
                     )}
                   </div>
                 )}

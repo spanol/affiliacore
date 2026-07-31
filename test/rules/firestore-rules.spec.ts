@@ -327,6 +327,9 @@ describe('coleções admin-only (servidor via Admin SDK; client direto negado)',
     'payment_profiles',
     'affiliate_statuses',
     'affiliate_email_aliases',
+    // Tag de rastreio -> afiliado: mesma classe do alias de e-mail (diz de quem é o
+    // resultado que a casa atribuiu àquela tag → define repasse). Server-only.
+    'affiliate_tag_aliases',
     'audit_logs',
     'affiliate_links',
     'link_clicks',

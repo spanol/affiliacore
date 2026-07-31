@@ -17,6 +17,7 @@ import { computeRankingEntries } from './src/lib/ranking';
 import { expandAffiliateIdsParam } from './src/lib/affiliateIdsParam';
 import { hrDocId, sanitizeMetrics } from './src/lib/houseResultsDoc';
 import { makeBoostAffiliateId, normalizeEmailKey } from './src/lib/boostAffiliate';
+import { normalizeTag } from './src/lib/houseTagImport';
 import { eurToBrl, parseEurBrlRate, FALLBACK_EUR_BRL } from './src/lib/currency';
 import { DEFAULT_BRANDS } from './src/lib/brand';
 import { projectPartnerResults } from './src/lib/partnerResults';
@@ -2764,6 +2765,94 @@ export function createApp(deps: ServerDeps) {
     } catch (error: any) {
       console.error('Error listing email aliases:', error);
       return res.status(500).json({ error: error.message || 'Erro interno listando aliases.' });
+    }
+  });
+
+  // --- Alias de TAG -> afiliado (import do relatório da CASA) -----------------
+  // O relatório da casa agrupa pela tag de rastreio (`?afp=infinitw02`), não por
+  // e-mail. As tags que saíram de um link nosso já casam sozinhas (o índice as extrai
+  // da `registerUrl` do `affiliate_links`); estas rotas guardam a decisão do admin
+  // para as demais — a variante digitada à mão no painel da casa, que nenhum link
+  // nosso cobre. Doc id = tag normalizada. Espelha /api/affiliate-email-aliases.
+
+  // Lista os apelidos de tag (p/ o índice do import). Admin-only.
+  app.get('/api/tag-aliases', requireAdmin, async (_req, res) => {
+    if (!adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+    try {
+      const snap = await adminDb.collection('affiliate_tag_aliases').get();
+      const aliases = snap.docs.map((d) => {
+        const x = d.data() as any;
+        return {
+          tag: x.tag ?? d.id,
+          affiliateId: x.affiliateId,
+          houseSlug: x.houseSlug ?? null,
+        };
+      });
+      return res.json({ aliases });
+    } catch (error: any) {
+      console.error('Error listing tag aliases:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno listando apelidos de tag.' });
+    }
+  });
+
+  // Vincula uma tag a um afiliado existente (persistente: o próximo upload já casa).
+  app.post('/api/tag-aliases', requireAdmin, async (req, res) => {
+    if (!adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+    try {
+      const tag = normalizeTag(req.body?.tag);
+      const affiliateId = String(req.body?.affiliateId ?? '').trim();
+      const houseSlug = String(req.body?.houseSlug ?? '').trim() || null;
+      if (!tag || !affiliateId) {
+        return res.status(400).json({ error: 'Informe tag e affiliateId.' });
+      }
+      await adminDb.collection('affiliate_tag_aliases').doc(tag).set({
+        tag,
+        affiliateId,
+        houseSlug,
+        createdByUid: (req as any).user?.uid ?? null,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      await writeAuditLog(req, {
+        entityType: 'affiliate',
+        entityId: affiliateId,
+        entityLabel: await affiliateNameOf(affiliateId),
+        action: 'affiliate.link_tag',
+        metadata: { tag, house: houseSlug },
+      });
+      return res.json({ tag, affiliateId, houseSlug });
+    } catch (error: any) {
+      console.error('Error creating tag alias:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno vinculando a tag.' });
+    }
+  });
+
+  // Desfaz o vínculo (o admin errou o dono). A tag volta a ficar pendente no import.
+  app.delete('/api/tag-aliases/:tag', requireAdmin, async (req, res) => {
+    if (!adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+    try {
+      const tag = normalizeTag(req.params.tag);
+      if (!tag) return res.status(400).json({ error: 'Tag inválida.' });
+      const ref = adminDb.collection('affiliate_tag_aliases').doc(tag);
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: 'Apelido de tag não encontrado.' });
+      const previous = String((snap.data() as any)?.affiliateId ?? '');
+      await ref.delete();
+      await writeAuditLog(req, {
+        entityType: 'affiliate',
+        entityId: previous || tag,
+        action: 'affiliate.unlink_tag',
+        metadata: { tag },
+      });
+      return res.json({ tag, removed: true });
+    } catch (error: any) {
+      console.error('Error deleting tag alias:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno removendo o apelido.' });
     }
   });
 

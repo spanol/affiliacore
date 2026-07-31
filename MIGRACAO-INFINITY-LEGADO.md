@@ -577,21 +577,38 @@ fechando com o painel da casa.
 Outras 7 tags têm visita e zero conversão: `infinitw45`, `infinitw298`, `infinitw299`,
 `infinitw280tem`, `infinitw280gay`, `infi`, `teste01`.
 
-### 10.2 ▶️ FALTA — a casca (desenho CONFIRMADO pelo Vinicius em 31/07)
+### 10.2 ✅ ENTREGUE — a casca (desenho CONFIRMADO pelo Vinicius em 31/07)
 
-**Decisão: a tela vive DENTRO do modal de import de `/casas`**, não como página nova — é onde o
-admin já sobe resultado, o arquivo é o mesmo, e evita ensinar uma segunda tela ao cliente.
+**A tela vive DENTRO do modal de import de `/casas`**, não como página nova — é onde o admin já
+sobe resultado, o arquivo é o mesmo, e evita ensinar uma segunda tela ao cliente.
 
 Fluxo: sobe o relatório da casa → tags conhecidas casam sozinhas (pelos links já emitidos) → as
 desconhecidas aparecem **com o volume em R$** e um seletor de afiliado → vincula → importa.
 O apelido fica salvo e não pergunta de novo.
 
-A construir:
-1. Coleção **`affiliate_tag_aliases/{tagNormalizada}`** — server-only (rule negando o cliente),
-   no padrão de `affiliate_email_aliases`.
-2. Rotas `GET/POST/DELETE /api/tag-aliases` (requireAdmin) + wrappers no `affiliateService`.
-3. No modal de import (`src/pages/Houses.tsx`): compor o lookup = **índice de tags** (links +
-   apelidos) **depois** o roster por e-mail; listar as tags pendentes com volume e o seletor.
+O que entrou:
+1. Coleção **`affiliate_tag_aliases/{tagNormalizada}`** — server-only (`isAdmin()`), no padrão de
+   `affiliate_email_aliases`. Coleção NOVA, nasce fechada → sem acoplamento de ordem de deploy.
+2. Rotas `GET/POST/DELETE /api/tag-aliases` (requireAdmin) + trilha `affiliate.link_tag` /
+   `affiliate.unlink_tag`, e os wrappers `fetchTagAliases`/`createTagAlias`/`deleteTagAlias`.
+3. No modal de import (`src/pages/Houses.tsx`): lookup COMPOSTO (`composeLookup`) = índice de tags
+   (links + apelidos) **depois** o roster por e-mail; painel "Tags do relatório" com pendentes
+   primeiro, dinheiro por tag e o seletor de afiliado.
+
+Decisões que a casca fixou:
+- **O arquivo é RECONHECIDO sozinho** (`adaptHouseTagReport` na matriz crua, antes do parse). Se
+  tem `AFP` mas falta coluna (`detected && !ok`), a tela ERRA em vez de cair no parser genérico —
+  lá `cpa` viraria contagem e infla o repasse ~120×.
+- **Tag pendente NÃO bloqueia a importação** (`canImportTagReport` ≠ `canImport`): entra só o que
+  tem dono, o resíduo fica visível com o total. Travar tudo por uma tag órfã deixaria de fora o
+  que já está atribuído — e o bloqueio aqui é de negócio (§ abaixo), não de dados.
+- O upload continua **reescrevendo o dia** da casa: vinculou depois, sobe o mesmo arquivo de novo.
+
+Verificado na demo dos emuladores (31/07): CSV no formato da Esportiva → 3 tags pendentes, ordem
+por dinheiro, `Atribuído R$ 0,00 + Sem vínculo R$ 3.239,15 == total do arquivo`; vinculou
+`infinitw280` → `1 linha(s) a importar` e `Atribuído R$ 2.782,48 · 23 CPA` (QFTDS como CONTAGEM,
+não os R$ 8.400 do depósito); import gravou **uma** linha (`superbet__2026-07-30__<afiliado>`),
+sem linha agregada para o resíduo, com a trilha `affiliate.link_tag` na /auditoria.
 
 ⚠️ **Bloqueio de negócio (não técnico):** o Maurício ainda não respondeu **de quem são** as tags
 `infinitw280`, `infinitw292`, `infinitw193` e `infinitw01` (a `02` é dele), nem se

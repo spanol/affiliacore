@@ -7,8 +7,9 @@ import {
   summarizeByTag,
   tagImportTotals,
   attributedRows,
+  canImportTagReport,
 } from './houseTagImport';
-import { parseResultsRows, resolveAffiliates, emptyMetrics, addMetrics } from './houseResults';
+import { parseResultsRows, resolveAffiliates, emptyMetrics, addMetrics, composeLookup, buildAffiliateLookup } from './houseResults';
 
 // Cabeçalho real do export da Esportiva (recortado nas colunas que importam).
 const HEADER = ['Período', 'AFP', 'Registros', 'FTDs', 'QFTDS', 'Depósito Valor (R$)', 'Comissão Total', 'RevShare'];
@@ -19,6 +20,13 @@ describe('normalizeTag', () => {
   it('case e espaço não distinguem tag', () => {
     expect(normalizeTag(' INFINITW02 ')).toBe('infinitw02');
     expect(normalizeTag(null)).toBe('');
+  });
+
+  it('o "sem valor" da casa (— / -) é tag VAZIA, não uma tag chamada traço', () => {
+    // Senão o resumo mostraria "—" como uma tag pendente, vinculável a um afiliado.
+    expect(normalizeTag('—')).toBe('');
+    expect(normalizeTag('-')).toBe('');
+    expect(normalizeTag('N/A')).toBe('');
   });
 });
 
@@ -46,7 +54,17 @@ describe('adaptHouseTagReport', () => {
   it('recusa arquivo que não é o relatório por tag', () => {
     const r = adaptHouseTagReport([['data', 'email', 'cpa'], ['30/07/2026', 'a@b.com', '2']]);
     expect(r.ok).toBe(false);
+    expect(r.detected).toBe(false); // template próprio: a tela cai no parser genérico
     expect(r.error).toMatch(/AFP/i);
+  });
+
+  it('⚠️ relatório da casa INCOMPLETO é DETECTADO (a tela não pode cair no genérico)', () => {
+    // Tem AFP mas falta QFTDS. No parser genérico, `afp` casaria como tag e a coluna
+    // "CPA" (R$) entraria como CONTAGEM — o bug de dinheiro. `detected` faz a tela
+    // mostrar o erro em vez de importar calada.
+    const r = adaptHouseTagReport([['Período', 'AFP', 'CPA'], ['30/07/2026', 'infinitw02', 'R$ 2.760,00']]);
+    expect(r.ok).toBe(false);
+    expect(r.detected).toBe(true);
   });
 
   it('arquivo vazio não quebra', () => {
@@ -69,6 +87,11 @@ describe('buildTagIndex', () => {
     expect(idx.get('infinitw280')).toEqual({ affiliateId: 'A2', origin: 'link' }); // normalizada
     expect(idx.has('infinitw999')).toBe(false);
     expect(idx.size).toBe(2);
+  });
+
+  it('tag EXPLÍCITA do doc vence a URL (link migrado sem ?afp= na query)', () => {
+    const idx = buildTagIndex([{ affiliateId: 'A9', registerUrl: 'https://go.aff.esportiva.bet/abc', tag: 'INFINITW45' }], []);
+    expect(idx.get('infinitw45')).toEqual({ affiliateId: 'A9', origin: 'link' });
   });
 
   it('apelido do admin SOBREPÕE o link', () => {
@@ -187,5 +210,49 @@ describe('attributedRows', () => {
     ];
     expect(attributedRows(resolved)).toHaveLength(1);
     expect(attributedRows(resolved)[0].affiliateId).toBe('A1');
+  });
+});
+
+describe('canImportTagReport', () => {
+  const row = (affiliateId: string | null) => ({ line: 2, date: '2026-07-30', affiliateId, ...emptyMetrics() });
+
+  it('tag pendente NÃO bloqueia: importa o que tem dono e deixa o resto para depois', () => {
+    const analysis = { rows: [row('A1')], unresolved: [{ line: 3, token: 'desconhecida', tag: 'desconhecida' }] };
+    expect(canImportTagReport(analysis, [])).toBe(true);
+  });
+
+  it('erro de FORMATO bloqueia', () => {
+    expect(canImportTagReport({ rows: [row('A1')], unresolved: [] }, [{ line: 2 }])).toBe(false);
+  });
+
+  it('sem nenhuma linha com dono não há o que importar', () => {
+    expect(canImportTagReport({ rows: [row(null)], unresolved: [] }, [])).toBe(false);
+    expect(canImportTagReport(null, [])).toBe(false);
+  });
+});
+
+// A tela compõe os dois cruzamentos; esta é a ordem que ela usa.
+describe('lookup composto (tag primeiro, roster por e-mail depois)', () => {
+  const index = buildTagIndex([{ affiliateId: 'A1', registerUrl: 'https://x/y?afp=infinitw02' }], []);
+  const roster = [{ id: 'A9', name: 'Maria', emails: ['maria@x.com'] }];
+  const lookup = composeLookup(tagLookup(index, (id) => (id === 'A1' ? 'João' : undefined)), buildAffiliateLookup(roster));
+
+  it('a tag resolve pelo índice, o e-mail pelo roster', () => {
+    expect(lookup('INFINITW02')).toEqual({ id: 'A1', label: 'João' });
+    expect(lookup('maria@x.com')).toEqual({ id: 'A9', label: 'Maria' });
+    expect(lookup('ninguem')).toBeNull();
+  });
+
+  it('a linha "—" da casa não vira tag pendente no resumo', () => {
+    const parsed = parseResultsRows(
+      adaptHouseTagReport([
+        ['Período', 'AFP', 'QFTDS', 'Comissão Total'],
+        ['30/07/2026', '—', '0', 'R$ 0,00'],
+        ['30/07/2026', 'infinitw02', '1', 'R$ 120,00'],
+      ]).grid,
+    );
+    const summaries = summarizeByTag(parsed.rows, index);
+    expect(summaries.map((s) => s.tag)).toEqual(['infinitw02', '']);
+    expect(tagImportTotals(summaries).pendingTags).toBe(0);
   });
 });

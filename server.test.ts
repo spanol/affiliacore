@@ -866,6 +866,65 @@ describe('/api/affiliate-uplines — rede de afiliados (N níveis)', () => {
 });
 
 // =============================================================================
+// Apelido de TAG -> afiliado (/api/tag-aliases) — import do relatório da CASA.
+// A casa atribui pela tag do link (?afp=), não por e-mail: este é o vínculo que o
+// admin salva para a tag que nenhum link nosso cobre.
+// =============================================================================
+describe('/api/tag-aliases (admin-only)', () => {
+  const seed = { users: { 'admin-uid': { role: 'admin' }, 'client-uid': { role: 'client', affiliateId: 'AFF-1' } } };
+  const logsOf = (db: any, action: string) =>
+    [...(db.__store.get('audit_logs')?.values() ?? [])].filter((l: any) => l.action === action);
+
+  it('POST normaliza a tag (doc id) e grava a trilha affiliate.link_tag', async () => {
+    const db = makeFirestore({ ...seed, affiliates: { 'AFF-7': { name: 'Maurício' } } });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/tag-aliases')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ tag: '  InfinitW280TEM ', affiliateId: 'AFF-7', houseSlug: 'esportiva' })
+      .expect(200);
+
+    const doc = db.__store.get('affiliate_tag_aliases')?.get('infinitw280tem');
+    expect(doc).toMatchObject({ tag: 'infinitw280tem', affiliateId: 'AFF-7', houseSlug: 'esportiva' });
+    const logs = logsOf(db, 'affiliate.link_tag');
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({
+      entityType: 'affiliate', entityId: 'AFF-7', entityLabel: 'Maurício',
+      metadata: { tag: 'infinitw280tem', house: 'esportiva' },
+    });
+  });
+
+  it('GET lista os apelidos; DELETE desfaz e loga affiliate.unlink_tag', async () => {
+    const db = makeFirestore({ ...seed, affiliate_tag_aliases: { infinitw02: { tag: 'infinitw02', affiliateId: 'AFF-2' } } });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const list = await request(app).get('/api/tag-aliases').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(list.body.aliases).toEqual([{ tag: 'infinitw02', affiliateId: 'AFF-2', houseSlug: null }]);
+
+    await request(app).delete('/api/tag-aliases/INFINITW02').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(db.__store.get('affiliate_tag_aliases')?.has('infinitw02')).toBe(false);
+    expect(logsOf(db, 'affiliate.unlink_tag')[0]).toMatchObject({ entityId: 'AFF-2', metadata: { tag: 'infinitw02' } });
+  });
+
+  it('tag/afiliado ausente → 400; apelido inexistente → 404', async () => {
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(seed) });
+    await request(app).post('/api/tag-aliases').set('Authorization', 'Bearer admin-uid').send({ tag: 'x' }).expect(400);
+    await request(app).post('/api/tag-aliases').set('Authorization', 'Bearer admin-uid').send({ affiliateId: 'A' }).expect(400);
+    // "—" (o "sem valor" da casa) não é tag: normaliza p/ vazio e cai no 400.
+    await request(app).post('/api/tag-aliases').set('Authorization', 'Bearer admin-uid').send({ tag: '—', affiliateId: 'A' }).expect(400);
+    await request(app).delete('/api/tag-aliases/naoexiste').set('Authorization', 'Bearer admin-uid').expect(404);
+  });
+
+  it('não-admin → 403 nas três rotas (o vínculo define de quem é o dinheiro)', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).get('/api/tag-aliases').set('Authorization', 'Bearer client-uid').expect(403);
+    await request(app).post('/api/tag-aliases').set('Authorization', 'Bearer client-uid').send({ tag: 't', affiliateId: 'AFF-1' }).expect(403);
+    await request(app).delete('/api/tag-aliases/t').set('Authorization', 'Bearer client-uid').expect(403);
+    expect(db.__store.get('affiliate_tag_aliases')?.size ?? 0).toBe(0);
+  });
+});
+
+// =============================================================================
 // R4 — IDOR no proxy externo /api/external/:endpoint
 // =============================================================================
 describe('proxy externo / IDOR (R4)', () => {

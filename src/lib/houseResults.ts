@@ -255,17 +255,21 @@ export function parseResultsRows(grid: string[][]): ParseResult {
   return result;
 }
 
-// Texto colado / CSV -> matriz -> parseResultsRows. Detecta o delimitador (TAB/;/,) na
-// 1ª linha não-vazia e preserva a numeração de linha do texto (linhas em branco contam).
-export function parseResultsCsv(text: string): ParseResult {
+// Texto colado / CSV -> MATRIZ. Detecta o delimitador (TAB/;/,) na 1ª linha não-vazia
+// e preserva a numeração de linha do texto (linhas em branco viram linha vazia). Sai
+// separado do parse porque o import da CASA precisa da matriz CRUA antes de parsear:
+// é sobre ela que `adaptHouseTagReport` decide o mapeamento de colunas.
+export function csvToGrid(text: string): string[][] {
   const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n');
   const headerIdx = lines.findIndex((l) => l.trim() !== '');
-  if (headerIdx === -1) {
-    return { rows: [], errors: [{ line: 0, raw: '', message: 'Nada para importar.' }], columns: {} };
-  }
+  if (headerIdx === -1) return [];
   const delim = detectDelimiter(lines[headerIdx]);
-  const grid = lines.map((l) => (l.trim() === '' ? [] : splitLine(l, delim)));
-  return parseResultsRows(grid);
+  return lines.map((l) => (l.trim() === '' ? [] : splitLine(l, delim)));
+}
+
+// Texto colado / CSV -> matriz -> parseResultsRows.
+export function parseResultsCsv(text: string): ParseResult {
+  return parseResultsRows(csvToGrid(text));
 }
 
 // --- Resolução de afiliados --------------------------------------------------
@@ -293,10 +297,23 @@ export type AffiliateLookup = (token: string) => { id: string; label?: string } 
 // Traço/travessão é como as casas escrevem "sem valor" no export (a Esportiva usa
 // `—`). Sem isso a linha sem tag viraria um token literal e nunca casaria.
 const EMPTY_TOKENS = new Set(['—', '–', '-', '--', 'n/a', 'null']);
-const cleanToken = (raw: unknown): string => {
+export const cleanToken = (raw: unknown): string => {
   const s = String(raw ?? '').trim();
   return EMPTY_TOKENS.has(s.toLowerCase()) ? '' : s;
 };
+
+// Encadeia lookups na ordem dada: o primeiro que casar vence. É assim que a tela de
+// import compõe o ÍNDICE DE TAGS (links emitidos + apelidos) ANTES do roster por
+// e-mail — a tag é a chave que a própria casa usa para atribuir, e é exata.
+export function composeLookup(...lookups: (AffiliateLookup | null | undefined)[]): AffiliateLookup {
+  return (token: string) => {
+    for (const l of lookups) {
+      const hit = l?.(token);
+      if (hit) return hit;
+    }
+    return null;
+  };
+}
 
 export function resolveAffiliates(parsed: ParsedRow[], lookup: AffiliateLookup): ResolveResult {
   const out: ResolveResult = { rows: [], unresolved: [] };

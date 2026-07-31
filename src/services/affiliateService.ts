@@ -498,6 +498,43 @@ export async function fetchEmailAliases(): Promise<EmailAlias[]> {
   return Array.isArray((data as any)?.aliases) ? (data as any).aliases : [];
 }
 
+// --- Apelidos de TAG (import do relatório da casa) ---------------------------
+// A casa agrupa o relatório pela tag de rastreio (`?afp=`), não por e-mail. Tag que
+// saiu de link nosso já casa sozinha; estas rotas guardam o vínculo das demais.
+
+export interface TagAliasRecord { tag: string; affiliateId: string; houseSlug?: string | null }
+
+export async function fetchTagAliases(): Promise<TagAliasRecord[]> {
+  const response = await authFetch('/api/tag-aliases', { headers: { Accept: 'application/json' } });
+  if (!response.ok) return [];
+  const data = await response.json().catch(() => ({}));
+  return Array.isArray((data as any)?.aliases) ? (data as any).aliases : [];
+}
+
+export async function createTagAlias(tag: string, affiliateId: string, houseSlug?: string | null): Promise<TagAliasRecord> {
+  const response = await authFetch('/api/tag-aliases', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ tag, affiliateId, houseSlug: houseSlug ?? null }),
+  });
+  if (!response.ok) {
+    const e = await response.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro ao vincular a tag: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function deleteTagAlias(tag: string): Promise<void> {
+  const response = await authFetch(`/api/tag-aliases/${encodeURIComponent(tag)}`, {
+    method: 'DELETE',
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) {
+    const e = await response.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro ao desvincular a tag: ${response.status}`);
+  }
+}
+
 export async function fetchAffiliateStatuses(): Promise<Record<string, AffiliateStatusConfig>> {
   try {
     const response = await authFetch('/api/affiliate-statuses', {
