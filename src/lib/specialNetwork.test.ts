@@ -8,8 +8,8 @@ import {
   isDirectDownline,
   type SpecialRecord,
 } from './specialNetwork';
-import { buildNetworkNodes, buildNetworkTree, uplineMapFromSpecials } from './network';
-import { buildSubToSpecialConfig } from '../services/affiliateService';
+import { buildNetworkNodes, buildNetworkTree, uplineMapFromSpecials, buildEligibleUpline } from './network';
+import { buildSubToSpecialConfig, composeAdminProfit } from '../services/affiliateService';
 
 // Estrutura de 4 níveis, o formato real da Infinity:
 //   topo → gerente → lider → ponta
@@ -200,5 +200,91 @@ describe('buildScopeTree', () => {
     // dinheiro, então os dois lados nunca discordam de quem manda em quem.
     expect(isDirectDownline('b', 'a', { uplines: ciclo })).toBe(true);
     expect(isDirectDownline('a', 'b', { uplines: ciclo })).toBe(false);
+  });
+});
+
+// Regressão do susto de 2026-07-30 em produção (Infinity): logo depois de registrar
+// um gerente como especial `fromNetwork`, o headline do /admin foi lido como
+// R$ 1.020,00 contra R$ 480,00 de minutos antes — exatamente o "lucro sobre equipe"
+// inteiro (R$ 540,00) desaparecendo. A pergunta que isso levanta é objetiva:
+// REGISTRAR um especial derivado pode mexer no lucro da agência?
+//
+// Não pode. O registro não é fonte de hierarquia (a árvore já existia) e o custo sai
+// de `buildRootConfigMap`, que lê a árvore. Este teste amarra a resposta ponta a
+// ponta — pelo `composeAdminProfit`, não só pelos blocos isolados.
+describe('registrar um especial fromNetwork NÃO mexe no lucro da agência', () => {
+  const UP = { filho: 'gerente', neto: 'filho' };
+  const results = [
+    { id: 'gerente', total_commission: 1000, qualified_cpa: 5, rvs: 0 },
+    { id: 'filho', total_commission: 600, qualified_cpa: 3, rvs: 0 },
+    { id: 'neto', total_commission: 400, qualified_cpa: 2, rvs: 0 },
+  ];
+  const configs = {
+    gerente: { affiliateId: 'gerente', cpaValue: 100, revPercentage: 0 },
+    filho: { affiliateId: 'filho', cpaValue: 60, revPercentage: 0 },
+    neto: { affiliateId: 'neto', cpaValue: 40, revPercentage: 0 },
+  } as any;
+  const houseOf = (id: string) =>
+    ({ gerente: { key: 'Casa', brandId: 'c' }, filho: { key: 'Casa', brandId: 'c' }, neto: { key: 'Casa', brandId: 'c' } } as any)[id] ?? null;
+
+  const profitCom = (specials: Record<string, SpecialRecord>) => {
+    const tree = buildNetworkTree(
+      buildNetworkNodes({ ids: ['gerente', 'filho', 'neto'], specials, uplines: UP }),
+      { isEligibleUpline: buildEligibleUpline(configs) }
+    );
+    return composeAdminProfit(
+      results,
+      [],
+      configs,
+      buildSubToSpecialConfig(specials as any, configs),
+      houseOf,
+      tree
+    );
+  };
+
+  it('antes e depois do registro, o lucro e a decomposição são IDÊNTICOS', () => {
+    const antes = profitCom({});
+    // o que o servidor devolve depois do registro: flag + a subárvore JÁ resolvida
+    const depois = profitCom({
+      gerente: {
+        affiliateId: 'gerente',
+        active: true,
+        fromNetwork: true,
+        subAffiliateIds: ['filho', 'neto'],
+      },
+    });
+
+    expect(depois.netProfit).toBe(antes.netProfit);
+    expect(depois.directPayout).toBe(antes.directPayout);
+    expect(depois.overridePayout).toBe(antes.overridePayout);
+    expect(depois.byHouseTotal).toBe(antes.byHouseTotal);
+  });
+
+  it('e o "lucro sobre equipe" continua existindo (não colapsa para zero)', () => {
+    const p = profitCom({
+      gerente: { affiliateId: 'gerente', active: true, fromNetwork: true, subAffiliateIds: ['filho', 'neto'] },
+    });
+    // toda a subárvore é cobrada à taxa do TOPO (100), não à taxa própria de cada um
+    expect(p.overridePayout).toBeGreaterThan(0);
+    expect(p.directPayout + p.overridePayout).toBe(10 * 100);
+  });
+
+  it('CONTRASTE — sem taxa no topo, a estrutura inteira cai e o lucro INFLA', () => {
+    // Ausência ≠ R$ 0: um upline sem taxa perde a aresta (isEligibleUpline), cada um
+    // vira topo próprio e o override some. É o mecanismo que faria o headline pular
+    // sem que ninguém tivesse mexido na rede — e ele NÃO depende do registro.
+    const semTaxaNoTopo = { ...configs, gerente: undefined } as any;
+    const tree = buildNetworkTree(
+      buildNetworkNodes({ ids: ['gerente', 'filho', 'neto'], uplines: UP }),
+      { isEligibleUpline: buildEligibleUpline(semTaxaNoTopo) }
+    );
+    const p = composeAdminProfit(results, [], semTaxaNoTopo, {}, houseOf, tree);
+    const comTaxa = profitCom({});
+    // A aresta filho→gerente cai (gerente sem taxa) e o gerente sai da conta; sobra só
+    // o override de neto→filho. O custo da estrutura DESPENCA e o lucro sobe — sem que
+    // ninguém tenha tocado na rede.
+    expect(tree.dropped.some((d) => d.reason === 'upline-inelegivel')).toBe(true);
+    expect(p.overridePayout).toBeLessThan(comTaxa.overridePayout);
+    expect(p.netProfit).toBeGreaterThan(comTaxa.netProfit);
   });
 });
