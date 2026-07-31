@@ -493,3 +493,107 @@ a taxa é do gerente do meio.
 
 **Depois do piloto:** replicar para os outros 18 topos é repetir os passos 1–4 por afiliado. A decisão de
 replicar é do operador — cada gerente que ganha a visão passa a enxergar a produção nominal da equipe.
+
+---
+
+## 9. Pull da Esportiva: como automatizar (medido 2026-07-31)
+
+### 9.1 O endpoint existe e tem a forma certa
+
+O Relatório de Mídia do painel é alimentado por um GET REST limpo, capturado na aba de rede:
+
+```
+GET https://wallet.esportiva.bet.br/api/afiliate/544865
+      ?startDate=2026-07-01&endDate=2026-07-31&aggregateBy=DAY&groupBy=afp
+```
+
+Data inicial, data final e `groupBy=afp` como parâmetros — exatamente a forma de um cron diário,
+igual ao que já fazemos com a OTG.
+
+### 9.2 ⛔ Mas os DOIS caminhos estão bloqueados para cliente não-navegador
+
+| Origem | Resultado server-side |
+|---|---|
+| API do TAP (`api.aff.esportiva.bet`) | **403** — Cloudflare managed challenge |
+| BFF do painel (`wallet.esportiva.bet.br/api/…`) | **429** — Vercel Security Checkpoint |
+
+O 429 foi medido com Node fetch em 31/07: devolve a página "Vercel Security Checkpoint", não JSON.
+E o botão **"Exportar dados" NÃO ajuda a automatizar** — ele monta o CSV **no navegador**, a partir
+do que a página já tem em memória (zero requisição nova quando clicado).
+
+**Logo: o cron diário depende do pedido à casa** (isentar `/api/*` do challenge). É o ÚNICO pedido
+que resta — o de capturar a tag caiu (§5.1, a captura já funciona pelo campo `AFP`).
+
+Um terceiro caminho — robô de navegador com sessão logada — foi considerado e **descartado**:
+exigiria guardar o cookie de sessão da conta do cliente em infraestrutura nossa e quebra a cada
+rotação de sessão ou mudança de checkpoint.
+
+### 9.3 Enquanto isso: export manual → upload (funciona hoje)
+
+O CSV do "Exportar dados" vem em **pt-BR com BOM UTF-8** (`R$ 1.234,56`) e 34 colunas.
+⚠️ Ao parsear no Windows use `InvariantCulture` no `TryParse` — culture pt-BR lê `"120.00"` como
+12000 e infla tudo por 100.
+
+O adaptador (`src/lib/houseTagImport.ts`) isola a fonte de propósito: trocar "arquivo enviado" por
+"puxado da API" é mudar o adaptador, não a tela.
+
+---
+
+## 10. Vínculo tag → afiliado (o que destrava a Esportiva por afiliado)
+
+### 10.1 ✅ ENTREGUE — o motor (commit `e574806`)
+
+`src/lib/houseTagImport.ts` (puro) + a coluna `tag` no `houseResults`:
+
+- **`adaptHouseTagReport`** — mapa EXPLÍCITO do cabeçalho da casa para o canônico. Existe por causa
+  de um erro de dinheiro: no export a coluna **"CPA" é R$ 2.760,00**, mas o nosso `qualified_cpa` é
+  **CONTAGEM** (quem conta é `QFTDS`). Um alias genérico `cpa → qualified_cpa` leria 2760 CPAs e
+  multiplicaria o repasse por ~120. Há teste cravando exatamente isso.
+- **`buildTagIndex`** — tag→afiliado a partir dos `affiliate_links` já emitidos (a tag sai da
+  `registerUrl` por `extractTagFromUrl`) **+** apelidos salvos, com o **apelido SOBREPONDO o link**
+  (é a correção humana). Cobre as variantes digitadas à mão (`infinitw280tem`, `infinitw280gay`).
+- **`summarizeByTag`** — ordena **pendentes primeiro e por DINHEIRO**: numa lista de dezenas de tags
+  o admin tem que ver antes a que carrega R$ 2.760, não a de uma visita.
+- **`tagImportTotals`** — invariante da tela: `atribuído + sem-vínculo == total do arquivo`.
+- **`attributedRows`** — só linha COM dono é gravada. ⚠️ O resíduo **não** vira `affiliateId: null`:
+  no modelo a linha nula é o *agregado do dia*, e `dailyAggregate` DESCARTA as atribuídas do mesmo
+  casa|dia — gravar o resíduo como agregado apagaria do total da casa justamente o que foi atribuído.
+- `resolveAffiliates` passa a tentar **TAG primeiro** (é a chave que a própria casa usa, e é exata),
+  depois e-mail, depois id/nome. Traço/travessão (`—`, como a Esportiva escreve "sem valor") vira
+  token **vazio**.
+
+**Validado contra o CSV real de julho** (74 linhas, 0 erro): 47 CPAq em 5 tags, comissão por tag
+fechando com o painel da casa.
+
+| AFP | Dias | Visitas | Registros | FTDs | QFTDs | Comissão |
+|---|---:|---:|---:|---:|---:|---:|
+| `infinitw280` | 11 | 122 | 29 | 23 | 23 | R$ 2.782,48 |
+| `infinitw292` | 10 | 60 | 18 | 13 | 12 | R$ 1.453,55 |
+| `infinitw02` (Maurício) | 9 | 35 | 13 | 9 | 8 | R$ 971,00 |
+| `infinitw193` | 10 | 74 | 11 | 3 | 3 | R$ 374,26 |
+| `infinitw01` | 10 | 11 | 1 | 1 | 1 | R$ 27,87 |
+| *(sem tag)* | 17 | 12 | 3 | 0 | 0 | −R$ 144,38 |
+
+Outras 7 tags têm visita e zero conversão: `infinitw45`, `infinitw298`, `infinitw299`,
+`infinitw280tem`, `infinitw280gay`, `infi`, `teste01`.
+
+### 10.2 ▶️ FALTA — a casca (desenho CONFIRMADO pelo Vinicius em 31/07)
+
+**Decisão: a tela vive DENTRO do modal de import de `/casas`**, não como página nova — é onde o
+admin já sobe resultado, o arquivo é o mesmo, e evita ensinar uma segunda tela ao cliente.
+
+Fluxo: sobe o relatório da casa → tags conhecidas casam sozinhas (pelos links já emitidos) → as
+desconhecidas aparecem **com o volume em R$** e um seletor de afiliado → vincula → importa.
+O apelido fica salvo e não pergunta de novo.
+
+A construir:
+1. Coleção **`affiliate_tag_aliases/{tagNormalizada}`** — server-only (rule negando o cliente),
+   no padrão de `affiliate_email_aliases`.
+2. Rotas `GET/POST/DELETE /api/tag-aliases` (requireAdmin) + wrappers no `affiliateService`.
+3. No modal de import (`src/pages/Houses.tsx`): compor o lookup = **índice de tags** (links +
+   apelidos) **depois** o roster por e-mail; listar as tags pendentes com volume e o seletor.
+
+⚠️ **Bloqueio de negócio (não técnico):** o Maurício ainda não respondeu **de quem são** as tags
+`infinitw280`, `infinitw292`, `infinitw193` e `infinitw01` (a `02` é dele), nem se
+`infinitw280tem`/`infinitw280gay` são a mesma pessoa da `280`. A tela existe justamente para ele
+resolver isso sozinho quando responder.

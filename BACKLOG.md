@@ -178,3 +178,75 @@ Commits na main: **0a10337** (feature) + **fb0330c** (fix). 493 testes verdes; t
 **Pendências de operador:** `firebase deploy --only firestore:rules` (inclui `affiliate_email_aliases`; Admin SDK já funciona sem). **Smoke test dos fixes ainda PENDENTE** (ver memória `boost-native-affiliates` → seção SMOKE TEST RESUME).
 
 **Follow-up (não feito):** afiliado nativo na lista global `/affiliates` com status/config próprios; revisar se o ClientDashboard do especial deve mostrar a rede.
+
+---
+
+## ABERTO (2026-07-31) — fila da Infinity, em ordem de prioridade
+
+Contexto e detalhe técnico em `MIGRACAO-INFINITY-LEGADO.md` §9 e §10.
+
+### 1. ▶️ PRÓXIMO — Tela de vínculo tag → afiliado (casca)
+
+Motor **entregue** (`e574806`): `src/lib/houseTagImport.ts`, validado contra o CSV real da Esportiva.
+Falta a interface, com o **desenho já confirmado**: vive DENTRO do modal de import de `/casas`
+(não é página nova). Escopo em `MIGRACAO-INFINITY-LEGADO.md` §10.2:
+
+- coleção `affiliate_tag_aliases/{tagNormalizada}` (server-only, padrão do `affiliate_email_aliases`);
+- rotas `GET/POST/DELETE /api/tag-aliases` (requireAdmin) + wrappers no `affiliateService`;
+- no modal: lookup = índice de tags (links + apelidos) → depois roster por e-mail; tags pendentes
+  listadas **com o volume em R$** e um seletor de afiliado.
+
+### 2. `/avisos` não mostra as notificações pessoais — o "Ver todos" mente
+
+Achado em 31/07 testando a notificação de novos resultados. O **sino** (`NotificationBell`) junta
+`notices` **+** `user_notifications`; a página **`/avisos` lê só `notices`**. O botão "Ver todos"
+do rodapé do sino (`NotificationBell.tsx:126`) navega para `/avisos` — ou seja, o afiliado vê
+"🎉 Novos resultados na Superbet!" no dropdown, clica em "Ver todos" e cai numa página que
+**estruturalmente não consegue** mostrar aquilo. Passou do dropdown, não há onde recuperar.
+
+Pesa mais num cenário de import diário, onde essas notificações serão as mais frequentes.
+
+**Proposta (recomendada):** `/avisos` passa a exibir as duas coisas em seções separadas —
+"Suas notificações" (pessoais, com histórico) + "Avisos da agência" (o mural). Alternativa barata
+(esconder o "Ver todos" quando não há aviso) resolve escondendo, e o histórico continua não existindo.
+
+### 3. Lançamento manual do dia (linha única)
+
+O legado tinha o botão **"Novo dia"**: o operador digitava a linha diária de cada afiliado na tela.
+Nosso `houseResults` aceita **só planilha/CSV** — não há formulário de linha única.
+Perdeu urgência quando a atribuição da Esportiva se mostrou funcional (§5.1), mas continua sendo
+atrito real para atualização diária.
+
+### 4. Materiais / banners para o afiliado
+
+Não existe (`rg 'material|banner|criativo'` só bate em `UpdateBanner`, que é outra coisa).
+O legado tinha materiais por categoria + carrossel no dashboard do afiliado. Primeira pergunta de
+influenciador e de afiliado migrado.
+
+### 5. Meta de CPA mensal
+
+Não existe. O legado tinha meta por competência com "Feito / Faltam / %" e **zerando na virada do
+mês**. As Conquistas (entregues) são **acumuladas**, não mensais — são complementares, não substitutas.
+
+### 6. CPA Abuser
+
+Detectava CPA abusado e **descontava do saque**, com detalhamento por tag no extrato. Quando isso foi
+mapeado (27/07) não tínhamos carteira; agora `/financeiro` + `/saques` existem, então o desconto tem
+onde morar. Pesa na Esportiva, onde o RevShare pode ser negativo e a margem já é fina.
+
+### 7. Menores (uso diário do legado, sem equivalente)
+
+- **Chat interno afiliado↔admin com anexo** — o nosso `directMessageService` é MÃO ÚNICA
+  (admin → afiliado, popup + read receipt); sem resposta e sem anexo.
+- **WhatsApp via Evolution API** (cria grupo, adiciona, promove admin) — temos só `supportContact`.
+- **Acesso de Bets por usuário** (quais casas cada afiliado enxerga) — sem `visibleHouses`/`allowedBrands`.
+- **Aprovação com CPA no ato** — `pending_affiliates` aprova e convida, mas não define a taxa no momento.
+- **Log de visualização com IP** — a nossa auditoria é server-authoritative e append-only (melhor),
+  mas não registra "Fulano visualizou", que a deles fazia.
+
+### Bloqueios que NÃO são nossos
+
+- **Cron da Esportiva** depende da casa isentar `/api/*` do challenge (§9.2). É o único pedido que resta.
+- **Convites dos 159 afiliados** dependem da decisão de **quem honra os R$ 32.306,40** de passivo.
+- **Vínculo das tags** depende de o Maurício informar de quem são `infinitw280`, `292`, `193`, `01`
+  e se `infinitw280tem`/`280gay` são a mesma pessoa da `280`.
