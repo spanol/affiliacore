@@ -60,15 +60,36 @@ Feito:
 - **Criativo pronto** (commit `1df2979`): PNG + segs em curvas.
 - **Campanha duplicada, em rascunho**, com 2 anúncios herdados.
 
-Falta (nesta ordem):
-1. **OPERADOR — resolver o "Payment error"** da conta de anúncios. Sem isso nada
-   entrega, e a página de cobrança não abre na sessão do MBS (pede a conta
-   pessoal do Facebook).
-2. Terminar o rascunho: trocar a imagem pelo criativo novo (injeção via canvas),
-   colar o texto acima, apontar pra `/ebook`, orçamento R$ 15/dia, fim em 03/08,
-   apagar o anúncio "E4 oferta" herdado.
-3. **Publicar = ação do Vinicius** (é compra).
-4. **Segunda-feira, 04/08: subir o produto na Kiwify p/ R$ 67.** A LP e o
-   cronômetro viram sozinhos; o preço do produto no painel **não**. Se não subir,
-   a prorrogação anunciada vira escassez falsa — que é justamente o que este
-   ângulo diz não fazer.
+## ✅ NO AR (01/08, crédito adicionado pelo Vinicius)
+
+Pagamento resolvido (as campanhas saíram de "Payment error"). Duas campanhas
+ativas, **R$ 35/dia somados ≈ R$ 40/dia com impostos**:
+
+| Campanha | Estado | Orçamento | Fim |
+|---|---|---|---|
+| `Guia R$47 - Prorrogado 03/08 - Vendas (IC) - IG` | **In review** | R$ 15/dia | ⚠️ **sem data** |
+| `[7/13/2026] Promoting…` (mensagens) | **Active** | R$ 20/dia | 08/08 |
+
+O anúncio do ebook ficou com: texto principal da prorrogação (verbatim acima),
+título "R$ 47 até domingo, depois R$ 67", destino `/ebook`, IG-only,
+otimizando InitiateCheckout. O anúncio "E4 oferta" herdado ficou OFF.
+
+⚠️ **DUAS PENDÊNCIAS DE PRAZO — as duas caem na segunda, 04/08:**
+1. **PAUSAR a campanha do ebook.** O editor Advantage+ não expõe data de
+   término (só "Ad scheduling: run all the time"), então ela **não para
+   sozinha** quando a promoção vencer. Deixar rodando = anunciar R$ 47 depois
+   que o preço subiu.
+2. **Subir o produto na Kiwify p/ R$ 67.** A LP e o cronômetro do checkout
+   viram sozinhos; o preço do produto no painel **não**.
+
+### Trade-off assumido no criativo
+
+O criativo `ad-prorrogado.png` **não** entrou: três caminhos de troca de imagem
+no editor Advantage+ falharam (Select → abre "Related media"; a lixeira não
+remove; `media_library` redireciona). Ficou o **g1-balcão**, que é a arte que
+rendeu os 31 InitiateCheckout a R$ 2,33 — é on-brand e não contradiz a
+mensagem, que vive no texto. A arte nova segue pronta em
+`generator/out-ad-prorrogado/` para quando o caminho de upload for resolvido.
+
+⚠️ A Meta avisou, ao ligar: **com R$ 15/dia a estimativa é ~0–1 resultado/dia.**
+Recusei o upsell de orçamento (a decisão de R$ 15 é do Vinicius).
