@@ -142,7 +142,37 @@ const detectDelimiter = (headerLine: string): string => {
   return ',';
 };
 
-const splitLine = (line: string, delim: string) => line.split(delim).map((c) => c.trim());
+// Tokenizador CSV com ASPAS (RFC 4180). NÃO dá para usar `split(delim)`: o export da
+// casa é separado por VÍRGULA e escreve dinheiro em pt-BR entre aspas (`"R$ 2.760,00"`),
+// então o split cru quebra a célula no meio e desloca a linha inteira — o cabeçalho
+// passa (não tem vírgula) e só as LINHAS quebram, com "valor numérico inválido" em
+// todas. Aspas duplicadas (`""`) são o escape de uma aspa literal. Suporta quebra de
+// linha DENTRO de campo entre aspas, por isso varre o texto e não linha a linha.
+function tokenizeCsv(text: string, delim: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let quoted = false;   // dentro de aspas
+  let hadField = false; // a linha tem ao menos um campo (distingue linha vazia de `['']`)
+  const pushField = () => { row.push(field.trim()); field = ''; hadField = true; };
+  const pushRow = () => { rows.push(hadField ? row : []); row = []; hadField = false; };
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c !== '"') { field += c; continue; }
+      if (text[i + 1] === '"') { field += '"'; i++; continue; } // "" -> "
+      quoted = false;
+      continue;
+    }
+    if (c === '"') { quoted = true; hadField = true; continue; }
+    if (c === delim) { pushField(); continue; }
+    if (c === '\n') { if (field.trim() !== '' || row.length) pushField(); pushRow(); continue; }
+    field += c;
+  }
+  if (field.trim() !== '' || row.length) pushField();
+  if (hadField) pushRow();
+  return rows;
+}
 
 export interface ParsedRow extends Metrics {
   line: number;        // nº da linha no texto colado (1-based, conta o header)
@@ -260,11 +290,11 @@ export function parseResultsRows(grid: string[][]): ParseResult {
 // separado do parse porque o import da CASA precisa da matriz CRUA antes de parsear:
 // é sobre ela que `adaptHouseTagReport` decide o mapeamento de colunas.
 export function csvToGrid(text: string): string[][] {
-  const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n');
+  const normalized = String(text ?? '').replace(/^﻿/, '').replace(/\r\n?/g, '\n');
+  const lines = normalized.split('\n');
   const headerIdx = lines.findIndex((l) => l.trim() !== '');
   if (headerIdx === -1) return [];
-  const delim = detectDelimiter(lines[headerIdx]);
-  return lines.map((l) => (l.trim() === '' ? [] : splitLine(l, delim)));
+  return tokenizeCsv(normalized, detectDelimiter(lines[headerIdx]));
 }
 
 // Texto colado / CSV -> matriz -> parseResultsRows.

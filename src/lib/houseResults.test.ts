@@ -73,6 +73,32 @@ describe('parseResultsCsv', () => {
     expect(parseResultsCsv('data,afiliado\n2026-06-01,x').errors[0].message).toMatch(/métrica/i);
   });
 
+  // ⚠️ O export REAL da casa é separado por VÍRGULA e escreve dinheiro pt-BR entre
+  // aspas. Sem respeitar as aspas, `"R$ 2.760,00"` vira duas células e desloca a linha
+  // inteira: o cabeçalho passa (não tem vírgula) e TODAS as linhas dão "valor numérico
+  // inválido". Foi o que aconteceu com o relatório de julho da Esportiva (74/74 linhas).
+  it('respeita ASPAS: vírgula dentro do campo não separa coluna', () => {
+    const text = [
+      'data,afiliado,deposito,comissao',
+      '01/07/2026,"Silva, João","R$ 2.760,00","R$ 2.782,48"',
+    ].join('\n');
+    const r = parseResultsCsv(text);
+    expect(r.errors).toEqual([]);
+    expect(r.rows[0]).toMatchObject({ affiliate: 'Silva, João', deposit: 2760, total_commission: 2782.48 });
+  });
+
+  it('aspas duplicadas ("") viram uma aspa literal, e o campo pode ter quebra de linha', () => {
+    const r = parseResultsCsv('data,afiliado,cadastros\n01/07/2026,"a ""b"" c",2');
+    expect(r.rows[0].affiliate).toBe('a "b" c');
+    const multi = parseResultsCsv('data,afiliado,cadastros\n01/07/2026,"linha\nquebrada",3');
+    expect(multi.errors).toEqual([]);
+    expect(multi.rows[0].registrations).toBe(3);
+  });
+
+  it('BOM no início do arquivo não vira parte do cabeçalho', () => {
+    expect(parseResultsCsv('﻿data,cadastros\n2026-06-01,10').rows[0].registrations).toBe(10);
+  });
+
   it('reporta data/número inválidos por linha sem derrubar as válidas', () => {
     const text = 'data,cadastros\n2026-06-01,10\n99/99/9999,5\n2026-06-02,abc';
     const r = parseResultsCsv(text);
