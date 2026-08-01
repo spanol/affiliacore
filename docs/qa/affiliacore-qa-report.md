@@ -65,16 +65,16 @@ São testes HTTP reais com `supertest` e o Firestore em memória já usado pela 
 | `npm test` | passou: **89 arquivos, 1.232 testes** |
 | `npm run coverage` | passou: **40,18% statements/linhas; 78,72% branches; 76,45% funções**; `server.ts` **70,54%** linhas |
 | `npm run build` | passou; mantém aviso não bloqueante de chunk grande |
-| `npm run test:rules` | não executado: Firebase CLI/emulador indisponível no checkout local |
+| regras Firestore em emulador | passou: **56 testes** em `test/rules/firestore-rules.spec.ts`, contra Firestore/Auth locais (`127.0.0.1:8080` e `127.0.0.1:9099`) |
 
 A suíte ainda emite warnings preexistentes de React `act(...)` em `HomePrizesSection.test.tsx` e logs de erro intencionalmente exercitados por testes. Não falharam e não pertencem à correção focada.
 
 ## Limites
 
-- Não foi feito E2E em browser contra Firebase remoto/produção por segurança e escopo.
-- Regras Firestore não foram executadas no emulador: instalar/disponibilizar `firebase-tools` e repetir `npm run test:rules` em ambiente isolado.
+- Não foi feito E2E em browser contra Firebase remoto/produção por segurança e escopo. A Home pública foi aberta com sucesso no modo demo local, sem erros de console.
+- A validação de rules foi executada no emulador local conforme `.claude/skills/verify/SKILL.md`. Como o pacote não declara `firebase-tools` localmente, o comando equivalente foi `npx --yes firebase-tools@15.25.1` + `vitest` com os hosts dos emuladores, sem alterar dependências do produto.
 - Integrações OTG externas não foram chamadas; foram usados doubles locais existentes.
 
 ## Recomendação de release
 
-**Aprovar condicionalmente para o código validado neste checkpoint**: lint, suíte completa, cobertura e build passaram; o redirect público foi corrigido com regressões. **Antes de liberar qualquer mudança que dependa de regras Firestore, executar obrigatoriamente `npm run test:rules` com emulador local/CI disponível.** Manter em backlog o bundle grande e os warnings `act(...)`; não bloqueiam esta correção focada.
+**Aprovar para o código validado neste checkpoint**, com os gates executados: lint, suíte completa, cobertura, build e 56 testes reais das regras Firestore passaram; o redirect público foi corrigido com regressões. Manter em backlog o bundle grande e os warnings `act(...)`; não bloqueiam esta correção focada.
