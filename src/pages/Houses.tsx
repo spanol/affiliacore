@@ -809,7 +809,8 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
 
   // Vincula um e-mail não-resolvido a um afiliado existente (alias persistente).
   const handleLink = async (email: string, affiliateId: string) => {
-    if (!email) { push({ type: 'error', message: 'Linha sem e-mail para vincular.' }); return; }
+    // Backstop: a UI já não oferece "Vincular" sem e-mail (o alias é chaveado por ele).
+    if (!email) { push({ type: 'error', message: 'O vínculo é salvo pelo e-mail, e esta linha não tem um.' }); return; }
     try {
       await createEmailAlias(email, affiliateId);
       push({ type: 'success', message: 'E-mail vinculado ao afiliado.' });
@@ -1202,7 +1203,11 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                   <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 p-3 space-y-2">
                     <div>
                       <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300">Afiliados não encontrados na plataforma</p>
-                      <p className="text-[11px] text-amber-700/70 dark:text-amber-300/60">Cadastre-os como afiliados da casa (passam a cruzar pelo e-mail) ou vincule cada um a um afiliado já existente.</p>
+                      <p className="text-[11px] text-amber-700/70 dark:text-amber-300/60">
+                        Cadastre-os como afiliados da casa (passam a cruzar pelo e-mail) ou vincule cada um a um
+                        afiliado já existente. O vínculo é salvo <b>pelo e-mail</b> — linha sem a coluna
+                        <code className="mx-0.5">email</code> preenchida só dá para cadastrar.
+                      </p>
                     </div>
                     <div className="space-y-1 max-h-44 overflow-y-auto">
                       {analysis.unresolved.map((u) => (
@@ -1212,12 +1217,24 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                               <span className="text-slate-400 dark:text-neutral-500">L{u.line}</span> {u.name || '—'}
                               {u.email && <span className="text-slate-400 dark:text-neutral-500"> · {u.email}</span>}
                             </span>
-                            <button
-                              onClick={() => { setLinkingLine(linkingLine === u.line ? null : u.line); setLinkQuery(''); }}
-                              className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-accent-600 dark:text-accent-400 hover:underline"
-                            >
-                              <Link2 size={11} /> {linkingLine === u.line ? 'Cancelar' : 'Vincular'}
-                            </button>
+                            {/* O vínculo é gravado com o E-MAIL como chave (alias). Linha só com
+                                nome não tem o que gravar — então não oferecemos a ação em vez de
+                                deixar o admin entrar num beco sem saída. */}
+                            {u.email ? (
+                              <button
+                                onClick={() => { setLinkingLine(linkingLine === u.line ? null : u.line); setLinkQuery(''); }}
+                                className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-accent-600 dark:text-accent-400 hover:underline"
+                              >
+                                <Link2 size={11} /> {linkingLine === u.line ? 'Cancelar' : 'Vincular'}
+                              </button>
+                            ) : (
+                              <span
+                                className="shrink-0 text-[11px] text-slate-400 dark:text-neutral-500"
+                                title="O vínculo é salvo pelo e-mail. Preencha a coluna “email” desta linha, ou cadastre o afiliado na plataforma pelo botão abaixo."
+                              >
+                                sem e-mail nesta linha
+                              </span>
+                            )}
                           </div>
                           {linkingLine === u.line && (
                             <div className="mt-1.5">
@@ -1228,9 +1245,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                                 className="w-full px-2 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-[11px] text-slate-900 dark:text-white focus:outline-none focus:border-accent-500"
                               />
                               <div className="mt-1 max-h-32 overflow-y-auto rounded-lg border border-slate-100 dark:border-neutral-800">
-                                {!u.email ? (
-                                  <p className="px-2 py-1.5 text-[11px] text-red-500">Esta linha não tem e-mail — não dá para vincular.</p>
-                                ) : linkOptions.length === 0 ? (
+                                {linkOptions.length === 0 ? (
                                   <p className="px-2 py-1.5 text-[11px] text-slate-400 dark:text-neutral-500">Nenhum afiliado encontrado.</p>
                                 ) : linkOptions.map((o) => (
                                   <button
