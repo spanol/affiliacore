@@ -3096,6 +3096,14 @@ export function createApp(deps: ServerDeps) {
   // qualquer visitante abre). Provado por probe (2026-06-17): o subid sobrevive
   // até a URL final de cadastro e convive com o `wm` (ref do afiliado).
   const GO_FALLBACK = process.env.GO_FALLBACK_URL || '/';
+  const isHttpUrl = (value: unknown): value is string => {
+    try {
+      const parsed = new URL(String(value).trim());
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
   // Limite generoso só p/ conter abuso de writes (humano não clica 60x/min). Não
   // usa o publicAuthLimiter (mais estrito) p/ não barrar tráfego legítimo do link.
   const goLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
@@ -3105,7 +3113,7 @@ export function createApp(deps: ServerDeps) {
     try {
       const snap = await adminDb.collection('affiliate_links').doc(code).get();
       const link = snap.exists ? (snap.data() as any) : null;
-      if (!link || link.active === false || !link.registerUrl) {
+      if (!link || link.active === false || !isHttpUrl(link.registerUrl)) {
         return res.redirect(302, GO_FALLBACK);
       }
 
@@ -3170,6 +3178,10 @@ export function createApp(deps: ServerDeps) {
       if (!affiliateId || !registerUrl) {
         return res.status(400).json({ error: 'affiliateId e registerUrl são obrigatórios' });
       }
+      const normalizedRegisterUrl = String(registerUrl).trim();
+      if (!isHttpUrl(normalizedRegisterUrl)) {
+        return res.status(400).json({ error: 'registerUrl deve ser uma URL HTTP(S) válida' });
+      }
       const normBrand = brandId != null ? String(brandId) : null;
       const existing = await adminDb
         .collection('affiliate_links')
@@ -3180,7 +3192,7 @@ export function createApp(deps: ServerDeps) {
       if (!existing.empty) {
         const docRef = existing.docs[0].ref;
         await docRef.set(
-          { registerUrl: String(registerUrl), active: true, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+          { registerUrl: normalizedRegisterUrl, active: true, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
           { merge: true }
         );
         const fresh = await docRef.get();
@@ -3191,7 +3203,7 @@ export function createApp(deps: ServerDeps) {
         code,
         affiliateId: String(affiliateId),
         brandId: normBrand,
-        registerUrl: String(registerUrl),
+        registerUrl: normalizedRegisterUrl,
         active: true,
         clicks: 0,
         botClicks: 0,

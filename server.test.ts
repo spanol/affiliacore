@@ -2173,6 +2173,17 @@ describe('/go/:code — redirect público do link de divulgação', () => {
     expect(stats[0][1]).toMatchObject({ code: 'ABC123', affiliateId: 'affX', brandId: 'esportiva' });
   });
 
+  it('destino legado com esquema não HTTP → fallback e NÃO registra clique', async () => {
+    const db = makeFirestore(linkSeed({ registerUrl: 'javascript:alert(1)' }));
+    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .get('/go/ABC123')
+      .set('User-Agent', CHROME_UA)
+      .expect(302);
+
+    expect(res.headers.location).toBe('/');
+    expect(db.__store.get('link_clicks')?.size ?? 0).toBe(0);
+  });
+
   it('link inativo, code inexistente ou sem registerUrl → fallback e NÃO registra clique', async () => {
     for (const seed of [
       linkSeed({ active: false }),
@@ -2845,6 +2856,19 @@ describe('triagem de links — standby (/api/affiliate-links)', () => {
     await request(app).post('/api/affiliate-links/c1/assign').set('Authorization', 'Bearer client-uid').send({ affiliateId: 'AFF-1' }).expect(403);
     await request(app).post('/api/affiliate-links/c1/release').set('Authorization', 'Bearer client-uid').expect(403);
     await request(app).delete('/api/affiliate-links/c1').set('Authorization', 'Bearer client-uid').expect(403);
+  });
+
+  it('rejeita destino com esquema não HTTP antes de persistir o link', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+
+    await request(app)
+      .post('/api/affiliate-links')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'AFF-1', brandId: 'casa', registerUrl: 'javascript:alert(1)' })
+      .expect(400);
+
+    expect(db.__store.get('affiliate_links')?.size ?? 0).toBe(0);
   });
 
   it('o pool NAO vaza para o afiliado no GET (filtro por affiliateId)', async () => {
