@@ -46,8 +46,17 @@ o anúncio diz isso em vez de inventar prova social. Foi descartada a versão
 Feito:
 - **5 campanhas antigas desligadas** (3 estavam ON travadas em "Payment error" e
   retomariam R$ 70/dia juntas assim que o pagamento voltasse).
-- **LPs prorrogadas** p/ 03/08 (commit `1276f9d`) — lógica verificada com relógio
-  falsificado + captura headless. **Falta o deploy.**
+- **LPs prorrogadas p/ 03/08 e DEPLOYADAS** (commit `1276f9d`, deploy do
+  Vinicius). Verificado em produção no navegador real: `.js-price` = 47 em todos
+  os pontos, 4 blocos de prazo visíveis, contador em 2d05h, R$ 67 riscado,
+  título `(R$ 47 até 03/08)`, checkout apontando p/ `pay.kiwify.com.br/83JFB9e`.
+- **Cronômetro do checkout Kiwify corrigido.** Ele exibia **"Preço de lançamento
+  encerrado"** enquanto a LP anunciava prorrogação — e a data guardada era
+  **29/12/2027** (contagem de ~1,5 ano, escassez sem lastro). Passou p/
+  **03/08/2026 23:59**, salvo e conferido no checkout ao vivo: R$ 47,00 e
+  contador correndo em 53h, batendo com a LP.
+  *Como editar:* o campo é **flatpickr** — o setter nativo do React reverte;
+  use `input._flatpickr.setDate(new Date(...), true)`.
 - **Criativo pronto** (commit `1df2979`): PNG + segs em curvas.
 - **Campanha duplicada, em rascunho**, com 2 anúncios herdados.
 
@@ -55,15 +64,11 @@ Falta (nesta ordem):
 1. **OPERADOR — resolver o "Payment error"** da conta de anúncios. Sem isso nada
    entrega, e a página de cobrança não abre na sessão do MBS (pede a conta
    pessoal do Facebook).
-2. **OPERADOR — deployar a LP**:
-   `firebase deploy --config firebase.affiliacore.json --project www --only hosting`
-   Sem isso a página mostra R$ 67 e o anúncio vira mentira.
-3. **Conferir o preço na Kiwify** — tem que estar em R$ 47 até 03/08 e subir pra
-   R$ 67 na segunda (o painel nunca virou sozinho).
-4. Terminar o rascunho: trocar a imagem pelo criativo novo (injeção via canvas),
+2. Terminar o rascunho: trocar a imagem pelo criativo novo (injeção via canvas),
    colar o texto acima, apontar pra `/ebook`, orçamento R$ 15/dia, fim em 03/08,
    apagar o anúncio "E4 oferta" herdado.
-5. **Publicar = ação do Vinicius** (é compra).
-
-⚠️ Se o deploy da LP não sair antes de domingo, esta campanha não deve ir ao ar:
-o anúncio promete R$ 47 e a página cobraria R$ 67.
+3. **Publicar = ação do Vinicius** (é compra).
+4. **Segunda-feira, 04/08: subir o produto na Kiwify p/ R$ 67.** A LP e o
+   cronômetro viram sozinhos; o preço do produto no painel **não**. Se não subir,
+   a prorrogação anunciada vira escassez falsa — que é justamente o que este
+   ângulo diz não fazer.
