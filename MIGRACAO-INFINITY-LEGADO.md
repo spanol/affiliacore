@@ -357,6 +357,11 @@ O XLSX de Pagamentos (21 colunas) foi baixado e parseado; serve para **conferir 
 
 ### 6.2.1 Não é preciso reemitir link: há um pool pronto
 
+> ⚠️ **Atualização 02/08/2026 (§9.4): nem o pool é necessário.** A tag é capturada na visita, não
+> cunhada na casa — a AffiliaCore gera link novo a partir do template da casa com tag própria
+> (`POST /api/affiliate-links/generate`). O pool abaixo continua válido como estoque de tags já
+> distribuídas, mas deixou de ser pré-requisito para dar link a alguém.
+
 O painel legado **não gera** link — ele só **registra** link cunhado na plataforma da casa. As duas formas de
 entrada são "cole links (1 por linha), tag extraída de `?tag=` ou `?afp2=`" e import XLSX (`Coluna A: Link,
 Coluna B: Tag`). Mas ele tem um terceiro fluxo, que resolve o problema: **atribuir um link do Standby a um
@@ -536,6 +541,54 @@ O CSV do "Exportar dados" vem em **pt-BR com BOM UTF-8** (`R$ 1.234,56`) e 34 co
 
 O adaptador (`src/lib/houseTagImport.ts`) isola a fonte de propósito: trocar "arquivo enviado" por
 "puxado da API" é mudar o adaptador, não a tela.
+
+### 9.4 ✅ A tag NÃO precisa ser cunhada na casa — e por isso a geração de link já existe (02/08/2026)
+
+Ao avaliar se a criação automática de link entraria junto com a integração da API, a doc do TAP
+respondeu o contrário do que o plano assumia:
+
+- **`af2_build_link` recebe `link_id` + `affiliate_id` (+ `source_id` opcional) e NÃO aceita `afp`
+  como entrada.** A própria doc define `afp` como *"parâmetro dinâmico capturado na visita do
+  jogador"* — ou seja, a tag entra pela URL, por quem monta o link, não por um cadastro na casa.
+- Isso explica os dois probes: **`teste01` (28/07) e `infinitw298` (29/07) apareceram no Relatório
+  de Mídia agrupado por AFP sem nunca terem sido emitidos no painel da Esportiva.**
+
+**Consequência:** dar link novo a um afiliado não depende nem da API liberada, nem do pool de 288
+standby, nem de pedir tag à casa — basta `houses.registerUrlTemplate` + uma tag nossa. Entregue como
+`POST /api/affiliate-links/generate` (admin) + botão "Gerar link" na `/links`; núcleo puro em
+`src/lib/linkGeneration.ts` (`buildTaggedUrl`, `suggestTag`, `tagParamForTemplate`).
+
+Regras que o desenho carrega:
+
+1. **Tag de outro afiliado → 409.** Reusar a tag passaria o resultado histórico dele ao novo dono no
+   próximo import (o índice do import casa por tag). A checagem varre links **e** apelidos, com a
+   mesma precedência do import, e ignora caixa.
+2. **Idempotente por afiliado × casa** — regerar atualiza o MESMO `code`, porque o code é o que o
+   afiliado já distribuiu.
+3. **`buildTaggedUrl` TROCA o valor do parâmetro de rastreio que já vier no template** (colar o link
+   de outro afiliado como template daria o crédito à pessoa errada) e preserva o resto da query
+   (`utm_*`, `ext_marker`).
+4. **Nada de apelido manual para o que sai daqui:** `buildTagIndex` já indexa a tag do link
+   atribuído (`origin: 'link'`), então o resultado casa sozinho no próximo import. A tela de vínculo
+   (§10) continua sendo para a tag digitada à mão no painel da casa.
+
+⚠️ **O que ainda não está provado:** tag inédita é comprovadamente **capturada** (visita). Que ela
+credite **FTD/CPA** segue o mesmo caminho das `infinitw###` em produção, mas só fecha de vez com o
+primeiro FTD real numa tag gerada aqui.
+
+**O que a API acrescenta quando a casa liberar** (nada disto bloqueia o de cima):
+
+| Método | Ganho | Chave |
+|---|---|---|
+| `af2_media_report_op` `group_by=afp` | **o cron diário** — resultado sem export manual | é o valor real |
+| `af2_link_op` | lista os templates/`link_id` da casa em vez de colar URL | conveniência |
+| `af2_build_link` | monta a URL oficial do template (sem injetar a tag) | conveniência |
+| Registration API | cria o afiliado como **conta na casa** | ⚠️ é o modelo sub-conta do §5.1 — muda o comercial |
+
+⚠️ **`af2_build_link` e `af2_link_op` exigem chave de OPERADOR.** A nossa respondeu *"Access to this
+label is not allowed"* e não sabemos de que família é. **Pedido à casa, junto com o de isentar
+`/api/*` do challenge: dizer se a chave é de operador ou de afiliado.** Se for de afiliado, sobra o
+relatório — e a geração de link segue funcionando pelo caminho de cima.
 
 ---
 

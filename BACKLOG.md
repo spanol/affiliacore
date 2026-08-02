@@ -185,16 +185,25 @@ Commits na main: **0a10337** (feature) + **fb0330c** (fix). 493 testes verdes; t
 
 Contexto e detalhe técnico em `MIGRACAO-INFINITY-LEGADO.md` §9 e §10.
 
-### 1. ▶️ PRÓXIMO — Tela de vínculo tag → afiliado (casca)
+### 1. ✅ ENTREGUE — Tela de vínculo tag → afiliado (motor `e574806` + casca `7eeb74e`)
 
-Motor **entregue** (`e574806`): `src/lib/houseTagImport.ts`, validado contra o CSV real da Esportiva.
-Falta a interface, com o **desenho já confirmado**: vive DENTRO do modal de import de `/casas`
-(não é página nova). Escopo em `MIGRACAO-INFINITY-LEGADO.md` §10.2:
+Vive DENTRO do modal de import de `/casas` (não é página nova): `affiliate_tag_aliases/{tagNorm}`
+(server-only) + `GET/POST/DELETE /api/tag-aliases`. Detalhe em `MIGRACAO-INFINITY-LEGADO.md` §10.
+O que falta ali é **negócio**: de quem são as tags órfãs (ver "Bloqueios" no fim).
 
-- coleção `affiliate_tag_aliases/{tagNormalizada}` (server-only, padrão do `affiliate_email_aliases`);
-- rotas `GET/POST/DELETE /api/tag-aliases` (requireAdmin) + wrappers no `affiliateService`;
-- no modal: lookup = índice de tags (links + apelidos) → depois roster por e-mail; tags pendentes
-  listadas **com o volume em R$** e um seletor de afiliado.
+### 1.1 ✅ ENTREGUE (02/08/2026) — Geração de link a partir do template da casa
+
+**A descoberta que destravou:** a tag de rastreio é **capturada na visita**, não cunhada na casa —
+`af2_build_link` do TAP não aceita `afp` como entrada, e os probes `teste01`/`infinitw298` entraram
+no relatório da Esportiva sem terem sido emitidos no painel dela. Logo, dar link novo **não depende
+da API liberada nem do pool de 288 standby**. Racional completo em `MIGRACAO-INFINITY-LEGADO.md` §9.4.
+
+Entregue: `POST /api/affiliate-links/generate` (admin, idempotente por afiliado × casa, 409 em tag de
+outro afiliado) + botão "Gerar link" na `/links` com prévia do destino; núcleo puro em
+`src/lib/linkGeneration.ts`. O resultado casa sozinho no import (o índice indexa a tag do link).
+
+**Fica em aberto:** confirmar o crédito de **FTD/CPA** numa tag gerada por nós (a captura de visita
+já está provada) — fecha com o primeiro FTD real.
 
 ### 2. `/avisos` não mostra as notificações pessoais — o "Ver todos" mente
 
@@ -246,7 +255,9 @@ onde morar. Pesa na Esportiva, onde o RevShare pode ser negativo e a margem já 
 
 ### Bloqueios que NÃO são nossos
 
-- **Cron da Esportiva** depende da casa isentar `/api/*` do challenge (§9.2). É o único pedido que resta.
+- **Cron da Esportiva** depende da casa isentar `/api/*` do challenge (§9.2). No MESMO pedido, perguntar
+  se a chave é de **operador** ou de **afiliado**: `af2_link_op` e `af2_build_link` só abrem com a de
+  operador (§9.4). Nenhum dos dois bloqueia a geração de link, que já está no ar.
 - **Convites dos 159 afiliados** dependem da decisão de **quem honra os R$ 32.306,40** de passivo.
 - **Vínculo das tags** depende de o Maurício informar de quem são `infinitw280`, `292`, `193`, `01`
   e se `infinitw280tem`/`280gay` são a mesma pessoa da `280`.
