@@ -1313,6 +1313,37 @@ async function linkActionError(response: Response, fallback: string): Promise<ne
   throw new Error(e.error || e.message || fallback);
 }
 
+export interface GeneratedLink {
+  code: string;
+  tag: string;
+  registerUrl: string;
+  brandId: string | null;
+  created: boolean;
+}
+
+// Gera o link do afiliado a partir do template da casa + a tag (o servidor sugere
+// uma quando não vem). A tag entra na URL e é o que a casa devolve no relatório —
+// ver src/lib/linkGeneration.ts para o porquê de isso não depender da API da casa.
+export async function generateAffiliateLink(
+  affiliateId: string,
+  brandId: string,
+  options?: { tag?: string | null; tagParam?: string | null; tagPrefix?: string | null },
+): Promise<GeneratedLink> {
+  const response = await authFetch('/api/affiliate-links/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      affiliateId,
+      brandId,
+      tag: options?.tag ?? null,
+      tagParam: options?.tagParam ?? null,
+      tagPrefix: options?.tagPrefix ?? null,
+    }),
+  });
+  if (!response.ok) await linkActionError(response, 'Falha ao gerar o link.');
+  return response.json();
+}
+
 // Envia o TEXTO colado; o servidor reparseia com a mesma função pura que a UI
 // usou na pré-visualização — sem drift entre o que o admin vê e o que é gravado.
 export async function importStandbyLinks(text: string, brandId?: string | null): Promise<StandbyImportResult> {

@@ -12,6 +12,7 @@ import {
   UserPlus,
   RotateCcw,
   Plus,
+  Sparkles,
   X,
 } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
@@ -21,11 +22,13 @@ import {
   rowsForView,
   searchRows,
   parseStandbyLinks,
+  extractTagFromUrl,
   LINK_TRIAGE_VIEWS,
   LINK_TRIAGE_LABELS,
   type LinkTriageView,
   type TriageRow,
 } from '../lib/linkTriage';
+import { suggestTag, buildTaggedUrl, tagParamForTemplate } from '../lib/linkGeneration';
 import { producingAffiliateIds } from '../lib/affiliateActivity';
 import {
   fetchAffiliates,
@@ -34,6 +37,7 @@ import {
   fetchManualResults,
   buildGoUrl,
   createAffiliateLink,
+  generateAffiliateLink,
   importStandbyLinks,
   assignAffiliateLink,
   releaseAffiliateLink,
@@ -76,6 +80,12 @@ export default function LinkTriage() {
   const [linkingRow, setLinkingRow] = useState<TriageRow | null>(null);
   const [manualUrl, setManualUrl] = useState('');
 
+  // Geração do link a partir do template da casa + tag nossa (não depende da
+  // casa cunhar tag: ela é capturada na visita — ver src/lib/linkGeneration.ts).
+  const [generatingRow, setGeneratingRow] = useState<TriageRow | null>(null);
+  const [genBrand, setGenBrand] = useState('');
+  const [genTag, setGenTag] = useState('');
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -115,6 +125,49 @@ export default function LinkTriage() {
 
   // Pré-visualização do import: o MESMO parser que o servidor roda ao gravar.
   const importPreview = useMemo(() => parseStandbyLinks(importText), [importText]);
+
+  // Tags já em uso (link emitido ou embutida na URL) — a sugestão nasce sem
+  // colidir, e o servidor recusa de novo na hora de gravar.
+  const takenTags = useMemo(
+    () =>
+      links
+        .map((l) => String((l as any).tag ?? '') || extractTagFromUrl(String(l.registerUrl ?? '')))
+        .filter(Boolean),
+    [links],
+  );
+
+  const genHouse = useMemo(() => houses.find((h) => houseKey(h) === genBrand) ?? null, [houses, genBrand]);
+  const genTemplate = String(genHouse?.registerUrlTemplate ?? '').trim();
+  // O MESMO builder do servidor: o que o admin lê aqui é o que vai ser gravado.
+  const genPreview = useMemo(() => buildTaggedUrl(genTemplate, genTag), [genTemplate, genTag]);
+
+  const openGenerate = (row: TriageRow) => {
+    const brand = brandKey || (houses.length === 1 ? houseKey(houses[0]) : '');
+    setGenBrand(brand);
+    setGenTag(suggestTag({ name: row.name, email: row.email, affiliateId: row.affiliateId }, takenTags));
+    setGeneratingRow(row);
+  };
+
+  const handleGenerate = async () => {
+    if (!generatingRow) return;
+    const row = generatingRow;
+    const brand = genBrand;
+    const tag = genTag.trim();
+    if (!brand) {
+      push({ type: 'error', message: 'Escolha a casa — o link sai do template dela.' });
+      return;
+    }
+    if (!tag) {
+      push({ type: 'error', message: 'A tag não pode ficar vazia: é ela que a casa devolve no relatório.' });
+      return;
+    }
+    setGeneratingRow(null);
+    await withBusy(
+      row.affiliateId,
+      () => generateAffiliateLink(row.affiliateId, brand, { tag }).then(() => undefined),
+      `Link gerado com a tag ${tag}.`,
+    );
+  };
 
   const copyLink = (code: string) => {
     navigator.clipboard.writeText(buildGoUrl(code));
@@ -349,9 +402,12 @@ export default function LinkTriage() {
                       </span>
                     ) : null}
                   </div>
+                  {/* A TAG é a da casa (`?afp=`) — o `code` é o nosso short link.
+                      Mostrar o code rotulado de "tag" fazia o admin procurar no
+                      relatório da casa uma string que ela nunca viu. */}
                   <p className="text-[11px] text-slate-500 dark:text-neutral-400 truncate">
                     {row.email || `ID ${row.affiliateId}`}
-                    {row.link ? ` · tag ${row.link.code}` : ''}
+                    {row.link ? ` · tag ${(row.link as any).tag || extractTagFromUrl(String(row.link.registerUrl ?? '')) || '—'}` : ''}
                     {row.hasLink ? ` · ${row.clicks} clique${row.clicks === 1 ? '' : 's'}` : ''}
                   </p>
                   {row.link && !row.hasLink && (
@@ -394,9 +450,18 @@ export default function LinkTriage() {
                   ) : (
                     <>
                       <button
+                        onClick={() => openGenerate(row)}
+                        disabled={busy === row.affiliateId}
+                        className="px-4 py-2 rounded-full bg-accent-500 text-accent-contrast text-xs font-bold hover:bg-accent-400 transition-all shadow-sm shadow-accent-500/20 flex items-center gap-2 disabled:opacity-40"
+                        title="Gerar o link a partir do template da casa, com tag própria"
+                      >
+                        {busy === row.affiliateId ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                        Gerar link
+                      </button>
+                      <button
                         onClick={() => takeFromStandby(row)}
                         disabled={busy === row.affiliateId || triage.standby.length === 0}
-                        className="px-4 py-2 rounded-full bg-accent-500 text-accent-contrast text-xs font-bold hover:bg-accent-400 transition-all shadow-sm shadow-accent-500/20 flex items-center gap-2 disabled:opacity-40"
+                        className="px-4 py-2 rounded-full bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-600 dark:text-neutral-200 hover:border-slate-300 dark:hover:border-neutral-600 transition-all flex items-center gap-2 disabled:opacity-40"
                         title={triage.standby.length === 0 ? 'Não há links em standby' : 'Atribuir um link do pool'}
                       >
                         {busy === row.affiliateId ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />}
@@ -472,6 +537,84 @@ export default function LinkTriage() {
                 >
                   {importing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                   Importar para o standby
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      )}
+
+      {/* Gerar link a partir do template da casa */}
+      {generatingRow && (
+        <div
+          onClick={() => setGeneratingRow(null)}
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm"
+        >
+          <div className="flex min-h-full items-center justify-center p-4">
+            <motion.div
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              className="w-full max-w-lg bg-white dark:bg-neutral-900 rounded-3xl shadow-2xl border border-slate-200/70 dark:border-neutral-800 overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 dark:border-neutral-800">
+                <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+                  Gerar link de {humanizeName(generatingRow.name)}
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-1">
+                  O link sai do cadastro da casa com a tag abaixo. É a tag que a casa devolve no relatório —
+                  não precisa cunhá-la no painel dela.
+                </p>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500 mb-1.5">
+                    Casa
+                  </label>
+                  <select value={genBrand} onChange={(e) => setGenBrand(e.target.value)} className={inputClass}>
+                    <option value="">Selecione…</option>
+                    {houses.map((h) => (
+                      <option key={h.id} value={houseKey(h)}>
+                        {h.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500 mb-1.5">
+                    Tag ({genTemplate ? tagParamForTemplate(genTemplate) : 'afp'})
+                  </label>
+                  <input
+                    value={genTag}
+                    onChange={(e) => setGenTag(e.target.value)}
+                    placeholder="infinitw777"
+                    className={cn(inputClass, 'font-mono')}
+                  />
+                </div>
+
+                {genBrand && !genTemplate ? (
+                  <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                    Esta casa não tem link de cadastro cadastrado. Preencha o campo "Link de cadastro" dela em
+                    /casas e volte aqui.
+                  </p>
+                ) : genPreview ? (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500 mb-1.5">
+                      Destino final
+                    </p>
+                    <code className="block px-3 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-[11px] text-slate-700 dark:text-neutral-200 break-all">
+                      {genPreview}
+                    </code>
+                  </div>
+                ) : null}
+
+                <button
+                  onClick={handleGenerate}
+                  disabled={!genPreview}
+                  className="w-full px-5 py-3 rounded-full bg-accent-500 text-accent-contrast text-xs font-bold hover:bg-accent-400 transition-all shadow-sm shadow-accent-500/20 disabled:opacity-40 flex items-center justify-center gap-2"
+                >
+                  <Sparkles size={14} />
+                  Gerar e atribuir
                 </button>
               </div>
             </motion.div>

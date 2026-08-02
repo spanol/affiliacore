@@ -2861,3 +2861,144 @@ describe('triagem de links — standby (/api/affiliate-links)', () => {
     expect(res.body.links.map((l: any) => l.code)).toEqual(['meu']);
   });
 });
+
+// =============================================================================
+// Geracao de link a partir do template da casa (/api/affiliate-links/generate)
+// A tag e' capturada na visita pela casa — nao precisa ser cunhada la'. Ver
+// src/lib/linkGeneration.ts.
+// =============================================================================
+describe('geracao de link (/api/affiliate-links/generate)', () => {
+  const seed = {
+    users: { 'admin-uid': { role: 'admin' }, 'client-uid': { role: 'client', affiliateId: 'AFF-1' } },
+    affiliates: { 'AFF-1': { id: 'AFF-1', name: 'Mauricio Fernandes' } },
+    houses: {
+      esportiva: {
+        slug: 'esportiva',
+        name: 'Esportiva Bet',
+        brandId: null,
+        registerUrlTemplate: 'https://go.aff.esportiva.bet/urto4foy',
+      },
+      semlink: { slug: 'semlink', name: 'Casa Sem Link', brandId: null, registerUrlTemplate: null },
+    },
+  };
+
+  it('gera com a tag pedida, ATIVO e com o destino taggeado', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app)
+      .post('/api/affiliate-links/generate')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'AFF-1', brandId: 'esportiva', tag: 'infinitw777' })
+      .expect(201);
+    expect(res.body).toMatchObject({
+      tag: 'infinitw777',
+      registerUrl: 'https://go.aff.esportiva.bet/urto4foy?afp=infinitw777',
+      created: true,
+    });
+    const row = db.__store.get('affiliate_links')?.get(res.body.code);
+    expect(row).toMatchObject({ affiliateId: 'AFF-1', brandId: 'esportiva', tag: 'infinitw777', active: true });
+  });
+
+  it('sem tag no corpo, sugere a partir do NOME do afiliado', async () => {
+    const app = buildApp({ seed });
+    const res = await request(app)
+      .post('/api/affiliate-links/generate')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'AFF-1', brandId: 'esportiva' })
+      .expect(201);
+    expect(res.body.tag).toBe('mauriciofernandes');
+  });
+
+  it('idempotente por afiliado x casa: regerar ATUALIZA o mesmo code (o afiliado ja compartilhou)', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const first = await request(app)
+      .post('/api/affiliate-links/generate')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'AFF-1', brandId: 'esportiva', tag: 'tag1' })
+      .expect(201);
+    const second = await request(app)
+      .post('/api/affiliate-links/generate')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'AFF-1', brandId: 'esportiva', tag: 'tag2' })
+      .expect(200);
+    expect(second.body.code).toBe(first.body.code);
+    expect(second.body).toMatchObject({ tag: 'tag2', created: false });
+    expect([...(db.__store.get('affiliate_links')?.values() ?? [])]).toHaveLength(1);
+  });
+
+  it('tag de OUTRO afiliado -> 409 (senao o resultado historico dele mudaria de dono)', async () => {
+    const app = buildApp({
+      seed: {
+        ...seed,
+        affiliate_links: {
+          outro: { code: 'outro', affiliateId: 'AFF-9', registerUrl: 'https://casa.bet/r?afp=infinitw280', active: true },
+        },
+      },
+    });
+    await request(app)
+      .post('/api/affiliate-links/generate')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'AFF-1', brandId: 'esportiva', tag: 'INFINITW280' }) // caixa nao distingue
+      .expect(409);
+  });
+
+  it('apelido salvo tambem reserva a tag (mesma precedencia do import)', async () => {
+    const app = buildApp({
+      seed: {
+        ...seed,
+        affiliate_tag_aliases: { infinitw01: { tag: 'infinitw01', affiliateId: 'AFF-9' } },
+      },
+    });
+    await request(app)
+      .post('/api/affiliate-links/generate')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'AFF-1', brandId: 'esportiva', tag: 'infinitw01' })
+      .expect(409);
+  });
+
+  it('casa sem link de cadastro -> 400 explicando onde preencher', async () => {
+    const app = buildApp({ seed });
+    const res = await request(app)
+      .post('/api/affiliate-links/generate')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'AFF-1', brandId: 'semlink', tag: 'x1' })
+      .expect(400);
+    expect(res.body.error).toMatch(/casas/i);
+  });
+
+  it('sem casa -> 400; casa inexistente -> 404', async () => {
+    const app = buildApp({ seed });
+    await request(app)
+      .post('/api/affiliate-links/generate')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'AFF-1' })
+      .expect(400);
+    await request(app)
+      .post('/api/affiliate-links/generate')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'AFF-1', brandId: 'nao-existe' })
+      .expect(404);
+  });
+
+  it('audita a geracao com a tag (a trilha e o que liga o link ao relatorio da casa)', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/affiliate-links/generate')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'AFF-1', brandId: 'esportiva', tag: 'infinitw777' })
+      .expect(201);
+    const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
+    expect(logs.some((l: any) => l.action === 'link.generate' && l.metadata?.tag === 'infinitw777')).toBe(true);
+  });
+
+  it('afiliado nao gera link (403)', async () => {
+    const app = buildApp({ seed });
+    await request(app)
+      .post('/api/affiliate-links/generate')
+      .set('Authorization', 'Bearer client-uid')
+      .send({ affiliateId: 'AFF-1', brandId: 'esportiva' })
+      .expect(403);
+  });
+});

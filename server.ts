@@ -28,7 +28,8 @@ import { buildVersionPayload, type AppVersion } from './src/lib/version';
 import { sanitizePrize, sanitizePrizePatch } from './src/lib/prizes';
 import { sanitizeTier, sanitizeTierPatch } from './src/lib/achievements';
 import { sanitizeSupportContact, SUPPORT_CONTACT_EMPTY } from './src/lib/supportContact';
-import { parseStandbyLinks } from './src/lib/linkTriage';
+import { parseStandbyLinks, extractTagFromUrl } from './src/lib/linkTriage';
+import { buildTaggedUrl, suggestTag } from './src/lib/linkGeneration';
 import { buildResultsNotification, type ResultsNotificationVariant } from './src/lib/resultsNotification';
 import { normalizeDealInput, buildDealLabel, dealBrandKey, dealToBrandRates } from './src/lib/deal';
 import { canTransition, type PartnershipStatus } from './src/lib/partnership';
@@ -3226,6 +3227,128 @@ export function createApp(deps: ServerDeps) {
     } catch (e) {
       console.error('[affiliate-links] erro ao listar links:', e);
       return res.status(500).json({ error: 'Erro ao listar os links' });
+    }
+  });
+
+  // Gera o link de um afiliado a partir do TEMPLATE da casa (`registerUrlTemplate`)
+  // + uma tag nossa. Admin only.
+  //
+  // Por que isto existe sem depender da API da casa: a tag de rastreio é um
+  // parâmetro DINÂMICO capturado na visita do jogador — a doc do TAP by Smartico
+  // não aceita `afp` como entrada do `af2_build_link`, e os probes `teste01` /
+  // `infinitw298` apareceram no relatório da Esportiva sem terem sido cunhados no
+  // painel dela. Ver src/lib/linkGeneration.ts e MIGRACAO-INFINITY-LEGADO.md §9.4.
+  //
+  // A tag gravada no link já casa o resultado sozinha no próximo import do
+  // relatório da casa (`buildTagIndex` indexa a tag do link atribuído) — o que sai
+  // daqui NÃO precisa de apelido manual na tela de vínculo.
+  app.post('/api/affiliate-links/generate', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const affiliateId = String(req.body?.affiliateId ?? '').trim();
+      const brandKey = String(req.body?.brandId ?? '').trim();
+      if (!affiliateId) return res.status(400).json({ error: 'affiliateId é obrigatório.' });
+      if (!brandKey) return res.status(400).json({ error: 'Escolha a casa: o link sai do template dela.' });
+
+      // Casa pela mesma convenção do client (`dealBrandKey`): brandId da OTG
+      // quando existe, senão o slug — e o id do doc como último recurso.
+      const housesSnap = await adminDb.collection('houses').get();
+      const house = housesSnap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as any) }))
+        .find((h) => [h.brandId, h.slug, h.id].map((v) => String(v ?? '').trim()).includes(brandKey));
+      if (!house) return res.status(404).json({ error: 'Casa não encontrada.' });
+      const template = String(house.registerUrlTemplate ?? '').trim();
+      if (!template) {
+        return res.status(400).json({
+          error: `A casa "${house.name ?? brandKey}" não tem link de cadastro cadastrado — preencha o campo em /casas.`,
+        });
+      }
+
+      // Tags já em uso: links emitidos + apelidos salvos. Serve para sugerir sem
+      // colidir E para recusar a tag digitada que já é de outra pessoa.
+      const [linksSnap, aliasSnap] = await Promise.all([
+        adminDb.collection('affiliate_links').get(),
+        adminDb.collection('affiliate_tag_aliases').get(),
+      ]);
+      const ownerByTag = new Map<string, string>();
+      for (const d of linksSnap.docs) {
+        const data = d.data() as any;
+        const owner = String(data?.affiliateId ?? '').trim();
+        const tag = normalizeTag(data?.tag) || normalizeTag(extractTagFromUrl(String(data?.registerUrl ?? '')));
+        if (tag && owner && !ownerByTag.has(tag)) ownerByTag.set(tag, owner);
+      }
+      for (const d of aliasSnap.docs) {
+        const data = d.data() as any;
+        const tag = normalizeTag(data?.tag ?? d.id);
+        const owner = String(data?.affiliateId ?? '').trim();
+        if (tag && owner) ownerByTag.set(tag, owner); // apelido vence, como no import
+      }
+
+      const requested = normalizeTag(req.body?.tag);
+      const tag = requested || suggestTag(
+        { name: await affiliateNameOf(affiliateId), affiliateId },
+        ownerByTag.keys(),
+        req.body?.tagPrefix,
+      );
+      const currentOwner = ownerByTag.get(tag);
+      if (currentOwner && currentOwner !== affiliateId) {
+        // Reusar a tag de outro afiliado passaria o resultado dele (o histórico
+        // inclusive) para o novo dono no próximo import.
+        return res.status(409).json({ error: `A tag "${tag}" já é de outro afiliado. Escolha outra.` });
+      }
+
+      const registerUrl = buildTaggedUrl(template, tag, req.body?.tagParam);
+      if (!registerUrl) {
+        return res.status(400).json({ error: 'O link de cadastro da casa não é uma URL http(s) válida.' });
+      }
+
+      // Idempotente por afiliado × casa, igual ao POST /api/affiliate-links: o
+      // code é o que o afiliado já compartilhou e não pode mudar.
+      const existing = await adminDb
+        .collection('affiliate_links')
+        .where('affiliateId', '==', affiliateId)
+        .where('brandId', '==', brandKey)
+        .limit(1)
+        .get();
+
+      let code: string;
+      let created: boolean;
+      if (!existing.empty) {
+        code = existing.docs[0].id;
+        created = false;
+        await existing.docs[0].ref.set(
+          { tag, registerUrl, active: true, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+          { merge: true },
+        );
+      } else {
+        code = crypto.randomBytes(6).toString('base64url');
+        created = true;
+        await adminDb.collection('affiliate_links').doc(code).set({
+          code,
+          affiliateId,
+          brandId: brandKey,
+          tag,
+          registerUrl,
+          active: true,
+          clicks: 0,
+          botClicks: 0,
+          createdByUid: (req as any).user?.uid ?? null,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      await writeAuditLog(req, {
+        entityType: 'affiliate',
+        entityId: affiliateId,
+        entityLabel: await affiliateNameOf(affiliateId),
+        action: 'link.generate',
+        metadata: { code, tag, brandId: brandKey, house: house.slug ?? house.id, created },
+      });
+      return res.status(created ? 201 : 200).json({ code, tag, registerUrl, brandId: brandKey, created });
+    } catch (e) {
+      console.error('[affiliate-links] erro ao gerar link:', e);
+      return res.status(500).json({ error: 'Erro ao gerar o link' });
     }
   });
 
