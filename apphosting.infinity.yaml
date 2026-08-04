@@ -146,5 +146,38 @@ env:
     availability:
       - RUNTIME
 
+  # --- Pull horário do relatório da Esportiva (TAP by Smartico) --------------
+  # Chave de AFILIADO da conta 544865. Só existe nesta instância, por isso é
+  # declarada aqui e não no apphosting.yaml base (declarar um secret ausente no
+  # projeto quebra o build com `misconfigured-secret`).
+  #
+  # ⚠️ ORDEM: criar o secret ANTES de subir este arquivo —
+  #   firebase apphosting:secrets:set esportiva-api-key --project infinity-affiliacore
+  #   firebase apphosting:secrets:grantaccess esportiva-api-key \
+  #     --project infinity-affiliacore --backend infinity-server
+  #
+  # Sem a chave a rota POST /api/internal/esportiva-pull responde 503 (feature off).
+  # Contrato e armadilhas: MIGRACAO-INFINITY-LEGADO.md §9.5 e §9.6.
+  - variable: ESPORTIVA_API_KEY
+    secret: esportiva-api-key
+    availability:
+      - RUNTIME
+
+  # Casa do backoffice /casas que recebe o pull.
+  - variable: ESPORTIVA_HOUSE_SLUG
+    value: 'esportiva-bet'
+    availability:
+      - RUNTIME
+
+  # Régua de CPA da casa, em R$. A API só devolve a comissão em DINHEIRO; a
+  # CONTAGEM de CPA (que multiplica a taxa do afiliado) sai de dividir por este
+  # valor. Se a Esportiva mudar o CPA, mude aqui no MESMO dia — até lá o resto da
+  # divisão aparece como alarme (`cpaRemainder`) na resposta e na auditoria.
+  - variable: ESPORTIVA_CPA_BASE
+    value: '120'
+    availability:
+      - RUNTIME
+
   # FIREBASE_SERVICE_ACCOUNT_KEY e RANKING_CRON_SECRET seguem como SECRETS do
   # base — criar os dois no projeto infinity-affiliacore (playbook §3).
+  # O RANKING_CRON_SECRET é o MESMO header do Scheduler do pull horário.
