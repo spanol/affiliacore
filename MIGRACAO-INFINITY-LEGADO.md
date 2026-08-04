@@ -592,6 +592,54 @@ relatório — e a geração de link segue funcionando pelo caminho de cima.
 
 ---
 
+### 9.5 ✅ API DESTRAVADA — era o HOST errado (04/08/2026)
+
+A casa respondeu ao pedido com o que faltava: **o host é `https://boapi3.smartico.ai`** (não
+`api.aff.esportiva.bet`, nem o `boapi.smartico.ai` da doc). O bloqueio inteiro do §9.2 era isso —
+**o host novo não tem Cloudflare**: responde JSON limpo a `curl` e a Node, sem challenge.
+
+**Contrato medido (não é da doc — é o que respondeu):**
+
+```
+GET https://boapi3.smartico.ai/api/<metodo>?aggregation_period=DAY&group_by=afp
+                                            &date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
+header: authorization: <chave>     (cru, sem "Bearer")
+```
+
+**A chave da Infinity é de AFILIADO, não de operador** — resolve a dúvida aberta no §9.4:
+
+| método | resultado |
+|---|---|
+| `af2_media_report_af` | ✅ o relatório por `afp` |
+| `af2_link_af` | ✅ 6 destinos da casa (Esportes, Página Inicial, Aposta Pronta, E-sports, Sports Virtual, Esportiva Day) com `destination_url` em template (`{{affiliate_id}}`, `{{tracker}}`) |
+| `af2_media_report_op`, `af2_aff_op`, `af2_link_op` | ❌ *"You don't have permissions… user infinity"* |
+| `af2_build_link` | ❌ não existe como GET nesse path |
+
+**Reconciliação de julho/2026 — a API devolve EXATAMENTE o export manual**, tag a tag:
+`infinitw280` R$ 2.760,00 CPA + 22,48 rev · `292` 1.440,00 + 13,55 · `02` 960,00 + 11,00 ·
+`193` 360,00 + 14,26 · `01` 120,00 − 92,14 · (sem tag) − 144,38. Total **CPA R$ 5.640,00**,
+rev −175,23, 321 visitas / 75 registros / 49 FTD. Confere com o card do dashboard.
+
+⚠️ **A API NÃO traz contagem de QFTD/CPA — só `commissions_cpa` em R$.** Nosso `qualified_cpa` é
+CONTAGEM: `5.640 / 120 = 47`, que bate com o painel, mas isso significa que o conector tem de
+**dividir pela régua de CPA da casa** para reconstruir a contagem. É a mesma armadilha do CSV
+(§10.1, "CPA é dinheiro"), com uma volta a mais — e ela quebra se a casa mudar o valor do CPA no
+meio do período.
+
+⚠️ **Rate limit agressivo:** chamadas seguidas devolvem *"Too many requests to API from the same
+account"*. O cron precisa de backoff e de poucas chamadas por dia (uma janela D−1 basta).
+
+Campos por linha: `dt`, `afp`, `visit_count`, `registration_count`, `ftd_count`, `ftd_total`,
+`deposit_count`, `deposit_total`, `net_deposits`, `net_pl`, `commissions_cpa`,
+`commissions_rev_share`, `commissions_cpl`, `commissions_total`, `balance`, `payments`.
+
+**Consequência:** cai o único bloqueio que não era nosso (§9.2 e a lista de "Bloqueios" do BACKLOG).
+O caminho agora é conector + cron diário lendo D−1, reusando o adaptador de `src/lib/houseTagImport.ts`
+— trocar "arquivo enviado" por "puxado da API" é mudar a fonte, não a tela. A chave vira secret da
+instância (Secret Manager), nunca env em texto.
+
+---
+
 ## 10. Vínculo tag → afiliado (o que destrava a Esportiva por afiliado)
 
 ### 10.1 ✅ ENTREGUE — o motor (commit `e574806`)

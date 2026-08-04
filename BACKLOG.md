@@ -255,9 +255,11 @@ onde morar. Pesa na Esportiva, onde o RevShare pode ser negativo e a margem já 
 
 ### Bloqueios que NÃO são nossos
 
-- **Cron da Esportiva** depende da casa isentar `/api/*` do challenge (§9.2). No MESMO pedido, perguntar
-  se a chave é de **operador** ou de **afiliado**: `af2_link_op` e `af2_build_link` só abrem com a de
-  operador (§9.4). Nenhum dos dois bloqueia a geração de link, que já está no ar.
+- ~~**Cron da Esportiva** depende da casa isentar `/api/*` do challenge~~ → **RESOLVIDO 04/08/2026**:
+  era o HOST errado. `https://boapi3.smartico.ai/api/af2_media_report_af` responde sem Cloudflare e
+  reconcilia exato com o export manual; a chave é de **afiliado** (métodos `_af`). Detalhes,
+  contrato e as duas armadilhas (CPA vem em R$ sem contagem; rate limit) no §9.5. **Virou trabalho
+  NOSSO:** conector + cron D−1 + a chave como secret da instância.
 - **Convites dos 159 afiliados** dependem da decisão de **quem honra os R$ 32.306,40** de passivo.
 - **Vínculo das tags** depende de o Maurício informar de quem são `infinitw280`, `292`, `193`, `01`
   e se `infinitw280tem`/`280gay` são a mesma pessoa da `280`.
