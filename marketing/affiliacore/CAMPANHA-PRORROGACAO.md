@@ -143,13 +143,42 @@ prova de que a campanha entregou.
    Ela não para sozinha (Advantage+ sem data de término) e o texto no ar
    anuncia um prazo vencido.
 
-⚠️ **Bloqueio de acesso (04/08):** as campanhas **não são alcançáveis pelo
-Chrome conectado ao MCP**. Esse navegador está logado no Facebook pessoal do
-Vinicius + Instagram `@subiu.dev`: as "Páginas que você gerencia" listam só
-`Subiu`, o único portfólio visível é `Campaign Factory` (ad account
-`2340945569582101`, com boosts pessoais antigos travados em "Erro no
-pagamento") e a conta de anúncios da AffiliaCore (`1038808991862700`) **não
-aparece nem na busca**. O portfólio `Affilia Core` (`1550870196394283`) abre
-pelo ID mas responde "nenhuma conta de anúncios para mostrar". `switch_browser`
-não achou outro navegador: **o Chrome da AffiliaCore não tem a extensão Claude
-instalada** — instalar lá é o pré-requisito para eu operar as campanhas.
+### ✅ Campanha do ebook PAUSADA (04/08) + números finais
+
+Feito no Ads Manager (`act=1038808991862700`), confirmado pelo toast "Campaign
+updated" e pela coluna Delivery = **Off**. A coluna **Ends** dizia **"Ongoing"**
+— confirmação de que ela realmente nunca pararia sozinha.
+
+Números do range **Maximum** (o "Last 30 days" corta o dia de hoje):
+
+| Campanha | Estado | Orçam. | Gasto | Resultado | Custo |
+|---|---|---|---|---|---|
+| `Guia R$47 - Prorrogado 03/08 - Vendas (IC) - IG` | ⏹ **Off (pausada agora)** | R$ 15/d | **R$ 42,06** | 27 Initiate Checkout | **R$ 1,56** |
+| `[7/13/2026] Promoting…` (mensagens) | ▶ **Active** — termina **08/08** | R$ 20/d | R$ 236,61 | **32 conversas** | R$ 7,39 |
+| `Guia R$47 — Vendas (IC) — IG` | Off | — | R$ 72,13 | 31 Initiate Checkout | R$ 2,33 |
+| `Post: "Novo: o guia da AffiliaCore"` | Off | — | R$ 57,70 | 281 cliques no link | R$ 0,21 |
+| `Post IG: Dá pra montar uma agência…` | Off | — | R$ 10,97 | 3 conversas | R$ 3,66 |
+| `Post IG: A conta que todo gestor…` | Off | — | R$ 19,22 | 6 conversas | R$ 3,20 |
+| **Conta inteira** | | | **R$ 438,69** | 42 conversas · **0 Purchases** | R$ 11,54/conversa nova |
+
+**O criativo da prorrogação foi o melhor de todos os do ebook: R$ 1,56 por
+Initiate Checkout** (contra R$ 2,33 do anterior) — e ainda assim **0 compras**.
+A coluna `Purchases` está vazia em TODAS as linhas, o que confirma pelo lado da
+Meta o que a Kiwify já dizia. Total queimado no ebook: **R$ 171,89** (42,06 +
+72,13 + 57,70) por zero venda.
+
+**Captação (o que fica de pé):** as 3 campanhas de mensagem somam **R$ 266,80**
+→ **38 conversas novas ≈ R$ 7 cada**. É o único canal da conta que produz
+alguma coisa. ⏰ **A campanha de mensagens termina em 08/08** — decidir antes
+disso se renova, com quanto, e se os R$ 15/dia liberados do ebook vão para ela.
+
+### Nota de acesso (resolvida)
+
+A conta de anúncios **não é alcançável pelo Chrome do perfil `Default`** (FB
+pessoal do Vinicius, IG `@subiu.dev`): lá o único portfólio é `Campaign Factory`
+e o ID `1038808991862700` não aparece nem na busca. Ela vive no **`Profile 4`**
+do Chrome (conta Google `ponycanoon12@gmail.com`), onde a extensão Claude foi
+instalada em 04/08 — a partir daí o MCP opera normalmente. Ao conectar, **há 2
+navegadores na lista e o `name` é posicional**: selecione pelo `deviceId`.
+Gotcha: `?date=maximum` na URL trava o Ads Manager em "Loading your ad account"
+— entre sem o parâmetro e troque o range pela UI.
