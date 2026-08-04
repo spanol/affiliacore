@@ -93,3 +93,63 @@ mensagem, que vive no texto. A arte nova segue pronta em
 
 ⚠️ A Meta avisou, ao ligar: **com R$ 15/dia a estimativa é ~0–1 resultado/dia.**
 Recusei o upsell de orçamento (a decisão de R$ 15 é do Vinicius).
+
+## 🛑 DESFECHO (04/08) — ebook encerrado como frente de investimento
+
+Decisão do Vinicius ao ver os números: **parar de investir no ebook e focar
+100% em captação de novos clientes.** A campanha de mensagens (R$ 20/dia até
+08/08) é a de captação e **permanece**; a do ebook sai do ar.
+
+### O que a prorrogação produziu (verificado na fonte)
+
+**Vendas: 0.** Kiwify, filtro "Tempo todo": 0 vendas, R$ 0,00. Na aba "Todas"
+só os 2 Pix do próprio Vinicius de 23/07, nunca pagos — **nenhum carrinho
+pendente novo**, ou seja, ninguém que abriu o checkout chegou a preencher o
+formulário.
+
+**Mas o topo e o meio do funil melhoraram muito** (GA4 `G-X5572SJY82`,
+01–04/08 vs. a campanha de 23–26/07):
+
+| Métrica | 01–04/08 | 23–26/07 |
+|---|---|---|
+| Usuários | 93 | 178 |
+| Tempo médio na LP | **12 s** (`/guia`) | 2–6 s |
+| `ebook_checkout_click` (pessoas) | **9** | 3 |
+| `begin_checkout` (pessoas) | **10** | 5 |
+| Vendas | 0 | 0 |
+
+Com **metade do tráfego**, o dobro de pessoas clicou no CTA e chegou ao
+checkout. O diagnóstico antigo ("o gargalo são os primeiros 5 segundos da LP")
+deixou de valer: a LP passou a segurar. O que não converte agora é o
+**checkout/oferta** — 10 pessoas abriram e nenhuma preencheu.
+
+⚠️ **Correção de fato:** o doc registrava o destino do anúncio como `/ebook`,
+mas o tráfego caiu na **`/guia`** (64 usuários × 10 na `/ebook`). Como a
+`/guia` é `noindex`, esses 64 usuários só podem ter vindo do anúncio — é a
+prova de que a campanha entregou.
+
+### Estado das pendências de prazo
+
+1. **Virada de preço nas LPs: ✅ automática, funcionou.** `/ebook` e `/guia`
+   viraram sozinhas em 04/08 — `.js-price` = 67 em todos os pontos, âncora
+   riscada removida, os 4 blocos de prazo escondidos, FAQ reescrito no passado
+   ("Subiu. R$ 47 era o preço de lançamento"), título limpo. O cronômetro do
+   checkout Kiwify zerou junto ("Preço de lançamento encerrado").
+2. **Preço na Kiwify: ❌ segue R$ 47** — e **fica assim**, já que o ebook não
+   recebe mais investimento. Enquanto isso a LP anuncia 67 e o checkout cobra
+   47 (divergência a favor do cliente, sem escassez falsa). Se um dia a página
+   voltar a receber tráfego, resolver antes.
+3. **PAUSAR a campanha do ebook: ❌ PENDENTE, é o único item que ainda gasta.**
+   Ela não para sozinha (Advantage+ sem data de término) e o texto no ar
+   anuncia um prazo vencido.
+
+⚠️ **Bloqueio de acesso (04/08):** as campanhas **não são alcançáveis pelo
+Chrome conectado ao MCP**. Esse navegador está logado no Facebook pessoal do
+Vinicius + Instagram `@subiu.dev`: as "Páginas que você gerencia" listam só
+`Subiu`, o único portfólio visível é `Campaign Factory` (ad account
+`2340945569582101`, com boosts pessoais antigos travados em "Erro no
+pagamento") e a conta de anúncios da AffiliaCore (`1038808991862700`) **não
+aparece nem na busca**. O portfólio `Affilia Core` (`1550870196394283`) abre
+pelo ID mas responde "nenhuma conta de anúncios para mostrar". `switch_browser`
+não achou outro navegador: **o Chrome da AffiliaCore não tem a extensão Claude
+instalada** — instalar lá é o pré-requisito para eu operar as campanhas.
