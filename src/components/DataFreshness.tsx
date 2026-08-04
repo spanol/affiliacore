@@ -19,7 +19,13 @@ export default function DataFreshness({ className }: { className?: string }) {
 
   useEffect(() => {
     fetchHouses()
-      .then((data) => setHouses(Array.isArray(data) ? data.filter((h) => h.active !== false) : []))
+      // Só casas COM carimbo. Duas razões: (a) o carimbo nasceu em 04/08/2026 —
+      // casa com dados antigos apareceria como "sem atualização ainda", que é
+      // mentira; (b) casa OTG nunca recebe carimbo (o dado vem da API externa).
+      // No /casas o admin continua vendo o "sem atualização", que lá é acionável.
+      .then((data) => setHouses(
+        (Array.isArray(data) ? data : []).filter((h) => h.active !== false && h.lastResultsSyncAt),
+      ))
       .catch(() => setHouses([]))
       .finally(() => setLoading(false));
     const id = setInterval(() => setTick((t) => t + 1), 60000);
