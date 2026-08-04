@@ -24,6 +24,12 @@ export interface House {
   // ISS retido no repasse ao afiliado, em % — VARIA POR CASA (5% / 2% / 2% no
   // legado da Infinity). Ausente = sem retenção. Núcleo em `src/lib/tax.ts`.
   issPercent?: number | null;
+  // Frescor do dado da casa: quando os resultados foram atualizados pela última
+  // vez, por qual via, e até que dia eles cobrem. Escrito tanto pelo pull horário
+  // quanto pelo upload manual. Lido pelo afiliado (src/lib/freshness.ts).
+  lastResultsSyncAt?: string | null;
+  lastResultsSyncSource?: 'api' | 'upload' | null;
+  lastResultsDate?: string | null;
 }
 
 // Campos editáveis no backoffice. `logoBase64` (data URL) sobe a logo nova; se
@@ -137,6 +143,32 @@ export async function importHouseResults(
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ houseSlug, rows }),
+  });
+  if (!response.ok) await parseError(response);
+  return response.json();
+}
+
+// Resultado do pull automático da casa (Esportiva/TAP). Ver src/lib/esportivaPull.ts.
+export interface PullResult {
+  ok: boolean;
+  house: string;
+  dateFrom: string;
+  dateTo: string;
+  imported: number;
+  deleted?: number;
+  attributed: number;
+  pending: { tag: string; days: number; total_commission: number }[];
+  cpaRemainder?: number;
+  note?: string;
+}
+
+// Puxa o relatório da casa direto da API dela (admin). O cron horário chama a
+// MESMA rota com o header de secret — aqui é o botão "Atualizar agora".
+export async function pullHouseResults(days?: number): Promise<PullResult> {
+  const response = await authFetch('/api/internal/esportiva-pull', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(days ? { days } : {}),
   });
   if (!response.ok) await parseError(response);
   return response.json();

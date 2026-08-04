@@ -638,6 +638,49 @@ O caminho agora é conector + cron diário lendo D−1, reusando o adaptador de 
 — trocar "arquivo enviado" por "puxado da API" é mudar a fonte, não a tela. A chave vira secret da
 instância (Secret Manager), nunca env em texto.
 
+### 9.6 ✅ ENTREGUE — pull horário + carimbo de frescor (04/08/2026)
+
+A Infinity pediu duas coisas ao ver o §9.5: **atualização de hora em hora** e **a data da última
+atualização visível para o afiliado, por casa**. Ambas entregues.
+
+**Pull** — `POST /api/internal/esportiva-pull`, aberto a **cron OU admin** (o Scheduler não tem
+token de usuário; o admin não tem o secret — a presença do header `x-cron-secret` decide a porta).
+Núcleo puro em `src/lib/esportivaPull.ts`; a gravação reusa a semântica do upload (as datas da
+janela são **reescritas**, então rodar de hora em hora nunca duplica).
+
+- **Janela `pullWindow(hoje, 2)`** = hoje + ontem. A casa corrige o dia anterior, e reler é de graça
+  porque a data é reescrita.
+- **Atribuição pelo MESMO `buildTagIndex` do upload** (links emitidos + apelidos). Fonte única —
+  senão a atribuição divergiria entre o cron e a planilha.
+- **O agregado do dia (`affiliateId: null`) soma TUDO** — atribuído + tag órfã + tráfego sem tag.
+  `dailyAggregate` descarta as atribuídas do mesmo casa|dia quando há agregado explícito, então
+  gravar só o resíduo faria o total da casa DESABAR para o que ninguém trouxe.
+- **Tag sem dono não vira linha atribuída:** volta em `pending` (ordenada por dinheiro) para a tela
+  de vínculo, e o dinheiro dela continua dentro do agregado.
+- **Não notifica afiliado** — de propósito: a rodada é horária, e o upload manual já celebra
+  resultado novo. Notificar a cada hora viraria spam.
+- Erro da casa → **502 com a mensagem dela**; rate limit → até 3 tentativas espaçadas.
+
+**Carimbo de frescor** — `houses/{slug}.lastResultsSyncAt` + `lastResultsSyncSource` (`api` |
+`upload`) + `lastResultsDate`, escrito **pelo pull E pelo upload** (a casa que só recebe planilha
+também precisa dizer quando foi atualizada). Exposto no `GET /api/houses` (já é `requireAuth`) e
+lido por `src/lib/freshness.ts` (puro). Aparece:
+
+- no painel do afiliado, card **"Atualização dos dados"** (`src/components/DataFreshness.tsx`), com
+  a ressalva de que **clique é ao vivo, resultado da casa não é** — que é o mal-entendido que o
+  carimbo existe para evitar;
+- no card de cada casa em `/casas`, ao lado do botão **"Atualizar"** (pull manual).
+
+**Operação (passo do operador):** `ESPORTIVA_API_KEY` no Secret Manager da instância + Cloud
+Scheduler de hora em hora batendo em `/api/internal/esportiva-pull` com `x-cron-secret`. As demais
+variáveis (`ESPORTIVA_API_BASE`, `ESPORTIVA_HOUSE_SLUG`, `ESPORTIVA_CPA_BASE`) têm default e estão
+documentadas no `.env.example`.
+
+⚠️ **`ESPORTIVA_CPA_BASE` é a régua que reconstrói a CONTAGEM de CPA** (a API só manda dinheiro).
+Se a casa mudar o valor do CPA, mude aqui no mesmo dia — enquanto isso não acontece, o resto da
+divisão aparece em `cpaRemainder` na resposta, na auditoria (`house_results.pull`) e como aviso
+vermelho na tela.
+
 ---
 
 ## 10. Vínculo tag → afiliado (o que destrava a Esportiva por afiliado)

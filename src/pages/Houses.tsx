@@ -4,13 +4,13 @@ import { Navigate } from 'react-router-dom';
 import {
   Building2, Plus, Loader2, Pencil, Trash2, X, Upload, Link2, Check, Power,
   Table2, AlertTriangle, FileSpreadsheet, Cloud, Calendar, Download, Sparkles,
-  ChevronDown, ExternalLink, Tag,
+  ChevronDown, ExternalLink, Tag, RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import {
   House, HouseInput, fetchHouses, createHouse, updateHouse, deleteHouse, syncKnownBrandsFrom,
-  fetchHouseResults, importHouseResults, clearHouseResults,
+  fetchHouseResults, importHouseResults, clearHouseResults, pullHouseResults,
 } from '../services/houseService';
 import {
   fetchAffiliates, fetchRegisteredUsers, fetchEmailAliases, createBoostAffiliates, createEmailAlias,
@@ -27,7 +27,8 @@ import {
 import { buildImportRoster } from '../lib/boostAffiliate';
 import { canImport, buildImportPayload } from '../lib/houseImport';
 import { parseSpreadsheetFile, downloadResultsTemplate, isExcelFile } from '../lib/xlsx';
-import { humanizeName } from '../lib/utils';
+import { cn, humanizeName } from '../lib/utils';
+import { describeFreshness } from '../lib/freshness';
 import {
   HOUSE_PRESETS, HousePreset, buildHouseIconDataUrl, housePresetIconPath, houseLogoOrPreset,
   svgToDataUrl,
@@ -49,6 +50,7 @@ export default function Houses() {
   const [resultsModal, setResultsModal] = useState<{ open: boolean; house?: House }>({ open: false });
   const [confirmDel, setConfirmDel] = useState<House | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [pulling, setPulling] = useState<string | null>(null); // id da casa sendo puxada da API
 
   const isAdmin = profile?.role === 'admin';
 
@@ -69,6 +71,32 @@ export default function Houses() {
     if (isAdmin) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
+
+  // Puxa o relatório direto da API da casa (Esportiva/TAP). É a MESMA rota que o
+  // cron horário chama — aqui é o "agora", para o admin não esperar a virada da hora.
+  const handlePull = async (house: House) => {
+    setPulling(house.id);
+    try {
+      const r = await pullHouseResults();
+      const pend = r.pending?.length
+        ? ` · ${r.pending.length} tag(s) sem dono: ${r.pending.slice(0, 3).map((p) => p.tag).join(', ')}`
+        : '';
+      push({
+        type: r.pending?.length ? 'info' : 'success',
+        message: `${r.imported} linha(s) de ${r.dateFrom} a ${r.dateTo} · ${r.attributed} atribuída(s)${pend}`,
+      });
+      // Régua de CPA trocada no meio do período: a contagem sai de dividir o
+      // dinheiro pela base, então resto > 0 é sinal de que a base mudou (§9.5).
+      if (r.cpaRemainder) {
+        push({ type: 'error', message: `Atenção: sobrou R$ ${r.cpaRemainder} na conta do CPA — confira o valor do CPA da casa.` });
+      }
+      await load();
+    } catch (e: any) {
+      push({ type: 'error', message: e?.message || 'Falha ao puxar da API da casa.' });
+    } finally {
+      setPulling(null);
+    }
+  };
 
   const handleDelete = async () => {
     if (!confirmDel) return;
@@ -203,15 +231,41 @@ export default function Houses() {
                       : <span className="text-slate-300 dark:text-neutral-600">—</span>}
                   </dd>
                 </div>
+                {/* Frescor: o MESMO carimbo que o afiliado vê no painel dele. */}
+                <div className="flex items-center justify-between gap-2">
+                  <dt className="text-slate-400 dark:text-neutral-500 font-medium flex items-center gap-1"><RefreshCw size={11} /> Dados atualizados</dt>
+                  <dd className="truncate max-w-[60%]" title={h.lastResultsDate ? `cobre até ${h.lastResultsDate}` : ''}>
+                    {(() => {
+                      const f = describeFreshness(h.lastResultsSyncAt);
+                      return (
+                        <span className={cn('font-semibold', f.stale ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400')}>
+                          {f.label}
+                          {h.lastResultsSyncSource === 'api' && f.minutes !== null ? ' · API' : ''}
+                        </span>
+                      );
+                    })()}
+                  </dd>
+                </div>
               </dl>
 
               {h.dataSource === 'manual' && (
-                <button
-                  onClick={() => setResultsModal({ open: true, house: h })}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 mb-2 rounded-xl bg-accent-500/10 border border-accent-500/30 text-xs font-bold text-accent-600 dark:text-accent-400 hover:bg-accent-500/20 transition-all"
-                >
-                  <Table2 size={14} /> Importar resultados
-                </button>
+                <div className="flex gap-2 mb-2">
+                  <button
+                    onClick={() => setResultsModal({ open: true, house: h })}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-accent-500/10 border border-accent-500/30 text-xs font-bold text-accent-600 dark:text-accent-400 hover:bg-accent-500/20 transition-all"
+                  >
+                    <Table2 size={14} /> Importar resultados
+                  </button>
+                  <button
+                    onClick={() => handlePull(h)}
+                    disabled={pulling === h.id}
+                    title="Puxar o relatório direto da API da casa (o mesmo que o robô faz de hora em hora)"
+                    className="shrink-0 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-600 dark:text-neutral-300 hover:border-accent-500/40 hover:text-accent-500 transition-all disabled:opacity-50"
+                  >
+                    {pulling === h.id ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                    Atualizar
+                  </button>
+                </div>
               )}
               <div className="flex gap-2">
                 <button

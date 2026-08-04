@@ -17,7 +17,10 @@ import { computeRankingEntries } from './src/lib/ranking';
 import { expandAffiliateIdsParam } from './src/lib/affiliateIdsParam';
 import { hrDocId, sanitizeMetrics } from './src/lib/houseResultsDoc';
 import { makeBoostAffiliateId, normalizeEmailKey } from './src/lib/boostAffiliate';
-import { normalizeTag } from './src/lib/houseTagImport';
+import { normalizeTag, buildTagIndex } from './src/lib/houseTagImport';
+import {
+  buildMediaReportUrl, adaptEsportivaRows, buildPullPayload, pullWindow, ESPORTIVA_API_BASE,
+} from './src/lib/esportivaPull';
 import { eurToBrl, parseEurBrlRate, FALLBACK_EUR_BRL } from './src/lib/currency';
 import { DEFAULT_BRANDS } from './src/lib/brand';
 import { projectPartnerResults } from './src/lib/partnerResults';
@@ -3583,6 +3586,11 @@ export function createApp(deps: ServerDeps) {
       defaultRev: Number.isFinite(Number(data.defaultRev)) ? Number(data.defaultRev) : null,
       // Alíquota de ISS retida no repasse ao afiliado. VARIA POR CASA (ver src/lib/tax.ts).
       issPercent: Number.isFinite(Number(data.issPercent)) ? Number(data.issPercent) : null,
+      // Frescor do dado (pull horário OU upload) — o afiliado lê isto no painel.
+      // Timestamp vira ISO: o client não tem o SDK admin para desserializar.
+      lastResultsSyncAt: data.lastResultsSyncAt?.toDate?.().toISOString?.() ?? data.lastResultsSyncAt ?? null,
+      lastResultsSyncSource: data.lastResultsSyncSource ?? null,
+      lastResultsDate: data.lastResultsDate ?? null,
     };
   };
 
@@ -4366,6 +4374,14 @@ export function createApp(deps: ServerDeps) {
         byAff.set(row.affiliateId, a);
       }
 
+      // Carimbo de frescor, igual ao do pull: a casa que só recebe planilha
+      // também precisa dizer ao afiliado quando o dado foi atualizado.
+      ops.push((b) => b.set(houseSnap.ref, {
+        lastResultsSyncAt: importedAt,
+        lastResultsSyncSource: 'upload',
+        lastResultsDate: [...dates].sort().pop() ?? null,
+      }, { merge: true }));
+
       // Auditoria do upload — atômica com a gravação dos resultados (mesmo batch).
       ops.push((b) => appendAuditLog(b, req, {
         entityType: 'house_results', entityId: slug, entityLabel: houseName, action: 'house_results.import',
@@ -4408,6 +4424,132 @@ export function createApp(deps: ServerDeps) {
     } catch (e) {
       console.error('[house-results] erro ao limpar:', e);
       return res.status(500).json({ error: 'Erro ao limpar os resultados' });
+    }
+  });
+
+  // === PULL automático do relatório da casa (Esportiva / TAP by Smartico) ====
+  // Substitui o export manual pela API. Roda de hora em hora pelo Cloud Scheduler
+  // (header x-cron-secret) e também no clique do admin em /casas. Contrato,
+  // reconciliação e armadilhas: MIGRACAO-INFINITY-LEGADO.md §9.5.
+  //
+  // Sem ESPORTIVA_API_KEY a rota responde 503 (feature off por instância) — é o
+  // mesmo desenho do cron de ranking: instância sem a casa não paga nada por isso.
+  const espKey = () => String(process.env.ESPORTIVA_API_KEY || '').trim();
+  const espHouseSlug = () => String(process.env.ESPORTIVA_HOUSE_SLUG || 'esportiva-bet').trim();
+  const espCpaBase = () => {
+    const n = Number(process.env.ESPORTIVA_CPA_BASE ?? 120);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+
+  // Cron OU admin: o Scheduler não tem token de usuário, e o admin não tem o
+  // secret. Presença do header decide qual porta é usada — nunca as duas juntas.
+  const allowCronOrAdmin: express.RequestHandler = (req, res, next) =>
+    req.headers['x-cron-secret'] ? requireCronSecret(req, res, next) : requireAdmin(req, res, next);
+
+  // A API tem rate limit agressivo ("Too many requests from the same account").
+  // Uma janela por rodada + até 3 tentativas espaçadas cobre a rodada horária sem
+  // martelar a casa.
+  const fetchEsportivaReport = async (url: string, key: string): Promise<any> => {
+    let last: any = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const response = await fetchImpl(url, { headers: { authorization: key, accept: 'application/json' } });
+      const text = await response.text();
+      let body: any = null;
+      try { body = JSON.parse(text); } catch { body = null; }
+      if (body && Array.isArray(body.data)) return body;
+      last = body ?? text.slice(0, 200);
+      const rateLimited = typeof last === 'object' && /too many requests/i.test(String(last?.message ?? ''));
+      if (!rateLimited) break; // erro de permissão/chave não melhora com espera
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 15000 * attempt));
+    }
+    throw new Error(
+      typeof last === 'object' && last?.message ? String(last.message) : 'Resposta inesperada da API da casa.',
+    );
+  };
+
+  app.post('/api/internal/esportiva-pull', allowCronOrAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    const key = espKey();
+    if (!key) return res.status(503).json({ error: 'Pull não configurado (defina ESPORTIVA_API_KEY).' });
+
+    const slug = espHouseSlug();
+    try {
+      const houseSnap = await adminDb.collection('houses').doc(slug).get();
+      if (!houseSnap.exists) return res.status(404).json({ error: `Casa "${slug}" não encontrada.` });
+      const houseName = (houseSnap.data() as any)?.name ?? slug;
+
+      const days = Number(req.body?.days);
+      const { dateFrom, dateTo } = pullWindow(resolveServerToday(), Number.isFinite(days) && days > 0 ? days : 2);
+      const url = buildMediaReportUrl(dateFrom, dateTo, process.env.ESPORTIVA_API_BASE || ESPORTIVA_API_BASE);
+      const body = await fetchEsportivaReport(url, key);
+
+      const { rows: pullRows, cpaRemainder, skipped } = adaptEsportivaRows(body.data, { cpaBase: espCpaBase() });
+
+      // Tag -> afiliado pelo MESMO índice do import manual (links + apelidos):
+      // uma fonte só, senão a atribuição diverge entre o upload e o cron.
+      const [linksSnap, aliasSnap] = await Promise.all([
+        adminDb.collection('affiliate_links').get(),
+        adminDb.collection('affiliate_tag_aliases').get(),
+      ]);
+      const tagIndex = buildTagIndex(
+        linksSnap.docs.map((d) => d.data() as any),
+        aliasSnap.docs.map((d) => ({ ...(d.data() as any), tag: (d.data() as any)?.tag ?? d.id })),
+      );
+      const payload = buildPullPayload(pullRows, tagIndex as any);
+
+      if (payload.rows.length === 0) {
+        return res.json({ ok: true, house: slug, dateFrom, dateTo, imported: 0, attributed: 0, pending: [], note: 'A casa não devolveu linhas nessa janela.' });
+      }
+
+      // Mesma semântica do upload: as datas da janela são REESCRITAS, então
+      // reprocessar o dia (o que a rodada horária faz o tempo todo) nunca duplica.
+      const dates = new Set(payload.dates);
+      const existing = await adminDb.collection('house_results').where('houseSlug', '==', slug).get();
+      const toDelete = existing.docs.filter((d) => dates.has((d.data() as any)?.date));
+
+      const importedAt = admin.firestore.FieldValue.serverTimestamp();
+      const ops: ((b: admin.firestore.WriteBatch) => void)[] = [];
+      toDelete.forEach((d) => ops.push((b) => b.delete(d.ref)));
+      payload.rows.forEach((row) => {
+        const ref = adminDb!.collection('house_results').doc(hrDocId(slug, row.date, row.affiliateId));
+        ops.push((b) => b.set(ref, {
+          houseSlug: slug, date: row.date, affiliateId: row.affiliateId, ...sanitizeMetrics(row),
+          importedByUid: (req as any).user?.uid ?? null, importedAt, source: 'api',
+        }));
+      });
+
+      // Carimbo de frescor — é o que o afiliado lê no painel ("atualizado há X").
+      ops.push((b) => b.set(houseSnap.ref, {
+        lastResultsSyncAt: importedAt,
+        lastResultsSyncSource: 'api',
+        lastResultsDate: payload.dates[payload.dates.length - 1] ?? null,
+      }, { merge: true }));
+
+      // Auditoria: 1 por rodada. `pendingTags` é a fila da tela de vínculo e
+      // `cpaRemainder` > 0 é o alarme de régua de CPA trocada (§9.5).
+      ops.push((b) => appendAuditLog(b, req, {
+        entityType: 'house_results', entityId: slug, entityLabel: houseName, action: 'house_results.pull',
+        metadata: {
+          dateFrom, dateTo, imported: payload.rows.length, deleted: toDelete.length,
+          attributed: payload.attributed, pendingTags: payload.pending.map((p) => p.tag),
+          cpaRemainder: Number(cpaRemainder.toFixed(2)), skipped,
+          via: req.headers['x-cron-secret'] ? 'cron' : 'admin',
+        },
+      }));
+
+      await commitChunked(ops);
+
+      // NÃO notifica afiliado aqui de propósito: a rodada é HORÁRIA e o upload
+      // manual já celebra resultado novo — notificar a cada hora viraria spam.
+      return res.json({
+        ok: true, house: slug, dateFrom, dateTo,
+        imported: payload.rows.length, deleted: toDelete.length,
+        attributed: payload.attributed, pending: payload.pending,
+        cpaRemainder: Number(cpaRemainder.toFixed(2)), skipped,
+      });
+    } catch (e: any) {
+      console.error('[esportiva-pull] falhou:', e);
+      return res.status(502).json({ error: e?.message || 'Falha ao puxar o relatório da casa.' });
     }
   });
 

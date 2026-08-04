@@ -24,6 +24,7 @@ import {
   resolveBrandRates,
 } from '../services/affiliateService';
 import BrandBreakdown from '../components/BrandBreakdown';
+import DataFreshness from '../components/DataFreshness';
 import BrandFilter from '../components/BrandFilter';
 import DailyPerformanceChart from '../components/DailyPerformanceChart';
 import DateRangePicker from '../components/DateRangePicker';
@@ -394,6 +395,11 @@ export default function ClientDashboard() {
 
                 {/* Per-house breakdown (real data from groupBy=brand) */}
                 <BrandBreakdown data={brandResults} config={config} />
+
+                {/* Frescor por casa: o painel mistura o clique (nosso, ao vivo)
+                    com o resultado da casa (pull horário / upload, D-1). Sem o
+                    carimbo o afiliado cobra tempo real de um número que não é. */}
+                <DataFreshness className="mb-8" />
 
               </div>
             );

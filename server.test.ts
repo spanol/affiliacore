@@ -3002,3 +3002,120 @@ describe('geracao de link (/api/affiliate-links/generate)', () => {
       .expect(403);
   });
 });
+
+// =============================================================================
+// Pull automático do relatorio da casa (Esportiva / TAP by Smartico)
+// Contrato e armadilhas: MIGRACAO-INFINITY-LEGADO.md §9.5.
+// =============================================================================
+describe('pull da Esportiva (/api/internal/esportiva-pull)', () => {
+  const seed = {
+    users: { 'admin-uid': { role: 'admin' }, 'client-uid': { role: 'client', affiliateId: 'AFF-1' } },
+    houses: { 'esportiva-bet': { slug: 'esportiva-bet', name: 'Esportiva Bet', dataSource: 'manual' } },
+    affiliate_links: {
+      L1: { code: 'L1', affiliateId: 'AFF-1', brandId: 'esportiva-bet', tag: 'infinitw02', registerUrl: 'https://go/x?afp=infinitw02', active: true },
+    },
+  };
+
+  // Duas tags no mesmo dia: uma com dono (AFF-1) e uma orfa, mais trafego sem tag.
+  const apiFetch = (rows?: any[]) => async () => ({
+    ok: true, status: 200,
+    text: async () => JSON.stringify({
+      meta: { affiliate_id: 544865 },
+      data: rows ?? [
+        { dt: '2026-08-03T00:00:00.000Z', afp: 'infinitw02', registration_count: 5, ftd_count: 3, deposit_total: 300, commissions_cpa: 360, commissions_rev_share: 2, commissions_total: 362 },
+        { dt: '2026-08-03T00:00:00.000Z', afp: 'orfa99', registration_count: 2, ftd_count: 1, deposit_total: 100, commissions_cpa: 120, commissions_rev_share: 1, commissions_total: 121 },
+        { dt: '2026-08-03T00:00:00.000Z', afp: '', registration_count: 1, ftd_count: 0, commissions_total: -5 },
+      ],
+    }),
+  }) as any;
+
+  const withKey = (fn: () => Promise<void>) => async () => {
+    process.env.ESPORTIVA_API_KEY = 'chave-de-teste';
+    process.env.ESPORTIVA_CPA_BASE = '120';
+    try { await fn(); } finally {
+      delete process.env.ESPORTIVA_API_KEY;
+      delete process.env.ESPORTIVA_CPA_BASE;
+    }
+  };
+
+  it('sem chave configurada -> 503 (feature off por instancia)', async () => {
+    delete process.env.ESPORTIVA_API_KEY;
+    await request(buildApp({ seed })).post('/api/internal/esportiva-pull').set('Authorization', 'Bearer admin-uid').expect(503);
+  });
+
+  it('afiliado nao dispara o pull (403)', withKey(async () => {
+    await request(buildApp({ seed, fetchImpl: apiFetch() }))
+      .post('/api/internal/esportiva-pull').set('Authorization', 'Bearer client-uid').expect(403);
+  }));
+
+  it('grava agregado do dia + linha do afiliado, e a tag orfa fica PENDENTE', withKey(async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch() });
+    const res = await request(app).post('/api/internal/esportiva-pull').set('Authorization', 'Bearer admin-uid').expect(200);
+
+    expect(res.body).toMatchObject({ ok: true, house: 'esportiva-bet', attributed: 1 });
+    expect(res.body.pending.map((p: any) => p.tag)).toEqual(['orfa99']);
+
+    const rows = [...(db.__store.get('house_results')?.values() ?? [])];
+    const agg = rows.find((r: any) => r.affiliateId === null);
+    const mine = rows.find((r: any) => r.affiliateId === 'AFF-1');
+    // agregado = TUDO do dia (com dono + orfa + sem tag): 362 + 121 - 5
+    expect(agg.total_commission).toBeCloseTo(478, 2);
+    expect(agg.registrations).toBe(8);
+    // a linha do afiliado tem so' o que e' dele, com a CONTAGEM derivada (360/120)
+    expect(mine).toMatchObject({ registrations: 5, first_deposits: 3, qualified_cpa: 3, total_commission: 362 });
+    // a orfa NAO virou linha atribuida a ninguem
+    expect(rows.some((r: any) => String(r.affiliateId ?? '').includes('orfa'))).toBe(false);
+  }));
+
+  it('carimba o frescor na casa (o que o afiliado le no painel)', withKey(async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch() });
+    await request(app).post('/api/internal/esportiva-pull').set('Authorization', 'Bearer admin-uid').expect(200);
+    const house = db.__store.get('houses')?.get('esportiva-bet');
+    expect(house.lastResultsSyncSource).toBe('api');
+    expect(house.lastResultsSyncAt).toBeTruthy();
+    expect(house.lastResultsDate).toBe('2026-08-03');
+  }));
+
+  it('rodar de novo REESCREVE o dia em vez de duplicar (a rodada e horaria)', withKey(async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch() });
+    await request(app).post('/api/internal/esportiva-pull').set('Authorization', 'Bearer admin-uid').expect(200);
+    const first = [...(db.__store.get('house_results')?.values() ?? [])].length;
+    await request(app).post('/api/internal/esportiva-pull').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect([...(db.__store.get('house_results')?.values() ?? [])].length).toBe(first);
+  }));
+
+  it('audita a rodada com as tags pendentes e o resto do CPA', withKey(async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch() });
+    await request(app).post('/api/internal/esportiva-pull').set('Authorization', 'Bearer admin-uid').expect(200);
+    const log = [...(db.__store.get('audit_logs')?.values() ?? [])].find((l: any) => l.action === 'house_results.pull');
+    expect(log.metadata).toMatchObject({ attributed: 1, pendingTags: ['orfa99'], cpaRemainder: 0, via: 'admin' });
+  }));
+
+  it('regua de CPA trocada aparece no cpaRemainder (nao some no arredondamento)', withKey(async () => {
+    const app = buildApp({ seed, fetchImpl: apiFetch([{ dt: '2026-08-03T00:00:00.000Z', afp: 'infinitw02', commissions_cpa: 250, commissions_total: 250 }]) });
+    const res = await request(app).post('/api/internal/esportiva-pull').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(res.body.cpaRemainder).toBeGreaterThan(0);
+  }));
+
+  it('erro de permissao da casa vira 502 com a mensagem dela', withKey(async () => {
+    const fetchImpl = (async () => ({
+      ok: true, status: 200,
+      text: async () => JSON.stringify({ message: "You don't have permissions to resource 'af2_media_report_op'." }),
+    })) as any;
+    const res = await request(buildApp({ seed, fetchImpl })).post('/api/internal/esportiva-pull').set('Authorization', 'Bearer admin-uid').expect(502);
+    expect(res.body.error).toMatch(/permissions/i);
+  }));
+
+  it('janela vazia nao apaga nada nem carimba', withKey(async () => {
+    const db = makeFirestore({ ...seed, house_results: { velha: { houseSlug: 'esportiva-bet', date: '2026-07-01', affiliateId: null, total_commission: 99 } } });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch([]) });
+    const res = await request(app).post('/api/internal/esportiva-pull').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(res.body.imported).toBe(0);
+    expect(db.__store.get('house_results')?.get('velha').total_commission).toBe(99);
+    expect(db.__store.get('houses')?.get('esportiva-bet').lastResultsSyncAt).toBeUndefined();
+  }));
+});
