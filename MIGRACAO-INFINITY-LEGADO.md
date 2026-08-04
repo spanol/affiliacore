@@ -671,10 +671,21 @@ lido por `src/lib/freshness.ts` (puro). Aparece:
   carimbo existe para evitar;
 - no card de cada casa em `/casas`, ao lado do botão **"Atualizar"** (pull manual).
 
-**Operação (passo do operador):** `ESPORTIVA_API_KEY` no Secret Manager da instância + Cloud
-Scheduler de hora em hora batendo em `/api/internal/esportiva-pull` com `x-cron-secret`. As demais
-variáveis (`ESPORTIVA_API_BASE`, `ESPORTIVA_HOUSE_SLUG`, `ESPORTIVA_CPA_BASE`) têm default e estão
-documentadas no `.env.example`.
+**✅ NO AR na Infinity desde 04/08/2026, 16:10 BRT.** `ESPORTIVA_API_KEY` no Secret Manager +
+job `esportiva-pull-hourly` no Cloud Scheduler (`us-east4`, `5 * * * *`, America/Sao_Paulo,
+POST com `x-cron-secret` e corpo `{"days":2}`, prazo padrão de 3 min, sem retentativa — o código
+já tenta 3× com backoff e a próxima rodada é em 1 h). Execução forçada de validação:
+`URL_CRAWLED · HTTP 200`. Primeiro pull real: 2 linhas em 03–04/08, **1 atribuída**, 0 pendente.
+As demais variáveis (`ESPORTIVA_API_BASE`, `ESPORTIVA_HOUSE_SLUG`, `ESPORTIVA_CPA_BASE`) têm
+default e estão documentadas no `.env.example`.
+
+⚠️ **INCIDENTE na configuração (04/08, corrigido no mesmo dia):** o `secrets:set` foi rodado duas
+vezes e a **chave da API da Esportiva acabou gravada como versão 2 do `ranking-cron-secret`**. Se
+tivesse ido ao ar, a chave da conta 544865 viajaria como header `x-cron-secret` em todo job do
+Scheduler e apareceria nos logs de execução. Correção: versão 3 com segredo aleatório novo
+(`randomBytes(32)`), versão 2 **desativada** (não destruída, para poder auditar), rollout do
+backend e só então o job. **Confira o VALOR, não só o nome, depois de criar um secret** — o
+formato `<uuid>-608054` denuncia a chave do TAP.
 
 ⚠️ **`ESPORTIVA_CPA_BASE` é a régua que reconstrói a CONTAGEM de CPA** (a API só manda dinheiro).
 Se a casa mudar o valor do CPA, mude aqui no mesmo dia — enquanto isso não acontece, o resto da
