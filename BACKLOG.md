@@ -235,8 +235,31 @@ Núcleo puro em **`src/lib/integrations.ts`** (+ `integrations.test.ts`), rota *
   "Remover chave". Travado em `sanitizeIntegrationPatch` e em teste de servidor.
 - **Catálogo FECHADO** (`INTEGRATION_CATALOG`): id fora dele responde 404 e não cria doc — a
   coleção não vira depósito. Integração nova entra no catálogo + no `PULL_CONNECTORS`.
-- **As duas pontas ficam coerentes:** vincular a casa na tela carimba `houses/{slug}.integration`
-  (e desvincular limpa a casa antiga), que é a flag que roteia o pull por casa.
+- **As duas pontas ficam coerentes:** o vínculo é 1:1 e vive em DOIS docs
+  (`houses/{slug}.integration` + `integrations/{id}.houseId`); quem escreve é sempre o helper
+  `applyIntegrationLink` no servidor, e trocar de casa limpa a anterior.
+
+### Complemento (08/08/2026) — vincular pelo lado da CASA
+
+O modal de `/casas` mostrava a Esportiva como **"Upload manual"** mesmo ela puxando sozinha: são
+**dois eixos** no banco (`dataSource` = de quem é o dado; `integration` = como ele chega) e o
+seletor olhava só o primeiro. Agora:
+
+- O seletor "Origem dos resultados" tem **3 modos** — Automático (OTG) · **Pull automático** ·
+  Upload manual — derivados por `houseResultsMode`/`houseModePayload` (`src/lib/integrations.ts`,
+  puros + testados). `dataSource` **continua binário**: a gravação recompõe os dois campos, então
+  nada mais no app mudou. Trocar para "Upload manual"/"OTG" desvincula o conector.
+- Escolhendo "Pull automático", um **seletor lista as integrações registradas em `/integracoes`** e
+  avisa o estado da escolhida (ativa · sem chave · desligada) e se ela já está em outra casa
+  ("salvar move o vínculo para cá").
+- `POST`/`PATCH /api/houses` passam a aceitar `integration` (validado contra o catálogo, 400 se
+  desconhecido) e escrevem o vínculo pelo mesmo `applyIntegrationLink` da tela de integrações.
+- O card da casa também deixou de mentir: mostra "Pull automático" no lugar de "Upload manual".
+
+**Verificado na demo emulada nos dois sentidos:** vincular por `/integracoes` faz o card virar
+"Pull automático" com o botão "Atualizar"; vincular pelo modal de outra casa move o vínculo, a
+casa antiga volta a "Upload manual" e perde o botão, e `/integracoes` passa a mostrar a casa nova
+com a chave preservada.
 
 **Falta (fase 2):** migrar a OTG pra essa camada; avaliar um segundo conector real
 (MyAffiliates/Affilka) — que é o teste de verdade do catálogo.

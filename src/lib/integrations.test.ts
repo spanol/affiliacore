@@ -8,6 +8,8 @@ import {
   resolveConnectorSettings,
   toPublicIntegration,
   numericSetting,
+  houseResultsMode,
+  houseModePayload,
 } from './integrations';
 
 const spec = findIntegrationSpec('esportiva-tap')!;
@@ -168,5 +170,54 @@ describe('numericSetting', () => {
     expect(numericSetting({ cpaBase: '0' }, 'cpaBase', 120)).toBe(120);
     expect(numericSetting({ cpaBase: 'abc' }, 'cpaBase', 120)).toBe(120);
     expect(numericSetting(undefined, 'cpaBase', 120)).toBe(120);
+  });
+});
+
+describe('houseResultsMode · o modo exibido no modal de /casas', () => {
+  it('casa com conector aparece como INTEGRACAO, nao como upload manual', () => {
+    // O bug: a Esportiva e dataSource:'manual' + integration, e o modal so olhava
+    // o 1o eixo — exibia "Upload manual" numa casa que puxa sozinha.
+    expect(houseResultsMode({ dataSource: 'manual', integration: 'esportiva-tap' })).toBe('integration');
+  });
+
+  it('casa manual de verdade (sem conector) segue manual', () => {
+    expect(houseResultsMode({ dataSource: 'manual', integration: null })).toBe('manual');
+    expect(houseResultsMode({ dataSource: 'manual' })).toBe('manual');
+    expect(houseResultsMode({ dataSource: 'manual', integration: '   ' })).toBe('manual');
+  });
+
+  it('OTG vence: a casa da API externa nao e "integração" nesse sentido', () => {
+    expect(houseResultsMode({ dataSource: 'otg' })).toBe('otg');
+    expect(houseResultsMode({ dataSource: 'otg', integration: 'esportiva-tap' })).toBe('otg');
+  });
+
+  it('casa nova (sem doc) nasce recebendo upload', () => {
+    expect(houseResultsMode(null)).toBe('manual');
+    expect(houseResultsMode(undefined)).toBe('manual');
+  });
+});
+
+describe('houseModePayload · recompoe os DOIS campos ao salvar', () => {
+  it('integração grava dataSource manual + o conector escolhido', () => {
+    expect(houseModePayload('integration', 'esportiva-tap')).toEqual({ dataSource: 'manual', integration: 'esportiva-tap' });
+  });
+
+  it('trocar para manual DESVINCULA o conector (senão o botão Atualizar ficaria órfão)', () => {
+    expect(houseModePayload('manual', 'esportiva-tap')).toEqual({ dataSource: 'manual', integration: null });
+  });
+
+  it('trocar para OTG tambem desvincula', () => {
+    expect(houseModePayload('otg', 'esportiva-tap')).toEqual({ dataSource: 'otg', integration: null });
+  });
+
+  it('modo integração SEM conector escolhido não grava vínculo vazio', () => {
+    expect(houseModePayload('integration', '')).toEqual({ dataSource: 'manual', integration: null });
+    expect(houseModePayload('integration', null)).toEqual({ dataSource: 'manual', integration: null });
+  });
+
+  it('ida e volta: o modo lido do doc gravado é o mesmo escolhido', () => {
+    for (const [mode, id] of [['otg', null], ['integration', 'esportiva-tap'], ['manual', null]] as const) {
+      expect(houseResultsMode(houseModePayload(mode, id))).toBe(mode);
+    }
   });
 });

@@ -3675,6 +3675,35 @@ export function createApp(deps: ServerDeps) {
     };
   };
 
+  // Fonte ÚNICA do vínculo casa↔integração (B7). O vínculo é 1:1 e vive em DOIS
+  // docs — `houses/{slug}.integration` (a flag que roteia o pull e liga o botão
+  // "Atualizar") e `integrations/{id}.houseId` (o alvo que o conector puxa).
+  // DUAS telas podem criá-lo: /integracoes (pelo lado da integração) e o modal de
+  // /casas (pelo lado da casa). Escrever só um lado faz a tela dizer "ligada na
+  // casa X" enquanto o botão da casa X não aparece — por isso todo mundo passa
+  // por aqui. Trocar de casa LIMPA a anterior: o conector serve uma casa só.
+  const applyIntegrationLink = async (integrationId: string, houseSlug: string | null) => {
+    if (!adminDb) return;
+    const ref = adminDb.collection('integrations').doc(integrationId);
+    const snap = await ref.get();
+    const prevHouse = snap.exists ? (String((snap.data() as any)?.houseId ?? '').trim() || null) : null;
+    if (prevHouse === houseSlug) return;
+    await ref.set({ id: integrationId, houseId: houseSlug }, { merge: true });
+    if (prevHouse) {
+      // `null`, não FieldValue.delete(): o leitor normaliza (`data.integration ??
+      // null`) e um campo explicitamente nulo é mais fácil de auditar/testar que
+      // a ausência dele.
+      await adminDb.collection('houses').doc(prevHouse)
+        .set({ integration: null }, { merge: true })
+        .catch((e) => console.error('[integrations] falha ao limpar a casa antiga:', e));
+    }
+    if (houseSlug) {
+      await adminDb.collection('houses').doc(houseSlug)
+        .set({ integration: integrationId }, { merge: true })
+        .catch((e) => console.error('[integrations] falha ao carimbar a casa:', e));
+    }
+  };
+
   // Lista as casas (qualquer signed-in: o afiliado precisa p/ logos/filtros).
   app.get('/api/houses', requireAuth, async (_req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
@@ -3715,7 +3744,11 @@ export function createApp(deps: ServerDeps) {
   app.post('/api/houses', requireAdmin, async (req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
     try {
-      const { name, brandId, registerUrlTemplate, active, order, dataSource, logoBase64 } = req.body || {};
+      const { name, brandId, registerUrlTemplate, active, order, dataSource, logoBase64, integration } = req.body || {};
+      const wantedIntegration = integration ? String(integration).trim() : '';
+      if (wantedIntegration && !findIntegrationSpec(wantedIntegration)) {
+        return res.status(400).json({ error: `Integração desconhecida: "${wantedIntegration}".` });
+      }
       // Taxa padrão da casa (comissão casa→agência): número finito OU null (vazio).
       const numOrNull = (v: any) => (v == null || v === '' ? null : (Number.isFinite(Number(v)) ? Number(v) : null));
       const cleanName = String(name ?? '').trim();
@@ -3745,9 +3778,11 @@ export function createApp(deps: ServerDeps) {
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+      // Casa nova já nascendo integrada: o vínculo vale nos DOIS docs.
+      if (wantedIntegration) await applyIntegrationLink(wantedIntegration, slug);
       await writeAuditLog(req, {
         entityType: 'house', entityId: slug, entityLabel: cleanName, action: 'house.create',
-        metadata: { dataSource: dataSource === 'otg' ? 'otg' : 'manual' },
+        metadata: { dataSource: dataSource === 'otg' ? 'otg' : 'manual', integration: wantedIntegration || null },
       });
       return res.status(201).json(houseFromDoc(await ref.get()));
     } catch (e: any) {
@@ -3781,12 +3816,40 @@ export function createApp(deps: ServerDeps) {
       if (body.issPercent !== undefined) patch.issPercent = numOrNull(body.issPercent);
       if (body.logoBase64) patch.logo = await uploadHouseLogo((snap.data() as any)?.slug ?? ref.id, String(body.logoBase64));
       else if (body.logo === null) patch.logo = null;
+
+      // Vínculo com uma integração, escolhido no modal de /casas ("Pull automático").
+      // Catálogo fechado: id desconhecido é erro do chamador, não doc novo.
+      const slugOfHouse = (snap.data() as any)?.slug ?? ref.id;
+      const prevIntegration = String((snap.data() as any)?.integration ?? '').trim() || null;
+      let nextIntegration: string | null | undefined;
+      if (body.integration !== undefined) {
+        const wanted = body.integration ? String(body.integration).trim() : '';
+        if (wanted && !findIntegrationSpec(wanted)) {
+          return res.status(400).json({ error: `Integração desconhecida: "${wanted}".` });
+        }
+        nextIntegration = wanted || null;
+        // O campo da casa é escrito por applyIntegrationLink (que cuida dos DOIS
+        // lados); aqui só o caso de DESVINCULAR, que não tem integração destino.
+        if (!nextIntegration && prevIntegration) patch.integration = null;
+      }
+
       await ref.set(patch, { merge: true });
+
+      if (nextIntegration !== undefined && nextIntegration !== prevIntegration) {
+        if (prevIntegration) await applyIntegrationLink(prevIntegration, null);
+        if (nextIntegration) await applyIntegrationLink(nextIntegration, slugOfHouse);
+      }
+
       // Auditoria: só os campos que de fato mudaram (antes→depois). 'logo' marcada à
       // parte (não logamos o base64/URL inteiro — só que houve troca).
       const changes = diffChanges(snap.data() as any, patch,
         ['name', 'brandId', 'registerUrlTemplate', 'active', 'order', 'dataSource', 'defaultCpa', 'defaultRev', 'issPercent']);
       if ('logo' in patch) changes.push({ field: 'logo', before: '(anterior)', after: patch.logo ? '(nova)' : null });
+      // `integration` fica fora do diffChanges: no desvínculo o patch carrega um
+      // FieldValue.delete(), que o diff leria como valor.
+      if (nextIntegration !== undefined && nextIntegration !== prevIntegration) {
+        changes.push({ field: 'integration', before: prevIntegration, after: nextIntegration });
+      }
       if (changes.length) {
         await writeAuditLog(req, {
           entityType: 'house', entityId: String(req.params.id),
@@ -4774,15 +4837,14 @@ export function createApp(deps: ServerDeps) {
       const beforeDoc = before.exists ? integrationFromDoc(spec.id, before.data()) : null;
       const patch = sanitizeIntegrationPatch(req.body, spec);
 
-      // A casa vinculada é a mesma flag que roteia o pull em /casas: gravar aqui
-      // e carimbar `houses/{slug}.integration` mantém as duas pontas coerentes
-      // (senão a tela diz "ligada na casa X" e o botão da casa X não aparece).
-      const nextHouse = patch.houseId !== undefined ? patch.houseId : beforeDoc?.houseId ?? null;
       const prevHouse = beforeDoc?.houseId ?? null;
+      const nextHouse = patch.houseId !== undefined ? patch.houseId : prevHouse;
+      // `houseId` sai do patch: quem grava o vínculo (nos dois docs) é o helper.
+      const { houseId: _ignored, ...rest } = patch;
 
       await ref.set(
         {
-          ...patch,
+          ...rest,
           id: spec.id,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedBy: (req as any).user?.uid ?? null,
@@ -4790,18 +4852,7 @@ export function createApp(deps: ServerDeps) {
         { merge: true },
       );
 
-      if (nextHouse && nextHouse !== prevHouse) {
-        await adminDb.collection('houses').doc(nextHouse)
-          .set({ integration: spec.id }, { merge: true })
-          .catch((e) => console.error('[integrations] falha ao carimbar a casa:', e));
-      }
-      if (prevHouse && prevHouse !== nextHouse) {
-        // Desvinculou: a casa antiga perde a flag, senão o botão "Atualizar"
-        // continuaria oferecendo um conector que não aponta mais pra ela.
-        await adminDb.collection('houses').doc(prevHouse)
-          .set({ integration: admin.firestore.FieldValue.delete() }, { merge: true })
-          .catch((e) => console.error('[integrations] falha ao limpar a casa antiga:', e));
-      }
+      if (nextHouse !== prevHouse) await applyIntegrationLink(spec.id, nextHouse);
 
       // Auditoria SEM a chave (é credencial): registra que mudou, não o valor.
       const changes: Array<{ field: string; before: unknown; after: unknown }> = [];

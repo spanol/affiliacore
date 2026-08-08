@@ -55,6 +55,9 @@ export interface HouseInput {
   defaultRev?: number | null;
   issPercent?: number | null;
   logoBase64?: string | null;
+  // Vínculo com um conector de /integracoes ('' / null desvincula). O servidor
+  // valida contra o catálogo e escreve os DOIS lados do vínculo.
+  integration?: string | null;
 }
 
 // Mapeia uma House (backend) para o BrandMeta usado pelos helpers de marca.

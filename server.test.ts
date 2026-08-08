@@ -3397,4 +3397,109 @@ describe('integracoes (/api/integrations)', () => {
     expect(log.metadata?.keyChanged).toBe(true);
     expect(JSON.stringify(log)).not.toContain('segredo-do-cliente');
   });
+
+  // --- Vinculo pelo lado da CASA (modal de /casas -> "Pull automatico") -------
+  // O vinculo e 1:1 e vive em DOIS docs; as duas telas escrevem pelo mesmo helper,
+  // senao a tela diz "ligada na casa X" e o botao da casa X nao aparece.
+
+  const twoHouses = {
+    ...seed,
+    houses: {
+      'esportiva-bet': { slug: 'esportiva-bet', name: 'Esportiva Bet', dataSource: 'manual' },
+      stake: { slug: 'stake', name: 'Stake', dataSource: 'manual' },
+    },
+  };
+
+  it('PATCH da casa com integration carimba os DOIS lados', async () => {
+    const db = makeFirestore(twoHouses);
+    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .patch('/api/houses/esportiva-bet')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ integration: 'esportiva-tap' })
+      .expect(200);
+    expect(res.body.integration).toBe('esportiva-tap');
+    expect(db.__store.get('houses')?.get('esportiva-bet')?.integration).toBe('esportiva-tap');
+    expect(db.__store.get('integrations')?.get('esportiva-tap')?.houseId).toBe('esportiva-bet');
+  });
+
+  it('trocar a casa vinculada LIMPA a anterior (o conector serve uma casa so)', async () => {
+    const db = makeFirestore({
+      ...twoHouses,
+      integrations: { 'esportiva-tap': { id: 'esportiva-tap', enabled: true, houseId: 'esportiva-bet' } },
+      houses: { ...twoHouses.houses, 'esportiva-bet': { ...twoHouses.houses['esportiva-bet'], integration: 'esportiva-tap' } },
+    });
+    await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .patch('/api/houses/stake')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ integration: 'esportiva-tap' })
+      .expect(200);
+    expect(db.__store.get('houses')?.get('stake')?.integration).toBe('esportiva-tap');
+    expect(db.__store.get('houses')?.get('esportiva-bet')?.integration ?? null).toBeNull();
+    expect(db.__store.get('integrations')?.get('esportiva-tap')?.houseId).toBe('stake');
+  });
+
+  it('voltar a casa para upload manual DESVINCULA os dois lados', async () => {
+    const db = makeFirestore({
+      ...twoHouses,
+      integrations: { 'esportiva-tap': { id: 'esportiva-tap', enabled: true, houseId: 'esportiva-bet' } },
+      houses: { ...twoHouses.houses, 'esportiva-bet': { ...twoHouses.houses['esportiva-bet'], integration: 'esportiva-tap' } },
+    });
+    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .patch('/api/houses/esportiva-bet')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ dataSource: 'manual', integration: null })
+      .expect(200);
+    expect(res.body.integration).toBeNull();
+    expect(db.__store.get('houses')?.get('esportiva-bet')?.integration ?? null).toBeNull();
+    expect(db.__store.get('integrations')?.get('esportiva-tap')?.houseId).toBeNull();
+  });
+
+  it('integration fora do catalogo -> 400 e nada e gravado', async () => {
+    const db = makeFirestore(twoHouses);
+    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .patch('/api/houses/esportiva-bet')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ integration: 'inventada' })
+      .expect(400);
+    expect(res.body.error).toMatch(/desconhecida/i);
+    expect(db.__store.get('houses')?.get('esportiva-bet')?.integration ?? null).toBeNull();
+    expect(db.__store.get('integrations')?.size ?? 0).toBe(0);
+  });
+
+  it('a mudanca de vinculo entra na auditoria da casa', async () => {
+    const db = makeFirestore(twoHouses);
+    await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .patch('/api/houses/esportiva-bet')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ integration: 'esportiva-tap' })
+      .expect(200);
+    const log = [...(db.__store.get('audit_logs')?.values() ?? [])].find((l: any) => l.action === 'house.update');
+    expect(log.changes).toContainEqual({ field: 'integration', before: null, after: 'esportiva-tap' });
+  });
+
+  it('casa NOVA pode ja nascer vinculada', async () => {
+    const db = makeFirestore(seed);
+    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .post('/api/houses')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ name: 'Casa Nova', slug: 'casa-nova', integration: 'esportiva-tap' })
+      .expect(201);
+    expect(res.body.integration).toBe('esportiva-tap');
+    expect(db.__store.get('integrations')?.get('esportiva-tap')?.houseId).toBe('casa-nova');
+  });
+
+  it('vinculo pelo lado da CASA faz o botao Atualizar aparecer nela', async () => {
+    process.env.ESPORTIVA_API_KEY = 'chave-de-teste';
+    try {
+      const db = makeFirestore(twoHouses);
+      const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+      await request(app).patch('/api/houses/stake').set('Authorization', 'Bearer admin-uid')
+        .send({ integration: 'esportiva-tap' }).expect(200);
+      const res = await request(app).get('/api/houses').set('Authorization', 'Bearer admin-uid').expect(200);
+      const flags = Object.fromEntries(res.body.houses.map((h: any) => [h.slug, h.pullAvailable]));
+      expect(flags).toMatchObject({ stake: true, 'esportiva-bet': false });
+    } finally {
+      delete process.env.ESPORTIVA_API_KEY;
+    }
+  });
 });

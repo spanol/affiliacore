@@ -260,3 +260,30 @@ export function numericSetting(config: Record<string, string> | undefined, key: 
   const n = Number(config?.[key]);
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
+
+// ——— Origem dos resultados de uma CASA (o seletor do modal de /casas) ————————
+//
+// São DOIS eixos no banco, e é isso que confundia a tela: `dataSource`
+// ('otg' | 'manual') diz de QUEM é o dado — da API da OTG ou gerido aqui — e
+// `integration` diz COMO ele chega quando é gerido aqui (conector vs planilha).
+// A Esportiva é `dataSource:'manual'` + `integration:'esportiva-tap'`: pull
+// automático de verdade, mas o modal só olhava o 1º eixo e a exibia como "Upload
+// manual". O seletor passa a falar em 3 modos, e a gravação recompõe os 2 campos
+// — `dataSource` continua binário, então nada mais no app precisou mudar.
+export type HouseResultsMode = 'otg' | 'integration' | 'manual';
+
+export function houseResultsMode(house?: { dataSource?: string | null; integration?: string | null } | null): HouseResultsMode {
+  if (!house) return 'manual'; // casa nova nasce recebendo upload
+  if (house.dataSource === 'otg') return 'otg';
+  return str(house.integration) ? 'integration' : 'manual';
+}
+
+/** Recompõe os dois campos a partir do modo escolhido na tela. */
+export function houseModePayload(
+  mode: HouseResultsMode,
+  integrationId?: string | null,
+): { dataSource: 'otg' | 'manual'; integration: string | null } {
+  if (mode === 'otg') return { dataSource: 'otg', integration: null };
+  if (mode === 'integration') return { dataSource: 'manual', integration: str(integrationId) || null };
+  return { dataSource: 'manual', integration: null };
+}

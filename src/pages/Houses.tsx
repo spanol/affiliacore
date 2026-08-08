@@ -4,7 +4,7 @@ import { Navigate } from 'react-router-dom';
 import {
   Building2, Plus, Loader2, Pencil, Trash2, X, Upload, Link2, Check, Power,
   Table2, AlertTriangle, FileSpreadsheet, Cloud, Calendar, Download, Sparkles,
-  ChevronDown, ExternalLink, Tag, RefreshCw,
+  ChevronDown, ExternalLink, Tag, RefreshCw, Plug,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -34,6 +34,8 @@ import {
   svgToDataUrl,
 } from '../lib/housePresets';
 import { fetchEurBrlRate, eurToBrl, formatBrl, getCachedEurBrlQuote, EurBrlQuote } from '../lib/currency';
+import { fetchIntegrations, type PublicIntegration } from '../services/integrationService';
+import { houseResultsMode, houseModePayload, type HouseResultsMode } from '../lib/integrations';
 import EntityAuditHistory from '../components/EntityAuditHistory';
 
 // Backoffice de casas (betting houses) — admin. Cria/edita o registro próprio de
@@ -210,11 +212,20 @@ export default function Houses() {
               <dl className="space-y-2 mb-5 text-xs">
                 <div className="flex items-center justify-between gap-2">
                   <dt className="text-slate-400 dark:text-neutral-500 font-medium">Resultados</dt>
+                  {/* 3 modos, o mesmo do modal: casa com conector NÃO é "upload
+                      manual" — ela puxa sozinha. [[houseResultsMode]] */}
                   <dd>
-                    {h.dataSource === 'manual' ? (
-                      <span className="inline-flex items-center gap-1 text-accent-600 dark:text-accent-400 font-semibold"><FileSpreadsheet size={11} /> Upload manual</span>
-                    ) : (
+                    {houseResultsMode(h) === 'otg' ? (
                       <span className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 font-semibold"><Cloud size={11} /> Automático (OTG)</span>
+                    ) : houseResultsMode(h) === 'integration' ? (
+                      <span
+                        className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold"
+                        title={`Integração: ${h.integration}`}
+                      >
+                        <Plug size={11} /> Pull automático
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-accent-600 dark:text-accent-400 font-semibold"><FileSpreadsheet size={11} /> Upload manual</span>
                     )}
                   </dd>
                 </div>
@@ -426,7 +437,14 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
   const [brandId, setBrandId] = useState(house?.brandId ?? '');
   const [registerUrlTemplate, setRegisterUrlTemplate] = useState(house?.registerUrlTemplate ?? '');
   const [active, setActive] = useState(house?.active ?? true);
-  const [dataSource, setDataSource] = useState<'otg' | 'manual'>(house?.dataSource ?? 'manual');
+  // Origem dos resultados em 3 modos. `dataSource` + `integration` são dois
+  // campos no banco; o seletor fala em modo e a gravação recompõe os dois
+  // (src/lib/integrations.ts). Antes o modal olhava só o `dataSource` e mostrava
+  // "Upload manual" numa casa que puxa sozinha, como a Esportiva.
+  const [mode, setMode] = useState<HouseResultsMode>(() => houseResultsMode(house));
+  const [integrationId, setIntegrationId] = useState(house?.integration ?? '');
+  const [integrations, setIntegrations] = useState<PublicIntegration[]>([]);
+  const [loadingIntegrations, setLoadingIntegrations] = useState(true);
   // Taxa padrão da casa (comissão casa→agência) — string no input, parseada no save.
   // defaultCpa é GRAVADO EM EUR (inteiro); a conversão p/ R$ é feita no cálculo da
   // comissão pela cotação ao vivo (não regravamos o valor quando o câmbio mexe).
@@ -440,6 +458,18 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
 
   // Cotação EUR→BRL ao vivo (AwesomeAPI) p/ o preview do CPA em R$.
   useEffect(() => { fetchEurBrlRate().then(setEurQuote).catch(() => {}); }, []);
+
+  // Conectores registrados em /integracoes — é de lá que sai a lista de opções
+  // do modo "Pull automático". Falha de rede não trava o modal: sem lista, o
+  // modo fica indisponível e o resto do formulário segue salvável.
+  useEffect(() => {
+    fetchIntegrations()
+      .then(setIntegrations)
+      .catch(() => setIntegrations([]))
+      .finally(() => setLoadingIntegrations(false));
+  }, []);
+
+  const selectedIntegration = integrations.find((i) => i.id === integrationId) ?? null;
 
   const autoSlug = useMemo(
     () => name.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
@@ -489,6 +519,10 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
 
   const handleSave = async () => {
     if (!name.trim()) { push({ type: 'error', message: 'Informe o nome da casa.' }); return; }
+    if (mode === 'integration' && !integrationId) {
+      push({ type: 'error', message: 'Escolha a integração que vai puxar os resultados desta casa.' });
+      return;
+    }
     setSaving(true);
     try {
       const payload: HouseInput = {
@@ -497,7 +531,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
         brandId: brandId.trim() || null,
         registerUrlTemplate: registerUrlTemplate.trim() || null,
         active,
-        dataSource,
+        ...houseModePayload(mode, integrationId),
         defaultCpa: defaultCpa.trim() === '' ? null : Math.trunc(Number(defaultCpa)), // EUR inteiro
         defaultRev: defaultRev.trim() === '' ? null : Number(defaultRev),
         issPercent: issPercent.trim() === '' ? null : Number(issPercent),
@@ -604,22 +638,23 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
             </Field>
 
             <Field label="Origem dos resultados">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {([
                   { v: 'otg' as const, icon: Cloud, title: 'Automático (OTG)', desc: 'vem da API externa' },
+                  { v: 'integration' as const, icon: Plug, title: 'Pull automático', desc: 'via integração' },
                   { v: 'manual' as const, icon: FileSpreadsheet, title: 'Upload manual', desc: 'planilha/CSV' },
                 ]).map((opt) => (
                   <button
                     key={opt.v}
                     type="button"
-                    onClick={() => setDataSource(opt.v)}
+                    onClick={() => setMode(opt.v)}
                     className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all ${
-                      dataSource === opt.v
+                      mode === opt.v
                         ? 'border-accent-500 bg-accent-500/10'
                         : 'border-slate-200 dark:border-neutral-700 hover:border-slate-300 dark:hover:border-neutral-600'
                     }`}
                   >
-                    <span className={`flex items-center gap-1.5 text-xs font-bold ${dataSource === opt.v ? 'text-accent-600 dark:text-accent-400' : 'text-slate-700 dark:text-neutral-200'}`}>
+                    <span className={`flex items-center gap-1.5 text-xs font-bold ${mode === opt.v ? 'text-accent-600 dark:text-accent-400' : 'text-slate-700 dark:text-neutral-200'}`}>
                       <opt.icon size={13} /> {opt.title}
                     </span>
                     <span className="text-[10px] text-slate-400 dark:text-neutral-500">{opt.desc}</span>
@@ -628,7 +663,58 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
               </div>
             </Field>
 
-            {dataSource === 'manual' && (
+            {/* Vínculo casa→conector. A lista vem de /integracoes, que é onde as
+                integrações são registradas; aqui só se escolhe qual serve ESTA casa. */}
+            {mode === 'integration' && (
+              <Field
+                label="Integração que puxa os resultados"
+                hint="Registrada em Integrações. É o que liga o botão “Atualizar” no card da casa e o robô que roda de hora em hora."
+              >
+                {loadingIntegrations ? (
+                  <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-neutral-500 py-2">
+                    <Loader2 size={13} className="animate-spin" /> Carregando integrações…
+                  </div>
+                ) : integrations.length === 0 ? (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 py-1">
+                    Nenhuma integração disponível nesta instância. Cadastre uma em <b>Integrações</b> antes de vincular.
+                  </p>
+                ) : (
+                  <>
+                    <select
+                      value={integrationId}
+                      onChange={(e) => setIntegrationId(e.target.value)}
+                      className={inputCls}
+                    >
+                      <option value="">— escolha a integração —</option>
+                      {integrations.map((i) => (
+                        <option key={i.id} value={i.id}>{i.label}</option>
+                      ))}
+                    </select>
+                    {selectedIntegration && (
+                      <p className={cn(
+                        'mt-2 text-[11px] leading-relaxed',
+                        selectedIntegration.configured
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-amber-600 dark:text-amber-400',
+                      )}>
+                        {selectedIntegration.configured ? (
+                          <>Integração ativa e com chave configurada — esta casa passa a receber os resultados por ela.</>
+                        ) : selectedIntegration.enabled ? (
+                          <>Esta integração ainda <b>não tem chave</b>. O vínculo é salvo, mas o pull só funciona depois de informar a chave em Integrações.</>
+                        ) : (
+                          <>Esta integração está <b>desligada</b>. O vínculo é salvo, mas nada será puxado até religá-la em Integrações.</>
+                        )}
+                        {selectedIntegration.houseId && selectedIntegration.houseId !== effectiveSlug && (
+                          <> Hoje ela está vinculada a outra casa (<b>{selectedIntegration.houseId}</b>) — salvar move o vínculo para cá.</>
+                        )}
+                      </p>
+                    )}
+                  </>
+                )}
+              </Field>
+            )}
+
+            {mode !== 'otg' && (
               <Field label="Taxa padrão da casa" hint="RECEITA: o que a casa paga à AGÊNCIA — NÃO é o repasse ao afiliado (esse fica em Afiliados). Usada p/ derivar a comissão quando a planilha não traz a coluna 'comissao'. O CPA é informado em EUR (inteiro) e convertido p/ R$ pela cotação do dia automaticamente. Sem isto, o lucro por casa fica negativo.">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
