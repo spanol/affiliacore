@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
-import { Mail, AlertCircle, CheckCircle, KeyRound } from 'lucide-react';
+import { Mail, AlertCircle, MailCheck, KeyRound } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { requestPasswordReset } from '../lib/authSecurity';
 import { useTheme } from '../contexts/ThemeContext';
@@ -23,6 +23,12 @@ export default function ForgotPassword() {
       await requestPasswordReset(auth, email);
       setSuccess(true);
     } catch (err: any) {
+      // ATENÇÃO ao ler este catch: com a **Email Enumeration Protection** ligada
+      // (padrão do Identity Platform em projeto novo — confirmado no
+      // infinity-affiliacore em 07/08/2026), o `sendPasswordResetEmail` resolve com
+      // SUCESSO para e-mail SEM conta e não envia nada. Ou seja, `auth/user-not-found`
+      // é código MORTO nessas instâncias e o caminho feliz é indistinguível do
+      // "não existe" — por isso a tela de sucesso NÃO pode afirmar que enviou.
       const code = String(err?.code || '');
       if (code === 'auth/user-not-found' || code === 'auth/invalid-email') {
         setError('Não foi possível localizar esse e-mail.');
@@ -55,10 +61,17 @@ export default function ForgotPassword() {
         )}
 
         {success ? (
-          <div className="p-5 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 rounded-2xl border border-emerald-100 dark:border-emerald-900/40 space-y-3">
-            <div className="flex items-center gap-2 text-sm font-bold"><CheckCircle size={18} /> Link enviado</div>
-            <p className="text-xs">Se esse e-mail existir na plataforma, você receberá um link para criar uma nova senha.</p>
-            <Link to="/login" className="inline-block text-xs font-bold uppercase tracking-wider hover:underline">Voltar para o login</Link>
+          <div className="p-5 bg-slate-50 dark:bg-neutral-800/60 text-slate-700 dark:text-neutral-300 rounded-2xl border border-slate-200 dark:border-neutral-700 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white"><MailCheck size={18} /> Pedido registrado</div>
+            <p className="text-xs">
+              Se <span className="font-bold break-all">{email.trim().toLowerCase()}</span> tiver uma conta na plataforma,
+              o link para criar uma nova senha chega em instantes.
+            </p>
+            <p className="text-xs text-slate-500 dark:text-neutral-400">
+              Não recebeu? Confira o spam / lixo eletrônico. Se não chegar, é provável que esse e-mail
+              ainda <span className="font-bold">não tenha acesso criado</span> — peça o convite a quem administra a plataforma.
+            </p>
+            <Link to="/login" className="inline-block text-xs font-bold uppercase tracking-wider text-auth-cta dark:text-lp-cta hover:underline">Voltar para o login</Link>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">

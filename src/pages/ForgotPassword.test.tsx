@@ -56,4 +56,24 @@ describe('ForgotPassword', () => {
     expect(String(settingsArg.url)).toContain('/login');
     expect(String(settingsArg.url)).not.toContain('/reset-password');
   });
+
+  // Com a Email Enumeration Protection ligada, o sucesso do SDK não prova envio:
+  // e-mail sem conta também resolve. A tela não pode afirmar que enviou.
+  it('não afirma envio na confirmação — mostra o e-mail e as duas saídas (spam / sem acesso)', async () => {
+    render(<ForgotPassword />);
+
+    fireEvent.change(screen.getByPlaceholderText('nome@empresa.com'), {
+      target: { value: ' LFSAPINHO@Gmail.com ' },
+    });
+    await act(async () => {
+      fireEvent.submit(screen.getByPlaceholderText('nome@empresa.com').closest('form')!);
+    });
+
+    expect(screen.getByText('Pedido registrado')).toBeInTheDocument();
+    expect(screen.queryByText(/link enviado/i)).not.toBeInTheDocument();
+    // Ecoa o e-mail normalizado: é como a pessoa percebe o próprio erro de digitação.
+    expect(screen.getByText('lfsapinho@gmail.com')).toBeInTheDocument();
+    expect(screen.getByText(/spam/i)).toBeInTheDocument();
+    expect(screen.getByText(/não tenha acesso criado/i)).toBeInTheDocument();
+  });
 });
