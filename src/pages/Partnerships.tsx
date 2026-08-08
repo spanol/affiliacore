@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'motion/react';
 import { Handshake, Loader2, Search, CheckCircle, Clock, XCircle, Ban, Copy, Check, ExternalLink } from 'lucide-react';
 import {
   fetchDeals, fetchPartnerships, requestPartnership, fetchAffiliateLinks,
@@ -101,7 +102,7 @@ export default function Partnerships() {
 
   return (
     <div className="space-y-8 pb-16">
-      <header>
+      <motion.header initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
         <span className="text-[10px] font-bold uppercase tracking-widest text-accent-500">Crescimento</span>
         <div className="flex items-center gap-3 mt-1">
           <span className="p-2 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700/60">
@@ -110,9 +111,9 @@ export default function Partnerships() {
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tighter">Parcerias</h1>
         </div>
         <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">Explore operadoras e solicite parcerias para começar a divulgar e ganhar comissões.</p>
-      </header>
+      </motion.header>
 
-      <div className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-neutral-800/60 rounded-2xl w-fit">
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-neutral-800/60 rounded-2xl w-fit">
         {([['available', 'Ofertas disponíveis'], ['mine', `Minhas solicitações${requests.length ? ` (${requests.length})` : ''}`]] as [Tab, string][]).map(([t, label]) => (
           <button
             key={t}
@@ -123,12 +124,12 @@ export default function Partnerships() {
             {label}
           </button>
         ))}
-      </div>
+      </motion.div>
 
       {loading ? (
         <div className="p-24 flex justify-center"><Loader2 className="animate-spin text-accent-500" size={40} /></div>
       ) : tab === 'available' ? (
-        <div className="space-y-5">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <input
@@ -173,9 +174,9 @@ export default function Partnerships() {
               ))}
             </div>
           )}
-        </div>
+        </motion.div>
       ) : (
-        <div className="space-y-3">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
           {requests.length === 0 ? (
             <div className="p-16 text-center bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl">
               <Clock className="mx-auto text-slate-300 dark:text-neutral-600 mb-3" size={40} />
@@ -227,7 +228,7 @@ export default function Partnerships() {
               );
             })
           )}
-        </div>
+        </motion.div>
       )}
     </div>
   );

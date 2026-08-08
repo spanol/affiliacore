@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'motion/react';
 import { Wallet, Loader2, Check, X, Banknote, Clock, CheckCircle, XCircle } from 'lucide-react';
 import {
   fetchWithdrawals, decideWithdrawal, fetchAffiliates,
@@ -63,7 +64,7 @@ export default function WithdrawalsAdmin() {
 
   return (
     <div className="space-y-8 pb-16">
-      <header>
+      <motion.header initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
         <span className="text-[10px] font-bold uppercase tracking-widest text-accent-500">Financeiro</span>
         <div className="flex items-center gap-3 mt-1">
           <span className="p-2 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700/60">
@@ -74,9 +75,9 @@ export default function WithdrawalsAdmin() {
         <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">
           Fila de solicitações de saque dos afiliados. {pendingTotal > 0 && <b className="text-amber-600 dark:text-amber-400">{fmt(pendingTotal)} pendente(s) de aprovação.</b>} Sem gateway — o pagamento (PIX) é feito manualmente fora do sistema; marque "Pago" depois de transferir.
         </p>
-      </header>
+      </motion.header>
 
-      <div className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-neutral-800/60 rounded-2xl w-fit overflow-x-auto">
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-neutral-800/60 rounded-2xl w-fit overflow-x-auto">
         {([['requested', 'Pendentes'], ['approved', 'Aprovados'], ['paid', 'Pagos'], ['rejected', 'Rejeitados']] as [Tab, string][]).map(([t, label]) => (
           <button
             key={t}
@@ -87,18 +88,18 @@ export default function WithdrawalsAdmin() {
             {label}{counts[t] ? ` (${counts[t]})` : ''}
           </button>
         ))}
-      </div>
+      </motion.div>
 
       {loading ? (
         <div className="p-24 flex justify-center"><Loader2 className="animate-spin text-accent-500" size={40} /></div>
       ) : filtered.length === 0 ? (
-        <div className="p-16 text-center bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="p-16 text-center bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl">
           <Wallet className="mx-auto text-slate-300 dark:text-neutral-600 mb-3" size={40} />
           <h3 className="text-sm font-bold text-slate-800 dark:text-neutral-100">Nada por aqui</h3>
           <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1">Nenhuma solicitação {WITHDRAWAL_STATUS_LABEL[tab as any]?.toLowerCase()}.</p>
-        </div>
+        </motion.div>
       ) : (
-        <div className="space-y-3">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
           {filtered.map((w) => {
             const st = STATUS_STYLE[w.status] || STATUS_STYLE.requested;
             const Icon = st.icon;
@@ -135,7 +136,7 @@ export default function WithdrawalsAdmin() {
               </div>
             );
           })}
-        </div>
+        </motion.div>
       )}
     </div>
   );

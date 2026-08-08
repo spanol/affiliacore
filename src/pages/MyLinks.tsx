@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'motion/react';
 import { Link2, Loader2, Copy, Check, MousePointerClick, ExternalLink } from 'lucide-react';
 import {
   fetchPartnerships, fetchAffiliateLinks, buildGoUrl,
@@ -50,7 +51,7 @@ export default function MyLinks() {
 
   return (
     <div className="space-y-8 pb-16">
-      <header>
+      <motion.header initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
         <span className="text-[10px] font-bold uppercase tracking-widest text-accent-500">Divulgação</span>
         <div className="flex items-center gap-3 mt-1">
           <span className="p-2 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700/60">
@@ -62,18 +63,18 @@ export default function MyLinks() {
           )}
         </div>
         <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">Seus links de divulgação, um por casa. Compartilhe e acompanhe os cliques.</p>
-      </header>
+      </motion.header>
 
       {loading ? (
         <div className="p-24 flex justify-center"><Loader2 className="animate-spin text-accent-500" size={40} /></div>
       ) : cards.length === 0 ? (
-        <div className="p-16 text-center bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="p-16 text-center bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl">
           <Link2 className="mx-auto text-slate-300 dark:text-neutral-600 mb-3" size={40} />
           <h3 className="text-sm font-bold text-slate-800 dark:text-neutral-100">Nenhum link ainda</h3>
           <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1">Solicite uma parceria em "Parcerias" — ao ser aprovada, o link aparece aqui. O administrador também pode atribuir um link direto a você.</p>
-        </div>
+        </motion.div>
       ) : (
-        <div className="space-y-4">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
           {cards.map((card) => {
             const logo = card.houseId ? logos[card.houseId] : null;
             return (
@@ -109,7 +110,7 @@ export default function MyLinks() {
               </div>
             );
           })}
-        </div>
+        </motion.div>
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'motion/react';
 import { Tag, Loader2, Plus, Check, X, Ban, Power, Pencil, Inbox } from 'lucide-react';
 import {
   fetchDeals, createDeal, updateDeal, fetchPartnerships, decidePartnership, fetchAffiliates,
@@ -96,7 +97,7 @@ export default function Deals() {
 
   return (
     <div className="space-y-8 pb-16">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <motion.header initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-widest text-accent-500">Marketplace</span>
           <div className="flex items-center gap-3 mt-1">
@@ -112,13 +113,13 @@ export default function Deals() {
             <Plus size={15} /> Novo acordo
           </button>
         )}
-      </header>
+      </motion.header>
 
-      <div className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-neutral-800/60 rounded-2xl w-fit">
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-neutral-800/60 rounded-2xl w-fit">
         {([['deals', 'Acordos'], ['requests', `Solicitações${pending.length ? ` (${pending.length})` : ''}`]] as [Tab, string][]).map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} className={cn('px-4 py-2 rounded-xl text-xs font-bold transition-all', tab === t ? 'bg-white dark:bg-neutral-900 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-neutral-200')}>{label}</button>
         ))}
-      </div>
+      </motion.div>
 
       {loading ? (
         <div className="p-24 flex justify-center"><Loader2 className="animate-spin text-accent-500" size={40} /></div>
@@ -130,7 +131,7 @@ export default function Deals() {
             <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1">Crie o primeiro acordo para os afiliados começarem a solicitar parcerias.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {deals.map((deal) => (
               <div key={deal.id} className={cn('bg-white dark:bg-neutral-900/60 border rounded-3xl p-5 shadow-sm flex flex-col gap-3', deal.active ? 'border-slate-200/70 dark:border-neutral-800' : 'border-slate-200/70 dark:border-neutral-800 opacity-60')}>
                 <div className="flex items-start justify-between gap-2">
@@ -153,10 +154,10 @@ export default function Deals() {
                 </div>
               </div>
             ))}
-          </div>
+          </motion.div>
         )
       ) : (
-        <div className="space-y-6">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
           <section>
             <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500 mb-3">Pendentes de aprovação</h2>
             {pending.length === 0 ? (
@@ -199,7 +200,7 @@ export default function Deals() {
               </div>
             </section>
           )}
-        </div>
+        </motion.div>
       )}
 
       {modal && (

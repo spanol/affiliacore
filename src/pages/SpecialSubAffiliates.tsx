@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { motion } from 'motion/react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Loader2, Users, ArrowUpRight, Crown, Save, Percent, Search } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -224,7 +225,7 @@ export default function SpecialSubAffiliates() {
 
   return (
     <div className="space-y-8 pb-20">
-      <header className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+      <motion.header initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 mb-3 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-600 dark:text-accent-400 text-[10px] font-bold uppercase tracking-widest">
             <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />
@@ -239,18 +240,18 @@ export default function SpecialSubAffiliates() {
           <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">{subIds.length} sub-afiliado(s) vinculado(s). Defina a comissão de cada um e abra os dados individuais.</p>
         </div>
         <DateRangePicker value={range} onChange={setRange} />
-      </header>
+      </motion.header>
 
       {subIds.length === 0 ? (
-        <div className="p-16 text-center rounded-3xl border border-slate-200/70 dark:border-neutral-800 bg-white dark:bg-neutral-900/60">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="p-16 text-center rounded-3xl border border-slate-200/70 dark:border-neutral-800 bg-white dark:bg-neutral-900/60">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl border border-slate-100 dark:border-neutral-700/60 bg-slate-50 dark:bg-neutral-800/60 text-slate-500 dark:text-neutral-300 mb-4">
             <Users size={24} />
           </div>
           <h3 className="text-sm font-bold text-slate-800 dark:text-neutral-100 mb-1">Nenhum sub-afiliado vinculado</h3>
           <p className="text-xs text-slate-500 dark:text-neutral-400">Fale com o administrador para vincular afiliados à sua rede.</p>
-        </div>
+        </motion.div>
       ) : (
-        <div className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl shadow-sm overflow-hidden transition-colors">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl shadow-sm overflow-hidden transition-colors">
           {/* Filtros — busca, marca e atividade na rede + teto. Espelham a /affiliates
               do master, capados à rede do especial (especial = master escopado). */}
           <div className="p-4 border-b border-slate-100 dark:border-neutral-800 flex flex-col lg:flex-row gap-4 lg:items-center justify-between">
@@ -488,7 +489,7 @@ export default function SpecialSubAffiliates() {
               Exibindo {filteredSubs.length} de {subIds.length} sub-afiliado(s)
             </p>
           </div>
-        </div>
+        </motion.div>
       )}
     </div>
   );

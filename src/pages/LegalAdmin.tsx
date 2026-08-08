@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'motion/react';
 import { Scale, Loader2, Plus, Pencil, Trash2, X, Check, Eye, EyeOff } from 'lucide-react';
 import {
   fetchLegalDocuments, createLegalDocument, updateLegalDocument, deleteLegalDocument,
@@ -55,7 +56,7 @@ export default function LegalAdmin() {
 
   return (
     <div className="space-y-8 pb-16">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <motion.header initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-widest text-accent-500">Conta</span>
           <div className="flex items-center gap-3 mt-1">
@@ -71,18 +72,18 @@ export default function LegalAdmin() {
         <button onClick={() => setModal(emptyDraft())} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-neutral-900 rounded-full text-xs font-bold hover:opacity-90 shadow-sm shrink-0">
           <Plus size={15} /> Novo documento
         </button>
-      </header>
+      </motion.header>
 
       {loading ? (
         <div className="p-24 flex justify-center"><Loader2 className="animate-spin text-accent-500" size={40} /></div>
       ) : docs.length === 0 ? (
-        <div className="p-16 text-center bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="p-16 text-center bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl">
           <Scale className="mx-auto text-slate-300 dark:text-neutral-600 mb-3" size={40} />
           <h3 className="text-sm font-bold text-slate-800 dark:text-neutral-100">Nenhum documento cadastrado</h3>
           <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1">Crie o Acordo de Afiliação ou outro documento para os afiliados verem em "Termos".</p>
-        </div>
+        </motion.div>
       ) : (
-        <div className="space-y-3">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
           {docs.map((d) => (
             <div key={d.id} className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl p-5 shadow-sm">
               <div className="flex items-start justify-between gap-3">
@@ -107,7 +108,7 @@ export default function LegalAdmin() {
               </div>
             </div>
           ))}
-        </div>
+        </motion.div>
       )}
 
       {modal && (

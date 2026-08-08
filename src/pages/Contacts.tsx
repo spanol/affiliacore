@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { motion } from 'motion/react';
 import { Mail, Phone, Share2, Clock4 } from 'lucide-react';
 import { subscribeToContactInquiries, ContactInquiry } from '../services/contactService';
 import { registrationSourceLabel } from '../lib/registrationSource';
@@ -31,16 +32,19 @@ export default function Contacts() {
 
   return (
     <div className="space-y-8 pb-20">
-      <header>
+      <motion.header initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
         <span className="inline-flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-slate-900/5 dark:bg-white/5 border border-slate-900/10 dark:border-white/10 text-slate-500 dark:text-neutral-300 text-[10px] font-bold uppercase tracking-widest">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           Caixa de entrada
         </span>
         <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tighter">Contatos</h1>
         <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">Lista de mensagens da tabela de contatos do banco de dados.</p>
-      </header>
+      </motion.header>
 
-      <section className="relative overflow-hidden bg-white dark:bg-neutral-900/60 p-6 md:p-8 rounded-3xl border border-slate-200/70 dark:border-neutral-800 shadow-sm">
+      <motion.section
+        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+        className="relative overflow-hidden bg-white dark:bg-neutral-900/60 p-6 md:p-8 rounded-3xl border border-slate-200/70 dark:border-neutral-800 shadow-sm"
+      >
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-6">
           <div>
             <p className="text-base font-bold text-slate-900 dark:text-white tracking-tight">Contatos recentes</p>
@@ -97,7 +101,7 @@ export default function Contacts() {
             ))}
           </div>
         )}
-      </section>
+      </motion.section>
     </div>
   );
 }
