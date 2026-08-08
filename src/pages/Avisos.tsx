@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { Megaphone, Plus, Pencil, Trash2, ExternalLink, Loader2, EyeOff, Inbox } from 'lucide-react';
+import { Megaphone, Plus, Pencil, Trash2, ExternalLink, Loader2, EyeOff, Inbox, BellRing } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { cn } from '../lib/utils';
@@ -11,6 +11,7 @@ import {
   isNoticeForUser,
   deleteNotice,
 } from '../services/noticeService';
+import { UserNotification, subscribeToMyNotifications } from '../services/userNotificationService';
 import NoticeComposerModal from '../components/NoticeComposerModal';
 
 const CATEGORY_STYLES: Record<NoticeCategory, { label: string; cls: string }> = {
@@ -21,17 +22,23 @@ const CATEGORY_STYLES: Record<NoticeCategory, { label: string; cls: string }> = 
 
 const AUDIENCE_LABEL: Record<string, string> = { all: 'Todos', clients: 'Clientes', specials: 'Especiais' };
 
-function formatDate(notice: Notice): string {
-  if (!notice.createdAt) return 'Sem data';
-  return new Date(notice.createdAt.toDate()).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+function formatStamp(at: { toDate: () => Date } | null | undefined): string {
+  if (!at) return 'Sem data';
+  return new Date(at.toDate()).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 export default function Avisos() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const { push } = useToast();
   const isAdmin = profile?.role === 'admin';
 
   const [notices, setNotices] = useState<Notice[]>([]);
+  // Notificações PESSOAIS (user_notifications — ex.: "novos resultados na casa X").
+  // O sino já juntava as duas coleções, mas esta página lia só `notices`: o
+  // afiliado via a notificação no dropdown, clicava em "Ver todos" e caía numa
+  // tela que ESTRUTURALMENTE não conseguia mostrá-la — passou do sino, não havia
+  // onde recuperar. [[affiliacore-avisos-ver-todos-gap]]
+  const [personal, setPersonal] = useState<UserNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [composer, setComposer] = useState<{ open: boolean; editing?: Notice }>({ open: false });
@@ -53,11 +60,26 @@ export default function Avisos() {
     return () => unsubscribe();
   }, []);
 
+  // Escopo por recipientUid (mesma assinatura do sino). Admin não recebe
+  // "novos resultados" — a lista fica vazia e a seção some p/ ele.
+  useEffect(() => {
+    if (!user?.uid) { setPersonal([]); return; }
+    const unsubscribe = subscribeToMyNotifications(
+      user.uid,
+      (data) => setPersonal(data),
+      (err) => console.error('Erro ao carregar notificações pessoais:', err),
+    );
+    return () => unsubscribe();
+  }, [user?.uid]);
+
   // Admin vê tudo (gestão); afiliado vê só o que é do seu segmento e está ativo.
   const visible = useMemo(
     () => (isAdmin ? notices : notices.filter((n) => isNoticeForUser(n, profile))),
     [notices, isAdmin, profile],
   );
+
+  // As duas coleções são independentes: uma pode estar vazia sem a outra estar.
+  const isEmpty = visible.length === 0 && personal.length === 0;
 
   const handleDelete = async (id: string) => {
     setDeleting(true);
@@ -82,7 +104,7 @@ export default function Avisos() {
         />
       )}
 
-      <header className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+      <motion.header initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
           <span className="inline-flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-600 dark:text-accent-400 text-[10px] font-bold uppercase tracking-widest">
             <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />
@@ -109,7 +131,7 @@ export default function Avisos() {
             Novo comunicado
           </button>
         )}
-      </header>
+      </motion.header>
 
       {loading ? (
         <div className="p-24 flex flex-col items-center justify-center gap-4">
@@ -118,7 +140,7 @@ export default function Avisos() {
         </div>
       ) : error ? (
         <div className="py-20 text-center text-red-500">{error}</div>
-      ) : visible.length === 0 ? (
+      ) : isEmpty ? (
         <div className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl shadow-sm p-20 text-center">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl border border-slate-100 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800 text-slate-400 dark:text-neutral-300 mb-4">
             <Inbox size={24} />
@@ -129,8 +151,51 @@ export default function Avisos() {
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {visible.map((notice, idx) => {
+        <div className="space-y-8">
+          {/* Seção 1 — notificações PESSOAIS (o que o "Ver todos" do sino promete).
+              Só aparece p/ quem tem alguma: instância sem import de resultados
+              segue com a tela de antes, sem cabeçalho de seção sobrando. */}
+          {personal.length > 0 && (
+            <section className="space-y-4">
+              <h2 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500">
+                <BellRing size={13} /> Suas notificações
+              </h2>
+              {personal.map((item, idx) => (
+                <motion.article
+                  key={item.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(idx * 0.04, 0.3) }}
+                  className="p-5 md:p-6 rounded-2xl border border-accent-500/25 bg-accent-500/[0.06] dark:bg-accent-500/[0.08] shadow-sm"
+                >
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-accent-500/30 text-accent-600 dark:text-accent-400">
+                      <BellRing size={11} /> Notificação
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500">{formatStamp(item.createdAt)}</span>
+                    {item.houseName && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest bg-slate-100 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 text-slate-500 dark:text-neutral-300">
+                        {item.houseName}
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-base md:text-lg font-bold text-slate-900 dark:text-white tracking-tight">{item.title}</h3>
+                  <p className="text-sm text-slate-600 dark:text-neutral-300 mt-1.5 whitespace-pre-wrap leading-relaxed">{item.body}</p>
+                </motion.article>
+              ))}
+            </section>
+          )}
+
+          {/* Seção 2 — o mural da agência (o que a página já mostrava). */}
+          <section className="space-y-4">
+            {personal.length > 0 && (
+              <h2 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500">
+                <Megaphone size={13} /> Avisos da agência
+              </h2>
+            )}
+            {visible.length === 0 ? (
+              <p className="text-xs text-slate-400 dark:text-neutral-500">Nenhum comunicado publicado.</p>
+            ) : visible.map((notice, idx) => {
             const cat = CATEGORY_STYLES[notice.category] ?? CATEGORY_STYLES.info;
             return (
               <motion.article
@@ -148,7 +213,7 @@ export default function Avisos() {
                     <span className={cn('inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border', cat.cls)}>
                       {cat.label}
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500">{formatDate(notice)}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500">{formatStamp(notice.createdAt)}</span>
                     {isAdmin && (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest bg-slate-100 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 text-slate-500 dark:text-neutral-300">
                         {AUDIENCE_LABEL[notice.audience] ?? notice.audience}
@@ -206,6 +271,7 @@ export default function Avisos() {
               </motion.article>
             );
           })}
+          </section>
         </div>
       )}
     </div>
