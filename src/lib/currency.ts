@@ -111,8 +111,15 @@ export function parseHouseCpaInput(
   text: string,
   currency: HouseCpaCurrency
 ): number | null {
-  const clean = String(text ?? '').trim().replace(',', '.');
-  if (clean === '') return null;
+  const raw = String(text ?? '').trim();
+  if (raw === '') return null;
+  // O ÚLTIMO separador é o decimal; os anteriores são de milhar ("1.234,50" →
+  // 1234.5). Trocar só a 1ª vírgula deixava "1,234,50" virar NaN → null → o
+  // servidor apagava o CPA da casa em silêncio, em vez de recusar a digitação.
+  const lastSep = Math.max(raw.lastIndexOf(','), raw.lastIndexOf('.'));
+  const clean = lastSep < 0
+    ? raw
+    : raw.slice(0, lastSep).replace(/[.,]/g, '') + '.' + raw.slice(lastSep + 1);
   const n = Number(clean);
   if (!Number.isFinite(n) || n < 0) return null;
   return currency === 'BRL' ? Math.round(n * 100) / 100 : Math.trunc(n);
@@ -129,14 +136,20 @@ export function convertHouseCpaInput(
   eurBrlRate: number
 ): string {
   const value = parseHouseCpaInput(text, from);
-  if (value == null) return '';
+  // Texto que não parseia (um "," no meio da digitação) volta COMO ESTÁ: apagar o
+  // campo sozinho seria perder o CPA da casa por causa de um caractere.
+  if (value == null) return String(text ?? '').trim() === '' ? '' : String(text);
   if (from === to) return String(value);
   const rate = num(eurBrlRate);
   if (rate <= 0) return String(value); // sem cotação, não inventa conversão
   const converted = to === 'BRL' ? value * rate : value / rate;
   // ARREDONDA (não trunca, como faz a digitação em euro): R$ 177 ÷ 5,9 dá 29,99…,
   // e truncar devolveria 29 — a ida-e-volta da moeda comeria um euro do CPA.
-  return String(to === 'BRL' ? Math.round(converted * 100) / 100 : Math.round(converted));
+  if (to === 'BRL') return String(Math.round(converted * 100) / 100);
+  // Piso de 1 € p/ valor positivo: o euro é inteiro, e arredondar um CPA baixo
+  // (R$ 3 ÷ 5,9) daria 0 — que NÃO é ausência, é um zero CONFIGURADO, e zeraria a
+  // comissão derivada da casa (ausência ≠ R$0).
+  return String(Math.max(value > 0 ? 1 : 0, Math.round(converted)));
 }
 
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });

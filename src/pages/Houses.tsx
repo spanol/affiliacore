@@ -748,6 +748,18 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                             type="button"
                             onClick={() => {
                               if (c === cpaCurrency) return;
+                              // Sem cotação AO VIVO não dá p/ converter: o valor em R$
+                              // é GRAVADO (não recalculado a cada render como o euro),
+                              // então converter pelo fallback congelaria o número errado
+                              // — €30 viraria R$ 180 em vez de R$ 177 e ficaria assim.
+                              // Campo vazio pode trocar à vontade (não há o que converter).
+                              if (!eurQuote.live && defaultCpa.trim() !== '') {
+                                push({
+                                  type: 'error',
+                                  message: 'Cotação do euro indisponível agora — sem ela a conversão gravaria um valor errado. Apague o campo para trocar a moeda e digite o valor na moeda nova.',
+                                });
+                                return;
+                              }
                               setDefaultCpa(convertHouseCpaInput(defaultCpa, cpaCurrency, c, eurQuote.rate));
                               setCpaCurrency(c);
                             }}

@@ -22,7 +22,8 @@ export interface RankingEntry {
 
 export interface RankingOpts {
   nameById?: Record<string, string>;
-  // Taxa da casa JÁ EM BRL (defaultCpa convertido de EUR→BRL pelo caller), p/ derivar a
+  // Taxa da casa JÁ EM BRL (o caller normaliza o defaultCpa da MOEDA da casa —
+  // `cpaCurrency`, ausente = EUR — via houseCpaToBrl), p/ derivar a
   // comissão das linhas manuais (house_results, total_commission=0). Sem ela, ou p/
   // linha da OTG (sem houseSlug), houseCommissionForRow usa o total_commission da linha.
   houseRateOf?: (houseSlug: string | undefined) => HouseRate | null | undefined;

@@ -80,6 +80,12 @@ describe('parseHouseCpaInput', () => {
     expect(parseHouseCpaInput('120,50', 'BRL')).toBe(120.5);
   });
 
+  it('o ÚLTIMO separador é o decimal (milhar pt-BR não pode virar null → apagar o CPA)', () => {
+    expect(parseHouseCpaInput('1.234,50', 'BRL')).toBe(1234.5);
+    expect(parseHouseCpaInput('1,234,50', 'BRL')).toBe(1234.5);
+    expect(parseHouseCpaInput('2.400', 'EUR')).toBe(2); // ponto = decimal aqui, e EUR trunca
+  });
+
   it('vazio/inválido é null, NUNCA 0 (ausência ≠ R$0)', () => {
     expect(parseHouseCpaInput('', 'BRL')).toBeNull();
     expect(parseHouseCpaInput('   ', 'EUR')).toBeNull();
@@ -101,6 +107,16 @@ describe('convertHouseCpaInput', () => {
   it('mesma moeda ou campo vazio não inventa valor', () => {
     expect(convertHouseCpaInput('30', 'EUR', 'EUR', 5.9)).toBe('30');
     expect(convertHouseCpaInput('', 'EUR', 'BRL', 5.9)).toBe('');
+  });
+
+  it('nunca converte p/ 0 euro: valor positivo tem piso de 1 (zero seria CONFIGURADO)', () => {
+    expect(convertHouseCpaInput('3', 'BRL', 'EUR', 5.9)).toBe('1');
+    expect(convertHouseCpaInput('0,50', 'BRL', 'EUR', 5.9)).toBe('1');
+  });
+
+  it('texto que não parseia volta como está — não apaga o CPA por um caractere', () => {
+    expect(convertHouseCpaInput(',', 'BRL', 'EUR', 5.9)).toBe(',');
+    expect(convertHouseCpaInput('   ', 'BRL', 'EUR', 5.9)).toBe('');
   });
 
   it('sem cotação válida mantém o valor (não zera o CPA da casa)', () => {

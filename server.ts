@@ -3821,9 +3821,10 @@ export function createApp(deps: ServerDeps) {
       const numOrNull = (v: any) => (v == null || v === '' ? null : (Number.isFinite(Number(v)) ? Number(v) : null));
       if (body.defaultCpa !== undefined) patch.defaultCpa = numOrNull(body.defaultCpa);
       if (body.defaultRev !== undefined) patch.defaultRev = numOrNull(body.defaultRev);
-      // Trocar a moeda NÃO reescala o valor: o número gravado passa a ser lido na moeda
-      // nova (é o que o operador quer ao corrigir "isto sempre foi R$"). Quem manda a
-      // moeda manda o valor junto — o modal envia os dois no mesmo save. Só grava quando
+      // A rota NÃO reescala nada: grava o par (valor, moeda) que chegou. Quem decide se
+      // o número muda é a TELA — o modal converte o valor ao trocar a moeda, preservando
+      // o R$ efetivo. Reinterpretar sem converter ("isto sempre foi R$") é possível pela
+      // API, mas não tem caminho na UI hoje: lá é apagar o campo e redigitar. Só grava quando
       // MUDA de fato: casa antiga (sem o campo) já é EUR pela normalização, e escrever
       // 'EUR' nela só produziria uma linha de auditoria fantasma.
       if (body.cpaCurrency !== undefined) {
