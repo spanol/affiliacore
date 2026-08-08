@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'motion/react';
 import { Scale, Loader2, CheckCircle, FileText } from 'lucide-react';
 import {
   fetchLegalDocuments, fetchMyLegalAcceptances, acceptLegalDocument, hasAcceptedLatest,
@@ -42,7 +43,7 @@ export default function Terms() {
 
   return (
     <div className="space-y-8 pb-16">
-      <header>
+      <motion.header initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
         <span className="text-[10px] font-bold uppercase tracking-widest text-accent-500">Conta</span>
         <div className="flex items-center gap-3 mt-1">
           <span className="p-2 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700/60">
@@ -51,17 +52,17 @@ export default function Terms() {
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tighter">Termos</h1>
         </div>
         <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">Acordo de Afiliação, Código de Conduta e demais documentos da parceria.</p>
-      </header>
+      </motion.header>
 
       {loading ? (
         <div className="p-24 flex justify-center"><Loader2 className="animate-spin text-accent-500" size={40} /></div>
       ) : docs.length === 0 ? (
-        <div className="p-16 text-center bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="p-16 text-center bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl">
           <FileText className="mx-auto text-slate-300 dark:text-neutral-600 mb-3" size={40} />
           <h3 className="text-sm font-bold text-slate-800 dark:text-neutral-100">Nenhum documento publicado ainda</h3>
-        </div>
+        </motion.div>
       ) : (
-        <div className="space-y-4">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="space-y-4">
           {docs.map((doc) => {
             const accepted = hasAcceptedLatest(acceptanceFor(doc.slug), doc);
             return (
@@ -91,7 +92,7 @@ export default function Terms() {
               </div>
             );
           })}
-        </div>
+        </motion.div>
       )}
     </div>
   );

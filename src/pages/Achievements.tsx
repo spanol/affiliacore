@@ -130,7 +130,7 @@ export default function Achievements() {
 
   return (
     <div className="space-y-8 pb-20">
-      <header className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+      <motion.header initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
           <span className="inline-flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-600 dark:text-accent-400 text-[10px] font-bold uppercase tracking-widest">
             <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />
@@ -157,11 +157,14 @@ export default function Achievements() {
             Gerenciar conquistas
           </button>
         )}
-      </header>
+      </motion.header>
 
       {/* Painel do afiliado: os três números do topo (molde do legado) */}
       {affiliateId && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+          className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+        >
           <div className="p-6 rounded-2xl border bg-white dark:bg-neutral-900/60 border-slate-200/70 dark:border-neutral-800 shadow-sm">
             <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-2">
               <Target size={13} /> CPAs acumulados
@@ -198,7 +201,7 @@ export default function Achievements() {
               Comissão acumulada: {loading ? '—' : formatBRL(totals.commission)}
             </p>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* Fila de solicitações (admin) */}

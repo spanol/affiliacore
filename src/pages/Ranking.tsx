@@ -92,7 +92,7 @@ export default function Ranking() {
 
   return (
     <div className="space-y-8 pb-20">
-      <header className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+      <motion.header initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
           <span className="inline-flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-600 dark:text-accent-400 text-[10px] font-bold uppercase tracking-widest">
             <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />
@@ -127,11 +127,14 @@ export default function Ranking() {
             </button>
           </div>
         )}
-      </header>
+      </motion.header>
 
       {/* Faixa com a posição do próprio afiliado */}
       {myEntry && (
-        <div className="rounded-2xl border border-accent-500/30 bg-accent-500/10 px-5 py-4 flex items-center justify-between gap-4">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+          className="rounded-2xl border border-accent-500/30 bg-accent-500/10 px-5 py-4 flex items-center justify-between gap-4"
+        >
           <div className="flex items-center gap-3">
             <span className="flex items-center justify-center w-10 h-10 rounded-full bg-accent-500 text-accent-contrast font-black text-sm shadow">#{myEntry.pos}</span>
             <div>
@@ -140,7 +143,7 @@ export default function Ranking() {
             </div>
           </div>
           <span className="text-base font-black text-slate-900 dark:text-white">{formatBRL(myEntry.commission)}</span>
-        </div>
+        </motion.div>
       )}
 
       {loading ? (

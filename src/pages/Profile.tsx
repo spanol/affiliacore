@@ -129,14 +129,14 @@ export default function Profile() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12">
-      <header>
+      <motion.header initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
         <span className="inline-flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-slate-900/5 dark:bg-white/5 border border-slate-900/10 dark:border-white/10 text-slate-500 dark:text-neutral-300 text-[10px] font-bold uppercase tracking-widest">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           Sua conta
         </span>
         <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tighter">Meu Perfil</h1>
         <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">Gerencie suas informações pessoais e segurança da conta.</p>
-      </header>
+      </motion.header>
       {profile?.mustChangePassword && (
         <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/40 text-amber-900 dark:text-amber-100">
           <p className="text-sm font-bold">Primeiro acesso: é necessário alterar a senha temporária antes de continuar.</p>
