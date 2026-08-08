@@ -77,9 +77,12 @@ export interface BrandMeta {
   dataSource?: 'otg' | 'manual';
   // Taxa PADRÃO da casa = comissão que a CASA paga à AGÊNCIA por CPA/REV (receita).
   // Usada p/ DERIVAR a comissão das linhas manuais SEM `comissao` importada (fallback,
-  // via houseCommissionForRow). Só faz sentido p/ casas 'manual'. CPA em R$, REV em %.
+  // via houseCommissionForRow). Só faz sentido p/ casas 'manual'. REV em %; o CPA
+  // está na moeda de `cpaCurrency` (ausente = EUR) — converta com houseCpaToBrl.
   defaultCpa?: number | null;
   defaultRev?: number | null;
+  // Moeda em que a CASA paga o CPA. Ausente = 'EUR' (convenção original).
+  cpaCurrency?: 'EUR' | 'BRL' | null;
 }
 
 const normBrandKey = (s?: string | null) => String(s ?? '').trim().toLowerCase();

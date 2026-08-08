@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   eurToBrl, parseEurBrlRate, formatBrl, fetchEurBrlRate, getCachedEurBrlRate,
-  FALLBACK_EUR_BRL,
+  FALLBACK_EUR_BRL, resolveCpaCurrency, houseCpaToBrl, parseHouseCpaInput,
+  convertHouseCpaInput,
 } from './currency';
 
 describe('eurToBrl', () => {
@@ -33,6 +34,78 @@ describe('parseEurBrlRate', () => {
     expect(parseEurBrlRate(null)).toBeNull();
     expect(parseEurBrlRate({ EURBRL: { bid: 'x' } })).toBeNull();
     expect(parseEurBrlRate({ EURBRL: { bid: '0' } })).toBeNull();
+  });
+});
+
+describe('resolveCpaCurrency', () => {
+  it('AUSÊNCIA = EUR (o defaultCpa histórico está todo em euro)', () => {
+    expect(resolveCpaCurrency(undefined)).toBe('EUR');
+    expect(resolveCpaCurrency(null)).toBe('EUR');
+    expect(resolveCpaCurrency('')).toBe('EUR');
+    expect(resolveCpaCurrency('lixo')).toBe('EUR');
+  });
+
+  it('só BRL explícito (qualquer caixa) tira a casa da conversão', () => {
+    expect(resolveCpaCurrency('BRL')).toBe('BRL');
+    expect(resolveCpaCurrency('brl')).toBe('BRL');
+    expect(resolveCpaCurrency(' Brl ')).toBe('BRL');
+    expect(resolveCpaCurrency('EUR')).toBe('EUR');
+  });
+});
+
+describe('houseCpaToBrl', () => {
+  it('EUR converte pela cotação; BRL é o valor exato', () => {
+    expect(houseCpaToBrl(30, 'EUR', 5.9)).toBeCloseTo(177);
+    expect(houseCpaToBrl(120, 'BRL', 5.9)).toBe(120);
+  });
+
+  it('casa antiga (sem moeda) segue convertendo — nenhum valor muda de sentido', () => {
+    expect(houseCpaToBrl(40, undefined, 6)).toBe(240);
+  });
+
+  it('BRL não depende da cotação (nem quebra com cotação inválida)', () => {
+    expect(houseCpaToBrl(120.5, 'BRL', NaN)).toBe(120.5);
+    expect(houseCpaToBrl(null, 'BRL', 6)).toBe(0);
+  });
+});
+
+describe('parseHouseCpaInput', () => {
+  it('EUR é inteiro; BRL aceita centavos', () => {
+    expect(parseHouseCpaInput('30', 'EUR')).toBe(30);
+    expect(parseHouseCpaInput('30.9', 'EUR')).toBe(30);
+    expect(parseHouseCpaInput('120.50', 'BRL')).toBe(120.5);
+  });
+
+  it('aceita vírgula pt-BR (num() só entende ponto)', () => {
+    expect(parseHouseCpaInput('120,50', 'BRL')).toBe(120.5);
+  });
+
+  it('vazio/inválido é null, NUNCA 0 (ausência ≠ R$0)', () => {
+    expect(parseHouseCpaInput('', 'BRL')).toBeNull();
+    expect(parseHouseCpaInput('   ', 'EUR')).toBeNull();
+    expect(parseHouseCpaInput('abc', 'BRL')).toBeNull();
+    expect(parseHouseCpaInput('-10', 'BRL')).toBeNull();
+  });
+});
+
+describe('convertHouseCpaInput', () => {
+  it('preserva o R$ efetivo ao trocar a moeda do campo', () => {
+    expect(convertHouseCpaInput('30', 'EUR', 'BRL', 5.9)).toBe('177');
+    expect(convertHouseCpaInput('177', 'BRL', 'EUR', 5.9)).toBe('30');
+  });
+
+  it('arredonda a volta p/ euro (177 ÷ 5,9 = 29,99… não pode virar 29)', () => {
+    expect(convertHouseCpaInput('120,50', 'BRL', 'EUR', 6)).toBe('20');
+  });
+
+  it('mesma moeda ou campo vazio não inventa valor', () => {
+    expect(convertHouseCpaInput('30', 'EUR', 'EUR', 5.9)).toBe('30');
+    expect(convertHouseCpaInput('', 'EUR', 'BRL', 5.9)).toBe('');
+  });
+
+  it('sem cotação válida mantém o valor (não zera o CPA da casa)', () => {
+    expect(convertHouseCpaInput('30', 'EUR', 'BRL', 0)).toBe('30');
+    expect(convertHouseCpaInput('30', 'EUR', 'BRL', NaN)).toBe('30');
   });
 });
 

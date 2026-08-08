@@ -2,7 +2,9 @@
 // (valor fixo). Em vez de regravar o valor em R$ toda vez que o câmbio mexe,
 // GRAVAMOS o CPA em EUR (inteiro) e convertemos no PONTO DE USO pela cotação ao
 // vivo da AwesomeAPI — assim a comissão acompanha o câmbio sozinha, sem update
-// diário. Núcleo puro (eurToBrl/parseEurBrlRate) + um cache de módulo p/ a
+// diário. Casa que paga em REAL grava o R$ direto (`cpaCurrency: 'BRL'`) e pula a
+// conversão — ver houseCpaToBrl no fim do arquivo.
+// Núcleo puro (eurToBrl/houseCpaToBrl/parseEurBrlRate) + um cache de módulo p/ a
 // conversão poder ser SÍNCRONA no cálculo de comissão sem martelar a API a cada
 // render. Sem Firebase — importável por services/pages (NÃO pelo server.ts).
 import { num } from './commission';
@@ -71,6 +73,70 @@ export async function fetchEurBrlRate(force = false): Promise<EurBrlQuote> {
     }
   })();
   return inflight;
+}
+
+// --- Moeda do CPA da casa ----------------------------------------------------
+// A casa pode nos pagar em EURO (convenção original: valor fixo em €, convertido
+// no ponto de uso) OU em REAL (casas BR — Esportiva/Superbet — que fecham em R$).
+// Forçar tudo a euro impedia gravar o valor EXATO acordado em R$: o operador tinha
+// que escolher um € inteiro cuja conversão só se APROXIMA do acordo, e o valor
+// ainda balançava com o câmbio. Com 'BRL' o número gravado é o próprio R$.
+export type HouseCpaCurrency = 'EUR' | 'BRL';
+
+// AUSÊNCIA = EUR: todo `defaultCpa` gravado antes desta opção está em euro, então
+// o default nunca pode reinterpretar dado histórico. Só o valor explícito 'BRL'
+// (em qualquer caixa) tira a casa da conversão.
+export function resolveCpaCurrency(v: unknown): HouseCpaCurrency {
+  return String(v ?? '').trim().toUpperCase() === 'BRL' ? 'BRL' : 'EUR';
+}
+
+// CPA da casa em R$, seja qual for a moeda em que ela paga. Fonte ÚNICA da
+// conversão do CPA: EUR passa pela cotação; BRL é o valor exato (não converte).
+// Puro — num() guarda contra NaN/null/objeto antes de multiplicar.
+export function houseCpaToBrl(
+  cpa: number | null | undefined,
+  currency: unknown,
+  eurBrlRate: number
+): number {
+  return resolveCpaCurrency(currency) === 'BRL' ? num(cpa) : eurToBrl(cpa, eurBrlRate);
+}
+
+// Lê o que o operador digitou no campo de CPA do /casas e devolve o número a
+// GRAVAR (na moeda escolhida) ou null p/ campo vazio — ausência ≠ R$0, então
+// texto vazio/inválido NUNCA vira 0. Em EUR o valor é inteiro (convenção da
+// casa, que informa o CPA em euro cheio); em BRL aceita centavos, que é o motivo
+// de a moeda existir: gravar o valor EXATO do acordo. Aceita vírgula pt-BR — o
+// `num()` da comissão só entende ponto, então a normalização acontece AQUI.
+export function parseHouseCpaInput(
+  text: string,
+  currency: HouseCpaCurrency
+): number | null {
+  const clean = String(text ?? '').trim().replace(',', '.');
+  if (clean === '') return null;
+  const n = Number(clean);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return currency === 'BRL' ? Math.round(n * 100) / 100 : Math.trunc(n);
+}
+
+// Converte o valor JÁ DIGITADO ao trocar a moeda do campo, preservando o R$
+// efetivo (30 € ↔ R$ 177 na cotação 5,9). Sem isto, virar "EUR → BRL" num valor
+// antigo passaria a ler 30 como R$ 30 e derrubaria a comissão da casa em silêncio.
+// Devolve texto p/ o input (ponto como separador), '' quando não há valor.
+export function convertHouseCpaInput(
+  text: string,
+  from: HouseCpaCurrency,
+  to: HouseCpaCurrency,
+  eurBrlRate: number
+): string {
+  const value = parseHouseCpaInput(text, from);
+  if (value == null) return '';
+  if (from === to) return String(value);
+  const rate = num(eurBrlRate);
+  if (rate <= 0) return String(value); // sem cotação, não inventa conversão
+  const converted = to === 'BRL' ? value * rate : value / rate;
+  // ARREDONDA (não trunca, como faz a digitação em euro): R$ 177 ÷ 5,9 dá 29,99…,
+  // e truncar devolveria 29 — a ida-e-volta da moeda comeria um euro do CPA.
+  return String(to === 'BRL' ? Math.round(converted * 100) / 100 : Math.round(converted));
 }
 
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });

@@ -26,7 +26,7 @@ import {
   sanitizeIntegrationPatch, toPublicIntegration, numericSetting,
   type ConnectorSettings, type IntegrationDoc,
 } from './src/lib/integrations';
-import { eurToBrl, parseEurBrlRate, FALLBACK_EUR_BRL } from './src/lib/currency';
+import { houseCpaToBrl, resolveCpaCurrency, parseEurBrlRate, FALLBACK_EUR_BRL } from './src/lib/currency';
 import { DEFAULT_BRANDS } from './src/lib/brand';
 import { projectPartnerResults } from './src/lib/partnerResults';
 import { pullApprovedRoster, isOtgLinksConfigured } from './otgLinksPull';
@@ -2154,9 +2154,9 @@ export function createApp(deps: ServerDeps) {
     });
 
     // Taxa das casas manuais p/ derivar a comissão das linhas com total_commission=0.
-    // defaultCpa é gravado EM EUR (a casa nos passa o CPA em euro) → converte p/ BRL pela
-    // cotação ao vivo (best-effort, cai no fallback), IGUAL ao /admin (houseRateOf). Só
-    // busca cotação/casas quando há linha manual — a OTG já traz total_commission em R$.
+    // defaultCpa é gravado NA MOEDA DA CASA (`cpaCurrency`, ausente = EUR) → normaliza p/
+    // BRL pela cotação ao vivo (best-effort, cai no fallback), IGUAL ao /admin (houseRateOf).
+    // Só busca cotação/casas quando há linha manual — a OTG já traz total_commission em R$.
     let houseRateOf: ((slug: string | undefined) => { defaultCpa: number; defaultRev: number } | undefined) | undefined;
     if (manualRows.length) {
       const eurBrl = await fetchEurBrlForRanking();
@@ -2164,7 +2164,10 @@ export function createApp(deps: ServerDeps) {
       const rateBySlug = new Map<string, { defaultCpa: number; defaultRev: number }>();
       housesSnap.forEach((d) => {
         const v = d.data() as any;
-        rateBySlug.set(d.id, { defaultCpa: eurToBrl(v?.defaultCpa, eurBrl), defaultRev: Number(v?.defaultRev) || 0 });
+        rateBySlug.set(d.id, {
+          defaultCpa: houseCpaToBrl(v?.defaultCpa, v?.cpaCurrency, eurBrl),
+          defaultRev: Number(v?.defaultRev) || 0,
+        });
       });
       houseRateOf = (slug) => (slug ? rateBySlug.get(slug) : undefined);
     }
@@ -3661,6 +3664,9 @@ export function createApp(deps: ServerDeps) {
       dataSource: data.dataSource === 'manual' ? 'manual' : 'otg',
       defaultCpa: Number.isFinite(Number(data.defaultCpa)) ? Number(data.defaultCpa) : null,
       defaultRev: Number.isFinite(Number(data.defaultRev)) ? Number(data.defaultRev) : null,
+      // Moeda do CPA. Normalizada na leitura (ausente = EUR): a casa antiga não tem o
+      // campo e o valor dela ESTÁ em euro — o client nunca precisa adivinhar.
+      cpaCurrency: resolveCpaCurrency(data.cpaCurrency),
       // Alíquota de ISS retida no repasse ao afiliado. VARIA POR CASA (ver src/lib/tax.ts).
       issPercent: Number.isFinite(Number(data.issPercent)) ? Number(data.issPercent) : null,
       // Frescor do dado (pull horário OU upload) — o afiliado lê isto no painel.
@@ -3773,6 +3779,8 @@ export function createApp(deps: ServerDeps) {
         dataSource: dataSource === 'otg' ? 'otg' : 'manual',
         defaultCpa: numOrNull(req.body?.defaultCpa),
         defaultRev: numOrNull(req.body?.defaultRev),
+        // Moeda em que a casa paga o CPA — gravada SEMPRE (casa nova nasce explícita).
+        cpaCurrency: resolveCpaCurrency(req.body?.cpaCurrency),
         issPercent: numOrNull(req.body?.issPercent),
         createdByUid: (req as any).user?.uid ?? null,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -3813,6 +3821,17 @@ export function createApp(deps: ServerDeps) {
       const numOrNull = (v: any) => (v == null || v === '' ? null : (Number.isFinite(Number(v)) ? Number(v) : null));
       if (body.defaultCpa !== undefined) patch.defaultCpa = numOrNull(body.defaultCpa);
       if (body.defaultRev !== undefined) patch.defaultRev = numOrNull(body.defaultRev);
+      // Trocar a moeda NÃO reescala o valor: o número gravado passa a ser lido na moeda
+      // nova (é o que o operador quer ao corrigir "isto sempre foi R$"). Quem manda a
+      // moeda manda o valor junto — o modal envia os dois no mesmo save. Só grava quando
+      // MUDA de fato: casa antiga (sem o campo) já é EUR pela normalização, e escrever
+      // 'EUR' nela só produziria uma linha de auditoria fantasma.
+      if (body.cpaCurrency !== undefined) {
+        const nextCurrency = resolveCpaCurrency(body.cpaCurrency);
+        if (nextCurrency !== resolveCpaCurrency((snap.data() as any)?.cpaCurrency)) {
+          patch.cpaCurrency = nextCurrency;
+        }
+      }
       if (body.issPercent !== undefined) patch.issPercent = numOrNull(body.issPercent);
       if (body.logoBase64) patch.logo = await uploadHouseLogo((snap.data() as any)?.slug ?? ref.id, String(body.logoBase64));
       else if (body.logo === null) patch.logo = null;
@@ -3843,7 +3862,7 @@ export function createApp(deps: ServerDeps) {
       // Auditoria: só os campos que de fato mudaram (antes→depois). 'logo' marcada à
       // parte (não logamos o base64/URL inteiro — só que houve troca).
       const changes = diffChanges(snap.data() as any, patch,
-        ['name', 'brandId', 'registerUrlTemplate', 'active', 'order', 'dataSource', 'defaultCpa', 'defaultRev', 'issPercent']);
+        ['name', 'brandId', 'registerUrlTemplate', 'active', 'order', 'dataSource', 'defaultCpa', 'defaultRev', 'cpaCurrency', 'issPercent']);
       if ('logo' in patch) changes.push({ field: 'logo', before: '(anterior)', after: patch.logo ? '(nova)' : null });
       // `integration` fica fora do diffChanges: no desvínculo o patch carrega um
       // FieldValue.delete(), que o diff leria como valor.

@@ -238,6 +238,7 @@ const FIELD_LABELS: Record<string, string> = {
   dataSource: 'Origem dos dados',
   defaultCpa: 'CPA padrão',
   defaultRev: 'REV padrão',
+  cpaCurrency: 'Moeda do CPA',
   logo: 'Logo',
   // comissão (config.update)
   cpaValue: 'CPA',

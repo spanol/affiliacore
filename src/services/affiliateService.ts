@@ -16,7 +16,7 @@ import { findAffiliateInList, userDocToAffiliate } from '../lib/affiliateLookup'
 import { getDefaultRange } from '../lib/dateRange';
 import { parseResultsPage, MAX_RESULT_PAGES } from '../lib/resultsPage';
 import { getKnownBrands } from '../lib/brand';
-import { eurToBrl, fetchEurBrlRate, getCachedEurBrlRate } from '../lib/currency';
+import { houseCpaToBrl, fetchEurBrlRate, getCachedEurBrlRate } from '../lib/currency';
 import { fetchHouseResults } from './houseService';
 import type { AuditLogEntry } from '../lib/auditView';
 import {
@@ -747,12 +747,14 @@ export function manualForAffiliates(rows: StoredManualRow[], ids: (string | numb
 }
 
 // Taxa padrão (defaultCpa/defaultRev) de uma casa manual pelo slug, do registro vivo
-// de casas — fonte do `rateOf` que deriva a comissão da casa. O `defaultCpa` é GRAVADO
-// EM EUR (a casa nos passa o CPA em euro); convertemos p/ BRL AQUI, pela cotação ao
-// vivo, p/ que `houseCommissionForRow` siga puro e em R$. `defaultRev` é % (não converte).
+// de casas — fonte do `rateOf` que deriva a comissão da casa. O `defaultCpa` é gravado
+// NA MOEDA DA CASA (`cpaCurrency`, ausente = EUR); normalizamos p/ BRL AQUI, p/ que
+// `houseCommissionForRow` siga puro e em R$. `defaultRev` é % (não converte).
 function houseRateOf(slug: string, eurBrlRate: number) {
   const b = getKnownBrands().find((x) => x.slug === slug);
-  return b ? { defaultCpa: eurToBrl(b.defaultCpa, eurBrlRate), defaultRev: b.defaultRev } : null;
+  return b
+    ? { defaultCpa: houseCpaToBrl(b.defaultCpa, b.cpaCurrency, eurBrlRate), defaultRev: b.defaultRev }
+    : null;
 }
 
 // Enriquece as linhas manuais com a comissão da casa derivada (deriveManualCommission

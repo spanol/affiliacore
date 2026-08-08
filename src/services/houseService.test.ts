@@ -56,6 +56,7 @@ describe('houseToBrandMeta', () => {
       dataSource: 'otg',
       defaultCpa: null,
       defaultRev: null,
+      cpaCurrency: 'EUR',
     });
   });
 
@@ -63,6 +64,11 @@ describe('houseToBrandMeta', () => {
     const meta = houseToBrandMeta(makeHouse({ defaultCpa: 150, defaultRev: 25 }));
     expect(meta.defaultCpa).toBe(150);
     expect(meta.defaultRev).toBe(25);
+  });
+
+  it('leva a moeda do CPA junto — casa sem o campo vira EUR (dado histórico)', () => {
+    expect(houseToBrandMeta(makeHouse({ cpaCurrency: 'BRL' })).cpaCurrency).toBe('BRL');
+    expect(houseToBrandMeta(makeHouse({ cpaCurrency: null })).cpaCurrency).toBe('EUR');
   });
 
   it('brandId null → id undefined', () => {

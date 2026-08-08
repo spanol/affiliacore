@@ -1500,6 +1500,30 @@ describe('cron interno daily-ranking', () => {
     ]);
   });
 
+  it('casa que paga em REAL (cpaCurrency BRL) NÃO passa pela cotação — vale o valor exato', async () => {
+    // Casa BR fecha o CPA em R$ (ex.: R$ 120,50). Antes tudo era lido como euro e
+    // 120,50 virava R$ 602,50 na cotação 5 — inflava a comissão em 5×.
+    const fs = makeFirestore({
+      ...seed,
+      affiliates: { 'AFF-R': { id: 'AFF-R', name: 'Rita Real' } },
+      houses: { esportiva: { name: 'Esportiva', dataSource: 'manual', defaultCpa: 120.5, defaultRev: 0, cpaCurrency: 'BRL' } },
+      house_results: {
+        r1: { houseSlug: 'esportiva', date: '2099-01-02', affiliateId: 'AFF-R', qualified_cpa: 2, rvs: 0 },
+      },
+    });
+    const { fetchImpl } = captureFetch(); // awesomeapi → bid 5 (irrelevante p/ BRL)
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs, fetchImpl });
+    await request(app)
+      .post('/api/rankings/compute')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ date: '2099-01-02' })
+      .expect(200);
+    const doc = fs.__store.get('daily_rankings').get('2099-01-02');
+    expect(doc.entries).toEqual([
+      { pos: 1, affiliateId: 'AFF-R', name: 'Rita Real', commission: 241 }, // 2 × R$ 120,50
+    ]);
+  });
+
   it('OTG: ranqueia pela comissão bruta (total_commission), inclusive produção só-REV (o bug)', async () => {
     // A produção real da OTG é quase toda REV-share (qualified_cpa=0, rvs>0). O ranking
     // ANTIGO recalculava pela config CPA/REV (revPercentage=0) e zerava esses afiliados

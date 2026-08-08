@@ -33,7 +33,10 @@ import {
   HOUSE_PRESETS, HousePreset, buildHouseIconDataUrl, housePresetIconPath, houseLogoOrPreset,
   svgToDataUrl,
 } from '../lib/housePresets';
-import { fetchEurBrlRate, eurToBrl, formatBrl, getCachedEurBrlQuote, EurBrlQuote } from '../lib/currency';
+import {
+  fetchEurBrlRate, eurToBrl, formatBrl, getCachedEurBrlQuote, EurBrlQuote,
+  HouseCpaCurrency, resolveCpaCurrency, parseHouseCpaInput, convertHouseCpaInput,
+} from '../lib/currency';
 import { fetchIntegrations, type PublicIntegration } from '../services/integrationService';
 import { houseResultsMode, houseModePayload, type HouseResultsMode } from '../lib/integrations';
 import EntityAuditHistory from '../components/EntityAuditHistory';
@@ -446,9 +449,12 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
   const [integrations, setIntegrations] = useState<PublicIntegration[]>([]);
   const [loadingIntegrations, setLoadingIntegrations] = useState(true);
   // Taxa padrão da casa (comissão casa→agência) — string no input, parseada no save.
-  // defaultCpa é GRAVADO EM EUR (inteiro); a conversão p/ R$ é feita no cálculo da
-  // comissão pela cotação ao vivo (não regravamos o valor quando o câmbio mexe).
+  // O defaultCpa é gravado NA MOEDA DA CASA (`cpaCurrency`): em EUR (inteiro) a
+  // conversão p/ R$ sai da cotação ao vivo no cálculo da comissão; em BRL o valor
+  // gravado é o próprio R$ acordado — casa brasileira paga em real e o valor exato
+  // (com centavos) não cabia na régua de euro inteiro.
   const [defaultCpa, setDefaultCpa] = useState<string>(house?.defaultCpa != null ? String(house.defaultCpa) : '');
+  const [cpaCurrency, setCpaCurrency] = useState<HouseCpaCurrency>(() => resolveCpaCurrency(house?.cpaCurrency));
   const [defaultRev, setDefaultRev] = useState<string>(house?.defaultRev != null ? String(house.defaultRev) : '');
   const [issPercent, setIssPercent] = useState<string>(house?.issPercent != null ? String(house.issPercent) : '');
   const [eurQuote, setEurQuote] = useState<EurBrlQuote>(() => getCachedEurBrlQuote());
@@ -532,7 +538,10 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
         registerUrlTemplate: registerUrlTemplate.trim() || null,
         active,
         ...houseModePayload(mode, integrationId),
-        defaultCpa: defaultCpa.trim() === '' ? null : Math.trunc(Number(defaultCpa)), // EUR inteiro
+        // Valor na moeda escolhida (EUR inteiro / BRL com centavos) + a moeda, que
+        // viajam SEMPRE juntos: é ela que decide se o número será convertido.
+        defaultCpa: parseHouseCpaInput(defaultCpa, cpaCurrency),
+        cpaCurrency,
         defaultRev: defaultRev.trim() === '' ? null : Number(defaultRev),
         issPercent: issPercent.trim() === '' ? null : Number(issPercent),
         ...(logoBase64 ? { logoBase64 } : {}),
@@ -715,22 +724,59 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
             )}
 
             {mode !== 'otg' && (
-              <Field label="Taxa padrão da casa" hint="RECEITA: o que a casa paga à AGÊNCIA — NÃO é o repasse ao afiliado (esse fica em Afiliados). Usada p/ derivar a comissão quando a planilha não traz a coluna 'comissao'. O CPA é informado em EUR (inteiro) e convertido p/ R$ pela cotação do dia automaticamente. Sem isto, o lucro por casa fica negativo.">
+              <Field label="Taxa padrão da casa" hint="RECEITA: o que a casa paga à AGÊNCIA — NÃO é o repasse ao afiliado (esse fica em Afiliados). Usada p/ derivar a comissão quando a planilha não traz a coluna 'comissao'. Informe na MOEDA em que a casa paga: em euro convertemos pela cotação do dia; em real gravamos o valor exato. Sem isto, o lucro por casa fica negativo.">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <span className="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">CPA (€ por CPA)</span>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">CPA (por CPA)</span>
+                      {/* Moeda em que a CASA paga. Trocar aqui CONVERTE o valor já
+                          digitado (preserva o R$ efetivo) — senão "30" viraria R$ 30
+                          e a comissão da casa despencaria sem ninguém notar. */}
+                      <div className="flex rounded-lg border border-slate-200 dark:border-neutral-700 overflow-hidden">
+                        {(['EUR', 'BRL'] as const).map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => {
+                              if (c === cpaCurrency) return;
+                              setDefaultCpa(convertHouseCpaInput(defaultCpa, cpaCurrency, c, eurQuote.rate));
+                              setCpaCurrency(c);
+                            }}
+                            className={cn(
+                              'px-2 py-0.5 text-[10px] font-bold transition-colors',
+                              cpaCurrency === c
+                                ? 'bg-accent-500 text-accent-contrast'
+                                : 'text-slate-500 dark:text-neutral-400 hover:bg-slate-100 dark:hover:bg-neutral-800'
+                            )}
+                          >
+                            {c === 'EUR' ? '€ EUR' : 'R$ BRL'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <div className="relative">
-                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500 text-sm font-semibold">€</span>
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500 text-sm font-semibold">
+                        {cpaCurrency === 'BRL' ? 'R$' : '€'}
+                      </span>
                       <input
-                        type="number" inputMode="numeric" min="0" step="1"
+                        type="text"
+                        inputMode={cpaCurrency === 'BRL' ? 'decimal' : 'numeric'}
                         value={defaultCpa}
-                        onChange={(e) => setDefaultCpa(e.target.value.replace(/[^0-9]/g, ''))}
-                        placeholder="ex.: 30"
-                        className={`${inputCls} pl-7`}
+                        onChange={(e) => setDefaultCpa(
+                          // EUR é inteiro (a casa informa euro cheio); BRL aceita
+                          // centavos com um separador só (vírgula ou ponto).
+                          cpaCurrency === 'BRL'
+                            ? e.target.value.replace(/[^0-9.,]/g, '').replace(/([.,])(?=.*[.,])/g, '')
+                            : e.target.value.replace(/[^0-9]/g, '')
+                        )}
+                        placeholder={cpaCurrency === 'BRL' ? 'ex.: 120,00' : 'ex.: 30'}
+                        className={`${inputCls} ${cpaCurrency === 'BRL' ? 'pl-9' : 'pl-7'}`}
                       />
                     </div>
                     <p className="mt-1 text-[10px] text-slate-400 dark:text-neutral-500">
-                      {defaultCpa.trim() === '' ? (
+                      {cpaCurrency === 'BRL' ? (
+                        <>Valor <b>exato</b> pago pela casa — não varia com o câmbio.</>
+                      ) : defaultCpa.trim() === '' ? (
                         <>1 € = {formatBrl(eurQuote.rate)}{!eurQuote.live && ' · cotação indisponível'}</>
                       ) : (
                         <>≈ <b className="text-emerald-600 dark:text-emerald-400">{formatBrl(eurToBrl(Number(defaultCpa), eurQuote.rate))}</b> por CPA · 1 € = {formatBrl(eurQuote.rate)}{!eurQuote.live && ' (estimada)'}</>

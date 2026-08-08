@@ -5,6 +5,7 @@
 import { authFetch } from '../lib/api';
 import { BrandMeta, setKnownBrands } from '../lib/brand';
 import { StoredManualRow, Metrics } from '../lib/houseResults';
+import { HouseCpaCurrency, resolveCpaCurrency } from '../lib/currency';
 
 export interface House {
   id: string;        // doc id (= slug)
@@ -18,9 +19,12 @@ export interface House {
   // 'otg' = resultados vêm da API externa; 'manual' = alimentados por upload (CSV).
   dataSource: 'otg' | 'manual';
   // Taxa PADRÃO (comissão casa→agência) — deriva a comissão de linhas manuais sem
-  // `comissao` importada. CPA em R$, REV em %. Só relevante p/ casas 'manual'.
+  // `comissao` importada. REV em %. Só relevante p/ casas 'manual'.
   defaultCpa?: number | null;
   defaultRev?: number | null;
+  // Moeda em que a casa paga o CPA: 'EUR' converte pela cotação ao vivo, 'BRL' é o
+  // valor exato. Ausente = 'EUR' (o defaultCpa histórico está todo em euro).
+  cpaCurrency?: HouseCpaCurrency | null;
   // ISS retido no repasse ao afiliado, em % — VARIA POR CASA (5% / 2% / 2% no
   // legado da Infinity). Ausente = sem retenção. Núcleo em `src/lib/tax.ts`.
   issPercent?: number | null;
@@ -53,6 +57,7 @@ export interface HouseInput {
   dataSource?: 'otg' | 'manual';
   defaultCpa?: number | null;
   defaultRev?: number | null;
+  cpaCurrency?: HouseCpaCurrency | null;
   issPercent?: number | null;
   logoBase64?: string | null;
   // Vínculo com um conector de /integracoes ('' / null desvincula). O servidor
@@ -73,6 +78,9 @@ export function houseToBrandMeta(h: House): BrandMeta {
     dataSource: h.dataSource,
     defaultCpa: h.defaultCpa ?? null,
     defaultRev: h.defaultRev ?? null,
+    // A moeda viaja junto com o valor: quem deriva a comissão (houseRateOf) só tem
+    // o BrandMeta em mãos e precisa saber se converte ou não.
+    cpaCurrency: resolveCpaCurrency(h.cpaCurrency),
   };
 }
 
