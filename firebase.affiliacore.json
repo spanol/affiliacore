@@ -5,12 +5,13 @@
     "cleanUrls": true,
     "headers": [
       {
-        "source": "**/*.@(woff2|svg|png)",
-        "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800, immutable" }]
+        "_comment": "Default no-cache p/ TUDO — com cleanUrls as páginas servem em '/', '/guia' etc. (sem .html na URL), então um padrão **/*.html NÃO casa e o HTML ficava 1h no cache do navegador (deploy 'invisível', 08/08). A regra dos assets vem DEPOIS e vence p/ eles.",
+        "source": "**",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
       },
       {
-        "source": "**/*.html",
-        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+        "source": "**/*.@(woff2|svg|png|jpg)",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800, immutable" }]
       }
     ]
   },
