@@ -31,7 +31,7 @@ import {
   deleteDoc,
 } from 'firebase/firestore';
 
-const PROJECT_ID = 'demo-boost-rules-test';
+const PROJECT_ID = 'demo-affiliacore-rules-test';
 // Lê as regras REAIS do projeto — a regressão é contra o que vai a produção.
 const RULES = readFileSync(resolve(process.cwd(), 'firestore.rules'), 'utf8');
 

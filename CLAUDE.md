@@ -23,12 +23,16 @@ Originated as a Google AI Studio applet (see README / `firebase-applet-config.js
 
 ```bash
 npm install          # install deps
-npm run dev          # start the app (Express + Vite middleware) on PORT (default 3000)
-npm start            # same as dev (tsx server.ts) — used in production with NODE_ENV=production
+npm run dev          # DEV PADRÃO: demo nos EMULADORES (scripts/dev-demo.mjs) — sobe Firestore+Auth
+                     # emulados, seeda a demo (senhas no console + .demo-runtime/) e inicia o app
+                     # em http://localhost:3123. ZERO contato com projeto real. DEMO_RESEED=1 reseeda.
+npm run dev:server   # servidor CRU (o antigo dev): tsx server.ts com o .env como estiver —
+                     # aponta pro projeto Firebase REAL configurado; use consciente.
+npm start            # same as dev:server (tsx server.ts) — used in production with NODE_ENV=production
 npm run build        # vite build -> dist/
 npm run preview      # vite preview of the built bundle
 npm run lint         # tsc --noEmit (type-check only; there is no ESLint)
-npm run clean        # rm -rf dist
+npm run clean        # remove dist/ (cross-platform)
 
 # Tests (Vitest + React Testing Library + jsdom)
 npm test             # run the suite once (vitest run)
@@ -42,7 +46,7 @@ firebase projects:list                    # confirm logged-in account / projects
 
 **Testing.** Test runner is **Vitest** (`vitest.config.ts`, jsdom env, setup in `src/test/setup.ts` registering jest-dom matchers). Convention: `*.test.ts(x)` colocated with the code. Current coverage is the B2 work (`lib/dateRange`, the `affiliateService` parsing helpers, `DateRangePicker`); see **Trilha E** in `INTEGRATION-PLAN.md` for the strategy — each new phase ships with its tests. `npm run lint` (TypeScript type-check) remains the other automated check.
 
-Dev and production both run through `server.ts` via `tsx` — there is no `vite dev` standalone path. In dev the Express server mounts Vite as middleware (`appType: 'spa'`); in production (`NODE_ENV=production`) it serves static `dist/` and falls back to `dist/index.html` for SPA routing.
+Dev and production both run through `server.ts` via `tsx` — there is no `vite dev` standalone path. In dev the Express server mounts Vite as middleware (`appType: 'spa'`); in production (`NODE_ENV=production`) it serves static `dist/` and falls back to `dist/index.html` for SPA routing. **`npm run dev` NÃO toca projeto real**: é o orquestrador da demo emulada (`scripts/dev-demo.mjs` — a mesma receita da skill `/verify`), que roda o servidor por baixo via `npm run dev:server` com o ambiente dos emuladores. Desenvolvimento contra a instância real do `.env` é opt-in explícito: `npm run dev:server`.
 
 ## Architecture
 

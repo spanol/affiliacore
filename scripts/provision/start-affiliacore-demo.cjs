@@ -185,7 +185,9 @@ async function ensureApp() {
       VITE_BRAND_SURFACE: '#3F1D2B',
       PORT: String(APP_PORT),
     };
-    const pid = spawnDetached(NPM, ['run', 'dev'], env, appLog);
+    // dev:server = servidor cru (o `npm run dev` virou o orquestrador da demo —
+    // chamá-lo daqui recursaria).
+    const pid = spawnDetached(NPM, ['run', 'dev:server'], env, appLog);
     await waitForPort(APP_PORT, 'app demo', 90000);
     return { started: true, pid };
   }

@@ -18,21 +18,24 @@ Detalhes completos de arquitetura, autenticação e fluxo de onboarding de afili
 ## Pré-requisitos
 
 - Node.js
-- Variáveis de ambiente em `.env` (veja `.env.example`). Vars com prefixo `VITE_` são expostas ao navegador; as demais (`FIREBASE_SERVICE_ACCOUNT_KEY`, `AFFILIATE_API_KEY`, `PORT`) são apenas do servidor.
-- `service-account.json` (gitignored) ou `GOOGLE_APPLICATION_CREDENTIALS` para o Firebase Admin SDK — sem isso, as rotas `/api/*` falham.
+- **Dev padrão (`npm run dev`)**: firebase CLI global (`npm i -g firebase-tools`) + Java — roda tudo nos emuladores, sem tocar projeto real nem exigir `.env`.
+- **Só para `npm run dev:server` (instância real)**: variáveis de ambiente em `.env` (veja `.env.example`) e `service-account.json` (gitignored) ou `GOOGLE_APPLICATION_CREDENTIALS` para o Firebase Admin SDK — sem isso, as rotas `/api/*` falham. Vars com prefixo `VITE_` são expostas ao navegador; as demais (`FIREBASE_SERVICE_ACCOUNT_KEY`, `AFFILIATE_API_KEY`, `PORT`) são apenas do servidor.
 
 ## Rodando localmente
 
 ```bash
 npm install      # instala dependências
-npm run dev      # inicia o app (Express + Vite) na PORT (default 3000)
+npm run dev      # DEMO nos emuladores (Firestore+Auth): seeda 3 logins e sobe o app
+                 # em http://localhost:3123 — zero contato com projeto real.
+                 # Senhas no console e em .demo-runtime/affiliacore/latest-demo-credentials.txt
 ```
 
 ## Scripts
 
 ```bash
-npm run dev       # inicia o app (tsx server.ts)
-npm start         # idem, usado em produção com NODE_ENV=production
+npm run dev        # demo nos emuladores (scripts/dev-demo.mjs); DEMO_RESEED=1 reseeda do zero
+npm run dev:server # servidor cru (tsx server.ts) — usa o .env e aponta pro projeto Firebase REAL
+npm start          # idem dev:server, usado em produção com NODE_ENV=production
 npm run build     # build de produção -> dist/
 npm run preview   # preview do bundle buildado
 npm run lint      # tsc --noEmit (type-check; não há ESLint)

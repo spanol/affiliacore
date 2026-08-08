@@ -26,4 +26,5 @@ set VITE_BRAND_ACCENT=#8332B9
 rem CANVAS/SURFACE removidos (2026-07-29): a instancia real NAO os declara — o
 rem preview pinava o vinho antigo e nao representava o app (apphosting.infinity.yaml).
 set PORT=3124
-npm run dev
+rem dev:server = servidor cru; "npm run dev" e o orquestrador da demo AffiliaCore
+npm run dev:server
