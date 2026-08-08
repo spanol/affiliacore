@@ -295,6 +295,9 @@ html.light .theme-toggle .ic-moon{display:block}
 .proof-num{border:1px solid var(--line);border-radius:12px;background:var(--fill-1);padding:16px 18px}
 .proof-num b{display:block;font-family:var(--display);font-weight:800;font-size:1.35rem;white-space:nowrap}
 .proof-num span{font-size:.82rem;color:var(--faint)}
+.proof-live{margin-top:16px;display:grid;gap:14px}
+.proof-avatar{display:flex;align-items:center;justify-content:center;flex:none;width:54px;height:54px;border-radius:14px;background:linear-gradient(135deg,var(--ember),#9F1239);color:#fff;font-family:var(--display);font-weight:800;font-size:1.3rem}
+.proof-live-note{font-size:.8rem;color:var(--faint);margin-top:14px}
 @media (max-width:880px){.proof-nums{grid-template-columns:1fr}}
 
 /* ——— do zero + simulador ——— */
@@ -638,6 +641,8 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div class="proof-num"><b>R$ 100 mil+</b><span>em comissões processadas e conferidas</span></div>
       <div class="proof-num"><b>0 planilhas</b><span>no fechamento do mês da agência</span></div>
     </div>
+    <div id="proof-live" class="proof-live" hidden></div>
+    <p class="proof-live-note" id="proof-live-note" hidden>Apresentações escritas pelas próprias agências, direto do painel — cada uma escolhe aparecer aqui.</p>
   </div>
 </section>
 
@@ -875,6 +880,49 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     });
   });
   calc();
+})();
+(function () {
+  // Vitrine viva: cada instância expõe GET /api/showcase, e a agência liga/desliga
+  // a própria presença pelo painel (Configurações → Vitrine AffiliaCore). Lista
+  // curada de instâncias — quem não responde ou está com a vitrine desligada é
+  // pulada em silêncio. (A instância da Boost builda de outro repo; enquanto o
+  // endpoint não chega lá, o card estático acima segue representando-a.)
+  var SOURCES = ['https://infinityaffiliates.agency'];
+  var wrap = document.getElementById('proof-live');
+  var note = document.getElementById('proof-live-note');
+  SOURCES.forEach(function (origin) {
+    fetch(origin + '/api/showcase').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+      if (!d || d.enabled !== true || !d.name) return;
+      // Conteúdo vem de fora → só textContent (nunca innerHTML), accent validado
+      // antes de virar style e link só com https.
+      var card = document.createElement('div'); card.className = 'proof-card';
+      var avatar = document.createElement('span'); avatar.className = 'proof-avatar';
+      avatar.textContent = String(d.name).charAt(0).toUpperCase();
+      if (/^#[0-9a-fA-F]{6}$/.test(String(d.accent || ''))) avatar.style.background = d.accent;
+      var body = document.createElement('div');
+      var name = document.createElement('b'); name.textContent = String(d.name).slice(0, 60);
+      body.appendChild(name);
+      if (d.description) {
+        var p = document.createElement('p'); p.textContent = String(d.description).slice(0, 400);
+        body.appendChild(p);
+      }
+      var side = document.createElement('div'); side.className = 'proof-side';
+      var badge = document.createElement('span'); badge.className = 'proof-badge';
+      badge.appendChild(document.createElement('i'));
+      badge.appendChild(document.createTextNode('Em produção'));
+      side.appendChild(badge);
+      var site = String(d.siteUrl || '');
+      if (/^https:\/\//.test(site)) {
+        var a = document.createElement('a'); a.className = 'proof-link';
+        a.target = '_blank'; a.rel = 'noopener nofollow'; a.href = site;
+        a.textContent = site.replace(/^https:\/\//, '').replace(/\/$/, '').slice(0, 40);
+        side.appendChild(a);
+      }
+      card.appendChild(avatar); card.appendChild(body); card.appendChild(side);
+      wrap.appendChild(card);
+      wrap.hidden = false; note.hidden = false;
+    }).catch(function () {});
+  });
 })();
 (function () {
   var meta = document.querySelector('meta[name="theme-color"]');

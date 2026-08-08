@@ -31,6 +31,7 @@ import { buildVersionPayload, type AppVersion } from './src/lib/version';
 import { sanitizePrize, sanitizePrizePatch } from './src/lib/prizes';
 import { sanitizeTier, sanitizeTierPatch } from './src/lib/achievements';
 import { sanitizeSupportContact, SUPPORT_CONTACT_EMPTY } from './src/lib/supportContact';
+import { sanitizeShowcase, buildShowcasePayload } from './src/lib/showcase';
 import { parseStandbyLinks, extractTagFromUrl } from './src/lib/linkTriage';
 import { buildTaggedUrl, suggestTag } from './src/lib/linkGeneration';
 import { buildResultsNotification, type ResultsNotificationVariant } from './src/lib/resultsNotification';
@@ -1907,6 +1908,77 @@ export function createApp(deps: ServerDeps) {
     } catch (error: any) {
       console.error('Error saving support contact:', error);
       return res.status(500).json({ error: error.message || 'Erro interno salvando contato de suporte.' });
+    }
+  });
+
+  // --- Vitrine AffiliaCore (opt-in da agência na LP do produto) ---------------
+  // A agência escolhe aparecer na seção "clientes" de affiliacore.com.br e escreve
+  // a própria apresentação. Mora em `settings/showcase` (admin-only nas rules); a
+  // LP lê o payload PÚBLICO montado por buildShowcasePayload — quando a vitrine
+  // está desligada, a resposta é só {enabled:false} (o rascunho salvo nunca vaza).
+  app.get('/api/showcase', async (_req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    // A LP busca cross-origin; o payload é público por definição (só sai o que a
+    // agência optou por exibir), então o CORS aberto aqui não expõe nada a mais.
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    try {
+      const snap = await adminDb.collection('settings').doc('showcase').get();
+      return res.json(
+        buildShowcasePayload(snap.exists ? (snap.data() as any) : null, {
+          name: BRAND.name,
+          accent: process.env.VITE_BRAND_ACCENT,
+        }),
+      );
+    } catch (error: any) {
+      console.error('Error building showcase payload:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno lendo a vitrine.' });
+    }
+  });
+
+  // Editor do admin lê a config CRUA (inclusive rascunho com a vitrine desligada).
+  app.get('/api/showcase-config', requireAdmin, async (_req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const snap = await adminDb.collection('settings').doc('showcase').get();
+      const data = (snap.exists ? snap.data() : null) as any;
+      return res.json({
+        showcase: {
+          enabled: data?.enabled === true,
+          description: String(data?.description ?? ''),
+          siteUrl: String(data?.siteUrl ?? ''),
+        },
+      });
+    } catch (error: any) {
+      console.error('Error fetching showcase config:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno lendo a config da vitrine.' });
+    }
+  });
+
+  app.put('/api/showcase-config', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const parsed = sanitizeShowcase(req.body);
+      if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+      const ref = adminDb.collection('settings').doc('showcase');
+      const before = (await ref.get()).data() ?? {};
+      await ref.set(
+        { ...parsed.value, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true },
+      );
+      const changes = diffChanges(before, { ...parsed.value! }, ['enabled', 'description', 'siteUrl']);
+      if (changes.length > 0) {
+        await writeAuditLog(req, {
+          entityType: 'settings',
+          entityId: 'showcase',
+          entityLabel: 'Vitrine AffiliaCore',
+          action: 'showcase.update',
+          changes,
+        });
+      }
+      return res.json({ showcase: parsed.value });
+    } catch (error: any) {
+      console.error('Error saving showcase config:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno salvando a vitrine.' });
     }
   });
 

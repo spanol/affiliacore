@@ -2724,6 +2724,78 @@ describe('contato de suporte (/api/support-contact)', () => {
 });
 
 // =============================================================================
+// Vitrine AffiliaCore (/api/showcase) — opt-in da agencia na LP do produto
+// =============================================================================
+describe('vitrine AffiliaCore (/api/showcase)', () => {
+  const seed = {
+    users: { 'admin-uid': { role: 'admin' }, 'client-uid': { role: 'client', affiliateId: 'AFF-1' } },
+  };
+
+  it('GET publico (sem token) devolve {enabled:false} quando nunca configurado, com CORS aberto', async () => {
+    const app = buildApp({ seed });
+    const res = await request(app).get('/api/showcase').expect(200);
+    expect(res.body).toEqual({ enabled: false });
+    expect(res.headers['access-control-allow-origin']).toBe('*');
+  });
+
+  it('vitrine DESLIGADA nao vaza o rascunho salvo no GET publico', async () => {
+    const db = makeFirestore({
+      ...seed,
+      settings: { showcase: { enabled: false, description: 'rascunho secreto', siteUrl: 'https://x.com' } },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app).get('/api/showcase').expect(200);
+    expect(res.body).toEqual({ enabled: false });
+  });
+
+  it('admin liga pela config e o GET publico passa a servir o payload', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .put('/api/showcase-config')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ enabled: true, description: '  Agencia com 80+ afiliados.  ', siteUrl: 'https://agencia.bet' })
+      .expect(200);
+    const res = await request(app).get('/api/showcase').expect(200);
+    expect(res.body).toMatchObject({
+      enabled: true,
+      name: 'AffiliaCore', // sem VITE_BRAND_NAME no ambiente de teste, cai no default do produto
+      description: 'Agencia com 80+ afiliados.',
+      siteUrl: 'https://agencia.bet',
+    });
+  });
+
+  it('config e admin-only: client nao le nem escreve; URL invalida -> 400', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).get('/api/showcase-config').set('Authorization', 'Bearer client-uid').expect(403);
+    await request(app)
+      .put('/api/showcase-config')
+      .set('Authorization', 'Bearer client-uid')
+      .send({ enabled: true })
+      .expect(403);
+    await request(app)
+      .put('/api/showcase-config')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ enabled: true, siteUrl: 'agencia.bet' })
+      .expect(400);
+    expect(db.__store.get('settings')?.has('showcase') ?? false).toBe(false);
+  });
+
+  it('PUT audita a mudanca', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .put('/api/showcase-config')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ enabled: true, description: 'Oi' })
+      .expect(200);
+    const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
+    expect(logs.some((l: any) => l.action === 'showcase.update')).toBe(true);
+  });
+});
+
+// =============================================================================
 // Triagem de links — pool de STANDBY, atribuicao e liberacao
 // =============================================================================
 describe('triagem de links — standby (/api/affiliate-links)', () => {

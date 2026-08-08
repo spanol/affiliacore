@@ -10,7 +10,8 @@ import {
   RefreshCw,
   Copy,
   Check,
-  LifeBuoy
+  LifeBuoy,
+  Megaphone
 } from 'lucide-react';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
@@ -18,6 +19,8 @@ import { useAuth } from '../contexts/AuthContext';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { fetchSupportContact, saveSupportContact } from '../services/supportService';
 import { formatSupportPhone, SUPPORT_LABEL_DEFAULT } from '../lib/supportContact';
+import { fetchShowcaseConfig, saveShowcaseConfig } from '../services/showcaseService';
+import { SHOWCASE_DESCRIPTION_MAX } from '../lib/showcase';
 
 export default function Settings() {
   const { profile } = useAuth();
@@ -39,6 +42,14 @@ export default function Settings() {
   const [supportSaved, setSupportSaved] = useState(false);
   const [supportError, setSupportError] = useState('');
 
+  // Vitrine AffiliaCore (opt-in): aparecer na seção "clientes" da LP do produto.
+  const [showcaseEnabled, setShowcaseEnabled] = useState(false);
+  const [showcaseDescription, setShowcaseDescription] = useState('');
+  const [showcaseSiteUrl, setShowcaseSiteUrl] = useState('');
+  const [showcaseSaving, setShowcaseSaving] = useState(false);
+  const [showcaseSaved, setShowcaseSaved] = useState(false);
+  const [showcaseError, setShowcaseError] = useState('');
+
   useEffect(() => {
     if (profile?.role !== 'admin') return;
     fetchSupportContact()
@@ -54,6 +65,40 @@ export default function Settings() {
       })
       .catch(() => {});
   }, [profile]);
+
+  useEffect(() => {
+    if (profile?.role !== 'admin') return;
+    fetchShowcaseConfig()
+      .then((cfg) => {
+        setShowcaseEnabled(cfg.enabled);
+        setShowcaseDescription(cfg.description || '');
+        setShowcaseSiteUrl(cfg.siteUrl || '');
+      })
+      .catch(() => {});
+  }, [profile]);
+
+  const handleSaveShowcase = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setShowcaseSaving(true);
+    setShowcaseError('');
+    setShowcaseSaved(false);
+    try {
+      const saved = await saveShowcaseConfig({
+        enabled: showcaseEnabled,
+        description: showcaseDescription,
+        siteUrl: showcaseSiteUrl,
+      });
+      setShowcaseEnabled(saved.enabled);
+      setShowcaseDescription(saved.description);
+      setShowcaseSiteUrl(saved.siteUrl);
+      setShowcaseSaved(true);
+      setTimeout(() => setShowcaseSaved(false), 3000);
+    } catch (err: any) {
+      setShowcaseError(err?.message || 'Falha ao salvar a vitrine.');
+    } finally {
+      setShowcaseSaving(false);
+    }
+  };
 
   const handleSaveSupport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -293,6 +338,86 @@ export default function Settings() {
               >
                 {supportSaving ? <RefreshCw size={14} className="animate-spin" /> : supportSaved ? <Check size={14} /> : <Save size={14} />}
                 {supportSaved ? 'Contato Salvo!' : 'Salvar Contato de Suporte'}
+              </button>
+            </form>
+          </div>
+        </motion.div>
+
+        {/* Vitrine AffiliaCore — opt-in de aparecer na LP do produto */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl shadow-sm overflow-hidden hover:border-slate-300 dark:hover:border-neutral-700 transition-colors"
+        >
+          <div className="p-5 border-b border-slate-100 dark:border-neutral-800 flex items-center gap-3">
+            <span className="p-2 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700/60">
+              <Megaphone size={16} className="text-slate-900 dark:text-neutral-100" />
+            </span>
+            <h3 className="text-sm font-bold text-slate-800 dark:text-white tracking-tight">Vitrine AffiliaCore</h3>
+          </div>
+          <div className="p-6 space-y-6">
+            <p className="text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
+              Com a vitrine ligada, sua agência aparece na seção de clientes do site da AffiliaCore
+              (affiliacore.com.br) — com o nome da instância, a apresentação abaixo e, se quiser, o link
+              do seu site. Afiliados que procuram uma agência podem chegar até você por lá. É totalmente
+              opcional e você pode desligar quando quiser; desligada, nada é exibido.
+            </p>
+
+            <form onSubmit={handleSaveShowcase} className="space-y-4">
+              <label className="flex items-center gap-3 text-xs font-medium text-slate-600 dark:text-neutral-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showcaseEnabled}
+                  onChange={(e) => setShowcaseEnabled(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 dark:border-neutral-600 accent-accent-500"
+                />
+                Exibir minha agência na vitrine da AffiliaCore
+              </label>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest ml-1 block">
+                  Apresentação (opcional)
+                </label>
+                <textarea
+                  value={showcaseDescription}
+                  onChange={(e) => setShowcaseDescription(e.target.value)}
+                  maxLength={SHOWCASE_DESCRIPTION_MAX}
+                  rows={3}
+                  placeholder="Conte em poucas linhas quem é a sua agência, com quais casas opera e o que oferece aos afiliados."
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all outline-none resize-y"
+                />
+                <p className="text-[10px] text-slate-400 dark:text-neutral-500 ml-1 text-right">
+                  {showcaseDescription.length}/{SHOWCASE_DESCRIPTION_MAX}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest ml-1 block">
+                  Site público (opcional)
+                </label>
+                <input
+                  type="url"
+                  value={showcaseSiteUrl}
+                  onChange={(e) => setShowcaseSiteUrl(e.target.value)}
+                  placeholder="https://suaagencia.com.br"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all outline-none"
+                />
+              </div>
+
+              {showcaseError && (
+                <div className="p-3 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-xl text-[11px] font-bold flex items-center gap-2 border border-red-100 dark:border-red-900/40">
+                  <AlertCircle size={14} />
+                  {showcaseError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={showcaseSaving}
+                className="w-full bg-slate-900 dark:bg-white text-white dark:text-neutral-900 py-3 rounded-full text-xs font-bold hover:opacity-90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+              >
+                {showcaseSaving ? <RefreshCw size={14} className="animate-spin" /> : showcaseSaved ? <Check size={14} /> : <Save size={14} />}
+                {showcaseSaved ? 'Vitrine Salva!' : 'Salvar Vitrine'}
               </button>
             </form>
           </div>
