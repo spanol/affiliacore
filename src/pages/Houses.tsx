@@ -238,10 +238,19 @@ export default function Houses() {
                   <dd className="truncate max-w-[60%]" title={h.lastResultsDate ? `cobre até ${h.lastResultsDate}` : ''}>
                     {(() => {
                       const f = describeFreshness(h.lastResultsSyncAt);
+                      // Checagem ≠ dado: rodada vazia carimba lastResultsCheckAt sem
+                      // mexer no frescor. Mostrada só quando é mais nova que o dado —
+                      // é o que separa "robô quebrado" de "sem dado novo".
+                      const check = describeFreshness(h.lastResultsCheckAt);
+                      const showCheck =
+                        check.minutes !== null && (f.minutes === null || check.minutes < f.minutes);
                       return (
                         <span className={cn('font-semibold', f.stale ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400')}>
                           {f.label}
                           {h.lastResultsSyncSource === 'api' && f.minutes !== null ? ' · API' : ''}
+                          {showCheck && (
+                            <span className="font-medium text-slate-400 dark:text-neutral-500"> · verificada {check.label}</span>
+                          )}
                         </span>
                       );
                     })()}

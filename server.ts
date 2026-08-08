@@ -3661,6 +3661,8 @@ export function createApp(deps: ServerDeps) {
       // Frescor do dado (pull horário OU upload) — o afiliado lê isto no painel.
       // Timestamp vira ISO: o client não tem o SDK admin para desserializar.
       lastResultsSyncAt: data.lastResultsSyncAt?.toDate?.().toISOString?.() ?? data.lastResultsSyncAt ?? null,
+      // Última VERIFICAÇÃO do conector (rodada vazia também carimba) ≠ último dado.
+      lastResultsCheckAt: data.lastResultsCheckAt?.toDate?.().toISOString?.() ?? data.lastResultsCheckAt ?? null,
       lastResultsSyncSource: data.lastResultsSyncSource ?? null,
       lastResultsDate: data.lastResultsDate ?? null,
       // Conector de pull declarado PELA casa (auto-carimbado pelo conector).
@@ -4588,6 +4590,17 @@ export function createApp(deps: ServerDeps) {
       const payload = buildPullPayload(pullRows, tagIndex as any);
 
       if (payload.rows.length === 0) {
+        // Janela vazia NÃO é falha: a casa fecha o dia com atraso (~1 dia), então
+        // de madrugada a janela (ontem..hoje) costuma vir sem linha nenhuma — foi
+        // o "cron sumido" de 08/08 (200 sem writes, auditoria muda). Carimba a
+        // VERIFICAÇÃO e a flag do conector mesmo assim: sem isso o /casas sugere
+        // robô quebrado e a flag `integration` nunca chega numa instância cujas
+        // rodadas estão todas vazias. O frescor do DADO (lastResultsSyncAt) fica
+        // intacto de propósito — ele mede dado, não checagem.
+        await houseSnap.ref.set({
+          lastResultsCheckAt: admin.firestore.FieldValue.serverTimestamp(),
+          integration: 'esportiva-tap',
+        }, { merge: true });
         return res.json({ ok: true, house: slug, dateFrom, dateTo, imported: 0, attributed: 0, pending: [], note: 'A casa não devolveu linhas nessa janela.' });
       }
 
@@ -4611,6 +4624,7 @@ export function createApp(deps: ServerDeps) {
       // Carimbo de frescor — é o que o afiliado lê no painel ("atualizado há X").
       ops.push((b) => b.set(houseSnap.ref, {
         lastResultsSyncAt: importedAt,
+        lastResultsCheckAt: importedAt,
         lastResultsSyncSource: 'api',
         lastResultsDate: payload.dates[payload.dates.length - 1] ?? null,
         // A casa DECLARA seu conector: é a flag que liga o "Atualizar" em /casas

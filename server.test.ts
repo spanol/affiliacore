@@ -3193,6 +3193,23 @@ describe('pull da Esportiva (/api/internal/esportiva-pull)', () => {
     expect(db.__store.get('houses')?.get('esportiva-bet')?.integration).toBe('esportiva-tap');
   }));
 
+  // O "cron sumido" de 08/08: casa fecha o dia com atraso -> de madrugada a janela
+  // vem vazia, a rota respondia 200 SEM gravar nada e o /casas sugeria robo quebrado.
+  it('janela VAZIA: 200 com note, carimba VERIFICACAO + flag, e NAO mexe no frescor do dado', withKey(async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch([]) });
+    const res = await request(app).post('/api/internal/esportiva-pull').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(res.body).toMatchObject({ ok: true, imported: 0 });
+    expect(String(res.body.note ?? '')).toMatch(/devolveu linhas/);
+    const house = db.__store.get('houses')?.get('esportiva-bet');
+    expect(house.integration).toBe('esportiva-tap'); // flag chega mesmo sem dado
+    expect(house.lastResultsCheckAt).toBeTruthy(); // a checagem fica registrada
+    expect(house.lastResultsSyncAt).toBeUndefined(); // frescor do DADO intacto
+    expect(db.__store.get('house_results')?.size ?? 0).toBe(0); // nada importado
+    const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
+    expect(logs.some((l: any) => l.action === 'house_results.pull')).toBe(false); // sem spam horario
+  }));
+
   it('grava agregado do dia + linha do afiliado, e a tag orfa fica PENDENTE', withKey(async () => {
     const db = makeFirestore(seed);
     const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch() });

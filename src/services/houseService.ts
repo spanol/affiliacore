@@ -28,6 +28,9 @@ export interface House {
   // vez, por qual via, e até que dia eles cobrem. Escrito tanto pelo pull horário
   // quanto pelo upload manual. Lido pelo afiliado (src/lib/freshness.ts).
   lastResultsSyncAt?: string | null;
+  // Última VERIFICAÇÃO do conector — rodada vazia (casa sem linhas na janela)
+  // também carimba. Distingue "robô quebrado" de "sem dado novo" no /casas.
+  lastResultsCheckAt?: string | null;
   lastResultsSyncSource?: 'api' | 'upload' | null;
   lastResultsDate?: string | null;
   // Conector de pull declarado PELA casa (ex.: 'esportiva-tap'), auto-carimbado
