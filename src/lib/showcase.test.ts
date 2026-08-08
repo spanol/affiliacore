@@ -3,6 +3,7 @@ import {
   sanitizeShowcase,
   buildShowcasePayload,
   normalizeShowcaseUrl,
+  selfRegistrationOpen,
   SHOWCASE_DESCRIPTION_MAX,
 } from './showcase';
 
@@ -85,5 +86,19 @@ describe('buildShowcasePayload', () => {
 
   it('marca sem nome cai no default do produto', () => {
     expect(buildShowcasePayload({ enabled: true }, { name: '' })).toMatchObject({ name: 'AffiliaCore' });
+  });
+});
+
+describe('selfRegistrationOpen (vitrine = declaração de auto-cadastro)', () => {
+  it('só um {enabled:false} explícito fecha o cadastro', () => {
+    expect(selfRegistrationOpen({ enabled: false })).toBe(false);
+    expect(selfRegistrationOpen({ enabled: true, name: 'X' })).toBe(true);
+  });
+
+  it('FAIL-OPEN: resposta ilegível ou sem o campo mantém o cadastro aberto', () => {
+    expect(selfRegistrationOpen(null)).toBe(true); // fetch falhou
+    expect(selfRegistrationOpen('<!doctype html>')).toBe(true); // build antiga → fallback SPA
+    expect(selfRegistrationOpen({})).toBe(true);
+    expect(selfRegistrationOpen(undefined)).toBe(true);
   });
 });

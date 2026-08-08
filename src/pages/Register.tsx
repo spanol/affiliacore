@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle, Phone, Share2, IdCard } from 'lucide-react';
+import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle, Phone, Share2, IdCard, MailQuestion } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
 import { maskCPF, maskPhone, isValidCPF, isValidPhone } from '../lib/validators';
 import InstanceLogo from '../components/InstanceLogo';
 import { readStoredRegistrationSource } from '../lib/registrationSource';
+import { selfRegistrationOpen } from '../lib/showcase';
 
 
 export default function Register() {
@@ -23,7 +24,27 @@ export default function Register() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  // O estado da vitrine (settings/showcase) É a declaração de auto-cadastro da
+  // agência: desligada = onboarding só por convite, e este formulário fecha.
+  // Consulta o próprio GET /api/showcase (público). FAIL-OPEN via
+  // selfRegistrationOpen: erro de rede ou build antiga não trancam o cadastro.
+  const [selfRegOpen, setSelfRegOpen] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/showcase', { headers: { Accept: 'application/json' } })
+      .then((r) => r.json())
+      .then((payload) => {
+        if (alive) setSelfRegOpen(selfRegistrationOpen(payload));
+      })
+      .catch(() => {
+        if (alive) setSelfRegOpen(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,6 +137,38 @@ export default function Register() {
       setLoading(false);
     }
   };
+
+  if (!selfRegOpen) {
+    return (
+      <div className={cn("relative min-h-screen overflow-hidden bg-slate-50 dark:bg-neutral-950 flex items-center justify-center p-4 transition-colors duration-300", theme === 'dark' && 'dark')}>
+        <div className="pointer-events-none fixed top-[-15%] right-[-10%] w-[45%] h-[45%] rounded-full bg-white/5 blur-[120px] hidden dark:block" />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative bg-glass-card dark:bg-glass-card-dark backdrop-blur-glass-strong p-10 rounded-3xl shadow-xl shadow-slate-900/5 dark:shadow-black/30 border border-slate-200/70 dark:border-neutral-800 text-center max-w-sm"
+        >
+          <InstanceLogo className="h-7 w-auto mx-auto mb-6" />
+          <div className="flex justify-center mb-5">
+            <MailQuestion size={48} className="text-slate-400 dark:text-neutral-500" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Cadastro por convite</h2>
+          <p className="text-sm text-slate-500 dark:text-neutral-400 mb-8">
+            No momento, novos afiliados entram por convite da agência. Fale com a gente pela página
+            inicial para pedir o seu acesso — ou, se você já recebeu um link de convite, é só abri-lo.
+          </p>
+          <Link
+            to="/"
+            className="inline-flex w-full items-center justify-center py-3.5 rounded-2xl font-bold text-sm transition-all bg-auth-cta text-auth-cta-text hover:bg-auth-cta-hover dark:bg-lp-cta dark:text-lp-cta-text dark:hover:bg-lp-cta-hover"
+          >
+            Ir para a página inicial
+          </Link>
+          <p className="text-center mt-6 text-xs font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-tight">
+            Já possui acesso? <Link to="/login" className="text-auth-cta dark:text-lp-cta hover:underline">Fazer login</Link>
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (success) {
     return (

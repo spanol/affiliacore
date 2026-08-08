@@ -642,7 +642,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div class="proof-num"><b>0 planilhas</b><span>no fechamento do mês da agência</span></div>
     </div>
     <div id="proof-live" class="proof-live" hidden></div>
-    <p class="proof-live-note" id="proof-live-note" hidden>Apresentações escritas pelas próprias agências, direto do painel — cada uma escolhe aparecer aqui.</p>
+    <p class="proof-live-note" id="proof-live-note" hidden>Apresentações escritas pelas próprias agências, direto do painel. Quem aparece aqui está com o cadastro de afiliados aberto — dá pra se cadastrar direto, sem convite.</p>
   </div>
 </section>
 
@@ -909,8 +909,15 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       var side = document.createElement('div'); side.className = 'proof-side';
       var badge = document.createElement('span'); badge.className = 'proof-badge';
       badge.appendChild(document.createElement('i'));
-      badge.appendChild(document.createTextNode('Em produção'));
+      // Vitrine ligada = a agência declarou que aceita cadastro espontâneo — o
+      // badge e o CTA de cadastro traduzem exatamente esse estado.
+      badge.appendChild(document.createTextNode('Cadastro aberto'));
       side.appendChild(badge);
+      var reg = document.createElement('a'); reg.className = 'proof-link';
+      reg.target = '_blank'; reg.rel = 'noopener';
+      reg.href = origin + '/register?src=vitrine-affiliacore';
+      reg.textContent = 'Cadastrar como afiliado →';
+      side.appendChild(reg);
       var site = String(d.siteUrl || '');
       if (/^https:\/\//.test(site)) {
         var a = document.createElement('a'); a.className = 'proof-link';

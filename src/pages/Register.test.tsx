@@ -63,15 +63,29 @@ async function submeter() {
   });
 }
 
+// O Register consulta GET /api/showcase no mount (gate do auto-cadastro — a
+// vitrine desligada fecha o formulário). Stub do fetch global por teste.
+let fetchMock: ReturnType<typeof vi.fn>;
+
+// O mount dispara o fetch do gate; render dentro de act + flush p/ o setState
+// do useEffect terminar sem warning.
+async function renderRegister() {
+  await act(async () => {
+    render(<Register />);
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   h.createUserWithEmailAndPassword.mockResolvedValue({ user: { uid: 'u1' } });
   h.setDoc.mockResolvedValue(undefined);
+  fetchMock = vi.fn().mockResolvedValue({ json: () => Promise.resolve({ enabled: true, name: 'X' }) });
+  vi.stubGlobal('fetch', fetchMock);
 });
 
 describe('Register (P1.10 — e-mail normalizado antes do Auth)', () => {
   it('passa o e-mail NORMALIZADO (trim + lowercase) ao Auth, não o cru', async () => {
-    render(<Register />);
+    await renderRegister();
     preencher({ email: '  TEST@X.COM ', cpf: CPF_VALIDO });
     await submeter();
 
@@ -84,11 +98,32 @@ describe('Register (P1.10 — e-mail normalizado antes do Auth)', () => {
   });
 
   it('CPF inválido bloqueia antes: createUser NÃO é chamado', async () => {
-    render(<Register />);
+    await renderRegister();
     preencher({ email: '  TEST@X.COM ', cpf: CPF_INVALIDO });
     await submeter();
 
     expect(h.createUserWithEmailAndPassword).not.toHaveBeenCalled();
     expect(screen.getByText(/CPF inválido/i)).toBeInTheDocument();
+  });
+});
+
+describe('Register — gate do auto-cadastro (estado da vitrine)', () => {
+  it('{enabled:false} explícito fecha o formulário: tela Cadastro por convite', async () => {
+    fetchMock.mockResolvedValue({ json: () => Promise.resolve({ enabled: false }) });
+    await renderRegister();
+    expect(screen.getByText('Cadastro por convite')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Seu nome')).not.toBeInTheDocument();
+  });
+
+  it('FAIL-OPEN: erro de rede não tranca o cadastro', async () => {
+    fetchMock.mockRejectedValue(new Error('offline'));
+    await renderRegister();
+    expect(screen.getByPlaceholderText('Seu nome')).toBeInTheDocument();
+  });
+
+  it('FAIL-OPEN: build antiga do servidor (fallback SPA devolve HTML, json() lança) mantém o formulário', async () => {
+    fetchMock.mockResolvedValue({ json: () => Promise.reject(new Error('not json')) });
+    await renderRegister();
+    expect(screen.getByPlaceholderText('Seu nome')).toBeInTheDocument();
   });
 });

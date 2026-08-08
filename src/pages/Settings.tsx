@@ -353,14 +353,16 @@ export default function Settings() {
             <span className="p-2 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700/60">
               <Megaphone size={16} className="text-slate-900 dark:text-neutral-100" />
             </span>
-            <h3 className="text-sm font-bold text-slate-800 dark:text-white tracking-tight">Vitrine AffiliaCore</h3>
+            <h3 className="text-sm font-bold text-slate-800 dark:text-white tracking-tight">Vitrine AffiliaCore &amp; auto-cadastro</h3>
           </div>
           <div className="p-6 space-y-6">
             <p className="text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
-              Com a vitrine ligada, sua agência aparece na seção de clientes do site da AffiliaCore
-              (affiliacore.com.br) — com o nome da instância, a apresentação abaixo e, se quiser, o link
-              do seu site. Afiliados que procuram uma agência podem chegar até você por lá. É totalmente
-              opcional e você pode desligar quando quiser; desligada, nada é exibido.
+              Esta chave declara que sua agência <strong>aceita cadastro espontâneo de afiliados</strong> (sem
+              convite): a página de cadastro fica aberta e a agência aparece na seção de clientes do site da
+              AffiliaCore (affiliacore.com.br) — com o nome da instância, a apresentação abaixo e, se quiser,
+              o link do seu site. Afiliados que procuram uma agência chegam até você por lá, já marcados com a
+              origem na tela de Contatos. Desligada, o cadastro volta a ser somente por convite e nada é exibido
+              na vitrine. Você pode alternar quando quiser.
             </p>
 
             <form onSubmit={handleSaveShowcase} className="space-y-4">
@@ -371,7 +373,7 @@ export default function Settings() {
                   onChange={(e) => setShowcaseEnabled(e.target.checked)}
                   className="w-4 h-4 rounded border-slate-300 dark:border-neutral-600 accent-accent-500"
                 />
-                Exibir minha agência na vitrine da AffiliaCore
+                Aceitar auto-cadastro e exibir minha agência na vitrine da AffiliaCore
               </label>
 
               <div className="space-y-2">

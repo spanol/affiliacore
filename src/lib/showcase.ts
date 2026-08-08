@@ -66,6 +66,18 @@ function safeAccent(raw: unknown): string | undefined {
   return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : undefined;
 }
 
+// O estado da vitrine É a declaração de auto-cadastro: ligada = a agência aceita
+// cadastro espontâneo de afiliado (sem convite) e por isso aparece na vitrine;
+// desligada = onboarding só por convite. O /register da instância consulta o
+// próprio GET /api/showcase (público, same-origin) e decide por esta função.
+// FAIL-OPEN de propósito: resposta ilegível (build antiga do servidor → o 404 cai
+// no fallback SPA e volta HTML) ou erro de rede mantém o cadastro aberto — o gate
+// só fecha com um {enabled:false} explícito do servidor.
+export function selfRegistrationOpen(payload: unknown): boolean {
+  if (!payload || typeof payload !== 'object') return true;
+  return (payload as { enabled?: unknown }).enabled !== false;
+}
+
 export function buildShowcasePayload(
   doc: Partial<ShowcaseConfig> | null | undefined,
   brand: { name: string; accent?: unknown },
