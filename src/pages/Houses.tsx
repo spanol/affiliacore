@@ -519,8 +519,8 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
-      <div className="min-h-full flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm overflow-y-auto mb-0" onClick={onClose}>
+      <div className="min-h-full flex items-center justify-center p-4 pb-0">
         <motion.div
           initial={{ opacity: 0, scale: 0.97, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -733,7 +733,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
 function ConfirmDeleteModal({ house, loading, onClose, onConfirm }: { house: House; loading: boolean; onClose: () => void; onConfirm: () => void }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
-      <div className="min-h-full flex items-center justify-center p-4">
+      <div className="min-h-full flex items-center justify-center p-4 pb-0">
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -1039,8 +1039,8 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
   }, [existing]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
-      <div className="min-h-full flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm overflow-y-auto mb-0" onClick={onClose}>
+      <div className="min-h-full flex items-center justify-center p-4 pb-0">
         <motion.div
           initial={{ opacity: 0, scale: 0.97, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
