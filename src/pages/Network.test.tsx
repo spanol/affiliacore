@@ -58,6 +58,14 @@ const renderPage = async () => {
   });
 };
 
+// O seletor de upline é LAZY (só a linha em edição monta o <select> — em rede
+// grande, um select populado por linha custava N×N <option> no DOM). Abre o
+// editor da linha pelo botão e devolve o único select vivo.
+const openUplineEditor = (name: string) => {
+  fireEvent.click(screen.getByLabelText(`Alterar upline de ${name}`));
+  return screen.getByRole('combobox');
+};
+
 // Valor do card de resumo (o mesmo R$ e os mesmos rótulos aparecem na tabela).
 const cardValue = (key: string) => screen.getByTestId(`resumo-${key}`).textContent;
 
@@ -70,7 +78,7 @@ beforeEach(() => {
 describe('/rede · árvore e decomposição do repasse', () => {
   it('exibe a cadeia de 3 níveis com os totais da cascata', async () => {
     await renderPage();
-    // Os 3 aparecem na árvore (o nome também popula os <option> dos seletores).
+    // Os 3 aparecem na árvore.
     expect(screen.getAllByText('Rita Topo').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Caio Meio').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Gabi Base').length).toBeGreaterThan(0);
@@ -82,23 +90,31 @@ describe('/rede · árvore e decomposição do repasse', () => {
     expect(cardValue('estrutura')).toBe('1 topo(s) · 3 nível(is)');
   });
 
+  it('só a linha em edição monta o <select> (rede grande não vira N×N options)', async () => {
+    await renderPage();
+    expect(screen.queryByRole('combobox')).toBeNull();
+    openUplineEditor('Rita Topo');
+    expect(screen.getAllByRole('combobox')).toHaveLength(1);
+  });
+
   it('o seletor de upline NÃO oferece o próprio afiliado nem a subárvore dele (evita ciclo)', async () => {
     await renderPage();
-    const selects = screen.getAllByRole('combobox');
-    // 1º select = Rita (topo): só pode escolher quem não está abaixo dela → ninguém.
-    const opcoesDaRita = [...selects[0].querySelectorAll('option')].map((o) => o.textContent);
+    // Rita (topo): só pode escolher quem não está abaixo dela → ninguém.
+    const selectDaRita = openUplineEditor('Rita Topo');
+    const opcoesDaRita = [...selectDaRita.querySelectorAll('option')].map((o) => o.textContent);
     expect(opcoesDaRita).toEqual(['— topo de estrutura —']);
-    // 3º select = Gabi (folha): pode escolher Rita ou Caio.
-    const opcoesDaGabi = [...selects[2].querySelectorAll('option')].map((o) => o.textContent);
+    // Gabi (folha): pode escolher Rita ou Caio.
+    const selectDaGabi = openUplineEditor('Gabi Base');
+    const opcoesDaGabi = [...selectDaGabi.querySelectorAll('option')].map((o) => o.textContent);
     expect(opcoesDaGabi).toEqual(['— topo de estrutura —', 'Caio Meio', 'Rita Topo']);
   });
 
   it('trocar o upline chama o serviço com o par (afiliado, upline)', async () => {
     h.saveAffiliateUpline.mockResolvedValue(undefined);
     await renderPage();
-    const selects = screen.getAllByRole('combobox');
+    const select = openUplineEditor('Gabi Base');
     await act(async () => {
-      fireEvent.change(selects[2], { target: { value: 'R' } }); // Gabi passa a ser filha da Rita
+      fireEvent.change(select, { target: { value: 'R' } }); // Gabi passa a ser filha da Rita
     });
     expect(h.saveAffiliateUpline).toHaveBeenCalledWith('G', 'R');
   });
@@ -106,9 +122,9 @@ describe('/rede · árvore e decomposição do repasse', () => {
   it('soltar o upline manda null (vira topo de estrutura)', async () => {
     h.saveAffiliateUpline.mockResolvedValue(undefined);
     await renderPage();
-    const selects = screen.getAllByRole('combobox');
+    const select = openUplineEditor('Caio Meio');
     await act(async () => {
-      fireEvent.change(selects[1], { target: { value: '' } });
+      fireEvent.change(select, { target: { value: '' } });
     });
     expect(h.saveAffiliateUpline).toHaveBeenCalledWith('C', null);
   });
@@ -116,8 +132,9 @@ describe('/rede · árvore e decomposição do repasse', () => {
   it('erro do servidor (ex.: ciclo) vira toast e não quebra a tela', async () => {
     h.saveAffiliateUpline.mockRejectedValue(new Error('Este vínculo criaria um ciclo na rede.'));
     await renderPage();
+    const select = openUplineEditor('Gabi Base');
     await act(async () => {
-      fireEvent.change(screen.getAllByRole('combobox')[2], { target: { value: 'R' } });
+      fireEvent.change(select, { target: { value: 'R' } });
     });
     expect(h.push).toHaveBeenCalledWith({ type: 'error', message: 'Este vínculo criaria um ciclo na rede.' });
   });

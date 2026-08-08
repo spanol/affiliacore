@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { Navigate, Link } from 'react-router-dom';
-import { Network as NetworkIcon, Loader2, AlertTriangle, CornerDownRight, Users, ArrowRight } from 'lucide-react';
+import { Network as NetworkIcon, Loader2, AlertTriangle, CornerDownRight, Users, ArrowRight, Pencil } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import {
@@ -55,6 +55,10 @@ export default function Network() {
   const [manualRows, setManualRows] = useState<StoredManualRow[]>([]);
   // Motivos de descarte expandidos no painel de anomalias (agrupado por motivo).
   const [expandedDrops, setExpandedDrops] = useState<Set<string>>(() => new Set());
+  // Linha com o seletor de upline ABERTO. O seletor lista a rede inteira, então
+  // renderizar um <select> populado por linha custa N×N <option> no DOM — era o
+  // que travava a página em rede grande. Só a linha em edição monta o select.
+  const [editingUpline, setEditingUpline] = useState<string | null>(null);
 
   const loadStructure = async () => {
     const [affs, cfgs, sp, ups] = await Promise.all([
@@ -82,10 +86,15 @@ export default function Network() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, range.startDate, range.endDate]);
 
+  // Nomes já humanizados UMA vez (não por chamada: nameOf roda em toda linha e
+  // dentro de sort — humanizar no acesso multiplicava o custo).
   const nameOf = useMemo(() => {
     const m: Record<string, string> = {};
-    for (const a of affiliates) m[String(a.id ?? a._id ?? '')] = a.name || a.label || '';
-    return (id: string) => humanizeName(m[String(id)] || `#${id}`);
+    for (const a of affiliates) {
+      const id = String(a.id ?? a._id ?? '');
+      if (id) m[id] = humanizeName(a.name || a.label || '') || `#${id}`;
+    }
+    return (id: string) => m[String(id)] || `#${id}`;
   }, [affiliates]);
 
   // Resolvedor afiliado→casa. SEM ele, a elegibilidade cai em `rateStatus(cfg,
@@ -123,12 +132,20 @@ export default function Network() {
   const flat = useMemo(() => flattenTree(tree), [tree]);
   const rootConfig = useMemo(() => buildRootConfigMap(tree, configs), [tree, configs]);
 
-  // Opções de upline para um afiliado: todo mundo, menos ele e a própria subárvore
-  // (evita oferecer o ciclo que o servidor recusaria com 400).
-  const uplineOptions = (id: string) => {
-    const blocked = new Set([id, ...descendantsOf(tree, id)]);
-    return tree.ids.filter((x) => !blocked.has(x)).sort((a, b) => nameOf(a).localeCompare(nameOf(b), 'pt-BR'));
-  };
+  // Rede inteira ordenada por nome UMA vez (Intl.Collator é muito mais barato que
+  // localeCompare por comparação; antes ordenava por linha).
+  const sortedIds = useMemo(() => {
+    const collator = new Intl.Collator('pt-BR');
+    return [...tree.ids].sort((a, b) => collator.compare(nameOf(a), nameOf(b)));
+  }, [tree, nameOf]);
+
+  // Opções de upline SÓ da linha em edição: todo mundo, menos ela e a própria
+  // subárvore (evita oferecer o ciclo que o servidor recusaria com 400).
+  const editingOptions = useMemo(() => {
+    if (!editingUpline) return [];
+    const blocked = new Set([editingUpline, ...descendantsOf(tree, editingUpline)]);
+    return sortedIds.filter((x) => !blocked.has(x));
+  }, [editingUpline, tree, sortedIds]);
 
   const changeUpline = async (affiliateId: string, uplineId: string) => {
     setSaving(affiliateId);
@@ -201,7 +218,7 @@ export default function Network() {
           {/* Anomalias: aresta descartada no saneamento + spread negativo + sem taxa.
               Nada é silenciosamente corrigido — o admin vê e decide. */}
           {(tree.dropped.length > 0 || payouts.anomalies.length > 0) && (
-            <section className="p-5 rounded-2xl border border-amber-300/60 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20">
+            <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="p-5 rounded-2xl border border-amber-300/60 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20">
               <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-amber-700 dark:text-amber-400 mb-3">
                 <AlertTriangle size={14} /> Pontos de atenção na rede
               </h3>
@@ -266,10 +283,10 @@ export default function Network() {
                   </li>
                 ))}
               </ul>
-            </section>
+            </motion.section>
           )}
 
-          <section className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl shadow-sm overflow-hidden">
+          <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -313,17 +330,41 @@ export default function Network() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <select
-                            value={tree.uplineOf[id] ?? ''}
-                            disabled={saving === id}
-                            onChange={(e) => changeUpline(id, e.target.value)}
-                            className="max-w-[220px] w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs text-slate-700 dark:text-neutral-200 disabled:opacity-50"
-                          >
-                            <option value="">— topo de estrutura —</option>
-                            {uplineOptions(id).map((o) => (
-                              <option key={o} value={o}>{nameOf(o)}</option>
-                            ))}
-                          </select>
+                          {editingUpline === id ? (
+                            <select
+                              autoFocus
+                              value={tree.uplineOf[id] ?? ''}
+                              disabled={saving === id}
+                              onBlur={() => setEditingUpline(null)}
+                              onChange={(e) => {
+                                setEditingUpline(null);
+                                changeUpline(id, e.target.value);
+                              }}
+                              className="max-w-[220px] w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs text-slate-700 dark:text-neutral-200 disabled:opacity-50"
+                            >
+                              <option value="">— topo de estrutura —</option>
+                              {editingOptions.map((o) => (
+                                <option key={o} value={o}>{nameOf(o)}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <button
+                              type="button"
+                              aria-label={`Alterar upline de ${nameOf(id)}`}
+                              disabled={saving === id}
+                              onClick={() => setEditingUpline(id)}
+                              className="max-w-[220px] w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-xs text-left hover:border-accent-500/40 transition-colors disabled:opacity-50"
+                            >
+                              {saving === id ? (
+                                <span className="inline-flex items-center gap-1.5 text-slate-400 dark:text-neutral-500"><Loader2 size={11} className="animate-spin" /> salvando…</span>
+                              ) : tree.uplineOf[id] ? (
+                                <span className="truncate text-slate-700 dark:text-neutral-200">{nameOf(tree.uplineOf[id])}</span>
+                              ) : (
+                                <span className="truncate text-slate-400 dark:text-neutral-500">— topo de estrutura —</span>
+                              )}
+                              <Pencil size={11} className="shrink-0 text-slate-300 dark:text-neutral-600" />
+                            </button>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums text-xs text-slate-600 dark:text-neutral-300">
                           {semTaxa ? (
@@ -353,7 +394,7 @@ export default function Network() {
                 </tbody>
               </table>
             </div>
-          </section>
+          </motion.section>
 
           <p className="text-[11px] text-slate-400 dark:text-neutral-500 px-1">
             {Object.keys(rootConfig).length} afiliado(s) são cobrados pela taxa do topo da estrutura deles.{' '}
