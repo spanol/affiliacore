@@ -3663,6 +3663,8 @@ export function createApp(deps: ServerDeps) {
       lastResultsSyncAt: data.lastResultsSyncAt?.toDate?.().toISOString?.() ?? data.lastResultsSyncAt ?? null,
       lastResultsSyncSource: data.lastResultsSyncSource ?? null,
       lastResultsDate: data.lastResultsDate ?? null,
+      // Conector de pull declarado PELA casa (auto-carimbado pelo conector).
+      integration: data.integration ?? null,
     };
   };
 
@@ -3675,13 +3677,16 @@ export function createApp(deps: ServerDeps) {
       const houses = snap.docs
         .map(houseFromDoc)
         .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, 'pt-BR'));
-      // Casa com integração DIRETA de resultados (conector de pull) — hoje só a
-      // Esportiva/TAP, UMA por instância (ESPORTIVA_HOUSE_SLUG, gateada pela
-      // chave). O client decide por isto onde mostrar o "Atualizar" em /casas —
-      // sem a anotação o botão aparecia em toda casa manual e sempre puxava a
+      // "Atualizar" em /casas é 100% dirigido pela FLAG da casa: `integration`
+      // (carimbada pelo conector) + conector configurado nesta instância. Sem a
+      // anotação o botão aparecia em toda casa manual e sempre puxava a
       // Esportiva (bug 08/08/2026).
-      const pullSlug = espKey() ? espHouseSlug() : null;
-      return res.json({ houses: houses.map((h) => ({ ...h, pullAvailable: h.slug === pullSlug })) });
+      return res.json({
+        houses: houses.map((h) => ({
+          ...h,
+          pullAvailable: !!(h.integration && PULL_CONNECTORS[h.integration]?.configured()),
+        })),
+      });
     } catch (e) {
       console.error('[houses] erro ao listar:', e);
       return res.status(500).json({ error: 'Erro ao listar as casas' });
@@ -4545,7 +4550,7 @@ export function createApp(deps: ServerDeps) {
     );
   };
 
-  app.post('/api/internal/esportiva-pull', allowCronOrAdmin, async (req, res) => {
+  const esportivaPullHandler: express.RequestHandler = async (req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     const key = espKey();
     if (!key) return res.status(503).json({ error: 'Pull não configurado (defina ESPORTIVA_API_KEY).' });
@@ -4608,6 +4613,10 @@ export function createApp(deps: ServerDeps) {
         lastResultsSyncAt: importedAt,
         lastResultsSyncSource: 'api',
         lastResultsDate: payload.dates[payload.dates.length - 1] ?? null,
+        // A casa DECLARA seu conector: é a flag que liga o "Atualizar" em /casas
+        // e roteia o pull por casa. Auto-carimbada aqui — instância que já roda o
+        // cron ganha a flag na primeira rodada, sem migração de dados.
+        integration: 'esportiva-tap',
       }, { merge: true }));
 
       // Auditoria: 1 por rodada. `pendingTags` é a fila da tela de vínculo e
@@ -4635,6 +4644,42 @@ export function createApp(deps: ServerDeps) {
     } catch (e: any) {
       console.error('[esportiva-pull] falhou:', e);
       return res.status(502).json({ error: e?.message || 'Falha ao puxar o relatório da casa.' });
+    }
+  };
+  // Rota do CRON (o Cloud Scheduler já aponta pra cá) — e retrocompat do admin.
+  app.post('/api/internal/esportiva-pull', allowCronOrAdmin, esportivaPullHandler);
+
+  // Registro de CONECTORES de pull POR CASA. A casa declara o seu na flag
+  // `integration` do doc dela (auto-carimbada pelo conector a cada rodada) —
+  // Esportiva é uma CASA, não um gateway: integração nova (ex.: MyAffiliates)
+  // entra como um item novo aqui, sem mexer em rota nem em UI.
+  const PULL_CONNECTORS: Record<string, { configured: () => boolean; handler: express.RequestHandler }> = {
+    'esportiva-tap': { configured: () => !!espKey(), handler: esportivaPullHandler },
+  };
+
+  // Pull POR CASA — o botão "Atualizar" de /casas chama a casa CLICADA e a rota
+  // resolve o conector DELA pela flag; casa sem integração automática responde
+  // 400 (nunca mais "clicou na Stake, puxou a Esportiva").
+  app.post('/api/houses/:slug/pull', requireAdmin, async (req, res, next) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    const slug = String(req.params.slug || '').trim();
+    try {
+      const snap = await adminDb.collection('houses').doc(slug).get();
+      if (!snap.exists) return res.status(404).json({ error: `Casa "${slug}" não encontrada.` });
+      const integration = String((snap.data() as any)?.integration ?? '').trim();
+      const connector = integration ? PULL_CONNECTORS[integration] : undefined;
+      if (!connector) {
+        return res.status(400).json({ error: `A casa "${slug}" não tem integração automática de resultados.` });
+      }
+      if (!connector.configured()) {
+        return res.status(503).json({ error: 'A integração desta casa não está configurada nesta instância.' });
+      }
+      // O handler do conector valida o alvo por `houseSlug` — repassa a casa clicada.
+      req.body = { ...(req.body ?? {}), houseSlug: slug };
+      return connector.handler(req, res, next);
+    } catch (e: any) {
+      console.error('[house-pull] falhou:', e);
+      return res.status(500).json({ error: 'Erro ao iniciar o pull da casa.' });
     }
   });
 

@@ -30,8 +30,11 @@ export interface House {
   lastResultsSyncAt?: string | null;
   lastResultsSyncSource?: 'api' | 'upload' | null;
   lastResultsDate?: string | null;
-  // Anotado pelo servidor: true SÓ na casa servida pelo conector de pull da
-  // instância (integração direta). Gate do botão "Atualizar" em /casas.
+  // Conector de pull declarado PELA casa (ex.: 'esportiva-tap'), auto-carimbado
+  // pelo conector a cada rodada. Fonte da verdade da integração automática.
+  integration?: string | null;
+  // Anotado pelo servidor: flag `integration` presente E conector configurado
+  // nesta instância. Gate do botão "Atualizar" em /casas.
   pullAvailable?: boolean;
 }
 
@@ -165,15 +168,15 @@ export interface PullResult {
   note?: string;
 }
 
-// Puxa o relatório da casa direto da API dela (admin). O cron horário chama a
-// MESMA rota com o header de secret — aqui é o botão "Atualizar agora".
-// `houseSlug` = a casa CLICADA: o servidor valida que ela é a casa do conector
-// (400 se não for) — antes o clique em qualquer casa puxava a Esportiva.
+// Puxa o relatório da casa direto da API dela (admin) — botão "Atualizar" de
+// /casas. Rota POR CASA: o servidor resolve o conector pela flag `integration`
+// da casa clicada (400 se ela não tiver integração automática) — antes a rota
+// era fixa da Esportiva e o clique em qualquer casa puxava ela.
 export async function pullHouseResults(houseSlug: string, days?: number): Promise<PullResult> {
-  const response = await authFetch('/api/internal/esportiva-pull', {
+  const response = await authFetch(`/api/houses/${encodeURIComponent(houseSlug)}/pull`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ houseSlug, ...(days ? { days } : {}) }),
+    body: JSON.stringify(days ? { days } : {}),
   });
   if (!response.ok) await parseError(response);
   return response.json();

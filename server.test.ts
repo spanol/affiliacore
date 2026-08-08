@@ -3142,16 +3142,19 @@ describe('pull da Esportiva (/api/internal/esportiva-pull)', () => {
     expect(res.body).toMatchObject({ ok: true, house: 'esportiva-bet' });
   }));
 
-  it('GET /api/houses anota pullAvailable SO na casa do conector (e em nenhuma sem chave)', async () => {
-    const twoHouses = {
-      ...seed,
-      houses: {
-        'esportiva-bet': { slug: 'esportiva-bet', name: 'Esportiva Bet', dataSource: 'manual' },
-        stake: { slug: 'stake', name: 'Stake', dataSource: 'manual' },
-      },
-    };
+  // A casa DECLARA o conector na flag `integration` — Esportiva e' uma casa,
+  // nao um gateway. O botao/anotacao seguem 100% a flag (+ conector configurado).
+  const flaggedHouses = {
+    ...seed,
+    houses: {
+      'esportiva-bet': { slug: 'esportiva-bet', name: 'Esportiva Bet', dataSource: 'manual', integration: 'esportiva-tap' },
+      stake: { slug: 'stake', name: 'Stake', dataSource: 'manual' },
+    },
+  };
+
+  it('GET /api/houses anota pullAvailable pela FLAG da casa (e nenhuma sem chave na instancia)', async () => {
     const flags = async () => {
-      const res = await request(buildApp({ seed: twoHouses }))
+      const res = await request(buildApp({ seed: flaggedHouses }))
         .get('/api/houses').set('Authorization', 'Bearer admin-uid').expect(200);
       return Object.fromEntries(res.body.houses.map((h: any) => [h.slug, h.pullAvailable]));
     };
@@ -3161,9 +3164,34 @@ describe('pull da Esportiva (/api/internal/esportiva-pull)', () => {
     } finally {
       delete process.env.ESPORTIVA_API_KEY;
     }
-    // sem chave (instancia sem o conector), NENHUMA casa oferece o pull
+    // flag presente mas conector sem chave (instancia sem a casa) -> nada de botao
     expect(await flags()).toMatchObject({ 'esportiva-bet': false, stake: false });
   });
+
+  it('pull POR CASA: casa sem flag -> 400 sem writes; com flag roda o conector DELA', withKey(async () => {
+    const db = makeFirestore(flaggedHouses);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch() });
+    const bad = await request(app).post('/api/houses/stake/pull').set('Authorization', 'Bearer admin-uid').expect(400);
+    expect(bad.body.error).toMatch(/integra/);
+    expect(db.__store.get('house_results')?.size ?? 0).toBe(0);
+    const ok = await request(app).post('/api/houses/esportiva-bet/pull').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(ok.body).toMatchObject({ ok: true, house: 'esportiva-bet', attributed: 1 });
+  }));
+
+  it('pull POR CASA: flag presente mas conector sem chave -> 503; afiliado -> 403; casa inexistente -> 404', async () => {
+    delete process.env.ESPORTIVA_API_KEY;
+    const app = buildApp({ seed: flaggedHouses, fetchImpl: apiFetch() });
+    await request(app).post('/api/houses/esportiva-bet/pull').set('Authorization', 'Bearer admin-uid').expect(503);
+    await request(app).post('/api/houses/esportiva-bet/pull').set('Authorization', 'Bearer client-uid').expect(403);
+    await request(app).post('/api/houses/nao-existe/pull').set('Authorization', 'Bearer admin-uid').expect(404);
+  });
+
+  it('a rodada CARIMBA a flag integration na casa (instancia existente se auto-migra)', withKey(async () => {
+    const db = makeFirestore(seed); // casa AINDA sem a flag
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch() });
+    await request(app).post('/api/internal/esportiva-pull').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(db.__store.get('houses')?.get('esportiva-bet')?.integration).toBe('esportiva-tap');
+  }));
 
   it('grava agregado do dia + linha do afiliado, e a tag orfa fica PENDENTE', withKey(async () => {
     const db = makeFirestore(seed);
