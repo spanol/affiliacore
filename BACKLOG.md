@@ -243,21 +243,27 @@ Núcleo puro em **`src/lib/integrations.ts`** (+ `integrations.test.ts`), rota *
 
 ---
 
-## B6 · Remover a rota /contacts (não só esconder da sidebar)
+## B6 · ✅ ENTREGUE (08/08/2026) — rota /contacts removida
 
-**Contexto.** O item "Contatos" foi removido da sidebar do admin (2026-06-02, commit `1aedfb8`),
-mas a rota `/contacts` continua existindo (acessível por URL, protegida por `requireAdmin`).
-O Carlos decidiu **não remover de vez por enquanto** — apenas escondeu.
+**Contexto.** O item "Contatos" saiu da sidebar do admin em 2026-06-02 (commit `1aedfb8`),
+mas a rota `/contacts` seguia existindo (alcançável por URL, protegida por `requireAdmin`).
 
-**Escopo aproximado (quando for remover).**
-- Tirar a `<Route path="/contacts">` de `src/App.tsx` e o import de `Contacts`.
-- Avaliar remover a página `src/pages/Contacts.tsx`, o `contactService.ts` e a coleção
-  `contacts` (Firestore + regra), se o formulário público de contato também sair.
-- Confirmar se o formulário de contato da landing (`Home`/`Register`) ainda alimenta `contacts`
-  antes de aposentar a coleção.
+**Decisão da pergunta em aberto** ("só a tela de admin ou todo o fluxo?"): **só o LEITOR**.
+O formulário público continua vivo e é o que alimenta a captação de leads hoje —
+`createContactInquiry` é chamado pela `Home` e pelo `LeadDiagnostic`, e é por ele que entram os
+leads tageados de campanha (`registrationSource`). Aposentar o fluxo inteiro mataria a captação.
 
-**Pergunta em aberto.** Aposentar só a tela de admin ou todo o fluxo de contato (incluindo o
-formulário público que grava em `contacts`)?
+**Feito.**
+- `<Route path="/contacts">` + import fora do `src/App.tsx`; `src/pages/Contacts.tsx` deletada.
+- `subscribeToContactInquiries` (e o tipo `ContactInquiry`) removidos do `contactService` — eram
+  usados só pela página. Sobrou o service de ESCRITA, com os testes dele.
+- **Mantidos:** a coleção `contacts`, a rule dela (create público restrito a shape/tamanho),
+  `createContactInquiry` e `registrationSourceLabel` (rótulo da origem, útil se voltar uma tela).
+
+**⚠️ Consequência operacional.** A partir daqui **não há leitor de leads dentro do app** — os
+`contacts` só são consultáveis pelo console do Firestore. Na prática já era assim desde 06/2026
+(sem item na sidebar), mas agora nem por URL. Se a captação crescer, a volta natural é uma tela
+de leads mediada por endpoint admin (o padrão do repo), não o `onSnapshot` direto que existia.
 
 
 ---

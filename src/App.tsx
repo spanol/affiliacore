@@ -14,7 +14,6 @@ import ClientDashboard from './pages/ClientDashboard';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Integracoes from './pages/Integracoes';
-import Contacts from './pages/Contacts';
 import Avisos from './pages/Avisos';
 import Ranking from './pages/Ranking';
 import Achievements from './pages/Achievements';
@@ -147,11 +146,11 @@ export default function App() {
                 <Integracoes />
               </ProtectedRoute>
             } />
-            <Route path="/contacts" element={
-              <ProtectedRoute role="admin">
-                <Contacts />
-              </ProtectedRoute>
-            } />
+            {/* B6 · /contacts REMOVIDA em 2026-08-08. A tela saiu da sidebar em
+                2026-06-02 (1aedfb8) e desde então só era alcançável por URL.
+                O formulário PÚBLICO de captação continua vivo (Home +
+                LeadDiagnostic → `createContactInquiry`), assim como a coleção
+                `contacts` e a rule dela: só o leitor admin foi aposentado. */}
             <Route path="/affiliates" element={<AffiliatesList />} />
             <Route path="/special-affiliates" element={
               <ProtectedRoute role="admin">

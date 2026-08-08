@@ -1,14 +1,17 @@
 import {
   addDoc,
   collection,
-  onSnapshot,
-  orderBy,
-  query,
   serverTimestamp,
-  Timestamp,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { readStoredRegistrationSource } from '../lib/registrationSource';
+
+// Captação de LEAD do formulário público (landing + LeadDiagnostic). Escreve e
+// só: o leitor (`subscribeToContactInquiries` + a tela /contacts) foi aposentado
+// em 2026-08-08 com o B6 — a coleção `contacts` e a rule dela seguem valendo, e
+// os leads passam a ser consultados fora do app. Se um dia voltar uma tela de
+// leads, o leitor está no histórico do git (e `registrationSourceLabel`, em
+// lib/registrationSource, continua lá para rotular a origem).
 
 export interface ContactInquiryInput {
   name: string;
@@ -17,15 +20,6 @@ export interface ContactInquiryInput {
   socialMedia: string;
   affiliateExperience: 'sim' | 'nao';
   presentation: string;
-}
-
-export interface ContactInquiry extends ContactInquiryInput {
-  id: string;
-  createdAt: Timestamp | null;
-  /** origem do lead capturada na chegada (ex.: 'vitrine-affiliacore'). */
-  source?: string;
-  /** @deprecated registros antigos gravavam `instagram`; usar `socialMedia`. */
-  instagram?: string;
 }
 
 const contactsCollection = collection(db, 'contacts');
@@ -46,27 +40,4 @@ export async function createContactInquiry(input: ContactInquiryInput) {
     if (error?.code !== 'permission-denied') throw error;
     await addDoc(contactsCollection, base);
   }
-}
-
-export function subscribeToContactInquiries(
-  onData: (contacts: ContactInquiry[]) => void,
-  onError?: (error: Error) => void,
-) {
-  const contactsQuery = query(contactsCollection, orderBy('createdAt', 'desc'));
-
-  return onSnapshot(
-    contactsQuery,
-    (snapshot) => {
-      const contacts = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...(doc.data() as ContactInquiryInput),
-        createdAt: (doc.data().createdAt as Timestamp | null) ?? null,
-      }));
-
-      onData(contacts);
-    },
-    (error) => {
-      onError?.(error);
-    },
-  );
 }

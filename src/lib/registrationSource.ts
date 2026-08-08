@@ -13,8 +13,11 @@ export const REGISTRATION_SOURCE_KEY = 'ac-reg-source';
 // Valor que a LP do produto envia nos links da vitrine.
 export const VITRINE_SOURCE = 'vitrine-affiliacore';
 
-// Rótulos de exibição das origens conhecidas (Contacts e afins). Origem
-// desconhecida é exibida crua — já saneada pelo normalize.
+// Rótulos de exibição das origens conhecidas. Origem desconhecida é exibida
+// crua — já saneada pelo normalize. ⚠️ Sem consumidor no app desde 2026-08-08
+// (B6): o único era a tela /contacts, aposentada; a CAPTAÇÃO da origem
+// (`readStoredRegistrationSource`, logo abaixo) segue viva e carimbando o lead.
+// Mantido de propósito — é o rótulo que uma futura tela de leads vai querer.
 // 'campanha-affiliacore' = lead vindo de campanha/post pago do IG da AffiliaCore
 // (1º uso: Guilherme Alan, carimbado retroativamente na Infinity em 08/08/2026).
 const SOURCE_LABELS: Record<string, string> = {
