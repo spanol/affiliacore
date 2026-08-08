@@ -88,6 +88,11 @@ export default function AffiliatesList() {
   // (handleConfigChange mexe em `configs`, não aqui); atualiza só no save.
   const [savedConfigIds, setSavedConfigIds] = useState<Set<string>>(new Set());
   const [onlyNeedsConfig, setOnlyNeedsConfig] = useState(false);
+  // Mesma ênfase de setup, para ACESSO: o badge "Sem acesso" já existia por linha,
+  // mas some num roster de dezenas — e afiliado sem login é invisível até ele
+  // reclamar. Pior: ele tenta "esqueci minha senha", a tela do Firebase resolve com
+  // sucesso (enumeration protection) e ninguém fica sabendo. [[ForgotPassword]]
+  const [onlyNeedsAccess, setOnlyNeedsAccess] = useState(false);
   // Filtro por ATIVIDADE (produziu no período). Espelha o que a visão do especial
   // já tem em /network, agora com a MESMA função pura e incluindo casa manual.
   // Os resultados só são buscados quando o filtro sai de 'all' — a lista não paga
@@ -365,6 +370,7 @@ export default function AffiliatesList() {
   const needsAccess = (item: any) => !item.isPending && !item.userUid;
 
   const needsConfigCount = isAdmin ? filteredAffiliates.filter(needsConfig).length : 0;
+  const needsAccessCount = isAdmin ? filteredAffiliates.filter(needsAccess).length : 0;
 
   // Produção no período: OTG + MANUAL. Sem o manual, numa instância OTG-free
   // (100% casas manuais) TODO afiliado cairia em "sem produção". [[affiliateActivity]]
@@ -378,8 +384,13 @@ export default function AffiliatesList() {
     return activityFilter === 'producing' ? produziu : !produziu;
   };
 
+  // Os três filtros de ênfase são compostos (E), não excludentes: "sem configuração"
+  // + "sem acesso" responde "quem eu cadastrei e deixei pela metade?".
   const visibleAffiliates = isAdmin
-    ? (onlyNeedsConfig ? filteredAffiliates.filter(needsConfig) : filteredAffiliates).filter(matchesActivity)
+    ? filteredAffiliates
+        .filter((a) => (onlyNeedsConfig ? needsConfig(a) : true))
+        .filter((a) => (onlyNeedsAccess ? needsAccess(a) : true))
+        .filter(matchesActivity)
     : [];
 
   const handleOpenDetails = (affiliate: any) => {
@@ -577,6 +588,21 @@ export default function AffiliatesList() {
               >
                 <AlertCircle size={13} />
                 {needsConfigCount} sem configuração
+              </button>
+            )}
+            {isAdmin && needsAccessCount > 0 && (
+              <button
+                onClick={() => setOnlyNeedsAccess((v) => !v)}
+                title="Afiliados sem login criado — eles não conseguem entrar na plataforma. Use 'Gerar acesso' para enviar o convite."
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider border transition-all',
+                  onlyNeedsAccess
+                    ? 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-neutral-900 dark:border-white shadow-sm'
+                    : 'bg-white dark:bg-neutral-900 text-slate-500 dark:text-neutral-300 border-slate-200 dark:border-neutral-700 hover:text-accent-500 hover:border-accent-500/40'
+                )}
+              >
+                <UserPlus size={13} />
+                {needsAccessCount} sem acesso
               </button>
             )}
             <BrandFilter brands={availableBrands} value={brandFilter} onChange={setBrandFilter} />
