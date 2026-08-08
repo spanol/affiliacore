@@ -633,7 +633,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </div>
       <div class="proof-side">
         <span class="proof-badge"><i></i>Em produção</span>
-        <a class="proof-link" href="https://agencyboost.com.br" target="_blank" rel="noopener">agencyboost.com.br</a>
+        <a class="proof-link" href="https://agencyboost.com.br/?src=vitrine-affiliacore" target="_blank" rel="noopener">agencyboost.com.br</a>
       </div>
     </div>
     <div class="proof-nums">
@@ -914,7 +914,12 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       var site = String(d.siteUrl || '');
       if (/^https:\/\//.test(site)) {
         var a = document.createElement('a'); a.className = 'proof-link';
-        a.target = '_blank'; a.rel = 'noopener nofollow'; a.href = site;
+        a.target = '_blank'; a.rel = 'noopener nofollow';
+        // src=vitrine-affiliacore → o app da agência carimba a origem em quem se
+        // auto-cadastrar vindo daqui ("a AffiliaCore te manda afiliados", medível).
+        try {
+          var u = new URL(site); u.searchParams.set('src', 'vitrine-affiliacore'); a.href = u.toString();
+        } catch (e) { a.href = site; }
         a.textContent = site.replace(/^https:\/\//, '').replace(/\/$/, '').slice(0, 40);
         side.appendChild(a);
       }

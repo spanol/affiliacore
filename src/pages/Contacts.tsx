@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Mail, Phone, Share2, Clock4 } from 'lucide-react';
 import { subscribeToContactInquiries, ContactInquiry } from '../services/contactService';
+import { registrationSourceLabel } from '../lib/registrationSource';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
 
@@ -66,6 +67,11 @@ export default function Contacts() {
                     <p className="text-sm text-slate-500 dark:text-neutral-400">{contact.presentation || 'Sem mensagem adicional'}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-widest text-slate-500 dark:text-neutral-400 font-bold">
+                    {registrationSourceLabel(contact.source) && (
+                      <span className="px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-900/40 text-emerald-600 dark:text-emerald-400">
+                        Origem: {registrationSourceLabel(contact.source)}
+                      </span>
+                    )}
                     <span className="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200/70 dark:border-white/10">{contact.affiliateExperience === 'sim' ? 'Já trabalhou com afiliado' : 'Sem experiência com afiliado'}</span>
                   </div>
                 </div>

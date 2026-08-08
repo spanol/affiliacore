@@ -137,14 +137,20 @@ service cloud.firestore {
     // tamanhos máximos — evita abuso de storage e injeção de conteúdo arbitrário no
     // painel admin. (Rate limit/captcha do formulário fica como follow-up — App Check.)
     match /contacts/{contactId} {
+      // `source` (opcional) = origem do lead — ex.: 'vitrine-affiliacore' quando o
+      // visitante chega pelo link da vitrine na LP do produto. Carimbado pelo app
+      // (lib/registrationSource); ampliação retrocompatível — deploy DESTA rule
+      // vem ANTES do código que envia o campo (o inverso da ordem de rule que fecha).
       allow create: if request.resource.data.keys().hasOnly(
-                         ['name','email','phone','socialMedia','affiliateExperience','presentation','createdAt'])
+                         ['name','email','phone','socialMedia','affiliateExperience','presentation','createdAt','source'])
                     && request.resource.data.name is string && request.resource.data.name.size() <= 120
                     && request.resource.data.email is string && request.resource.data.email.size() <= 200
                     && request.resource.data.phone is string && request.resource.data.phone.size() <= 40
                     && request.resource.data.socialMedia is string && request.resource.data.socialMedia.size() <= 120
                     && request.resource.data.affiliateExperience in ['sim', 'nao']
-                    && request.resource.data.presentation is string && request.resource.data.presentation.size() <= 2000;
+                    && request.resource.data.presentation is string && request.resource.data.presentation.size() <= 2000
+                    && (!('source' in request.resource.data.keys())
+                        || (request.resource.data.source is string && request.resource.data.source.size() <= 40));
       allow read, update, delete: if isAdmin();
     }
 

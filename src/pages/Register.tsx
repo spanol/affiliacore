@@ -9,6 +9,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
 import { maskCPF, maskPhone, isValidCPF, isValidPhone } from '../lib/validators';
 import InstanceLogo from '../components/InstanceLogo';
+import { readStoredRegistrationSource } from '../lib/registrationSource';
 
 
 export default function Register() {
@@ -75,6 +76,10 @@ export default function Register() {
       const role = 'client';
       currentPath = `users/${user.uid}`;
 
+      // Origem do auto-cadastro (ex.: 'vitrine-affiliacore'), capturada no boot.
+      // O create de `users` não tem allowlist de campos — o carimbo passa direto.
+      const registrationSource = readStoredRegistrationSource();
+
       try {
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
@@ -85,6 +90,7 @@ export default function Register() {
           cpf: cpf.trim(),
           role,
           avatarUrl: `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(name)}`,
+          ...(registrationSource ? { source: registrationSource } : {}),
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         }, { merge: true });

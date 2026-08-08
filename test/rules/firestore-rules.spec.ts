@@ -470,6 +470,18 @@ describe('contacts/{id} (create público restrito ao shape)', () => {
     );
   });
 
+  it('source (origem do lead) opcional: string curta OK; número ou >40 chars NEGADO', async () => {
+    await assertSucceeds(
+      setDoc(doc(asAnon(), 'contacts', 'C7'), { ...VALID_CONTACT, source: 'vitrine-affiliacore' }),
+    );
+    await assertFails(
+      setDoc(doc(asAnon(), 'contacts', 'C8'), { ...VALID_CONTACT, source: 123 }),
+    );
+    await assertFails(
+      setDoc(doc(asAnon(), 'contacts', 'C9'), { ...VALID_CONTACT, source: 'x'.repeat(41) }),
+    );
+  });
+
   it('create com affiliateExperience fora de [sim,nao] → NEGADO', async () => {
     await assertFails(
       setDoc(doc(asAnon(), 'contacts', 'C3'), {
