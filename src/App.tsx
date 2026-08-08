@@ -13,6 +13,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import ClientDashboard from './pages/ClientDashboard';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
+import Integracoes from './pages/Integracoes';
 import Contacts from './pages/Contacts';
 import Avisos from './pages/Avisos';
 import Ranking from './pages/Ranking';
@@ -140,6 +141,12 @@ export default function App() {
                 papel logado — não bloqueia nada, só visualiza/aceita. */}
             <Route path="/termos" element={<Terms />} />
             <Route path="/settings" element={<Settings />} />
+            {/* B7 · Integrações externas (chave/toggle/casa) — admin-only. */}
+            <Route path="/integracoes" element={
+              <ProtectedRoute role="admin">
+                <Integracoes />
+              </ProtectedRoute>
+            } />
             <Route path="/contacts" element={
               <ProtectedRoute role="admin">
                 <Contacts />

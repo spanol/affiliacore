@@ -3178,6 +3178,35 @@ describe('pull da Esportiva (/api/internal/esportiva-pull)', () => {
     expect(ok.body).toMatchObject({ ok: true, house: 'esportiva-bet', attributed: 1 });
   }));
 
+  // --- B7: a configuracao passou a vir de `integrations/{id}`, env como fallback ---
+
+  it('doc integrations DESLIGADO barra o pull mesmo com a chave no env (sem redeploy)', withKey(async () => {
+    const db = makeFirestore({ ...seed, integrations: { 'esportiva-tap': { id: 'esportiva-tap', enabled: false, apiKey: 'k' } } });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch() });
+    const res = await request(app).post('/api/internal/esportiva-pull').set('Authorization', 'Bearer admin-uid').expect(503);
+    expect(res.body.error).toMatch(/deslig/i);
+    expect(db.__store.get('house_results')?.size ?? 0).toBe(0);
+  }));
+
+  it('chave do doc funciona SEM env nenhuma (instancia 100% Firestore)', async () => {
+    delete process.env.ESPORTIVA_API_KEY;
+    const db = makeFirestore({
+      ...seed,
+      integrations: { 'esportiva-tap': { id: 'esportiva-tap', enabled: true, apiKey: 'chave-da-tela', houseId: 'esportiva-bet' } },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch() });
+    const res = await request(app).post('/api/internal/esportiva-pull').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(res.body).toMatchObject({ ok: true, house: 'esportiva-bet' });
+  });
+
+  it('desligar pela tela apaga o botao Atualizar de /casas na hora (pullAvailable=false)', withKey(async () => {
+    const off = makeFirestore({ ...flaggedHouses, integrations: { 'esportiva-tap': { id: 'esportiva-tap', enabled: false } } });
+    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: off, fetchImpl: apiFetch() }))
+      .get('/api/houses').set('Authorization', 'Bearer admin-uid').expect(200);
+    const flags = Object.fromEntries(res.body.houses.map((h: any) => [h.slug, h.pullAvailable]));
+    expect(flags).toMatchObject({ 'esportiva-bet': false });
+  }));
+
   it('pull POR CASA: flag presente mas conector sem chave -> 503; afiliado -> 403; casa inexistente -> 404', async () => {
     delete process.env.ESPORTIVA_API_KEY;
     const app = buildApp({ seed: flaggedHouses, fetchImpl: apiFetch() });
@@ -3280,4 +3309,92 @@ describe('pull da Esportiva (/api/internal/esportiva-pull)', () => {
     expect(db.__store.get('house_results')?.get('velha').total_commission).toBe(99);
     expect(db.__store.get('houses')?.get('esportiva-bet').lastResultsSyncAt).toBeUndefined();
   }));
+});
+
+// =============================================================================
+// B7 · Integracoes (/api/integrations) — a chave da casa e' CREDENCIAL: nunca
+// volta ao browser em claro, e a colecao e' server-only (rule `if false`).
+// =============================================================================
+describe('integracoes (/api/integrations)', () => {
+  const seed = {
+    users: { 'admin-uid': { role: 'admin' }, 'client-uid': { role: 'client', affiliateId: 'AFF-1' } },
+    houses: { 'esportiva-bet': { slug: 'esportiva-bet', name: 'Esportiva Bet', dataSource: 'manual' } },
+  };
+
+  it('afiliado nao acessa (403) e sem token 401', async () => {
+    const app = buildApp({ seed });
+    await request(app).get('/api/integrations').expect(401);
+    await request(app).get('/api/integrations').set('Authorization', 'Bearer client-uid').expect(403);
+    await request(app).put('/api/integrations/esportiva-tap').set('Authorization', 'Bearer client-uid').send({ enabled: true }).expect(403);
+  });
+
+  it('GET lista o catalogo com a chave MASCARADA (nunca em claro)', async () => {
+    process.env.ESPORTIVA_API_KEY = 'chave-secreta-9999';
+    try {
+      const res = await request(buildApp({ seed })).get('/api/integrations').set('Authorization', 'Bearer admin-uid').expect(200);
+      const esp = res.body.integrations.find((i: any) => i.id === 'esportiva-tap');
+      expect(esp).toMatchObject({ hasKey: true, keyMask: '••••9999', keyFromEnv: true, configured: true });
+      expect(JSON.stringify(res.body)).not.toContain('chave-secreta-9999');
+    } finally {
+      delete process.env.ESPORTIVA_API_KEY;
+    }
+  });
+
+  it('PUT grava a chave e ela NAO volta na resposta', async () => {
+    const db = makeFirestore(seed);
+    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .put('/api/integrations/esportiva-tap')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ apiKey: 'nova-chave-4321', enabled: true })
+      .expect(200);
+    expect(res.body).toMatchObject({ hasKey: true, keyMask: '••••4321' });
+    expect(JSON.stringify(res.body)).not.toContain('nova-chave-4321');
+    expect(db.__store.get('integrations')?.get('esportiva-tap')?.apiKey).toBe('nova-chave-4321');
+  });
+
+  it('salvar sem digitar a chave NAO apaga a gravada', async () => {
+    const db = makeFirestore({ ...seed, integrations: { 'esportiva-tap': { id: 'esportiva-tap', enabled: true, apiKey: 'ja-gravada' } } });
+    await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .put('/api/integrations/esportiva-tap')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ enabled: false, apiKey: '' })
+      .expect(200);
+    const doc = db.__store.get('integrations')?.get('esportiva-tap');
+    expect(doc?.apiKey).toBe('ja-gravada');
+    expect(doc?.enabled).toBe(false);
+  });
+
+  it('vincular a casa carimba houses/{slug}.integration (as duas pontas coerentes)', async () => {
+    const db = makeFirestore(seed);
+    await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .put('/api/integrations/esportiva-tap')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ houseId: 'esportiva-bet' })
+      .expect(200);
+    expect(db.__store.get('houses')?.get('esportiva-bet')?.integration).toBe('esportiva-tap');
+  });
+
+  it('id fora do catalogo -> 404 (a colecao nao vira deposito)', async () => {
+    const db = makeFirestore(seed);
+    await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .put('/api/integrations/inventada')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ apiKey: 'x' })
+      .expect(404);
+    expect(db.__store.get('integrations')?.size ?? 0).toBe(0);
+  });
+
+  it('auditoria registra a mudanca SEM o valor da chave', async () => {
+    const db = makeFirestore(seed);
+    await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .put('/api/integrations/esportiva-tap')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ apiKey: 'segredo-do-cliente', enabled: false })
+      .expect(200);
+    const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
+    const log = logs.find((l: any) => l.action === 'integration.update');
+    expect(log).toMatchObject({ entityType: 'integration', entityId: 'esportiva-tap' });
+    expect(log.metadata?.keyChanged).toBe(true);
+    expect(JSON.stringify(log)).not.toContain('segredo-do-cliente');
+  });
 });

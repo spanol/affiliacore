@@ -288,6 +288,29 @@ describe('auth_totp/{uid} (segredo do 2FA — ninguém lê pelo client)', () => 
 });
 
 // =============================================================================
+// integrations — B7: chave da API da casa. Segue a rule do auth_totp (não a de
+// `settings`): é CREDENCIAL, não dado de gestão. A tela /integracoes fala com
+// GET/PUT /api/integrations (Admin SDK) e só recebe a MÁSCARA da chave.
+// =============================================================================
+describe('integrations/{id} (chave de integração — server-only)', () => {
+  beforeEach(async () => {
+    await seedDoc('integrations', 'esportiva-tap', { id: 'esportiva-tap', enabled: true, apiKey: 'chave-da-casa' });
+  });
+
+  it('client não lê nem escreve', async () => {
+    await assertFails(getDoc(doc(asClient(), 'integrations', 'esportiva-tap')));
+    await assertFails(setDoc(doc(asClient(), 'integrations', 'esportiva-tap'), { enabled: false }));
+  });
+
+  it('nem o ADMIN lê a chave pelo client — o acesso legítimo é o endpoint', async () => {
+    await seedAdmin();
+    await assertFails(getDoc(doc(asAdmin(), 'integrations', 'esportiva-tap')));
+    await assertFails(getDocs(collection(asAdmin(), 'integrations')));
+    await assertFails(setDoc(doc(asAdmin(), 'integrations', 'outra'), { apiKey: 'x' }));
+  });
+});
+
+// =============================================================================
 // achievement_requests — o pedido carrega o SNAPSHOT de ganhos do afiliado;
 // expor a coleção vazaria o ganho de um para os outros. O acesso legítimo é o
 // GET /api/achievement-requests, que escopa por papel.

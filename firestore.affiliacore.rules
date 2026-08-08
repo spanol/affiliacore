@@ -59,6 +59,17 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // B7 · Integrações externas por instância (chave da API da casa + toggle +
+    // vínculo com a casa). Segue a rule do auth_totp, não a de `settings`: aqui
+    // mora CREDENCIAL DE VERDADE (a chave que puxa o relatório da casa), não um
+    // dado de gestão — quem lê, lê a casa inteira. Nem o admin toca pelo SDK do
+    // cliente: a tela /integracoes fala com GET/PUT /api/integrations (Admin SDK),
+    // e o que volta ao browser é só a MÁSCARA da chave. Coleção nova, sem leitor
+    // client-side prévio → fechar aqui não tem risco de ordem de deploy.
+    match /integrations/{integrationId} {
+      allow read, write: if false;
+    }
+
     // Local mirror of the external affiliate list (synced by admins).
     match /affiliates/{affiliateId} {
       allow read: if isSignedIn();

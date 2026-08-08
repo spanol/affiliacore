@@ -180,6 +180,9 @@ export default function DashboardLayout() {
           { label: 'Auditoria', path: '/auditoria', icon: ScrollText },
           // Jurídico versionado (Tier 1, modo soft): admin gere os documentos.
           { label: 'Jurídico', path: '/juridico', icon: Scale },
+          // B7: conectores externos (chave + toggle + casa vinculada). Antes isso
+          // vivia em env/Secret Manager e trocar exigia redeploy.
+          { label: 'Integrações', path: '/integracoes', icon: Plug },
           { label: 'Configurações', path: '/settings', icon: Settings }
         ] : [])
       ] 

@@ -82,6 +82,7 @@ const ACTION_LABELS: Record<string, string> = {
   'achievement_request.reject': 'Recusou resgate de conquista',
   'support_contact.update': 'Alterou contato de suporte',
   'showcase.update': 'Alterou vitrine da página inicial',
+  'integration.update': 'Alterou integração externa',
 };
 
 export function actionLabel(action?: string | null): string {
@@ -106,6 +107,7 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
   achievement_tier: 'Nível de conquista',
   achievement_request: 'Resgate de conquista',
   settings: 'Configurações',
+  integration: 'Integração',
 };
 
 export function entityTypeLabel(entityType?: string | null): string {

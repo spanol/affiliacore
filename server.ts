@@ -21,6 +21,11 @@ import { normalizeTag, buildTagIndex } from './src/lib/houseTagImport';
 import {
   buildMediaReportUrl, adaptEsportivaRows, buildPullPayload, pullWindow, ESPORTIVA_API_BASE,
 } from './src/lib/esportivaPull';
+import {
+  INTEGRATION_CATALOG, findIntegrationSpec, integrationFromDoc, resolveConnectorSettings,
+  sanitizeIntegrationPatch, toPublicIntegration, numericSetting,
+  type ConnectorSettings, type IntegrationDoc,
+} from './src/lib/integrations';
 import { eurToBrl, parseEurBrlRate, FALLBACK_EUR_BRL } from './src/lib/currency';
 import { DEFAULT_BRANDS } from './src/lib/brand';
 import { projectPartnerResults } from './src/lib/partnerResults';
@@ -3683,10 +3688,21 @@ export function createApp(deps: ServerDeps) {
       // (carimbada pelo conector) + conector configurado nesta instância. Sem a
       // anotação o botão aparecia em toda casa manual e sempre puxava a
       // Esportiva (bug 08/08/2026).
+      //
+      // B7: "configurado" passou a depender de `integrations/{id}` (chave +
+      // toggle da tela /integracoes). Resolve UMA vez por request e reusa — não
+      // por casa, senão N casas = N leituras do mesmo doc. Desligar a integração
+      // apaga o botão na hora, sem esperar o próximo ciclo do cron.
+      const connectorReady = new Map<string, boolean>();
+      await Promise.all(
+        Object.keys(PULL_CONNECTORS).map(async (id) => {
+          connectorReady.set(id, await PULL_CONNECTORS[id].configured());
+        }),
+      );
       return res.json({
         houses: houses.map((h) => ({
           ...h,
-          pullAvailable: !!(h.integration && PULL_CONNECTORS[h.integration]?.configured()),
+          pullAvailable: !!(h.integration && connectorReady.get(h.integration)),
         })),
       });
     } catch (e) {
@@ -4517,13 +4533,27 @@ export function createApp(deps: ServerDeps) {
   // (header x-cron-secret) e também no clique do admin em /casas. Contrato,
   // reconciliação e armadilhas: MIGRACAO-INFINITY-LEGADO.md §9.5.
   //
-  // Sem ESPORTIVA_API_KEY a rota responde 503 (feature off por instância) — é o
-  // mesmo desenho do cron de ranking: instância sem a casa não paga nada por isso.
-  const espKey = () => String(process.env.ESPORTIVA_API_KEY || '').trim();
-  const espHouseSlug = () => String(process.env.ESPORTIVA_HOUSE_SLUG || 'esportiva-bet').trim();
-  const espCpaBase = () => {
-    const n = Number(process.env.ESPORTIVA_CPA_BASE ?? 120);
-    return Number.isFinite(n) && n > 0 ? n : 0;
+  // B7: a configuração do conector vem de `integrations/{id}` (tela /integracoes)
+  // com o env como FALLBACK — resolveConnectorSettings é a fonte única. Antes era
+  // `process.env.ESPORTIVA_*` direto, e ligar/desligar ou trocar a chave exigia
+  // redeploy. Sem chave em lugar nenhum (ou desligado na tela) a rota responde
+  // 503 — mesmo desenho do cron de ranking.
+  const loadIntegrationDoc = async (id: string): Promise<IntegrationDoc | null> => {
+    if (!adminDb) return null;
+    try {
+      const snap = await adminDb.collection('integrations').doc(id).get();
+      return snap.exists ? integrationFromDoc(id, snap.data()) : null;
+    } catch (e) {
+      // Falha de leitura NÃO pode derrubar o pull: cai no env (comportamento antigo).
+      console.error(`[integrations] falha ao ler ${id}:`, e);
+      return null;
+    }
+  };
+
+  const connectorSettings = async (id: string): Promise<ConnectorSettings | null> => {
+    const spec = findIntegrationSpec(id);
+    if (!spec) return null;
+    return resolveConnectorSettings(spec, await loadIntegrationDoc(id), process.env);
   };
 
   // Cron OU admin: o Scheduler não tem token de usuário, e o admin não tem o
@@ -4554,10 +4584,14 @@ export function createApp(deps: ServerDeps) {
 
   const esportivaPullHandler: express.RequestHandler = async (req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
-    const key = espKey();
-    if (!key) return res.status(503).json({ error: 'Pull não configurado (defina ESPORTIVA_API_KEY).' });
+    const settings = await connectorSettings('esportiva-tap');
+    if (!settings?.enabled) {
+      return res.status(503).json({ error: 'Integração desligada em Integrações.' });
+    }
+    const key = settings.apiKey;
+    if (!key) return res.status(503).json({ error: 'Pull não configurado (informe a chave em Integrações).' });
 
-    const slug = espHouseSlug();
+    const slug = settings.houseSlug;
     // O botão de /casas manda a casa CLICADA — o conector serve uma casa só por
     // instância, então pedir outra é erro do chamador e responde 400 (antes o
     // slug era ignorado e qualquer clique puxava a Esportiva).
@@ -4572,10 +4606,12 @@ export function createApp(deps: ServerDeps) {
 
       const days = Number(req.body?.days);
       const { dateFrom, dateTo } = pullWindow(resolveServerToday(), Number.isFinite(days) && days > 0 ? days : 2);
-      const url = buildMediaReportUrl(dateFrom, dateTo, process.env.ESPORTIVA_API_BASE || ESPORTIVA_API_BASE);
+      const url = buildMediaReportUrl(dateFrom, dateTo, settings.config.apiBase || ESPORTIVA_API_BASE);
       const body = await fetchEsportivaReport(url, key);
 
-      const { rows: pullRows, cpaRemainder, skipped } = adaptEsportivaRows(body.data, { cpaBase: espCpaBase() });
+      const { rows: pullRows, cpaRemainder, skipped } = adaptEsportivaRows(body.data, {
+        cpaBase: numericSetting(settings.config, 'cpaBase', 120),
+      });
 
       // Tag -> afiliado pelo MESMO índice do import manual (links + apelidos):
       // uma fonte só, senão a atribuição diverge entre o upload e o cron.
@@ -4667,8 +4703,13 @@ export function createApp(deps: ServerDeps) {
   // `integration` do doc dela (auto-carimbada pelo conector a cada rodada) —
   // Esportiva é uma CASA, não um gateway: integração nova (ex.: MyAffiliates)
   // entra como um item novo aqui, sem mexer em rota nem em UI.
-  const PULL_CONNECTORS: Record<string, { configured: () => boolean; handler: express.RequestHandler }> = {
-    'esportiva-tap': { configured: () => !!espKey(), handler: esportivaPullHandler },
+  // `configured` é ASSÍNCRONO desde o B7: a resposta depende do doc
+  // `integrations/{id}` (chave + toggle), não mais só de uma env em memória.
+  const PULL_CONNECTORS: Record<string, { configured: () => Promise<boolean>; handler: express.RequestHandler }> = {
+    'esportiva-tap': {
+      configured: async () => !!(await connectorSettings('esportiva-tap'))?.configured,
+      handler: esportivaPullHandler,
+    },
   };
 
   // Pull POR CASA — o botão "Atualizar" de /casas chama a casa CLICADA e a rota
@@ -4685,7 +4726,7 @@ export function createApp(deps: ServerDeps) {
       if (!connector) {
         return res.status(400).json({ error: `A casa "${slug}" não tem integração automática de resultados.` });
       }
-      if (!connector.configured()) {
+      if (!(await connector.configured())) {
         return res.status(503).json({ error: 'A integração desta casa não está configurada nesta instância.' });
       }
       // O handler do conector valida o alvo por `houseSlug` — repassa a casa clicada.
@@ -4694,6 +4735,100 @@ export function createApp(deps: ServerDeps) {
     } catch (e: any) {
       console.error('[house-pull] falhou:', e);
       return res.status(500).json({ error: 'Erro ao iniciar o pull da casa.' });
+    }
+  });
+
+  // === B7 · INTEGRAÇÕES (admin) =============================================
+  // Gestão das integrações externas por instância. A coleção `integrations` é a
+  // mais fechada depois de `auth_totp` (`read, write: if false` — NEM o admin lê
+  // direto): guarda credencial de casa, então todo acesso passa por aqui, com
+  // Admin SDK. A chave NUNCA volta ao browser em claro — só `keyMask`.
+  app.get('/api/integrations', requireAdmin, async (_req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const items = await Promise.all(
+        INTEGRATION_CATALOG.map(async (spec) => {
+          const snap = await adminDb!.collection('integrations').doc(spec.id).get();
+          const data = snap.exists ? (snap.data() as any) : null;
+          return toPublicIntegration(spec, data ? integrationFromDoc(spec.id, data) : null, process.env, {
+            updatedAt: serializeTimestamp(data?.updatedAt),
+            updatedBy: data?.updatedBy ?? null,
+          });
+        }),
+      );
+      return res.json({ integrations: items });
+    } catch (e) {
+      console.error('[integrations] erro ao listar:', e);
+      return res.status(500).json({ error: 'Erro ao carregar as integrações' });
+    }
+  });
+
+  app.put('/api/integrations/:id', requireAdmin, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    const spec = findIntegrationSpec(req.params.id);
+    // Catálogo fechado: id fora dele não cria doc (a coleção não é depósito).
+    if (!spec) return res.status(404).json({ error: 'Integração desconhecida.' });
+    try {
+      const ref = adminDb.collection('integrations').doc(spec.id);
+      const before = await ref.get();
+      const beforeDoc = before.exists ? integrationFromDoc(spec.id, before.data()) : null;
+      const patch = sanitizeIntegrationPatch(req.body, spec);
+
+      // A casa vinculada é a mesma flag que roteia o pull em /casas: gravar aqui
+      // e carimbar `houses/{slug}.integration` mantém as duas pontas coerentes
+      // (senão a tela diz "ligada na casa X" e o botão da casa X não aparece).
+      const nextHouse = patch.houseId !== undefined ? patch.houseId : beforeDoc?.houseId ?? null;
+      const prevHouse = beforeDoc?.houseId ?? null;
+
+      await ref.set(
+        {
+          ...patch,
+          id: spec.id,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedBy: (req as any).user?.uid ?? null,
+        },
+        { merge: true },
+      );
+
+      if (nextHouse && nextHouse !== prevHouse) {
+        await adminDb.collection('houses').doc(nextHouse)
+          .set({ integration: spec.id }, { merge: true })
+          .catch((e) => console.error('[integrations] falha ao carimbar a casa:', e));
+      }
+      if (prevHouse && prevHouse !== nextHouse) {
+        // Desvinculou: a casa antiga perde a flag, senão o botão "Atualizar"
+        // continuaria oferecendo um conector que não aponta mais pra ela.
+        await adminDb.collection('houses').doc(prevHouse)
+          .set({ integration: admin.firestore.FieldValue.delete() }, { merge: true })
+          .catch((e) => console.error('[integrations] falha ao limpar a casa antiga:', e));
+      }
+
+      // Auditoria SEM a chave (é credencial): registra que mudou, não o valor.
+      const changes: Array<{ field: string; before: unknown; after: unknown }> = [];
+      if (patch.enabled !== undefined && patch.enabled !== beforeDoc?.enabled) {
+        changes.push({ field: 'enabled', before: beforeDoc?.enabled ?? null, after: patch.enabled });
+      }
+      if (patch.houseId !== undefined && patch.houseId !== prevHouse) {
+        changes.push({ field: 'houseId', before: prevHouse, after: patch.houseId });
+      }
+      await writeAuditLog(req, {
+        entityType: 'integration', entityId: spec.id, entityLabel: spec.label,
+        action: 'integration.update',
+        changes: changes.length ? changes : null,
+        metadata: { keyChanged: patch.apiKey !== undefined },
+      });
+
+      const after = await ref.get();
+      const afterData = after.data() as any;
+      return res.json(
+        toPublicIntegration(spec, integrationFromDoc(spec.id, afterData), process.env, {
+          updatedAt: serializeTimestamp(afterData?.updatedAt),
+          updatedBy: afterData?.updatedBy ?? null,
+        }),
+      );
+    } catch (e) {
+      console.error('[integrations] erro ao salvar:', e);
+      return res.status(500).json({ error: 'Erro ao salvar a integração' });
     }
   });
 

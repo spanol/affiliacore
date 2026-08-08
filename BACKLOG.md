@@ -145,6 +145,104 @@ Ver também o bug já corrigido: admins não aparecem mais na listagem de afilia
 
 ---
 
+## B7 · Feature "Integrações" — camada dedicada p/ integrações externas (OTG, Esportiva Bet, …)
+
+> Rascunhado 08/08/2026 a pedido do Carlos. **FASE 1 ENTREGUE em 08/08/2026** — ver
+> "O que foi entregue" no fim desta seção. O texto abaixo é o plano original, mantido
+> como registro do racional; as "perguntas em aberto" viraram decisões (respondidas ali).
+
+**Contexto.** Hoje não existe um lugar único para gerenciar as integrações externas (OTG,
+Esportiva Bet/TAP, e as que vierem depois). O que existe, espalhado:
+- **Configurações (`/settings`, `Settings.tsx`)** tem um card "API de Captura de Dados" que
+  salva `{ key: 'client_capture_api_key', value }` em `settings/external_api` **direto do
+  client** (`setDoc`, sem passar pelo servidor). ⚠️ **Achado ao investigar:** nada no código lê
+  esse valor de volta — não é a chave que a OTG ou a Esportiva realmente usam. É um campo órfão,
+  provavelmente sobrevivente do applet original (ver `CLAUDE.md` → "AI Studio applet").
+- **As chaves REAIS são env vars / Secret Manager, uma por integração, coladas no
+  `apphosting.yaml` de cada instância:** `AFFILIATE_API_KEY` (OTG, lido em `server.ts` em
+  vários pontos: proxy `/api/external`, ranking, partner-api) e `ESPORTIVA_API_KEY` +
+  `ESPORTIVA_HOUSE_SLUG` + `ESPORTIVA_CPA_BASE` + `ESPORTIVA_API_BASE` (pull horário da
+  Esportiva, `server.ts:4520-4575`, núcleo puro em `src/lib/esportivaPull.ts`). Ligar/desligar
+  ou trocar a chave hoje = editar secret no Secret Manager + redeploy — **não dá pra fazer pela
+  UI**, e não tem toggle (a rota simplesmente responde 503 sem a env var).
+- **`House` (`src/services/houseService.ts`) já tem os campos que apontam pra esse buraco:**
+  `integration?: string | null` (nome do conector, ex. `'esportiva-tap'`, auto-carimbado pelo
+  pull) e `pullAvailable?: boolean` (anotado pelo servidor = flag `integration` presente **e**
+  conector configurado nesta instância → gate do botão "Atualizar" em `/casas`). Ou seja, o
+  vínculo casa↔integração já existe conceitualmente; falta a tela que gerencia o outro lado
+  (ligar/desligar + a chave) em vez de isso morar só em env var.
+
+**Proposta.**
+- Nova página/rota admin **`/integracoes`** (sidebar), substituindo o card "API de Captura de
+  Dados" que sai de `/settings`.
+- Uma coleção nova, **`integrations/{id}`** (server-only, mesmo padrão de `payment_profiles`/
+  `houses`/`special_affiliates`: `read,write: if isAdmin()` nas rules, mas a leitura/escrita de
+  verdade passa por endpoint admin — nunca `setDoc` direto do client como o card atual faz).
+  Shape sugerido: `{ id: 'esportiva-tap' | 'otg' | ..., label, enabled: boolean, apiKey: string,
+  houseId: string | null, config?: Record<string,string>, updatedAt, updatedBy }`. Campos extra
+  por integração (ex. `houseSlug`/`cpaBase` da Esportiva) entram em `config`.
+- UI: lista de integrações conhecidas (cards, um por conector — OTG, Esportiva Bet, e um slot
+  pra próximas), cada uma com: switch liga/desliga, campo de API key (mascarado, tipo password,
+  igual ao padrão atual), **seletor de casa já cadastrada** (dropdown das `houses` com
+  `dataSource:'manual'`, escreve `houseId` → grava de volta em `houses/{id}.integration`), e
+  status de frescor (reaproveita `lastResultsSyncAt`/`lastResultsCheckAt` que `House` já tem).
+- Servidor: `GET/POST/PATCH /api/integrations` (admin) — o pull da Esportiva
+  (`server.ts:4520+`) passa a ler `enabled`/`apiKey`/`houseId` de `integrations/esportiva-tap`
+  em vez de `process.env.ESPORTIVA_*` direto. **Cuidado:** `server.ts` só recarrega em restart
+  (sem watch) — mas como a leitura vira Firestore em vez de env var, o toggle passa a valer sem
+  redeploy, que é o ganho real da feature.
+- Migração da chave da OTG (`AFFILIATE_API_KEY`) pra esse modelo é **opcional/fase 2** — ela
+  autentica o proxy `/api/external` inteiro (não é por-casa) e tirá-la do Secret Manager é
+  mais sensível; a Fase 1 pode focar só nas integrações "por casa" tipo Esportiva Bet, que já
+  têm o campo `House.integration` esperando.
+
+**Perguntas em aberto p/ amanhã.**
+- A chave por integração ainda vem de Secret Manager (mais seguro, precisa redeploy pra trocar)
+  ou passa a ser 100% Firestore (mais ágil, mas material sensível fora do padrão atual de
+  secrets)? Puxa o mesmo dilema do card atual, que já guarda em Firestore sem criptografia própria.
+  Ver se o padrão `auth_totp` (rule `read,write: if false`, nem admin lê) se aplica aqui também.
+- OTG entra nessa camada na Fase 1 ou fica de fora por enquanto (ela não é "por casa")?
+- O card órfão de Configurações (`settings/external_api`) só sai da tela, ou vale também apagar
+  o doc/dado morto no Firestore de cada instância?
+- Toggle "desligado" deve impedir só o PULL automático, ou também zerar `pullAvailable` na hora
+  (afeta o botão "Atualizar" em `/casas` mesmo sem esperar o próximo ciclo do cron)?
+
+### ✅ O que foi ENTREGUE (Fase 1 — 08/08/2026)
+
+Núcleo puro em **`src/lib/integrations.ts`** (+ `integrations.test.ts`), rota **`/integracoes`**
+(`src/pages/Integracoes.tsx`, admin-only, item novo na sidebar), serviço
+`src/services/integrationService.ts`, endpoints **`GET /api/integrations`** e
+**`PUT /api/integrations/:id`** (`requireAdmin`) e a coleção **`integrations/{id}`**.
+
+**Decisões tomadas** (as 4 perguntas acima):
+1. **Chave no Firestore, env como FALLBACK.** `resolveConnectorSettings` faz o merge campo a
+   campo: doc vence env. Instância que nunca abriu a tela segue lendo o Secret Manager, igual a
+   antes — a migração é silenciosa e reversível. Sobre segurança, vale o padrão `auth_totp`, não
+   o de `settings`: a rule é **`read, write: if false`** (nem o admin lê pelo SDK do cliente) e
+   a chave **nunca volta ao browser** — só `keyMask` (`••••1234`). A auditoria registra
+   `keyChanged: true`, jamais o valor.
+2. **OTG ficou de fora** (fase 2, como o plano previa): a `AFFILIATE_API_KEY` autentica o proxy
+   `/api/external` inteiro, não é por-casa.
+3. **O card órfão só saiu da tela.** O doc `settings/external_api` é deixado intacto em cada
+   instância: apagar dado em produção é ato de operador, não efeito colateral de refactor.
+4. **O toggle zera o `pullAvailable` na hora** — `configured()` virou assíncrono e lê o doc, então
+   desligar apaga o botão "Atualizar" em `/casas` sem esperar o cron. (`GET /api/houses` resolve
+   o estado do conector **uma vez por request**, não por casa.)
+
+**Detalhes que valem lembrar:**
+- **Campo de chave vazio = "não mexe"**, nunca "apagar" (senão salvar o toggle apagaria a
+  credencial, já que a tela só recebe a máscara). Remover exige `apiKey: null` — o botão
+  "Remover chave". Travado em `sanitizeIntegrationPatch` e em teste de servidor.
+- **Catálogo FECHADO** (`INTEGRATION_CATALOG`): id fora dele responde 404 e não cria doc — a
+  coleção não vira depósito. Integração nova entra no catálogo + no `PULL_CONNECTORS`.
+- **As duas pontas ficam coerentes:** vincular a casa na tela carimba `houses/{slug}.integration`
+  (e desvincular limpa a casa antiga), que é a flag que roteia o pull por casa.
+
+**Falta (fase 2):** migrar a OTG pra essa camada; avaliar um segundo conector real
+(MyAffiliates/Affilka) — que é o teste de verdade do catálogo.
+
+---
+
 ## B6 · Remover a rota /contacts (não só esconder da sidebar)
 
 **Contexto.** O item "Contatos" foi removido da sidebar do admin (2026-06-02, commit `1aedfb8`),
@@ -205,7 +303,7 @@ outro afiliado) + botão "Gerar link" na `/links` com prévia do destino; núcle
 **Fica em aberto:** confirmar o crédito de **FTD/CPA** numa tag gerada por nós (a captura de visita
 já está provada) — fecha com o primeiro FTD real.
 
-### 2. `/avisos` não mostra as notificações pessoais — o "Ver todos" mente
+### 2. ✅ ENTREGUE (08/08/2026) — `/avisos` não mostrava as notificações pessoais
 
 Achado em 31/07 testando a notificação de novos resultados. O **sino** (`NotificationBell`) junta
 `notices` **+** `user_notifications`; a página **`/avisos` lê só `notices`**. O botão "Ver todos"
@@ -215,9 +313,12 @@ do rodapé do sino (`NotificationBell.tsx:126`) navega para `/avisos` — ou sej
 
 Pesa mais num cenário de import diário, onde essas notificações serão as mais frequentes.
 
-**Proposta (recomendada):** `/avisos` passa a exibir as duas coisas em seções separadas —
-"Suas notificações" (pessoais, com histórico) + "Avisos da agência" (o mural). Alternativa barata
-(esconder o "Ver todos" quando não há aviso) resolve escondendo, e o histórico continua não existindo.
+**Entregue** (a proposta recomendada): a página assina as DUAS coleções e exibe em seções
+separadas — "Suas notificações" (pessoais, escopo `recipientUid`, mesma assinatura do sino) +
+"Avisos da agência" (o mural). Os cabeçalhos de seção só aparecem quando há notificação pessoal:
+instância sem import de resultados vê a tela idêntica à de antes. O estado vazio agora exige as
+**duas** listas vazias — antes, mural vazio + notificação pessoal escondia a notificação.
+Testes em `src/pages/Avisos.test.tsx`.
 
 ### 3. Lançamento manual do dia (linha única)
 
