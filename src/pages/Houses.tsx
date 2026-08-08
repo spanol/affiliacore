@@ -233,7 +233,7 @@ export default function Houses() {
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <dt className="text-slate-400 dark:text-neutral-500 font-medium">brandId (OTG)</dt>
+
                   <dd className="font-mono text-slate-600 dark:text-neutral-300 truncate max-w-[60%]" title={h.brandId || ''}>
                     {h.brandId || <span className="text-slate-300 dark:text-neutral-600">—</span>}
                   </dd>
