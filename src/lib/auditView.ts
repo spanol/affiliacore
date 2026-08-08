@@ -44,6 +44,8 @@ const ACTION_LABELS: Record<string, string> = {
   'house.delete': 'Removeu casa',
   'house_results.import': 'Importou resultados',
   'house_results.clear': 'Limpou resultados',
+  // Pull automático do conector da casa (cron/botão Atualizar) — sem ator humano.
+  'house_results.pull': 'Coletou resultados (automação)',
   'config.update': 'Alterou comissão (CPA/REV)',
   // Rede de afiliados: mexer na aresta filho→upline muda o custo da agência (o
   // repasse passa a sair da taxa do TOPO da estrutura). [[REDE-AFILIADOS.md]]
@@ -52,6 +54,34 @@ const ACTION_LABELS: Record<string, string> = {
   'user.create': 'Criou usuário',
   'user.link_affiliate': 'Vinculou login a afiliado',
   'user.accept_invite': 'Aceitou convite (auto-cadastro)',
+  'mfa.enable': 'Ativou 2FA',
+  'mfa.disable': 'Desativou 2FA',
+  'link.generate': 'Gerou link de divulgação',
+  'link.standby_import': 'Importou links em standby',
+  'link.assign': 'Atribuiu link a afiliado',
+  'link.release': 'Liberou link (voltou ao standby)',
+  'link.delete': 'Removeu link',
+  'deal.create': 'Criou acordo',
+  'deal.update': 'Editou acordo',
+  'partnership.request': 'Solicitou parceria',
+  'partnership.approve': 'Aprovou parceria',
+  'partnership.reject': 'Recusou parceria',
+  'partnership.discontinue': 'Descontinuou parceria',
+  'withdrawal.request': 'Solicitou saque',
+  'withdrawal.approved': 'Aprovou saque',
+  'withdrawal.rejected': 'Recusou saque',
+  'withdrawal.paid': 'Pagou saque',
+  'legal_document.create': 'Criou documento legal',
+  'legal_document.update': 'Editou documento legal',
+  'legal_document.delete': 'Removeu documento legal',
+  'legal_document.accept': 'Aceitou documento legal',
+  'achievement_tier.create': 'Criou nível de conquista',
+  'achievement_tier.update': 'Editou nível de conquista',
+  'achievement_tier.delete': 'Removeu nível de conquista',
+  'achievement_request.approve': 'Aprovou resgate de conquista',
+  'achievement_request.reject': 'Recusou resgate de conquista',
+  'support_contact.update': 'Alterou contato de suporte',
+  'showcase.update': 'Alterou vitrine da página inicial',
 };
 
 export function actionLabel(action?: string | null): string {
@@ -68,6 +98,14 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
   user: 'Usuário',
   affiliate_config: 'Comissão',
   affiliate_network: 'Rede (upline)',
+  affiliate_link: 'Link de divulgação',
+  deal: 'Acordo',
+  partnership: 'Parceria',
+  withdrawal: 'Saque',
+  legal_document: 'Documento legal',
+  achievement_tier: 'Nível de conquista',
+  achievement_request: 'Resgate de conquista',
+  settings: 'Configurações',
 };
 
 export function entityTypeLabel(entityType?: string | null): string {

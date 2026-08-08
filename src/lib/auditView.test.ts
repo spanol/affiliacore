@@ -32,6 +32,20 @@ describe('actionLabel / entityTypeLabel', () => {
     expect(actionLabel('affiliate.activate')).toBe('Ativou afiliado');
     expect(actionLabel('user.accept_invite')).toBe('Aceitou convite (auto-cadastro)');
   });
+  it('rotula as ações de automação e das áreas novas (nada de código cru na coluna Ação)', () => {
+    expect(actionLabel('house_results.pull')).toBe('Coletou resultados (automação)');
+    expect(actionLabel('mfa.enable')).toBe('Ativou 2FA');
+    expect(actionLabel('link.generate')).toBe('Gerou link de divulgação');
+    expect(actionLabel('partnership.approve')).toBe('Aprovou parceria');
+    expect(actionLabel('withdrawal.paid')).toBe('Pagou saque');
+    expect(actionLabel('legal_document.accept')).toBe('Aceitou documento legal');
+    expect(actionLabel('achievement_request.approve')).toBe('Aprovou resgate de conquista');
+    expect(actionLabel('showcase.update')).toBe('Alterou vitrine da página inicial');
+    expect(entityTypeLabel('withdrawal')).toBe('Saque');
+    expect(entityTypeLabel('partnership')).toBe('Parceria');
+    expect(entityTypeLabel('affiliate_link')).toBe('Link de divulgação');
+    expect(entityTypeLabel('settings')).toBe('Configurações');
+  });
   it('ação desconhecida cai no próprio código (não some da UI)', () => {
     expect(actionLabel('algo.novo')).toBe('algo.novo');
     expect(actionLabel(null)).toBe('—');
