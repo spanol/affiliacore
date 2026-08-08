@@ -74,10 +74,11 @@ export default function Houses() {
 
   // Puxa o relatório direto da API da casa (Esportiva/TAP). É a MESMA rota que o
   // cron horário chama — aqui é o "agora", para o admin não esperar a virada da hora.
+  // Passa a casa CLICADA: o servidor rejeita casa que não é a do conector.
   const handlePull = async (house: House) => {
     setPulling(house.id);
     try {
-      const r = await pullHouseResults();
+      const r = await pullHouseResults(house.slug);
       const pend = r.pending?.length
         ? ` · ${r.pending.length} tag(s) sem dono: ${r.pending.slice(0, 3).map((p) => p.tag).join(', ')}`
         : '';
@@ -256,15 +257,19 @@ export default function Houses() {
                   >
                     <Table2 size={14} /> Importar resultados
                   </button>
-                  <button
-                    onClick={() => handlePull(h)}
-                    disabled={pulling === h.id}
-                    title="Puxar o relatório direto da API da casa (o mesmo que o robô faz de hora em hora)"
-                    className="shrink-0 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-600 dark:text-neutral-300 hover:border-accent-500/40 hover:text-accent-500 transition-all disabled:opacity-50"
-                  >
-                    {pulling === h.id ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                    Atualizar
-                  </button>
+                  {/* Só a casa com integração DIRETA (anotada pelo servidor) tem o
+                      que "atualizar" — nas demais o botão puxava a Esportiva. */}
+                  {h.pullAvailable && (
+                    <button
+                      onClick={() => handlePull(h)}
+                      disabled={pulling === h.id}
+                      title="Puxar o relatório direto da API da casa (o mesmo que o robô faz de hora em hora)"
+                      className="shrink-0 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-600 dark:text-neutral-300 hover:border-accent-500/40 hover:text-accent-500 transition-all disabled:opacity-50"
+                    >
+                      {pulling === h.id ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                      Atualizar
+                    </button>
+                  )}
                 </div>
               )}
               <div className="flex gap-2">

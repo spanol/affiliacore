@@ -30,6 +30,9 @@ export interface House {
   lastResultsSyncAt?: string | null;
   lastResultsSyncSource?: 'api' | 'upload' | null;
   lastResultsDate?: string | null;
+  // Anotado pelo servidor: true SÓ na casa servida pelo conector de pull da
+  // instância (integração direta). Gate do botão "Atualizar" em /casas.
+  pullAvailable?: boolean;
 }
 
 // Campos editáveis no backoffice. `logoBase64` (data URL) sobe a logo nova; se
@@ -164,11 +167,13 @@ export interface PullResult {
 
 // Puxa o relatório da casa direto da API dela (admin). O cron horário chama a
 // MESMA rota com o header de secret — aqui é o botão "Atualizar agora".
-export async function pullHouseResults(days?: number): Promise<PullResult> {
+// `houseSlug` = a casa CLICADA: o servidor valida que ela é a casa do conector
+// (400 se não for) — antes o clique em qualquer casa puxava a Esportiva.
+export async function pullHouseResults(houseSlug: string, days?: number): Promise<PullResult> {
   const response = await authFetch('/api/internal/esportiva-pull', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(days ? { days } : {}),
+    body: JSON.stringify({ houseSlug, ...(days ? { days } : {}) }),
   });
   if (!response.ok) await parseError(response);
   return response.json();

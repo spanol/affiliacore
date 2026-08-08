@@ -3120,6 +3120,51 @@ describe('pull da Esportiva (/api/internal/esportiva-pull)', () => {
       .post('/api/internal/esportiva-pull').set('Authorization', 'Bearer client-uid').expect(403);
   }));
 
+  it('houseSlug de casa SEM integracao direta -> 400 e nada e gravado (bug do botao em /casas)', withKey(async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch() });
+    const res = await request(app)
+      .post('/api/internal/esportiva-pull')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ houseSlug: 'stake' })
+      .expect(400);
+    expect(res.body.error).toMatch(/integra/);
+    expect(db.__store.get('house_results')?.size ?? 0).toBe(0);
+  }));
+
+  it('houseSlug da casa do conector passa normalmente', withKey(async () => {
+    const app = buildApp({ seed, fetchImpl: apiFetch() });
+    const res = await request(app)
+      .post('/api/internal/esportiva-pull')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ houseSlug: 'esportiva-bet' })
+      .expect(200);
+    expect(res.body).toMatchObject({ ok: true, house: 'esportiva-bet' });
+  }));
+
+  it('GET /api/houses anota pullAvailable SO na casa do conector (e em nenhuma sem chave)', async () => {
+    const twoHouses = {
+      ...seed,
+      houses: {
+        'esportiva-bet': { slug: 'esportiva-bet', name: 'Esportiva Bet', dataSource: 'manual' },
+        stake: { slug: 'stake', name: 'Stake', dataSource: 'manual' },
+      },
+    };
+    const flags = async () => {
+      const res = await request(buildApp({ seed: twoHouses }))
+        .get('/api/houses').set('Authorization', 'Bearer admin-uid').expect(200);
+      return Object.fromEntries(res.body.houses.map((h: any) => [h.slug, h.pullAvailable]));
+    };
+    process.env.ESPORTIVA_API_KEY = 'chave-de-teste';
+    try {
+      expect(await flags()).toMatchObject({ 'esportiva-bet': true, stake: false });
+    } finally {
+      delete process.env.ESPORTIVA_API_KEY;
+    }
+    // sem chave (instancia sem o conector), NENHUMA casa oferece o pull
+    expect(await flags()).toMatchObject({ 'esportiva-bet': false, stake: false });
+  });
+
   it('grava agregado do dia + linha do afiliado, e a tag orfa fica PENDENTE', withKey(async () => {
     const db = makeFirestore(seed);
     const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch() });

@@ -3675,7 +3675,13 @@ export function createApp(deps: ServerDeps) {
       const houses = snap.docs
         .map(houseFromDoc)
         .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, 'pt-BR'));
-      return res.json({ houses });
+      // Casa com integração DIRETA de resultados (conector de pull) — hoje só a
+      // Esportiva/TAP, UMA por instância (ESPORTIVA_HOUSE_SLUG, gateada pela
+      // chave). O client decide por isto onde mostrar o "Atualizar" em /casas —
+      // sem a anotação o botão aparecia em toda casa manual e sempre puxava a
+      // Esportiva (bug 08/08/2026).
+      const pullSlug = espKey() ? espHouseSlug() : null;
+      return res.json({ houses: houses.map((h) => ({ ...h, pullAvailable: h.slug === pullSlug })) });
     } catch (e) {
       console.error('[houses] erro ao listar:', e);
       return res.status(500).json({ error: 'Erro ao listar as casas' });
@@ -4545,6 +4551,13 @@ export function createApp(deps: ServerDeps) {
     if (!key) return res.status(503).json({ error: 'Pull não configurado (defina ESPORTIVA_API_KEY).' });
 
     const slug = espHouseSlug();
+    // O botão de /casas manda a casa CLICADA — o conector serve uma casa só por
+    // instância, então pedir outra é erro do chamador e responde 400 (antes o
+    // slug era ignorado e qualquer clique puxava a Esportiva).
+    const requestedSlug = String(req.body?.houseSlug ?? '').trim();
+    if (requestedSlug && requestedSlug !== slug) {
+      return res.status(400).json({ error: `A casa "${requestedSlug}" não tem integração direta de resultados.` });
+    }
     try {
       const houseSnap = await adminDb.collection('houses').doc(slug).get();
       if (!houseSnap.exists) return res.status(404).json({ error: `Casa "${slug}" não encontrada.` });
