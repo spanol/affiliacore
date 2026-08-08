@@ -628,15 +628,6 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
               {editing && <p className="text-[10px] text-slate-400 dark:text-neutral-500 mt-1">O slug não pode ser alterado após a criação.</p>}
             </Field>
 
-            <Field label="brandId (OTG)" hint="opcional — id da casa na OTG, se conhecido">
-              <input
-                value={brandId}
-                onChange={(e) => setBrandId(e.target.value)}
-                placeholder="ex.: cmm5dhdqm000e19b58dqc549a"
-                className={`${inputCls} font-mono`}
-              />
-            </Field>
-
             <Field label="URL de cadastro" hint="opcional · use {ref} onde entra o código do afiliado">
               <input
                 value={registerUrlTemplate}
@@ -671,6 +662,26 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                 ))}
               </div>
             </Field>
+
+            {/* O brandId é 100% acoplado à OTG (é o id da casa NA API externa): só faz
+                sentido no modo "Automático (OTG)". Numa casa gerida aqui ele é ruído.
+                Fica visível também quando já EXISTE um id gravado numa casa que hoje
+                não é OTG — senão um valor legado ficaria preso, sem como limpar. */}
+            {(mode === 'otg' || brandId.trim() !== '') && (
+              <Field
+                label="brandId (OTG)"
+                hint={mode === 'otg'
+                  ? 'opcional — id da casa na OTG, se conhecido'
+                  : 'id herdado da OTG — esta casa não usa mais a API externa; limpe se não for voltar'}
+              >
+                <input
+                  value={brandId}
+                  onChange={(e) => setBrandId(e.target.value)}
+                  placeholder="ex.: cmm5dhdqm000e19b58dqc549a"
+                  className={`${inputCls} font-mono`}
+                />
+              </Field>
+            )}
 
             {/* Vínculo casa→conector. A lista vem de /integracoes, que é onde as
                 integrações são registradas; aqui só se escolhe qual serve ESTA casa. */}
