@@ -15,8 +15,11 @@ export const VITRINE_SOURCE = 'vitrine-affiliacore';
 
 // Rótulos de exibição das origens conhecidas (Contacts e afins). Origem
 // desconhecida é exibida crua — já saneada pelo normalize.
+// 'campanha-affiliacore' = lead vindo de campanha/post pago do IG da AffiliaCore
+// (1º uso: Guilherme Alan, carimbado retroativamente na Infinity em 08/08/2026).
 const SOURCE_LABELS: Record<string, string> = {
   [VITRINE_SOURCE]: 'Vitrine AffiliaCore',
+  'campanha-affiliacore': 'Campanha AffiliaCore',
 };
 
 // Só slug minúsculo (letras/números/._-/underscore, começando alfanumérico, ≤40).

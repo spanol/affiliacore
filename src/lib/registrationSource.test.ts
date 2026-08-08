@@ -68,8 +68,9 @@ describe('captura + leitura na sessionStorage', () => {
 });
 
 describe('registrationSourceLabel', () => {
-  it('vitrine ganha rótulo amigável; origem desconhecida sai crua; inválida sai vazia', () => {
+  it('origens conhecidas ganham rótulo amigável; desconhecida sai crua; inválida sai vazia', () => {
     expect(registrationSourceLabel(VITRINE_SOURCE)).toBe('Vitrine AffiliaCore');
+    expect(registrationSourceLabel('campanha-affiliacore')).toBe('Campanha AffiliaCore');
     expect(registrationSourceLabel('instagram')).toBe('instagram');
     expect(registrationSourceLabel('<x>')).toBe('');
     expect(registrationSourceLabel(null)).toBe('');
