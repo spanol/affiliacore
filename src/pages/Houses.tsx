@@ -233,12 +233,6 @@ export default function Houses() {
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-
-                  <dd className="font-mono text-slate-600 dark:text-neutral-300 truncate max-w-[60%]" title={h.brandId || ''}>
-                    {h.brandId || <span className="text-slate-300 dark:text-neutral-600">—</span>}
-                  </dd>
-                </div>
-                <div className="flex items-center justify-between gap-2">
                   <dt className="text-slate-400 dark:text-neutral-500 font-medium flex items-center gap-1"><Link2 size={11} /> URL de cadastro</dt>
                   <dd className="text-slate-600 dark:text-neutral-300 truncate max-w-[60%]" title={h.registerUrlTemplate || ''}>
                     {h.registerUrlTemplate
@@ -438,6 +432,9 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
   const [slugTouched, setSlugTouched] = useState(editing);
   const [slug, setSlug] = useState(house?.slug ?? '');
   const [brandId, setBrandId] = useState(house?.brandId ?? '');
+  // Congelado na abertura: decide se o campo de brandId existe nesta edição. Ver o
+  // gate lá embaixo — o estado vivo faria o input sumir ao esvaziar o campo.
+  const [hadBrandId] = useState(() => (house?.brandId ?? '').trim() !== '');
   const [registerUrlTemplate, setRegisterUrlTemplate] = useState(house?.registerUrlTemplate ?? '');
   const [active, setActive] = useState(house?.active ?? true);
   // Origem dos resultados em 3 modos. `dataSource` + `integration` são dois
@@ -665,14 +662,15 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
 
             {/* O brandId é 100% acoplado à OTG (é o id da casa NA API externa): só faz
                 sentido no modo "Automático (OTG)". Numa casa gerida aqui ele é ruído.
-                Fica visível também quando já EXISTE um id gravado numa casa que hoje
-                não é OTG — senão um valor legado ficaria preso, sem como limpar. */}
-            {(mode === 'otg' || brandId.trim() !== '') && (
+                Fica visível também quando a casa JÁ ABRIU com um id gravado (`hadBrandId`,
+                congelado na montagem): gatear pelo estado VIVO desmontaria o input no
+                meio da digitação, no instante em que o campo ficasse vazio. */}
+            {(mode === 'otg' || hadBrandId) && (
               <Field
                 label="brandId (OTG)"
                 hint={mode === 'otg'
                   ? 'opcional — id da casa na OTG, se conhecido'
-                  : 'id herdado da OTG — esta casa não usa mais a API externa; limpe se não for voltar'}
+                  : 'id herdado da OTG. As taxas POR CASA dos afiliados estão gravadas sob ele — apagar faz cada um cair na taxa de topo, sem aviso.'}
               >
                 <input
                   value={brandId}
