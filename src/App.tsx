@@ -29,6 +29,7 @@ import PartnerApiExplorer from './pages/PartnerApiExplorer';
 import OtgRoster from './pages/OtgRoster';
 import { OTG_ENABLED, MARKETPLACE_ENABLED } from './lib/instanceClient';
 import Houses from './pages/Houses';
+import RegistrationRequests from './pages/RegistrationRequests';
 import Deals from './pages/Deals';
 import Partnerships from './pages/Partnerships';
 import MyLinks from './pages/MyLinks';
@@ -183,6 +184,13 @@ export default function App() {
             <Route path="/casas" element={
               <ProtectedRoute role="admin">
                 <Houses />
+              </ProtectedRoute>
+            } />
+            {/* Captação: fila de quem pediu cadastro (auto-cadastro + lead do
+                formulário) com as ações de vincular/criar afiliado/arquivar. */}
+            <Route path="/solicitacoes" element={
+              <ProtectedRoute role="admin">
+                <RegistrationRequests />
               </ProtectedRoute>
             } />
             {/* Triagem de links (portada da tela /regras do legado): as 5 visões

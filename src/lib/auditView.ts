@@ -46,6 +46,9 @@ const ACTION_LABELS: Record<string, string> = {
   'house_results.clear': 'Limpou resultados',
   // Pull automático do conector da casa (cron/botão Atualizar) — sem ator humano.
   'house_results.pull': 'Coletou resultados (automação)',
+  // Triagem da fila de captação: não apaga nem desvincula nada, só tira da fila.
+  'request.archive': 'Arquivou solicitação',
+  'request.restore': 'Devolveu solicitação à fila',
   'config.update': 'Alterou comissão (CPA/REV)',
   // Rede de afiliados: mexer na aresta filho→upline muda o custo da agência (o
   // repasse passa a sair da taxa do TOPO da estrutura). [[REDE-AFILIADOS.md]]
@@ -108,6 +111,8 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
   achievement_request: 'Resgate de conquista',
   settings: 'Configurações',
   integration: 'Integração',
+  // Lead do formulário público, na fila de solicitações de cadastro.
+  contact: 'Solicitação',
 };
 
 export function entityTypeLabel(entityType?: string | null): string {

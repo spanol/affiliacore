@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
   Settings as SettingsIcon,
@@ -269,8 +270,9 @@ export default function Settings() {
               Esta chave declara que sua agência <strong>aceita cadastro espontâneo de afiliados</strong> (sem
               convite): a página de cadastro fica aberta e a agência aparece na seção de clientes do site da
               AffiliaCore (affiliacore.com.br) — com o nome da instância, a apresentação abaixo e, se quiser,
-              o link do seu site. Afiliados que procuram uma agência chegam até você por lá, já marcados com a
-              origem na tela de Contatos. Desligada, o cadastro volta a ser somente por convite e nada é exibido
+              o link do seu site. Afiliados que procuram uma agência chegam até você por lá e caem em{' '}
+              <Link to="/solicitacoes" className="font-bold underline decoration-dotted underline-offset-2">Solicitações</Link>,
+              já marcados com a origem. Desligada, o cadastro volta a ser somente por convite e nada é exibido
               na vitrine. Você pode alternar quando quiser.
             </p>
 

@@ -45,6 +45,9 @@ import { canTransition, type PartnershipStatus } from './src/lib/partnership';
 import { normalizeLegalDocInput, computeNextVersion } from './src/lib/legal';
 import { canTransitionWithdrawal, normalizeWithdrawalAmount, type WithdrawalStatus } from './src/lib/withdrawal';
 import { buildNetworkTree, resolveRepasseCap, exceedsRepasseCap } from './src/lib/network';
+import {
+  isPendingSignup, signupToRequest, leadToRequest, buildCaptureFeed, resolveRequestStatus,
+} from './src/lib/registrationRequests';
 import { resolveSpecialSubIds, resolveDirectSubIds, isDirectDownline, type SpecialRecord } from './src/lib/specialNetwork';
 import {
   BACKUP_CODE_COUNT,
@@ -2849,6 +2852,75 @@ export function createApp(deps: ServerDeps) {
     } catch (error: any) {
       console.error('Error listing email aliases:', error);
       return res.status(500).json({ error: error.message || 'Erro interno listando aliases.' });
+    }
+  });
+
+  // --- Solicitações de cadastro (captação) ------------------------------------
+  // Quem bateu na porta e ainda não é afiliado, pelas DUAS portas de entrada:
+  // `users` sem `affiliateId` (auto-cadastro no /register, aberto quando a
+  // instância liga a vitrine) e `contacts` (formulário público). Nenhuma das duas
+  // tinha leitor no app — o auto-cadastro nunca teve, e o de leads foi aposentado
+  // no B6. É PII (telefone, rede social, texto do lead), então a leitura é
+  // MEDIADA pelo servidor e admin-only, como payment_profiles/affiliate_configs.
+  app.get('/api/registration-requests', requireAdmin, async (_req, res) => {
+    if (!adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+    try {
+      const [usersSnap, contactsSnap] = await Promise.all([
+        adminDb.collection('users').get(),
+        adminDb.collection('contacts').get(),
+      ]);
+      const requests = [
+        // `isPendingSignup` é a MESMA regra que a tela usa p/ dizer "pendente" —
+        // filtra aqui p/ o doc de quem já é afiliado nem sair do servidor.
+        ...usersSnap.docs
+          .filter((d) => isPendingSignup(d.data()))
+          .map((d) => signupToRequest(d.id, d.data())),
+        ...contactsSnap.docs.map((d) => leadToRequest(d.id, d.data())),
+      ];
+      return res.json({ requests: buildCaptureFeed(requests) });
+    } catch (error: any) {
+      console.error('Error listing registration requests:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno listando solicitações.' });
+    }
+  });
+
+  // Arquiva/desarquiva uma solicitação. É só TRIAGEM: não apaga nada e não mexe
+  // em papel nem em vínculo — a pessoa arquivada continua com o login dela.
+  app.post('/api/registration-requests/archive', requireAdmin, async (req, res) => {
+    if (!adminDb) {
+      return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    }
+    try {
+      const kind = String(req.body?.kind ?? '').trim();
+      const id = String(req.body?.id ?? '').trim();
+      const archived = req.body?.archived !== false; // default: arquivar
+      if ((kind !== 'signup' && kind !== 'lead') || !id) {
+        return res.status(400).json({ error: 'Informe kind ("signup" | "lead") e id.' });
+      }
+      const ref = adminDb.collection(kind === 'signup' ? 'users' : 'contacts').doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+      const before = snap.data() as any;
+      // Guarda-corpo: `users` é doc de LOGIN. Arquivar quem já virou afiliado
+      // esconderia da fila alguém que nem está nela — sinal de id trocado.
+      if (kind === 'signup' && !isPendingSignup(before)) {
+        return res.status(409).json({ error: 'Este login já está vinculado a um afiliado.' });
+      }
+      const status = archived ? 'archived' : 'pending';
+      await ref.set({ requestStatus: status, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      await writeAuditLog(req, {
+        entityType: kind === 'signup' ? 'user' : 'contact',
+        entityId: id,
+        entityLabel: String(before?.name ?? before?.email ?? id),
+        action: archived ? 'request.archive' : 'request.restore',
+        changes: [{ field: 'requestStatus', before: resolveRequestStatus(before?.requestStatus), after: status }],
+      });
+      return res.json({ id, kind, status });
+    } catch (error: any) {
+      console.error('Error archiving registration request:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno arquivando solicitação.' });
     }
   });
 

@@ -19,6 +19,7 @@ import {
   Plug,
   Database,
   Building2,
+  UserPlus,
   Megaphone,
   Trophy,
   ScrollText,
@@ -162,6 +163,10 @@ export default function DashboardLayout() {
           // Rede de afiliados (upline N níveis) — árvore + lucro sobre equipe.
           { label: 'Rede', path: '/rede', icon: NetworkIcon },
           { label: 'Casas', path: '/casas', icon: Building2 },
+          // Captação: quem pediu cadastro e ainda não é afiliado (auto-cadastro do
+          // /register + lead do formulário público). Antes o auto-cadastro não
+          // tinha leitor NENHUM e o lead só existia no console do Firestore.
+          { label: 'Solicitações', path: '/solicitacoes', icon: UserPlus },
           // Triagem de links: as 5 visões (com/sem link, standby, sem resultado,
           // produzindo) + o pool de links cunhados na casa e ainda sem dono.
           { label: 'Links', path: '/links', icon: LinkIcon },
@@ -319,6 +324,8 @@ export default function DashboardLayout() {
                 ? 'Afiliados Especiais'
                 : location.pathname === '/casas'
                 ? 'Casas'
+                : location.pathname === '/solicitacoes'
+                ? 'Solicitações de cadastro'
                 : location.pathname === '/roster-otg'
                 ? 'Roster OTG'
                 : location.pathname === '/auditoria'

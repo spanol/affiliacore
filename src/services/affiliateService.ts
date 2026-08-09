@@ -73,6 +73,8 @@ export type { Deal, DealModel, PaymentCycle, DealCurrency, PartnershipRequest, P
 
 // Jurídico versionado (Tier 1, modo soft). Re-exporta os puros.
 import { hasAcceptedLatest, type LegalDocument, type LegalAcceptance } from '../lib/legal';
+import type { CaptureRequest, RequestKind } from '../lib/registrationRequests';
+export type { CaptureRequest, RequestKind } from '../lib/registrationRequests';
 export { hasAcceptedLatest };
 export type { LegalDocument, LegalAcceptance };
 
@@ -448,6 +450,38 @@ export async function linkAffiliateUser(
     throw new Error(e.error || e.message || `Erro ao vincular login: ${response.status}`);
   }
   return response.json();
+}
+
+// --- Solicitações de cadastro (captação) ------------------------------------
+
+// Fila de quem pediu cadastro e ainda não é afiliado: auto-cadastro no /register
+// (users sem affiliateId) + lead do formulário público (contacts). É PII, então
+// vem TODA do servidor (admin-only) — o cliente não lê `contacts` nem lista `users`.
+export async function fetchRegistrationRequests(): Promise<CaptureRequest[]> {
+  const response = await authFetch('/api/registration-requests', { headers: { Accept: 'application/json' } });
+  if (!response.ok) {
+    const e = await response.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro ao carregar solicitações: ${response.status}`);
+  }
+  const data = await response.json().catch(() => ({}));
+  return Array.isArray((data as any)?.requests) ? (data as any).requests : [];
+}
+
+// Triagem: tira da fila (ou devolve) sem apagar nada e sem mexer no login.
+export async function archiveRegistrationRequest(
+  kind: RequestKind,
+  id: string,
+  archived = true
+): Promise<void> {
+  const response = await authFetch('/api/registration-requests/archive', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ kind, id, archived }),
+  });
+  if (!response.ok) {
+    const e = await response.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro ao arquivar solicitação: ${response.status}`);
+  }
 }
 
 // --- Afiliado nativo Boost + alias de e-mail (Boost-first) ------------------

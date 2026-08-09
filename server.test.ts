@@ -870,6 +870,101 @@ describe('/api/affiliate-uplines — rede de afiliados (N níveis)', () => {
 // A casa atribui pela tag do link (?afp=), não por e-mail: este é o vínculo que o
 // admin salva para a tag que nenhum link nosso cobre.
 // =============================================================================
+// Captação: as duas portas de entrada (auto-cadastro no /register e lead do
+// formulário público) nunca tiveram leitor no app. O dado é PII, então a rota é
+// admin-only e é ela que faz a triagem — nunca o cliente lendo a coleção.
+describe('/api/registration-requests (admin-only)', () => {
+  const seed = {
+    users: {
+      'admin-uid': { role: 'admin', name: 'Agência' },
+      'client-uid': { role: 'client', affiliateId: 'AFF-1', name: 'Já vinculado' },
+      'novo-uid': { role: 'client', name: 'Guilherme', email: 'g@x.com', phone: '11999', source: 'vitrine-affiliacore' },
+      'arquivado-uid': { role: 'client', name: 'Sumiu', email: 's@x.com', requestStatus: 'archived' },
+    },
+    contacts: {
+      lead1: { name: 'Ana', email: 'a@x.com', presentation: 'Trabalho com tráfego', affiliateExperience: 'sim' },
+    },
+  };
+  const logsOf = (db: any, action: string) =>
+    [...(db.__store.get('audit_logs')?.values() ?? [])].filter((l: any) => l.action === action);
+
+  it('lista quem NÃO tem afiliado + os leads, e nunca o admin nem quem já é afiliado', async () => {
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(seed) });
+    const res = await request(app)
+      .get('/api/registration-requests')
+      .set('Authorization', 'Bearer admin-uid')
+      .expect(200);
+    const byId = Object.fromEntries(res.body.requests.map((r: any) => [r.id, r]));
+    expect(Object.keys(byId).sort()).toEqual(['arquivado-uid', 'lead1', 'novo-uid']);
+    expect(byId['novo-uid']).toMatchObject({ kind: 'signup', name: 'Guilherme', source: 'vitrine-affiliacore', status: 'pending' });
+    expect(byId['lead1']).toMatchObject({ kind: 'lead', experienced: true, status: 'pending' });
+    // O arquivado VOLTA na lista (com status) — a tela decide se mostra; some do
+    // servidor seria perder a chance de desarquivar.
+    expect(byId['arquivado-uid'].status).toBe('archived');
+  });
+
+  it('arquivar grava o status e a trilha, sem tocar em papel ou vínculo', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/registration-requests/archive')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ kind: 'signup', id: 'novo-uid' })
+      .expect(200);
+    const doc = db.__store.get('users')?.get('novo-uid');
+    expect(doc).toMatchObject({ requestStatus: 'archived', role: 'client' });
+    expect(doc.affiliateId).toBeUndefined();
+    expect(logsOf(db, 'request.archive')[0]).toMatchObject({
+      entityType: 'user', entityId: 'novo-uid', entityLabel: 'Guilherme',
+      changes: [{ field: 'requestStatus', before: 'pending', after: 'archived' }],
+    });
+  });
+
+  it('desarquivar volta o lead p/ a fila (archived:false)', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/registration-requests/archive')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ kind: 'lead', id: 'lead1', archived: false })
+      .expect(200);
+    expect(db.__store.get('contacts')?.get('lead1')).toMatchObject({ requestStatus: 'pending' });
+    expect(logsOf(db, 'request.restore')).toHaveLength(1);
+  });
+
+  it('arquivar login JÁ vinculado → 409 (sinal de id trocado, não é da fila)', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/registration-requests/archive')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ kind: 'signup', id: 'client-uid' })
+      .expect(409);
+    expect(db.__store.get('users')?.get('client-uid')?.requestStatus).toBeUndefined();
+  });
+
+  it('kind inválido → 400; id inexistente → 404', async () => {
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(seed) });
+    const post = (body: any) =>
+      request(app).post('/api/registration-requests/archive').set('Authorization', 'Bearer admin-uid').send(body);
+    await post({ kind: 'outro', id: 'novo-uid' }).expect(400);
+    await post({ kind: 'signup' }).expect(400);
+    await post({ kind: 'signup', id: 'naoexiste' }).expect(404);
+  });
+
+  it('não-admin → 403 nas duas rotas (é PII de candidato)', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).get('/api/registration-requests').set('Authorization', 'Bearer client-uid').expect(403);
+    await request(app)
+      .post('/api/registration-requests/archive')
+      .set('Authorization', 'Bearer client-uid')
+      .send({ kind: 'signup', id: 'novo-uid' })
+      .expect(403);
+    expect(db.__store.get('users')?.get('novo-uid')?.requestStatus).toBeUndefined();
+  });
+});
+
 describe('/api/tag-aliases (admin-only)', () => {
   const seed = { users: { 'admin-uid': { role: 'admin' }, 'client-uid': { role: 'client', affiliateId: 'AFF-1' } } };
   const logsOf = (db: any, action: string) =>
