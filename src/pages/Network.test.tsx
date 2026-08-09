@@ -12,6 +12,11 @@ const h = vi.hoisted(() => ({
   saveAffiliateUpline: vi.fn(),
   push: vi.fn(),
   uplines: {} as Record<string, string>,
+  // Fixtures variáveis por teste (o default é remontado no beforeEach): a suíte de
+  // FONTES precisa de afiliados com casa e de linha manual.
+  affiliates: [] as any[],
+  results: [] as any[],
+  manual: [] as any[],
 }));
 
 vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ profile: h.profile }) }));
@@ -30,11 +35,7 @@ vi.mock('../services/affiliateService', async () => {
   const network = await vi.importActual<any>('../lib/network');
   return {
     ...network,
-    fetchAffiliates: async () => [
-      { id: 'R', name: 'Rita Topo' },
-      { id: 'C', name: 'Caio Meio' },
-      { id: 'G', name: 'Gabi Base' },
-    ],
+    fetchAffiliates: async () => h.affiliates,
     fetchAffiliateConfigs: async () => ({
       R: { affiliateId: 'R', cpaValue: 300, revPercentage: 0 },
       C: { affiliateId: 'C', cpaValue: 200, revPercentage: 0 },
@@ -42,12 +43,8 @@ vi.mock('../services/affiliateService', async () => {
     }),
     fetchSpecialAffiliates: async () => ({}),
     fetchAffiliateUplines: async () => h.uplines,
-    fetchAllResults: async () => [
-      { affiliate_id: 'R', qualified_cpa: 1, rvs: 0 },
-      { affiliate_id: 'C', qualified_cpa: 1, rvs: 0 },
-      { affiliate_id: 'G', qualified_cpa: 1, rvs: 0 },
-    ],
-    fetchManualResults: async () => [],
+    fetchAllResults: async () => h.results,
+    fetchManualResults: async () => h.manual,
     saveAffiliateUpline: (...a: any[]) => h.saveAffiliateUpline(...a),
   };
 });
@@ -73,6 +70,17 @@ beforeEach(() => {
   vi.clearAllMocks();
   h.profile = { role: 'admin' };
   h.uplines = { C: 'R', G: 'C' }; // cadeia de 3 níveis
+  h.affiliates = [
+    { id: 'R', name: 'Rita Topo' },
+    { id: 'C', name: 'Caio Meio' },
+    { id: 'G', name: 'Gabi Base' },
+  ];
+  h.results = [
+    { affiliate_id: 'R', qualified_cpa: 1, rvs: 0 },
+    { affiliate_id: 'C', qualified_cpa: 1, rvs: 0 },
+    { affiliate_id: 'G', qualified_cpa: 1, rvs: 0 },
+  ];
+  h.manual = [];
 });
 
 describe('/rede · árvore e decomposição do repasse', () => {
@@ -161,5 +169,65 @@ describe('/rede · anomalias e gate de papel', () => {
     h.profile = { role: 'client' };
     await renderPage();
     expect(screen.getByText('REDIRECIONADO')).toBeInTheDocument();
+  });
+});
+
+// A rede soma DUAS bases (API da OTG + casas geridas aqui) e o total não dizia de
+// quantas casas era. Estes testes cobrem o que a tela passou a afirmar: as fontes
+// do período e o recorte por casa.
+describe('/rede · fontes dos dados e filtro por casa', () => {
+  beforeEach(() => {
+    h.uplines = {}; // todo mundo topo: o custo é a soma simples, fácil de conferir
+    h.affiliates = [
+      { id: 'R', name: 'Rita Topo', brand: { name: 'Superbet' } },
+      { id: 'C', name: 'Caio Meio', brand: { name: 'Superbet' } },
+      { id: 'G', name: 'Gabi Base', brand: { name: 'Betano' } },
+    ];
+  });
+
+  it('lista as casas de onde vieram os números, com quantos afiliados cada uma', async () => {
+    await renderPage();
+    expect(screen.getByText('Dados de')).toBeInTheDocument();
+    expect(screen.getByTitle('Ver só Superbet')).toHaveTextContent('2 afiliado(s)');
+    expect(screen.getByTitle('Ver só Betano')).toHaveTextContent('1 afiliado(s)');
+  });
+
+  it('distingue a origem: casa da OTG × casa gerida aqui', async () => {
+    h.manual = [{ affiliateId: 'G', houseSlug: 'sportingbet', qualified_cpa: 1, rvs: 0 }] as any;
+    await renderPage();
+    expect(screen.getByTitle('Ver só Superbet')).toHaveTextContent('OTG');
+    expect(screen.getByTitle('Ver só SportingBet')).toHaveTextContent('gerida aqui');
+  });
+
+  it('clicar numa casa recorta o DINHEIRO para ela', async () => {
+    await renderPage();
+    expect(cardValue('direto')).toBe('R$ 600,00'); // 300 + 200 + 100
+    fireEvent.click(screen.getByTitle('Ver só Betano'));
+    expect(cardValue('direto')).toBe('R$ 100,00'); // só a Gabi
+    expect(cardValue('custo')).toBe('R$ 100,00');
+  });
+
+  it('o filtro NÃO mexe na estrutura — a árvore continua inteira', async () => {
+    await renderPage();
+    const estrutura = cardValue('estrutura');
+    fireEvent.click(screen.getByTitle('Ver só Betano'));
+    expect(cardValue('estrutura')).toBe(estrutura);
+    expect(screen.getAllByText('Rita Topo').length).toBeGreaterThan(0);
+  });
+
+  it('clicar na casa já selecionada volta para todas', async () => {
+    await renderPage();
+    fireEvent.click(screen.getByTitle('Ver só Betano'));
+    expect(screen.getByText('Filtrando por')).toBeInTheDocument();
+    fireEvent.click(screen.getByTitle('Clique para ver todas as casas'));
+    expect(cardValue('direto')).toBe('R$ 600,00');
+  });
+
+  it('produção de afiliado SEM casa no cadastro é sinalizada, não escondida', async () => {
+    h.affiliates = [{ id: 'R', name: 'Rita Topo' }];
+    h.results = [{ affiliate_id: 'R', qualified_cpa: 1, rvs: 0 }];
+    await renderPage();
+    expect(screen.getByText('Sem casa no cadastro')).toBeInTheDocument();
+    expect(cardValue('direto')).toBe('R$ 300,00'); // segue no total
   });
 });

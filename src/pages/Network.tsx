@@ -25,7 +25,15 @@ import {
   NetworkRow,
 } from '../services/affiliateService';
 import { StoredManualRow } from '../lib/houseResults';
-import { getKnownBrands, buildBrandIdOf } from '../lib/brand';
+import { getKnownBrands, buildBrandIdOf, getBrandName, ALL_BRANDS } from '../lib/brand';
+import {
+  buildNetworkSourceRows,
+  summarizeNetworkSources,
+  filterRowsByHouse,
+  HOUSE_UNKNOWN,
+} from '../lib/networkSources';
+import BrandFilter from '../components/BrandFilter';
+import BrandLogo from '../components/BrandLogo';
 import DateRangePicker from '../components/DateRangePicker';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
 import { humanizeName, cn } from '../lib/utils';
@@ -47,6 +55,8 @@ export default function Network() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [range, setRange] = useState<DateRange>(() => getDefaultRange());
+  // Casa selecionada (nome) ou ALL_BRANDS. Recorta só a produção — ver `rows`.
+  const [houseFilter, setHouseFilter] = useState<string>(ALL_BRANDS);
   const [affiliates, setAffiliates] = useState<any[]>([]);
   const [configs, setConfigs] = useState<Record<string, AffiliateConfig>>({});
   const [specials, setSpecials] = useState<Record<string, SpecialAffiliate>>({});
@@ -103,6 +113,18 @@ export default function Network() {
   // taxa" e perderia a aresta. [[brandIdOf]]
   const brandIdOf = useMemo(() => buildBrandIdOf(affiliates), [affiliates]);
 
+  // Nome da casa de cada afiliado (mirror) — a MESMA atribuição do `brandById` do
+  // /admin, e o que dá nome às fontes e ao filtro.
+  const brandNameOf = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const a of affiliates) {
+      const id = String(a?.id ?? a?._id ?? '');
+      const name = getBrandName(a);
+      if (id && name) m[id] = name;
+    }
+    return (id: string) => m[String(id)] ?? null;
+  }, [affiliates]);
+
   // Árvore saneada: aresta explícita (affiliate_uplines) + vínculo derivado dos
   // especiais ativos. Upline sem taxa configurada perde a aresta (ausência ≠ R$ 0).
   const tree = useMemo(
@@ -112,21 +134,47 @@ export default function Network() {
     [affiliates, specials, uplines, configs, brandIdOf]
   );
 
-  // Linhas de produção no shape da rede (OTG + manuais atribuídas), com o mesmo
-  // brandId que o /admin usa nos cards por casa.
-  const rows: NetworkRow[] = useMemo(() => {
-    const brandKeyOf = (slug: string) => getKnownBrands().find((b) => b.slug === slug)?.id ?? slug;
-    const out: NetworkRow[] = [];
-    for (const r of results) {
-      const id = String(r?.affiliate_id ?? r?.id ?? '');
-      if (id) out.push({ affiliateId: id, qualified_cpa: r?.qualified_cpa, rvs: r?.rvs });
-    }
-    for (const r of manualRows) {
-      if (!r || r.affiliateId === null) continue;
-      out.push({ affiliateId: String(r.affiliateId), brandId: brandKeyOf(r.houseSlug), qualified_cpa: r.qualified_cpa, rvs: r.rvs });
-    }
-    return out;
-  }, [results, manualRows]);
+  // Linhas de produção no shape da rede (OTG + manuais atribuídas), CADA UMA com a
+  // casa de origem e o mesmo brandId que o /admin usa nos cards por casa. A casa da
+  // linha OTG é a do AFILIADO (o groupBy=affiliate não quebra por casa); a da manual
+  // é a da própria linha. Levar o brandId na linha OTG também CORRIGE o pagamento de
+  // quem só tem taxa POR CASA: antes ele caía na taxa de topo aqui e no byBrand no
+  // /admin — dois números para a mesma produção.
+  const sourceRows = useMemo(
+    () => buildNetworkSourceRows({
+      results,
+      manualRows,
+      otgHouseOf: (id) => {
+        const name = brandNameOf(id);
+        return name ? { name, brandId: brandIdOf(id) } : null;
+      },
+      manualHouseOf: (slug) => {
+        const meta = getKnownBrands().find((b) => b.slug === slug);
+        return meta ? { name: meta.name, brandId: meta.id ?? meta.slug } : null;
+      },
+    }),
+    [results, manualRows, brandNameOf, brandIdOf]
+  );
+
+  // Fontes do período (casas que produziram) — é o que a tela lista p/ deixar
+  // explícito de onde vêm os números, e de onde saem as opções do filtro.
+  const sources = useMemo(() => summarizeNetworkSources(sourceRows), [sourceRows]);
+
+  // Opções do filtro: as casas que produziram + a selecionada (que pode ter ficado
+  // sem produção ao trocar o período). Casa "não identificada" não vira opção — é
+  // um diagnóstico, exibido na faixa de fontes.
+  const houseOptions = useMemo(() => {
+    const names = sources.map((s) => s.house).filter((h) => h !== HOUSE_UNKNOWN);
+    if (houseFilter !== ALL_BRANDS && !names.includes(houseFilter)) names.push(houseFilter);
+    return names;
+  }, [sources, houseFilter]);
+
+  // O filtro recorta só a PRODUÇÃO: a árvore de uplines continua inteira, o dinheiro
+  // é que passa a ser o daquela casa.
+  const rows: NetworkRow[] = useMemo(
+    () => filterRowsByHouse(sourceRows, houseFilter),
+    [sourceRows, houseFilter]
+  );
 
   const payouts = useMemo(() => calcNetworkPayouts(tree, rows, configs), [tree, rows, configs]);
   const flat = useMemo(() => flattenTree(tree), [tree]);
@@ -163,6 +211,7 @@ export default function Network() {
   if (profile && !isAdmin) return <Navigate to="/dashboard" replace />;
 
   const maxDepth = flat.reduce((m, f) => Math.max(m, f.depth), 0) + 1;
+  const houseSuffix = houseFilter === ALL_BRANDS ? '' : ` · só ${houseFilter}`;
 
   return (
     <div className="space-y-8 pb-20">
@@ -184,7 +233,16 @@ export default function Network() {
             de cada um pela taxa do <strong>topo</strong> da estrutura.
           </p>
         </div>
-        <DateRangePicker value={range} onChange={setRange} />
+        <div className="flex flex-wrap items-center gap-2">
+          {/* A casa selecionada entra nas opções mesmo sem produção no período —
+              senão o filtro ativo sumiria da lista e não teria como desfazer. */}
+          <BrandFilter
+            brands={houseOptions}
+            value={houseFilter}
+            onChange={setHouseFilter}
+          />
+          <DateRangePicker value={range} onChange={setRange} />
+        </div>
       </header>
 
       {loading ? (
@@ -196,10 +254,12 @@ export default function Network() {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { key: 'direto', label: 'Repasse direto', value: brl(payouts.directTotal), hint: 'produção própria × taxa própria' },
-              { key: 'equipe', label: 'Lucro sobre equipe', value: brl(payouts.overrideTotal), hint: 'override pago aos uplines' },
-              { key: 'custo', label: 'Custo total da agência', value: brl(payouts.agencyCost), hint: 'Σ dos topos de estrutura' },
-              { key: 'estrutura', label: 'Estrutura', value: `${tree.roots.length} topo(s) · ${maxDepth} nível(is)`, hint: `${tree.ids.length} afiliados na rede` },
+              // O sufixo da casa entra só nos cards de DINHEIRO: o filtro recorta a
+              // produção, não a árvore — a estrutura segue sendo a rede inteira.
+              { key: 'direto', label: 'Repasse direto', value: brl(payouts.directTotal), hint: `produção própria × taxa própria${houseSuffix}` },
+              { key: 'equipe', label: 'Lucro sobre equipe', value: brl(payouts.overrideTotal), hint: `override pago aos uplines${houseSuffix}` },
+              { key: 'custo', label: 'Custo total da agência', value: brl(payouts.agencyCost), hint: `Σ dos topos de estrutura${houseSuffix}` },
+              { key: 'estrutura', label: 'Estrutura', value: `${tree.roots.length} topo(s) · ${maxDepth} nível(is)`, hint: `${tree.ids.length} afiliados na rede · não muda com o filtro` },
             ].map((c, idx) => (
               <motion.div
                 key={c.key}
@@ -214,6 +274,82 @@ export default function Network() {
               </motion.div>
             ))}
           </div>
+
+          {/* De ONDE vêm os números acima. A rede soma duas bases (API da OTG +
+              casas geridas aqui) e antes o total não dizia de quantas casas era.
+              Cada casa é clicável: vira o filtro. */}
+          <section className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500 mr-1">
+              {houseFilter === ALL_BRANDS ? 'Dados de' : 'Filtrando por'}
+            </span>
+
+            {sources.length === 0 && (
+              <span className="text-xs text-slate-400 dark:text-neutral-500">
+                nenhuma casa produziu no período
+              </span>
+            )}
+
+            {sources.map((s) => {
+              const unknown = s.house === HOUSE_UNKNOWN;
+              const selected = !unknown && houseFilter === s.house;
+              // Casa não identificada é DIAGNÓSTICO (afiliado sem casa no cadastro),
+              // não um filtro: produção que não sabemos atribuir tem que aparecer.
+              if (unknown) {
+                return (
+                  <span
+                    key="__unknown__"
+                    title="Afiliados sem casa no cadastro — a produção entra no total, mas não é atribuída a nenhuma casa."
+                    className="inline-flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-xl border border-amber-300/60 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20 text-[11px] font-bold text-amber-700 dark:text-amber-400"
+                  >
+                    <AlertTriangle size={13} />
+                    Sem casa no cadastro
+                    <span className="font-medium opacity-70">· {s.affiliates} afiliado(s)</span>
+                  </span>
+                );
+              }
+              return (
+                <button
+                  key={s.house}
+                  type="button"
+                  onClick={() => setHouseFilter(selected ? ALL_BRANDS : s.house)}
+                  aria-pressed={selected}
+                  title={selected ? 'Clique para ver todas as casas' : `Ver só ${s.house}`}
+                  className={cn(
+                    'inline-flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl border text-[11px] font-bold transition-all',
+                    selected
+                      ? 'border-accent-500 bg-accent-500/10 text-accent-600 dark:text-accent-400'
+                      : 'border-slate-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 text-slate-600 dark:text-neutral-300 hover:border-slate-300 dark:hover:border-neutral-700'
+                  )}
+                >
+                  <BrandLogo name={s.house} size={18} />
+                  {s.house}
+                  <span className="font-medium text-slate-400 dark:text-neutral-500">
+                    · {s.affiliates} afiliado(s)
+                  </span>
+                  {/* Origem do dado: API da casa vs. planilha/pull. "Ambas" avisa que
+                      o número da casa está sendo alimentado pelos dois caminhos. */}
+                  <span className={cn(
+                    'px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-wider',
+                    s.origin === 'ambas'
+                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                      : 'bg-slate-100 dark:bg-neutral-800 text-slate-500 dark:text-neutral-400'
+                  )}>
+                    {s.origin === 'otg' ? 'OTG' : s.origin === 'manual' ? 'gerida aqui' : 'ambas'}
+                  </span>
+                </button>
+              );
+            })}
+
+            {houseFilter !== ALL_BRANDS && (
+              <button
+                type="button"
+                onClick={() => setHouseFilter(ALL_BRANDS)}
+                className="text-[11px] font-bold text-slate-400 dark:text-neutral-500 hover:text-slate-600 dark:hover:text-neutral-300 underline decoration-dotted underline-offset-2"
+              >
+                limpar filtro
+              </button>
+            )}
+          </section>
 
           {/* Anomalias: aresta descartada no saneamento + spread negativo + sem taxa.
               Nada é silenciosamente corrigido — o admin vê e decide. */}
