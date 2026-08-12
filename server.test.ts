@@ -560,6 +560,17 @@ describe('POST /api/special/sub-config — taxa do sub também vira config.updat
 // REDE-AFILIADOS.md.
 // =============================================================================
 describe('special_affiliates com fromNetwork — visão N níveis, dinheiro 1 nível', () => {
+  // O teste do proxy externo (IDOR) precisa da chave no ambiente — sem ela a
+  // rota devolve 500 antes do escopo. Antes vinha implícita do .env da máquina
+  // (quebrava em checkout limpo/worktree); agora segue o padrão dos demais
+  // testes de proxy: seta e restaura.
+  const PREV_KEY = process.env.AFFILIATE_API_KEY;
+  beforeAll(() => { process.env.AFFILIATE_API_KEY = 'test-key'; });
+  afterAll(() => {
+    if (PREV_KEY === undefined) delete process.env.AFFILIATE_API_KEY;
+    else process.env.AFFILIATE_API_KEY = PREV_KEY;
+  });
+
   // topo → GER (o gerente) → LID → PONTA
   const seed = {
     users: {
