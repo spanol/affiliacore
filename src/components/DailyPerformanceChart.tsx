@@ -19,6 +19,8 @@ interface DailyPerformanceChartProps {
 // Renders the affiliate's daily evolution (cadastros + comissão) from the
 // external API's `groupBy=date` results. Replaces the old per-client table,
 // since the affiliate API exposes no per-client data.
+// Quando a série traz `own_commission` (painel do especial via buildSpecialDailySeries),
+// desenha uma SEGUNDA linha — a produção própria separada do total da rede (call 12/08).
 export default function DailyPerformanceChart({ data }: DailyPerformanceChartProps) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -29,7 +31,9 @@ export default function DailyPerformanceChart({ data }: DailyPerformanceChartPro
   const tickColor = isDark ? '#a3a3a3' : '#94a3b8';        // neutral-400 no dark (eixos)
   const barColor = isDark ? '#525252' : '#141C2A';         // neutral-600 no dark, brand no light
   const lineColor = '#0ea5e9';
+  const ownLineColor = '#10b981'; // emerald — mesma família do card de lucro do especial
 
+  const hasOwnSeries = (Array.isArray(data) ? data : []).some((r: any) => r?.own_commission !== undefined);
   const rows = (Array.isArray(data) ? data : [])
     .map((r: any) => {
       const date = String(r.id || r.label || '');
@@ -38,6 +42,7 @@ export default function DailyPerformanceChart({ data }: DailyPerformanceChartPro
         label: date.length >= 10 ? `${date.slice(8, 10)}/${date.slice(5, 7)}` : date,
         cadastros: Number(r.registrations || 0),
         comissao: Number(r.total_commission || 0),
+        propria: Number(r.own_commission || 0),
       };
     })
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -71,15 +76,18 @@ export default function DailyPerformanceChart({ data }: DailyPerformanceChartPro
             }}
             itemStyle={{ color: isDark ? '#E5E5E5' : '#334155' }}
             labelStyle={{ color: isDark ? '#A3A3A3' : '#64748B' }}
-            formatter={(value: any, name: any) =>
-              name === 'comissao'
-                ? [`R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 'Comissão']
-                : [value, 'Cadastros']
-            }
+            formatter={(value: any, name: any) => {
+              if (name === 'cadastros') return [value, 'Cadastros'];
+              const brl = `R$ ${Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+              return [brl, name === 'propria' ? 'Produção própria' : 'Comissão'];
+            }}
             labelFormatter={(l) => `Dia ${l}`}
           />
           <Bar yAxisId="left" dataKey="cadastros" fill={barColor} radius={[4, 4, 0, 0]} maxBarSize={26} />
           <Line yAxisId="right" type="monotone" dataKey="comissao" stroke={lineColor} strokeWidth={2} dot={false} />
+          {hasOwnSeries && (
+            <Line yAxisId="right" type="monotone" dataKey="propria" stroke={ownLineColor} strokeWidth={2} strokeDasharray="6 3" dot={false} />
+          )}
         </ComposedChart>
       </ResponsiveContainer>
     </div>

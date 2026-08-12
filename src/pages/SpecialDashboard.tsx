@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Loader2, DollarSign, UserPlus, Wallet, Target, Crown, HelpCircle, Users, BarChart3, TrendingUp } from 'lucide-react';
+import { Loader2, DollarSign, UserPlus, Wallet, Target, Crown, HelpCircle, Users, BarChart3, TrendingUp, MousePointerClick, Hash, Divide, Receipt } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   fetchSpecialAffiliates,
@@ -10,6 +10,7 @@ import {
   fetchAllResultsByBrand,
   fetchAllResultsByCampaign,
   fetchAllDailyResults,
+  fetchAffiliateDailyResults,
   fetchAffiliateConfigs,
   calcAffiliatePayout,
   resolveBrandRates,
@@ -18,6 +19,8 @@ import {
   CampaignRow,
 } from '../services/affiliateService';
 import { buildPerHousePayout, type HouseMetricRow } from '../lib/perHousePayout';
+import { buildFunnelItems, sumFunnelTotals, formatFunnelValue, type FunnelItemKey } from '../lib/funnel';
+import { buildSpecialDailySeries } from '../lib/specialDaily';
 import DateRangePicker from '../components/DateRangePicker';
 import BrandBreakdown from '../components/BrandBreakdown';
 import BrandFilter from '../components/BrandFilter';
@@ -49,6 +52,9 @@ export default function SpecialDashboard() {
   const [brandResults, setBrandResults] = useState<any[]>([]);
   const [campaignResults, setCampaignResults] = useState<CampaignRow[]>([]);
   const [dailyResults, setDailyResults] = useState<any[]>([]);
+  // Série diária SÓ da produção própria do especial (own id) — alimenta a linha
+  // "produção própria" do gráfico (clone do "minhas comissões" do legado, 12/08).
+  const [ownDailyResults, setOwnDailyResults] = useState<any[]>([]);
   const [configs, setConfigs] = useState<Record<string, AffiliateConfig>>({});
   const [pool, setPool] = useState<any[]>([]); // mirror p/ afiliado→brandId (byBrand)
 
@@ -69,11 +75,12 @@ export default function SpecialDashboard() {
       const networkIds = [ownId, ...((mine?.subAffiliateIds || []).map(String))];
       // brand/campaign/daily vão SEM affiliateIds — o proxy escopa à sub-rede do
       // especial (own + subs). Agregados pela API por casa/campanha/dia.
-      const [split, byBrand, byCampaign, byDay, cfgs, poolData] = await Promise.all([
+      const [split, byBrand, byCampaign, byDay, ownByDay, cfgs, poolData] = await Promise.all([
         fetchResultsForAffiliatesSplit(networkIds, range),
         fetchAllResultsByBrand(range),
         fetchAllResultsByCampaign(range),
         fetchAllDailyResults(range),
+        fetchAffiliateDailyResults(ownId, range.startDate, range.endDate).catch(() => []),
         fetchAffiliateConfigs(),
         fetchAffiliates().catch(() => []),
       ]);
@@ -83,6 +90,7 @@ export default function SpecialDashboard() {
       setBrandResults(Array.isArray(byBrand) ? byBrand : []);
       setCampaignResults(Array.isArray(byCampaign) ? byCampaign : []);
       setDailyResults(Array.isArray(byDay) ? byDay : []);
+      setOwnDailyResults(Array.isArray(ownByDay) ? ownByDay : []);
       setConfigs(cfgs);
       setPool(Array.isArray(poolData) ? poolData : []);
     } catch (err) {
@@ -92,6 +100,7 @@ export default function SpecialDashboard() {
       setBrandResults([]);
       setCampaignResults([]);
       setDailyResults([]);
+      setOwnDailyResults([]);
     } finally {
       setLoading(false);
     }
@@ -133,13 +142,9 @@ export default function SpecialDashboard() {
   const selectedBrandRow = isAllBrands ? null : brandResults.find((r) => brandNameOf(r) === selectedBrand);
   const metricRows = isAllBrands ? results : (selectedBrandRow ? [selectedBrandRow] : []);
 
-  // Funil agregado da sub-rede (own + subs), escopado pela casa selecionada.
-  const funnelTotals = metricRows.reduce((acc, r) => ({
-    registrations: acc.registrations + (r.registrations || 0),
-    firstDeposits: acc.firstDeposits + (r.first_deposits || 0),
-    deposit: acc.deposit + (r.deposit || 0),
-    qualifiedCpa: acc.qualifiedCpa + (r.qualified_cpa || 0),
-  }), { registrations: 0, firstDeposits: 0, deposit: 0, qualifiedCpa: 0 });
+  // Funil agregado da sub-rede (own + subs), escopado pela casa selecionada —
+  // na ORDEM do painel da Esportiva, com derivados (lib/funnel, call 12/08).
+  const funnelItems = buildFunnelItems(sumFunnelTotals(metricRows));
 
   // Lucro líquido do especial = link dele (produção própria) + lucro da rede (spread).
   // Spread por sub = taxa própria do especial − taxa que ele definiu pro sub. TODO o
@@ -193,12 +198,14 @@ export default function SpecialDashboard() {
     { label: 'Total REV', value: brl(revPortion), icon: TrendingUp },
   ];
 
-  // Série diária: a API agrega own+subs por dia. Substituímos a comissão da CASA
-  // (total_commission cru) pela comissão DO ESPECIAL à taxa própria, mantendo a
-  // regra do lucro líquido (nunca expor a margem/receita bruta da agência).
+  // Série diária: a API agrega own+subs por dia. buildSpecialDailySeries troca a
+  // comissão da CASA (total_commission cru) pela comissão DO ESPECIAL à taxa
+  // própria (regra do lucro líquido — nunca expor a margem/receita bruta) e
+  // carimba `own_commission` por dia — a linha de PRODUÇÃO PRÓPRIA separada do
+  // total da rede (clone do "minhas comissões" do painel legado, call 12/08).
   const dailyChartData = useMemo(
-    () => dailyResults.map((r) => ({ ...r, total_commission: calcAffiliatePayout(r, ownConfig) })),
-    [dailyResults, ownConfig]
+    () => buildSpecialDailySeries(dailyResults, ownDailyResults, ownConfig),
+    [dailyResults, ownDailyResults, ownConfig]
   );
 
   // Desempenho por afiliado da rede (own + subs), ordenado por comissão. TUDO à
@@ -244,12 +251,21 @@ export default function SpecialDashboard() {
   // Mesma lógica para "Por casa": o BrandBreakdown calcula a comissão a partir do
   // config informado — passamos a taxa própria do especial (o que ele recebe).
 
-  const funnel = [
-    { label: 'Cadastros', value: funnelTotals.registrations.toLocaleString('pt-BR'), icon: UserPlus },
-    { label: 'Primeiros Depósitos', value: funnelTotals.firstDeposits.toLocaleString('pt-BR'), icon: Wallet },
-    { label: 'Valor Depositado', value: brl(funnelTotals.deposit), icon: DollarSign },
-    { label: 'CPA Qualificado', value: funnelTotals.qualifiedCpa.toLocaleString('pt-BR'), icon: Target },
-  ];
+  const FUNNEL_ICONS: Record<FunnelItemKey, typeof UserPlus> = {
+    visits: MousePointerClick,
+    registrations: UserPlus,
+    first_deposits: Wallet,
+    deposit_count: Hash,
+    deposit: DollarSign,
+    avg_deposit: Divide,
+    avg_ticket: Receipt,
+    qualified_cpa: Target,
+  };
+  const funnel = funnelItems.map((item) => ({
+    label: item.label,
+    value: formatFunnelValue(item),
+    icon: FUNNEL_ICONS[item.key],
+  }));
 
   // Guard: só afiliado especial acessa esta rota.
   if (profile && !profile.isSpecial) return <Navigate to="/dashboard" replace />;
@@ -440,7 +456,7 @@ export default function SpecialDashboard() {
           <div className="p-6 border-b border-slate-50 dark:border-neutral-800 flex justify-between items-center bg-slate-50/50 dark:bg-neutral-800/30">
             <h3 className="font-black text-xs text-slate-800 dark:text-white uppercase tracking-widest">Evolução Diária (sua rede)</h3>
             <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-neutral-800 rounded-lg text-[10px] font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-widest">
-              Cadastros · Comissão
+              Cadastros · Comissão da rede · <span className="text-emerald-600 dark:text-emerald-400">Produção própria</span>
             </div>
           </div>
           <DailyPerformanceChart data={dailyChartData} />
