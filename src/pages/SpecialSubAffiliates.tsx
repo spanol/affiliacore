@@ -7,15 +7,15 @@ import { useToast } from '../contexts/ToastContext';
 import {
   fetchSpecialAffiliates,
   fetchAffiliates,
-  fetchResultsForAffiliates,
+  fetchResultsForAffiliatesSplit,
   fetchManualResults,
   fetchAffiliateConfigs,
   saveSubAffiliateConfig,
-  calcAffiliatePayout,
   SpecialAffiliate,
   AffiliateConfig,
 } from '../services/affiliateService';
 import { producingAffiliateIds } from '../lib/affiliateActivity';
+import { buildPerHousePayout, type HouseMetricRow } from '../lib/perHousePayout';
 import { StoredManualRow } from '../lib/houseResults';
 import DateRangePicker from '../components/DateRangePicker';
 import BrandFilter from '../components/BrandFilter';
@@ -42,6 +42,9 @@ export default function SpecialSubAffiliates() {
   const [loading, setLoading] = useState(true);
   const [special, setSpecial] = useState<SpecialAffiliate | null>(null);
   const [results, setResults] = useState<any[]>([]);
+  // Partes SEPARADAS (OTG × manual) — o "Seu ganho" (spread) precifica a linha
+  // manual pela casa da LINHA via perHousePayout (bug do R$ 280, 2026-08-12).
+  const [payoutParts, setPayoutParts] = useState<{ otg: any[]; manual: HouseMetricRow[] }>({ otg: [], manual: [] });
   const [manualRows, setManualRows] = useState<StoredManualRow[]>([]);
   const [configs, setConfigs] = useState<Record<string, AffiliateConfig>>({});
   const [pool, setPool] = useState<any[]>([]); // mirror p/ afiliado→brandId (byBrand)
@@ -69,8 +72,8 @@ export default function SpecialSubAffiliates() {
       const specials = await fetchSpecialAffiliates();
       const mine = specials[ownId] || null;
       const networkIds = [ownId, ...((mine?.subAffiliateIds || []).map(String))];
-      const [rows, cfgs, poolData, manual] = await Promise.all([
-        fetchResultsForAffiliates(networkIds, range),
+      const [split, cfgs, poolData, manual] = await Promise.all([
+        fetchResultsForAffiliatesSplit(networkIds, range),
         fetchAffiliateConfigs(),
         fetchAffiliates().catch(() => []),
         // Casas MANUAIS entram na atividade: sem isto, numa instância OTG-free
@@ -78,7 +81,8 @@ export default function SpecialSubAffiliates() {
         fetchManualResults(range).catch(() => []),
       ]);
       setSpecial(mine);
-      setResults(Array.isArray(rows) ? rows : []);
+      setResults(split.rows);
+      setPayoutParts({ otg: split.otg, manual: split.manual });
       setManualRows(Array.isArray(manual) ? manual : []);
       setConfigs(cfgs);
       setPool(Array.isArray(poolData) ? poolData : []);
@@ -107,7 +111,12 @@ export default function SpecialSubAffiliates() {
     () => configs[ownId] ?? { affiliateId: ownId, cpaValue: 0, revPercentage: 0 },
     [ownId, configs]
   );
+  // brandIdOf só manda na parte OTG; a manual é precificada pela casa da linha.
   const brandIdOf = useMemo(() => buildBrandIdOf(pool), [pool]);
+  const payoutOf = useMemo(
+    () => buildPerHousePayout(payoutParts.otg, payoutParts.manual, brandIdOf),
+    [payoutParts, brandIdOf]
+  );
 
   const rowById = (id: string) => results.find((r) => String(r.affiliate_id ?? r.id ?? '') === String(id));
   const subIds = special?.subAffiliateIds?.map(String) || [];
@@ -323,10 +332,10 @@ export default function SpecialSubAffiliates() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-neutral-800 text-xs">
-                    {filteredSubs.map(({ id, row: r, name, producing }) => {
+                    {filteredSubs.map(({ id, name, producing, row: r }) => {
                       // Seu ganho = spread (taxa própria − taxa do sub) sobre a produção
-                      // dele, na taxa POR CASA (byBrand) do sub — no-op sem override (R10).
-                      const spread = calcAffiliatePayout(r, ownConfig, brandIdOf(id)) - calcAffiliatePayout(r, configs[id], brandIdOf(id));
+                      // dele, precificada POR CASA (perHousePayout) dos dois lados.
+                      const spread = payoutOf.breakdownFor(id, ownConfig).total - payoutOf.breakdownFor(id, configs[id]).total;
                       const canEdit = directIds.has(id);
                       return (
                         <tr
@@ -399,8 +408,10 @@ export default function SpecialSubAffiliates() {
 
               {/* Mobile · cards */}
               <div className="md:hidden divide-y divide-slate-100 dark:divide-neutral-800">
-                {filteredSubs.map(({ id, row: r, name, producing }) => {
-                  const spread = calcAffiliatePayout(r, ownConfig) - calcAffiliatePayout(r, configs[id]);
+                {filteredSubs.map(({ id, name, producing, row: r }) => {
+                  // Mesmo spread por casa do desktop — antes o mobile usava só a
+                  // taxa de topo e os dois divergiam com byBrand.
+                  const spread = payoutOf.breakdownFor(id, ownConfig).total - payoutOf.breakdownFor(id, configs[id]).total;
                   const canEdit = directIds.has(id);
                   const stats = [
                     { label: 'Cadastros', value: (r.registrations || 0).toLocaleString('pt-BR') },

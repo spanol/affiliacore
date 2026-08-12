@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   fetchSpecialAffiliates,
   fetchAffiliates,
-  fetchResultsForAffiliates,
+  fetchResultsForAffiliatesSplit,
   fetchAllResultsByBrand,
   fetchAllResultsByCampaign,
   fetchAllDailyResults,
@@ -17,6 +17,7 @@ import {
   AffiliateConfig,
   CampaignRow,
 } from '../services/affiliateService';
+import { buildPerHousePayout, type HouseMetricRow } from '../lib/perHousePayout';
 import DateRangePicker from '../components/DateRangePicker';
 import BrandBreakdown from '../components/BrandBreakdown';
 import BrandFilter from '../components/BrandFilter';
@@ -40,6 +41,10 @@ export default function SpecialDashboard() {
   const [loading, setLoading] = useState(true);
   const [special, setSpecial] = useState<SpecialAffiliate | null>(null);
   const [results, setResults] = useState<any[]>([]);
+  // Partes SEPARADAS (OTG × manual) das mesmas linhas — base do DINHEIRO: a
+  // linha manual é precificada pela casa da LINHA (perHousePayout), nunca pelo
+  // merge (que perde o houseSlug — bug do R$ 280, 2026-08-12).
+  const [payoutParts, setPayoutParts] = useState<{ otg: any[]; manual: HouseMetricRow[] }>({ otg: [], manual: [] });
   // Visões analíticas da rede (own + subs), escopadas pelo proxy (B3 Fase 2).
   const [brandResults, setBrandResults] = useState<any[]>([]);
   const [campaignResults, setCampaignResults] = useState<CampaignRow[]>([]);
@@ -64,8 +69,8 @@ export default function SpecialDashboard() {
       const networkIds = [ownId, ...((mine?.subAffiliateIds || []).map(String))];
       // brand/campaign/daily vão SEM affiliateIds — o proxy escopa à sub-rede do
       // especial (own + subs). Agregados pela API por casa/campanha/dia.
-      const [rows, byBrand, byCampaign, byDay, cfgs, poolData] = await Promise.all([
-        fetchResultsForAffiliates(networkIds, range),
+      const [split, byBrand, byCampaign, byDay, cfgs, poolData] = await Promise.all([
+        fetchResultsForAffiliatesSplit(networkIds, range),
         fetchAllResultsByBrand(range),
         fetchAllResultsByCampaign(range),
         fetchAllDailyResults(range),
@@ -73,7 +78,8 @@ export default function SpecialDashboard() {
         fetchAffiliates().catch(() => []),
       ]);
       setSpecial(mine);
-      setResults(Array.isArray(rows) ? rows : []);
+      setResults(split.rows);
+      setPayoutParts({ otg: split.otg, manual: split.manual });
       setBrandResults(Array.isArray(byBrand) ? byBrand : []);
       setCampaignResults(Array.isArray(byCampaign) ? byCampaign : []);
       setDailyResults(Array.isArray(byDay) ? byDay : []);
@@ -82,6 +88,7 @@ export default function SpecialDashboard() {
     } catch (err) {
       console.error('Erro ao carregar painel da sub-rede:', err);
       setResults([]);
+      setPayoutParts({ otg: [], manual: [] });
       setBrandResults([]);
       setCampaignResults([]);
       setDailyResults([]);
@@ -105,10 +112,14 @@ export default function SpecialDashboard() {
     [ownId, configs]
   );
   // afiliado→brandId (byBrand) — mesma atribuição afiliado→casa do /admin.
+  // Vale SÓ pra parte OTG: a produção MANUAL é precificada pela casa de cada
+  // LINHA (houseSlug) via perHousePayout — o mirror não manda nela.
   const brandIdOf = useMemo(() => buildBrandIdOf(pool), [pool]);
+  const payoutOf = useMemo(
+    () => buildPerHousePayout(payoutParts.otg, payoutParts.manual, brandIdOf),
+    [payoutParts, brandIdOf]
+  );
 
-  const rowById = (id: string) => results.find((r) => String(r.affiliate_id ?? r.id ?? '') === String(id));
-  const ownRow = rowById(ownId);
   const subIds = special?.subAffiliateIds?.map(String) || [];
 
   // Filtro por casa: "Todas as casas" usa as linhas por afiliado (own+subs); uma
@@ -131,18 +142,16 @@ export default function SpecialDashboard() {
   }), { registrations: 0, firstDeposits: 0, deposit: 0, qualifiedCpa: 0 });
 
   // Lucro líquido do especial = link dele (produção própria) + lucro da rede (spread).
-  // Spread por sub = taxa própria do especial − taxa que ele definiu pro sub. Aplica a
-  // taxa POR CASA (byBrand) de cada afiliado — no-op p/ quem não tem override (R10).
+  // Spread por sub = taxa própria do especial − taxa que ele definiu pro sub. TODO o
+  // dinheiro sai de `payoutOf` (perHousePayout): OTG na casa do afiliado (mirror),
+  // manual na casa da LINHA — precificar o agregado com a casa do mirror cobrou um
+  // QFTD da Esportiva à taxa da Super Bet (R$ 280 em vez de R$ 110, 2026-08-12).
   const rowAff = (r: any) => String(r?.affiliate_id ?? r?.id ?? '');
-  // brandId de uma linha de métrica: "Todas as casas" → casa do afiliado da linha
-  // (groupBy=affiliate); casa selecionada → o brandId da própria casa (groupBy=brand).
-  const brandIdForMetric = (r: any) => (isAllBrands ? brandIdOf(rowAff(r)) : String(selectedBrandRow?.id ?? '') || undefined);
-  const ownPayout = calcAffiliatePayout(ownRow, ownConfig, brandIdOf(ownId));
-  const spreadTotal = subIds.reduce((sum, id) => {
-    const r = rowById(id);
-    if (!r) return sum;
-    return sum + (calcAffiliatePayout(r, ownConfig, brandIdOf(id)) - calcAffiliatePayout(r, configs[id], brandIdOf(id)));
-  }, 0);
+  const ownPayout = payoutOf.breakdownFor(ownId, ownConfig).total;
+  const spreadTotal = subIds.reduce(
+    (sum, id) => sum + (payoutOf.breakdownFor(id, ownConfig).total - payoutOf.breakdownFor(id, configs[id]).total),
+    0
+  );
   const earnings = ownPayout + spreadTotal;
 
   // Comissão total do especial = taxa PRÓPRIA aplicada sobre TODA a rede (própria + subs).
@@ -150,13 +159,31 @@ export default function SpecialDashboard() {
   // Mantém a regra do lucro líquido: tudo à taxa do especial, nunca a comissão bruta da casa.
   // `Rede` = sempre a rede inteira (alimenta o lucro líquido); as versões scopadas
   // abaixo respeitam o filtro de casa e alimentam só a grade de métricas.
-  const comissaoTotalRede = results.reduce((sum, r) => sum + calcAffiliatePayout(r, ownConfig, brandIdOf(rowAff(r))), 0);
+  const comissaoTotalRede = results.reduce((sum, r) => sum + payoutOf.breakdownFor(rowAff(r), ownConfig).total, 0);
   const repasse = comissaoTotalRede - earnings;
-  const comissaoTotal = metricRows.reduce((sum, r) => sum + calcAffiliatePayout(r, ownConfig, brandIdForMetric(r)), 0);
-  // split CPA/REV coerente com o byBrand: resolve a taxa por casa de cada linha (antes
-  // usava só o topo, então a soma CPA+REV podia não bater com a Comissão total).
-  const cpaPortion = metricRows.reduce((sum, r) => sum + (r.qualified_cpa || 0) * resolveBrandRates(ownConfig, brandIdForMetric(r)).cpaValue, 0);
-  const revPortion = metricRows.reduce((sum, r) => sum + (r.rvs || 0) * (resolveBrandRates(ownConfig, brandIdForMetric(r)).revPercentage / 100), 0);
+  // Escopo do filtro de casa: "Todas as casas" → partes por afiliado (perHousePayout);
+  // casa selecionada → a linha agregada daquela casa à taxa DELA (groupBy=brand),
+  // caminho que já era por-casa e continua igual.
+  const scopedParts = isAllBrands
+    ? results.reduce(
+        (acc, r) => {
+          const b = payoutOf.breakdownFor(rowAff(r), ownConfig);
+          return { total: acc.total + b.total, cpa: acc.cpa + b.cpa, rev: acc.rev + b.rev };
+        },
+        { total: 0, cpa: 0, rev: 0 }
+      )
+    : metricRows.reduce(
+        (acc, r) => {
+          const rates = resolveBrandRates(ownConfig, String(selectedBrandRow?.id ?? '') || undefined);
+          const cpa = (r.qualified_cpa || 0) * rates.cpaValue;
+          const rev = (r.rvs || 0) * (rates.revPercentage / 100);
+          return { total: acc.total + cpa + rev, cpa: acc.cpa + cpa, rev: acc.rev + rev };
+        },
+        { total: 0, cpa: 0, rev: 0 }
+      );
+  const comissaoTotal = scopedParts.total;
+  const cpaPortion = scopedParts.cpa;
+  const revPortion = scopedParts.rev;
 
   // Cards de métrica (espelham o /admin, capados à rede do especial).
   const metrics = [
@@ -180,20 +207,19 @@ export default function SpecialDashboard() {
   const affiliateChartData = useMemo(
     () => [...results]
       .map((r) => {
-        // taxa POR CASA do afiliado (não só o topo) — espelha os cards/CPA/REV acima
-        // (:146-152). Sem isso o chart divergia da Comissão real quando havia override
-        // byBrand. [[boost-net-profit-per-house]]
-        const brandId = brandIdOf(rowAff(r));
-        const rates = resolveBrandRates(ownConfig, brandId);
+        // Partes POR CASA do afiliado (perHousePayout) — espelha os cards/CPA/REV
+        // acima. Sem isso o chart divergia da Comissão real quando o afiliado
+        // produzia fora da casa do mirror. [[boost-net-profit-per-house]]
+        const b = payoutOf.breakdownFor(rowAff(r), ownConfig);
         return {
           name: humanizeName(String(r.affiliate_name || r.name || r.label || r.affiliate_id || r.id || '---')),
-          Comissão: calcAffiliatePayout(r, ownConfig, brandId),
-          CPA: (r.qualified_cpa || 0) * rates.cpaValue,
-          REV: (r.rvs || 0) * (rates.revPercentage / 100),
+          Comissão: b.total,
+          CPA: b.cpa,
+          REV: b.rev,
         };
       })
       .sort((a, b) => b.Comissão - a.Comissão),
-    [results, ownConfig]
+    [results, ownConfig, payoutOf]
   );
 
   // Top 5 afiliados da rede (own + subs) por comissão à TAXA PRÓPRIA do especial —
@@ -203,14 +229,16 @@ export default function SpecialDashboard() {
       .map((r) => ({
         id: String(r.affiliate_id ?? r.id ?? ''),
         name: humanizeName(String(r.affiliate_name || r.name || r.label || r.affiliate_id || r.id || '---')),
-        commission: calcAffiliatePayout(r, ownConfig),
+        // Mesma fonte por-casa dos cards — antes usava só a taxa de topo e
+        // divergia da Comissão total quando havia byBrand.
+        commission: payoutOf.breakdownFor(rowAff(r), ownConfig).total,
         registrations: r.registrations || 0,
         qualifiedCpa: r.qualified_cpa || 0,
         isOwn: String(r.affiliate_id ?? r.id ?? '') === ownId,
       }))
       .sort((a, b) => b.commission - a.commission)
       .slice(0, 5),
-    [results, ownConfig, ownId]
+    [results, ownConfig, ownId, payoutOf]
   );
 
   // Mesma lógica para "Por casa": o BrandBreakdown calcula a comissão a partir do

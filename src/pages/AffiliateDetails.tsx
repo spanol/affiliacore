@@ -35,6 +35,7 @@ import {
   fetchAffiliateById,
   fetchAffiliateResults,
   fetchResultsForAffiliates,
+  fetchResultsForAffiliatesSplit,
   fetchAffiliateResultsByBrand,
   fetchAffiliateResultsByCampaign,
   fetchAffiliateDailyResults,
@@ -70,6 +71,7 @@ import InfoTooltip from '../components/InfoTooltip';
 import TrendBadge from '../components/TrendBadge';
 import { DateRange, getDefaultRange, getPreviousRange, percentChange } from '../lib/dateRange';
 import { ALL_BRANDS, getKnownBrandName, buildBrandIdOf } from '../lib/brand';
+import { buildPerHousePayout, type HouseMetricRow } from '../lib/perHousePayout';
 import { withKnownBrandNames } from '../lib/knownHouses';
 import { canViewAffiliateNetProfit } from '../lib/affiliateView';
 import { cn, humanizeName } from '../lib/utils';
@@ -146,9 +148,11 @@ export default function AffiliateDetails() {
   const [loadingNetwork, setLoadingNetwork] = useState(false);
   // Quando o afiliado é um especial com rede, os cards agregam own + subs.
   const [isNetworkView, setIsNetworkView] = useState(false);
-  // Linhas POR afiliado (own + subs) e configs completos — base do card de
-  // lucro líquido do afiliado (ganho dele: direto + spread da rede).
-  const [perAffiliateRows, setPerAffiliateRows] = useState<any[]>([]);
+  // Partes SEPARADAS (OTG × manual) das linhas por afiliado (own + subs) — base
+  // do card de lucro líquido do afiliado (ganho dele: direto + spread da rede):
+  // a linha manual é precificada pela casa da LINHA (perHousePayout), nunca o
+  // agregado pela casa do mirror (bug do R$ 280, 2026-08-12).
+  const [payoutSplit, setPayoutSplit] = useState<{ otg: any[]; manual: HouseMetricRow[] }>({ otg: [], manual: [] });
   const [allConfigs, setAllConfigs] = useState<Record<string, AffiliateConfig>>({});
   // Pool de afiliados (mirror) → afiliado→brandId p/ aplicar a taxa POR CASA (byBrand)
   // no card de lucro do afiliado (R9). Mesma atribuição afiliado→casa do /admin.
@@ -249,11 +253,13 @@ export default function AffiliateDetails() {
       const idsCsv = networkIds.join(',');
       setIsNetworkView(isNetwork);
 
-      const [detailsData, resultsData, allConfigs, brandData, campaignData, dailyData, prevResults, funnelData] = await Promise.all([
+      const [detailsData, resultsSplit, allConfigs, brandData, campaignData, dailyData, prevResults, funnelData] = await Promise.all([
         fetchAffiliateById(affId),
-        (isNetwork ? fetchResultsForAffiliates(networkIds, range) : fetchAffiliateResults(affId, range)).catch(err => {
+        // Split (OTG × manual) mesmo p/ afiliado único: o card de lucro precifica a
+        // produção manual pela casa de cada linha. `networkIds` = [affId] fora da rede.
+        fetchResultsForAffiliatesSplit(networkIds, range).catch(err => {
           console.error('Error fetching results:', err);
-          return [];
+          return { rows: [], otg: [], manual: [] };
         }),
         fetchAffiliateConfigs(),
         fetchAffiliateResultsByBrand(isNetwork ? idsCsv : affId, range),
@@ -280,9 +286,9 @@ export default function AffiliateDetails() {
       setAffiliate(resolvedAffiliate);
       // groupBy=affiliate devolve 1 linha por afiliado; p/ a rede somamos numa linha só
       // (a página renderiza um conjunto de cards por linha de `results`).
-      const resultsArr = Array.isArray(resultsData) ? resultsData : (resultsData ? [resultsData] : []);
+      const resultsArr = Array.isArray(resultsSplit.rows) ? resultsSplit.rows : [];
       setResults(isNetwork ? [sumResultRows(resultsArr)] : resultsArr);
-      setPerAffiliateRows(resultsArr); // linhas cruas por afiliado (own + subs) p/ o lucro líquido
+      setPayoutSplit({ otg: resultsSplit.otg, manual: resultsSplit.manual });
       setAllConfigs(allConfigs || {});
       setBrandResults(Array.isArray(brandData) ? brandData : []);
       setCampaignResults(Array.isArray(campaignData) ? campaignData : []);
@@ -478,18 +484,19 @@ export default function AffiliateDetails() {
     viewedAffiliateId: String(id),
     ownAffiliateId: profile?.affiliateId,
   });
-  // Aplica a taxa POR CASA (byBrand) de cada afiliado, igual ao lucro da agência no
-  // /admin — antes usava só a taxa de topo e divergia (R9). No-op p/ quem não tem
-  // override byBrand. brandIdOf resolve a casa de cada afiliado pelo mirror.
+  // Dinheiro POR CASA via perHousePayout: a parte OTG usa a casa do afiliado
+  // (brandIdOf pelo mirror, igual ao /admin — R9); a produção MANUAL usa a casa
+  // de cada LINHA (houseSlug). Precificar o agregado pela casa do mirror cobrou
+  // um QFTD da Esportiva à taxa da Super Bet (R$ 280 vs R$ 110, 2026-08-12).
   const brandIdOf = buildBrandIdOf(affiliatesPool);
   const lucro = (() => {
-    const rowFor = (tid: string) => perAffiliateRows.find((r) => String(r?.id ?? r?.affiliate_id ?? '') === String(tid));
+    const payoutOf = buildPerHousePayout(payoutSplit.otg, payoutSplit.manual, brandIdOf);
     const subIds = (specials[String(id)]?.subAffiliateIds || []).map(String);
-    const direto = calcAffiliatePayout(rowFor(String(id)), config, brandIdOf(String(id)));
-    const rede = subIds.reduce((sum, sid) => {
-      const r = rowFor(sid);
-      return r ? sum + (calcAffiliatePayout(r, config, brandIdOf(sid)) - calcAffiliatePayout(r, allConfigs[sid], brandIdOf(sid))) : sum;
-    }, 0);
+    const direto = payoutOf.breakdownFor(String(id), config).total;
+    const rede = subIds.reduce(
+      (sum, sid) => sum + (payoutOf.breakdownFor(sid, config).total - payoutOf.breakdownFor(sid, allConfigs[sid]).total),
+      0
+    );
     return { direto, rede, total: direto + rede, hasRede: subIds.length > 0 };
   })();
 

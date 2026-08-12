@@ -920,23 +920,48 @@ export async function fetchAllResults(opts: DateRangeOpts = {}): Promise<any[]> 
   }
 }
 
-// Resultados por afiliado para um CONJUNTO de ids (groupBy=affiliate). Usado pelo
-// master p/ ver a rede de um afiliado especial (own + subs) na AffiliateDetails.
-// O proxy expande o CSV em params repetidos (a API externa exige isso, não aceita
-// affiliateIds=a,b). Admin não sofre auto-escopo no servidor.
-export async function fetchResultsForAffiliates(ids: string[], opts: DateRangeOpts = {}): Promise<any[]> {
+// Resultados por afiliado para um CONJUNTO de ids (groupBy=affiliate), com as
+// PARTES separadas além do merge: `rows` (OTG+manual somados, como sempre —
+// alimenta grades de métricas) e `otg`/`manual` crus. As partes existem porque
+// DINHEIRO não pode ser calculado sobre o merge: a linha manual carrega a casa
+// (`houseSlug`) e é precificada por ela (lib/perHousePayout), enquanto o merge
+// perde essa granularidade — foi o bug do R$ 280 (QFTD da Esportiva cobrado à
+// taxa da casa do mirror, 2026-08-12).
+export interface ResultsForAffiliatesSplit {
+  rows: any[]; // merge OTG+manual por afiliado (métricas/exibição)
+  otg: any[]; // groupBy=affiliate SÓ da API externa
+  manual: StoredManualRow[]; // linhas manuais ATRIBUÍDAS aos ids (por casa/dia)
+}
+
+export async function fetchResultsForAffiliatesSplit(
+  ids: string[],
+  opts: DateRangeOpts = {},
+): Promise<ResultsForAffiliatesSplit> {
   const clean = (ids || []).map(String).map((s) => s.trim()).filter(Boolean);
-  if (!clean.length) return [];
+  if (!clean.length) return { rows: [], otg: [], manual: [] };
   try {
     const [otg, manual] = await Promise.all([
       fetchResultsGrouped('affiliate', { affiliateIds: clean.join(','), ...opts }),
       fetchManualRowsSafe(opts),
     ]);
-    return mergeManualAffiliateRows(otg, aggregateByAffiliate(manualForAffiliates(manual, clean)));
+    const mine = manualForAffiliates(manual, clean);
+    return {
+      rows: mergeManualAffiliateRows(otg, aggregateByAffiliate(mine)),
+      otg: Array.isArray(otg) ? otg : [],
+      manual: mine,
+    };
   } catch (error) {
     console.error('Error fetching results for affiliate set:', error);
-    return [];
+    return { rows: [], otg: [], manual: [] };
   }
+}
+
+// Compat: quem só precisa das linhas mescladas (métricas). Usado pelo master p/
+// ver a rede de um afiliado especial (own + subs) na AffiliateDetails. O proxy
+// expande o CSV em params repetidos (a API externa exige isso, não aceita
+// affiliateIds=a,b). Admin não sofre auto-escopo no servidor.
+export async function fetchResultsForAffiliates(ids: string[], opts: DateRangeOpts = {}): Promise<any[]> {
+  return (await fetchResultsForAffiliatesSplit(ids, opts)).rows;
 }
 
 // Per-house (brand) breakdown for the whole accessible scope (sem affiliateIds).
