@@ -3769,3 +3769,217 @@ describe('integracoes (/api/integrations)', () => {
     }
   });
 });
+
+// =============================================================================
+// Validação de telefone por SMS (/api/phone) — item 7 da call Infinity
+// =============================================================================
+describe('validação de telefone por SMS (/api/phone)', () => {
+  const future = () => ({ toMillis: () => Date.now() + 3_600_000 });
+  const PHONE = '(11) 98765-4321';
+  const E164 = '+5511987654321';
+  const DOC_ID = '5511987654321';
+
+  // Provedor de teste: captura o SMS em vez de enviar (ServerDeps.smsProvider).
+  const captureSms = () => {
+    const sent: Array<{ to: string; body: string }> = [];
+    return {
+      sent,
+      provider: { id: 'console', send: async (to: string, body: string) => { sent.push({ to, body }); } },
+    };
+  };
+  const codeFrom = (body: string) => (body.match(/\d{6}/) || [''])[0];
+  const logsOf = (db: any, action: string) =>
+    [...(db.__store.get('audit_logs')?.values() ?? [])].filter((l: any) => l.action === action);
+
+  beforeEach(() => {
+    // Liga a feature (modo console/dev — sem credencial de provedor).
+    process.env.PHONE_VERIFICATION_ENABLED = 'true';
+  });
+  afterEach(() => {
+    delete process.env.PHONE_VERIFICATION_ENABLED;
+  });
+
+  it('feature OFF (env ausente): status enabled:false, send-code 503 e o cadastro por convite NÃO quebra', async () => {
+    delete process.env.PHONE_VERIFICATION_ENABLED;
+    const fs = makeFirestore({
+      invites: { t1: { status: 'pending', affiliateId: 'AFF-1', affiliateName: 'Casa', expiresAt: future() } },
+    });
+    const app = createApp({ adminApp: makeAdminApp({ createUser: () => ({ uid: 'fresh-uid' }) }), adminDb: fs });
+
+    const status = await request(app).get('/api/phone/status').expect(200);
+    expect(status.body.enabled).toBe(false);
+
+    await request(app).post('/api/phone/send-code').send({ phone: PHONE }).expect(503);
+
+    // Fail-safe: sem provedor configurado o accept-invite segue como sempre.
+    await request(app)
+      .post('/api/accept-invite')
+      .send({ token: 't1', email: 'a@b.com', password: 'secret123', phone: PHONE })
+      .expect(201);
+    const userDoc = fs.__store.get('users').get('fresh-uid');
+    expect(userDoc.phone).toBe(PHONE);
+    expect(userDoc.phoneVerified).toBeUndefined();
+  });
+
+  it('send-code: telefone inválido (fixo/lixo) → 400', async () => {
+    const { provider } = captureSms();
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(), smsProvider: provider });
+    await request(app).post('/api/phone/send-code').send({ phone: '(11) 3765-4321' }).expect(400);
+    await request(app).post('/api/phone/send-code').send({ phone: 'abc' }).expect(400);
+  });
+
+  it('send-code: envia o SMS com código de 6 dígitos, grava só o HASH e nunca devolve o código', async () => {
+    const { sent, provider } = captureSms();
+    const fs = makeFirestore();
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs, smsProvider: provider });
+    const res = await request(app).post('/api/phone/send-code').send({ phone: PHONE }).expect(200);
+
+    expect(res.body.sent).toBe(true);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].to).toBe(E164);
+    const code = codeFrom(sent[0].body);
+    expect(code).toMatch(/^\d{6}$/);
+    expect(JSON.stringify(res.body)).not.toContain(code); // o código NUNCA volta na resposta
+
+    const challenge = fs.__store.get('phone_verifications').get(DOC_ID);
+    expect(challenge.codeHash).toBeTruthy();
+    expect(JSON.stringify(challenge)).not.toContain(code); // nem fica em claro no doc
+  });
+
+  it('send-code: reenvio imediato do MESMO telefone → 429 (cooldown)', async () => {
+    const { provider } = captureSms();
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(), smsProvider: provider });
+    await request(app).post('/api/phone/send-code').send({ phone: PHONE }).expect(200);
+    const res = await request(app).post('/api/phone/send-code').send({ phone: PHONE }).expect(429);
+    expect(res.body.code).toBe('OTP_COOLDOWN');
+  });
+
+  it('rate limit por IP: o 11º envio (telefones diferentes) → 429', async () => {
+    const { provider } = captureSms();
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(), smsProvider: provider });
+    let lastStatus = 0;
+    for (let i = 0; i < 11; i++) {
+      lastStatus = (await request(app).post('/api/phone/send-code').send({ phone: `119${8000 + i}0432${i % 10}` })).status;
+    }
+    expect(lastStatus).toBe(429);
+  });
+
+  it('verify-code: código errado → 400 e conta a tentativa; 5 erradas travam mesmo o código certo', async () => {
+    const { sent, provider } = captureSms();
+    const fs = makeFirestore();
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs, smsProvider: provider });
+    await request(app).post('/api/phone/send-code').send({ phone: PHONE }).expect(200);
+    const code = codeFrom(sent[0].body);
+    const wrong = code === '000000' ? '111111' : '000000';
+
+    for (let i = 1; i <= 5; i++) {
+      const res = await request(app).post('/api/phone/verify-code').send({ phone: PHONE, code: wrong }).expect(400);
+      expect(res.body.code).toBe('OTP_INVALID');
+      expect(fs.__store.get('phone_verifications').get(DOC_ID).attempts).toBe(i);
+    }
+    // Tentativas esgotadas: nem o código CERTO passa (peça um novo código).
+    const blocked = await request(app).post('/api/phone/verify-code').send({ phone: PHONE, code }).expect(429);
+    expect(blocked.body.code).toBe('OTP_TOO_MANY_ATTEMPTS');
+  });
+
+  it('verify-code: código expirado → 410', async () => {
+    const { sent, provider } = captureSms();
+    const fs = makeFirestore();
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs, smsProvider: provider });
+    await request(app).post('/api/phone/send-code').send({ phone: PHONE }).expect(200);
+    // Volta o relógio do desafio: expirou há 1ms.
+    const col = fs.__store.get('phone_verifications');
+    col.set(DOC_ID, { ...col.get(DOC_ID), expiresAtMs: Date.now() - 1 });
+    const res = await request(app)
+      .post('/api/phone/verify-code')
+      .send({ phone: PHONE, code: codeFrom(sent[0].body) })
+      .expect(410);
+    expect(res.body.code).toBe('OTP_EXPIRED');
+  });
+
+  it('fluxo completo do convite: verify-code emite token de USO ÚNICO → accept-invite grava E.164 + phoneVerified', async () => {
+    const { sent, provider } = captureSms();
+    const fs = makeFirestore({
+      invites: { t1: { status: 'pending', affiliateId: 'AFF-1', affiliateName: 'Casa', expiresAt: future() } },
+      users: { 'client-uid': { role: 'client' } },
+    });
+    const app = createApp({
+      adminApp: makeAdminApp({ createUser: () => ({ uid: 'fresh-uid' }) }),
+      adminDb: fs,
+      smsProvider: provider,
+    });
+
+    // Sem verificação → o aceite é barrado (a feature está LIGADA).
+    const denied = await request(app)
+      .post('/api/accept-invite')
+      .send({ token: 't1', email: 'a@b.com', password: 'secret123', phone: PHONE })
+      .expect(400);
+    expect(denied.body.code).toBe('PHONE_NOT_VERIFIED');
+
+    await request(app).post('/api/phone/send-code').send({ phone: PHONE }).expect(200);
+    const verify = await request(app)
+      .post('/api/phone/verify-code')
+      .send({ phone: PHONE, code: codeFrom(sent[0].body) })
+      .expect(200);
+    const token = verify.body.verificationToken;
+    expect(token).toBeTruthy();
+
+    await request(app)
+      .post('/api/accept-invite')
+      .send({ token: 't1', email: 'a@b.com', password: 'secret123', phone: PHONE, phoneVerificationToken: token })
+      .expect(201);
+    const userDoc = fs.__store.get('users').get('fresh-uid');
+    expect(userDoc.phone).toBe(E164); // telefone gravado NORMALIZADO
+    expect(userDoc.phoneVerified).toBe(true);
+    expect(fs.__store.get('phone_verifications').get(DOC_ID).consumedAtMs).toBeTruthy();
+
+    // USO ÚNICO: o mesmo token não carimba outra conta via /api/phone/attach.
+    const reuse = await request(app)
+      .post('/api/phone/attach')
+      .set('Authorization', 'Bearer client-uid')
+      .send({ phone: PHONE, verificationToken: token })
+      .expect(400);
+    expect(reuse.body.code).toBe('PHONE_TOKEN_INVALID');
+  });
+
+  it('attach (auto-cadastro): usuário autenticado carimba phone+phoneVerified no PRÓPRIO doc, com trilha mascarada', async () => {
+    const { sent, provider } = captureSms();
+    const fs = makeFirestore({ users: { 'client-uid': { role: 'client', name: 'Fulano' } } });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs, smsProvider: provider });
+
+    await request(app).post('/api/phone/send-code').send({ phone: PHONE }).expect(200);
+    const verify = await request(app)
+      .post('/api/phone/verify-code')
+      .send({ phone: PHONE, code: codeFrom(sent[0].body) })
+      .expect(200);
+
+    // Token inválido → 400 (não carimba).
+    await request(app)
+      .post('/api/phone/attach')
+      .set('Authorization', 'Bearer client-uid')
+      .send({ phone: PHONE, verificationToken: 'token-forjado' })
+      .expect(400);
+
+    await request(app)
+      .post('/api/phone/attach')
+      .set('Authorization', 'Bearer client-uid')
+      .send({ phone: PHONE, verificationToken: verify.body.verificationToken })
+      .expect(200);
+
+    const userDoc = fs.__store.get('users').get('client-uid');
+    expect(userDoc.phone).toBe(E164);
+    expect(userDoc.phoneVerified).toBe(true);
+
+    // Auditoria: registra a verificação SEM o telefone inteiro (PII mascarada).
+    const logs = logsOf(fs, 'user.phone_verified');
+    expect(logs).toHaveLength(1);
+    expect(JSON.stringify(logs[0])).not.toContain(DOC_ID);
+    expect((logs[0] as any).metadata.phone).toBe('+5511*****4321');
+  });
+
+  it('attach sem login → 401 (requireAuth)', async () => {
+    const { provider } = captureSms();
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(), smsProvider: provider });
+    await request(app).post('/api/phone/attach').send({ phone: PHONE, verificationToken: 'x' }).expect(401);
+  });
+});
