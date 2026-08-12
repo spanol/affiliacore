@@ -19,7 +19,7 @@ import { hrDocId, sanitizeMetrics } from './src/lib/houseResultsDoc';
 import { makeBoostAffiliateId, normalizeEmailKey } from './src/lib/boostAffiliate';
 import { normalizeTag, buildTagIndex } from './src/lib/houseTagImport';
 import {
-  buildMediaReportUrl, adaptEsportivaRows, buildPullPayload, pullWindow, ESPORTIVA_API_BASE,
+  buildMediaReportUrl, adaptEsportivaRows, buildPullPayload, pullWindow, toApiDateTo, ESPORTIVA_API_BASE,
 } from './src/lib/esportivaPull';
 import {
   INTEGRATION_CATALOG, findIntegrationSpec, integrationFromDoc, resolveConnectorSettings,
@@ -4761,7 +4761,9 @@ export function createApp(deps: ServerDeps) {
 
       const days = Number(req.body?.days);
       const { dateFrom, dateTo } = pullWindow(resolveServerToday(), Number.isFinite(days) && days > 0 ? days : 2);
-      const url = buildMediaReportUrl(dateFrom, dateTo, settings.config.apiBase || ESPORTIVA_API_BASE);
+      // `dateTo` acima é INCLUSIVO (hoje); a API trata `date_to` como EXCLUSIVO —
+      // sem o +1 aqui, "hoje" nunca entrava na consulta. Ver toApiDateTo().
+      const url = buildMediaReportUrl(dateFrom, toApiDateTo(dateTo), settings.config.apiBase || ESPORTIVA_API_BASE);
       const body = await fetchEsportivaReport(url, key);
 
       const { rows: pullRows, cpaRemainder, skipped } = adaptEsportivaRows(body.data, {

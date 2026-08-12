@@ -209,10 +209,27 @@ function pick(m: Metrics): Metrics {
  * fecha com atraso (~1 dia) e ainda corrige o dia anterior, então reler D−1 a cada
  * rodada é o que mantém o número certo — e como o upload REESCREVE as datas
  * presentes, reler não duplica nada.
+ *
+ * `dateTo` aqui é o limite INCLUSIVO (uso humano: auditoria, resposta da rota).
+ * Quem chama a API tem que passar por `toApiDateTo` antes — ver o porquê lá.
  */
 export function pullWindow(today: string, days = 2): { dateFrom: string; dateTo: string } {
   const span = Math.max(1, Math.floor(days));
   const end = new Date(`${today}T12:00:00Z`);
   const start = new Date(end.getTime() - (span - 1) * 24 * 60 * 60 * 1000);
   return { dateFrom: start.toISOString().slice(0, 10), dateTo: today };
+}
+
+/**
+ * Converte um `dateTo` INCLUSIVO (o que `pullWindow` devolve) pro limite que a API
+ * espera. Doc oficial do TAP: "date_from is inclusive" / "date_to is exclusive" —
+ * `date_from=2022-07-12, date_to=2022-07-14` devolve só 12 e 13/07. Sem este +1,
+ * `dateTo: hoje` nunca inclui HOJE (só ontem em diante), não importa quantas vezes
+ * a rodada horária rode — era a causa real do "atraso de ~1 dia" observado em
+ * produção (achado 11/08/2026, verificação contra a wallet real da Infinity).
+ */
+export function toApiDateTo(dateToInclusive: string): string {
+  const d = new Date(`${dateToInclusive}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
 }

@@ -4,6 +4,7 @@ import {
   adaptEsportivaRows,
   buildPullPayload,
   pullWindow,
+  toApiDateTo,
   ESPORTIVA_API_BASE,
 } from './esportivaPull';
 
@@ -150,5 +151,24 @@ describe('pullWindow', () => {
 
   it('days < 1 vira o próprio dia', () => {
     expect(pullWindow('2026-08-04', 0)).toEqual({ dateFrom: '2026-08-04', dateTo: '2026-08-04' });
+  });
+});
+
+describe('toApiDateTo', () => {
+  it('soma 1 dia — o date_to que a API espera é EXCLUSIVO', () => {
+    expect(toApiDateTo('2026-08-11')).toBe('2026-08-12');
+  });
+
+  it('atravessa virada de mês e de ano', () => {
+    expect(toApiDateTo('2026-08-31')).toBe('2026-09-01');
+    expect(toApiDateTo('2026-12-31')).toBe('2027-01-01');
+  });
+
+  it('composto com pullWindow: a URL da API cobre HOJE de verdade', () => {
+    const { dateFrom, dateTo } = pullWindow('2026-08-11');
+    const url = buildMediaReportUrl(dateFrom, toApiDateTo(dateTo));
+    // date_to exclusivo em 12/08 devolve dados de 10 e 11/08 — hoje (11) entra.
+    expect(url).toContain('date_from=2026-08-10');
+    expect(url).toContain('date_to=2026-08-12');
   });
 });
