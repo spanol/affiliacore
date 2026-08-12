@@ -36,18 +36,40 @@ service cloud.firestore {
                     && request.resource.data.role == 'client'
                     && request.resource.data.uid == userId
                     && !('affiliateId' in request.resource.data.keys())
-                    && !('isSpecial' in request.resource.data.keys());
+                    && !('isSpecial' in request.resource.data.keys())
+                    && !('phoneVerified' in request.resource.data.keys())
+                    && !('phoneVerifiedAt' in request.resource.data.keys());
       // O próprio usuário atualiza o doc, mas NÃO pode mudar role, o vínculo
       // (affiliateId) NEM a flag isSpecial — senão poderia se reapontar pra outro
       // afiliado (IDOR), se promover a admin, ou se auto-marcar especial e ganhar
-      // acesso à /network e à sub-rede (R6). Esses três campos são server-only
+      // acesso à /network e à sub-rede (R6). Esses campos são server-only
       // (Admin SDK). Admin faz qualquer coisa.
+      //
+      // `phoneVerified`/`phoneVerifiedAt` (validação de telefone por SMS) são a
+      // MESMA classe: só o servidor carimba (POST /api/phone/attach ou o
+      // accept-invite), senão o cliente se auto-marca verificado. E um usuário
+      // VERIFICADO não troca o `phone` pelo client (o selo seguiria um número
+      // nunca verificado) — trocar exige re-verificar pelo /api/phone/attach.
+      // `get(..., null)` porque os campos não existem em contas antigas.
       allow update: if isAdmin()
         || (request.auth.uid == userId
             && request.resource.data.role == resource.data.role
             && request.resource.data.affiliateId == resource.data.affiliateId
-            && request.resource.data.isSpecial == resource.data.isSpecial);
+            && request.resource.data.isSpecial == resource.data.isSpecial
+            && request.resource.data.get('phoneVerified', null) == resource.data.get('phoneVerified', null)
+            && request.resource.data.get('phoneVerifiedAt', null) == resource.data.get('phoneVerifiedAt', null)
+            && (resource.data.get('phoneVerified', null) != true
+                || request.resource.data.get('phone', null) == resource.data.get('phone', null)));
       allow delete: if isAdmin();
+    }
+
+    // Desafios de verificação de telefone por SMS (OTP). Guarda o HASH do código
+    // + hash do token de uso único — material de desafio, não dado de gestão.
+    // Mesma rule do auth_totp: NEM O ADMIN lê pelo SDK do cliente; todo acesso é
+    // pelas rotas /api/phone/* (Admin SDK). Coleção NOVA (nasce fechada, sem
+    // leitor client-side prévio) → sem acoplamento de ORDEM DE DEPLOY.
+    match /phone_verifications/{phoneId} {
+      allow read, write: if false;
     }
 
     // 2FA (TOTP) por usuário: segredo do autenticador + hashes dos códigos de backup.
@@ -107,6 +129,18 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Alias de TAG de rastreio -> affiliateId. Doc id = tag normalizada (`infinitw02`).
+    // O relatório da CASA (Esportiva/TAP) não conhece e-mail: ele agrupa pela tag que
+    // viaja no link (`?afp=`). Quando a tag não sai de um link nosso (variante digitada
+    // à mão no painel da casa), o admin liga tag→afiliado uma vez no import de /casas e
+    // fica salvo. Guarda a mesma coisa que `affiliate_links`: quem fatura sob qual tag.
+    // Mediado pelo servidor (/api/tag-aliases). Espelha affiliate_email_aliases.
+    // Coleção NOVA (nasce fechada) — nenhum build anterior a lia direto, então não há
+    // acoplamento de ORDEM DE DEPLOY a declarar no predeploy hook.
+    match /affiliate_tag_aliases/{tagKey} {
+      allow read, write: if isAdmin();
+    }
+
     // B3 · Afiliado especial: marca o especial + sub-rede + taxa da sub-rede.
     // Só o master (admin) escreve; leitura liberada a signed-in (o especial
     // precisa ler a própria sub-rede; escopo fino fica no proxy/servidor).
@@ -152,14 +186,20 @@ service cloud.firestore {
     // tamanhos máximos — evita abuso de storage e injeção de conteúdo arbitrário no
     // painel admin. (Rate limit/captcha do formulário fica como follow-up — App Check.)
     match /contacts/{contactId} {
+      // `source` (opcional) = origem do lead — ex.: 'vitrine-affiliacore' quando o
+      // visitante chega pelo link da vitrine na LP do produto. Carimbado pelo app
+      // (lib/registrationSource); ampliação retrocompatível — deploy DESTA rule
+      // vem ANTES do código que envia o campo (o inverso da ordem de rule que fecha).
       allow create: if request.resource.data.keys().hasOnly(
-                         ['name','email','phone','socialMedia','affiliateExperience','presentation','createdAt'])
+                         ['name','email','phone','socialMedia','affiliateExperience','presentation','createdAt','source'])
                     && request.resource.data.name is string && request.resource.data.name.size() <= 120
                     && request.resource.data.email is string && request.resource.data.email.size() <= 200
                     && request.resource.data.phone is string && request.resource.data.phone.size() <= 40
                     && request.resource.data.socialMedia is string && request.resource.data.socialMedia.size() <= 120
                     && request.resource.data.affiliateExperience in ['sim', 'nao']
-                    && request.resource.data.presentation is string && request.resource.data.presentation.size() <= 2000;
+                    && request.resource.data.presentation is string && request.resource.data.presentation.size() <= 2000
+                    && (!('source' in request.resource.data.keys())
+                        || (request.resource.data.source is string && request.resource.data.source.size() <= 40));
       allow read, update, delete: if isAdmin();
     }
 
