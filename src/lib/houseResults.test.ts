@@ -189,19 +189,67 @@ describe('parseResultsRows (matriz — caminho Excel)', () => {
 
 describe('planilha modelo (constantes)', () => {
   it('o cabeçalho do modelo é reconhecido pelo parser (round-trip)', () => {
-    const grid = [TEMPLATE_HEADERS, ['2026-06-01', 'João Silva', 'joao@x.com', '40', '18', '12', '80', '2400', '2400']];
+    const grid = [TEMPLATE_HEADERS, ['2026-06-01', 'João Silva', 'joao@x.com', '120', '40', '18', '12', '80', '25', '2400', '2400']];
     const r = parseResultsRows(grid);
     expect(r.errors).toEqual([]);
     // todas as colunas do modelo foram mapeadas
     expect(Object.keys(r.columns).sort()).toEqual(TEMPLATE_COLUMNS.map((c) => c.key).sort());
-    expect(r.rows[0]).toMatchObject({ date: '2026-06-01', affiliate: 'João Silva', email: 'joao@x.com', registrations: 40, total_commission: 2400 });
+    expect(r.rows[0]).toMatchObject({
+      date: '2026-06-01', affiliate: 'João Silva', email: 'joao@x.com',
+      registrations: 40, total_commission: 2400, visits: 120, deposit_count: 25,
+    });
   });
 
-  it('o modelo tem data obrigatória e as 6 métricas canônicas', () => {
+  it('o modelo tem data obrigatória, as 6 métricas canônicas e as 2 opcionais do funil', () => {
     expect(TEMPLATE_COLUMNS.find((c) => c.key === 'date')?.required).toBe(true);
     expect(TEMPLATE_COLUMNS.some((c) => c.key === 'email')).toBe(true);
     const metricCount = TEMPLATE_COLUMNS.filter((c) => !['date', 'affiliate', 'email'].includes(c.key)).length;
-    expect(metricCount).toBe(6);
+    expect(metricCount).toBe(8); // 6 canônicas + visitas + qtd_depositos (call 12/08)
+  });
+});
+
+describe('métricas opcionais do funil (visits/deposit_count — call Infinity 12/08)', () => {
+  it('addMetrics preserva a AUSÊNCIA: fonte sem o campo não vira 0 no acumulado', () => {
+    const acc = emptyMetrics();
+    addMetrics(acc, { registrations: 5 }); // linha OTG-like, sem funil opcional
+    expect(acc.visits).toBeUndefined();
+    expect(acc.deposit_count).toBeUndefined();
+    addMetrics(acc, { registrations: 2, visits: 10, deposit_count: 3 }); // linha Esportiva
+    expect(acc.visits).toBe(10);
+    expect(acc.deposit_count).toBe(3);
+    addMetrics(acc, { visits: 5 }); // acumula quando presente
+    expect(acc.visits).toBe(15);
+  });
+
+  it('planilha SEM as colunas opcionais parseia com as chaves ausentes (≠ 0)', () => {
+    const r = parseResultsRows([['data', 'cadastros'], ['2026-06-01', '5']]);
+    expect(r.errors).toEqual([]);
+    expect(r.rows[0].registrations).toBe(5);
+    expect(r.rows[0].visits).toBeUndefined();
+    expect(r.rows[0].deposit_count).toBeUndefined();
+  });
+
+  it('colunas em pt-BR (cliques / qtd_depositos) são reconhecidas', () => {
+    const r = parseResultsRows([
+      ['data', 'cadastros', 'cliques', 'qtd_depositos'],
+      ['2026-06-01', '5', '120', '8'],
+    ]);
+    expect(r.errors).toEqual([]);
+    expect(r.rows[0].visits).toBe(120);
+    expect(r.rows[0].deposit_count).toBe(8);
+  });
+
+  it('agregações carregam as opcionais quando presentes e as omitem quando ausentes', () => {
+    const rows: StoredManualRow[] = [
+      { houseSlug: 'esportiva', date: '2026-06-01', affiliateId: 'A', ...emptyMetrics(), registrations: 3, visits: 10, deposit_count: 2 },
+      { houseSlug: 'leon', date: '2026-06-01', affiliateId: 'A', ...emptyMetrics(), registrations: 1, deposit_count: 4 }, // sem visits
+    ];
+    const byAff = aggregateByAffiliate(rows);
+    expect(byAff['A'].visits).toBe(10); // só a Esportiva trouxe clique
+    expect(byAff['A'].deposit_count).toBe(6);
+    const byHouse = aggregateByHouse(rows);
+    expect(byHouse['leon'].visits).toBeUndefined(); // ausência preservada por casa
+    expect(byHouse['leon'].deposit_count).toBe(4);
   });
 });
 

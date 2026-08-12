@@ -57,4 +57,13 @@ describe('sanitizeMetrics (P2.8 · coage as 6 métricas, descarta extras)', () =
     expect(out).not.toHaveProperty('junk');
     expect(Object.keys(out).sort()).toEqual([...HR_METRICS].sort());
   });
+
+  it('opcionais do funil (visits/deposit_count) só entram quando presentes — nunca undefined no doc', () => {
+    const sem = sanitizeMetrics({ registrations: 1 });
+    expect(sem).not.toHaveProperty('visits'); // undefined quebraria o Firestore
+    expect(sem).not.toHaveProperty('deposit_count');
+    const com = sanitizeMetrics({ registrations: 1, visits: '40', deposit_count: 25, });
+    expect(com.visits).toBe(40);
+    expect(com.deposit_count).toBe(25);
+  });
 });

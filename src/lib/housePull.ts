@@ -8,7 +8,7 @@
 // Núcleo PURO (sem Firebase, sem fetch): o servidor busca e adapta, este
 // módulo só agrega e resolve tag -> afiliado.
 
-import { METRIC_KEYS, emptyMetrics, addMetrics, type Metrics } from './houseResults';
+import { METRIC_KEYS, OPTIONAL_METRIC_KEYS, emptyMetrics, addMetrics, type Metrics } from './houseResults';
 import { normalizeTag } from './houseTagImport';
 
 export interface PullRow extends Metrics {
@@ -95,10 +95,12 @@ export function buildPullPayload(
 }
 
 // Copia só as métricas canônicas — o mesmo cuidado de `buildImportPayload`:
-// campo de UI não pode vazar para o backend.
+// campo de UI não pode vazar para o backend. Métrica opcional (visits/deposit_count)
+// só entra quando a fonte a trouxe — ausência ≠ 0.
 function pick(m: Metrics): Metrics {
   const out = emptyMetrics();
   for (const k of METRIC_KEYS) out[k] = m[k] ?? 0;
+  for (const k of OPTIONAL_METRIC_KEYS) if (m[k] !== undefined) out[k] = m[k];
   return out;
 }
 

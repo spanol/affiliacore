@@ -17,7 +17,15 @@ export const METRIC_KEYS = [
   'total_commission',
 ] as const;
 export type MetricKey = (typeof METRIC_KEYS)[number];
-export type Metrics = Record<MetricKey, number>;
+
+// Métricas OPCIONAIS do funil (call Infinity 12/08): nem toda fonte as informa —
+// a OTG não manda clique nem qtd de depósitos; uploads antigos não têm as colunas.
+// AUSÊNCIA ≠ 0 (mesma regra das taxas): elas só entram quando a fonte trouxe o
+// campo, e a agregação PRESERVA a ausência (chave indefinida quando nenhuma linha
+// a trouxe) para a UI mostrar "—" em vez de um 0 enganoso.
+export const OPTIONAL_METRIC_KEYS = ['visits', 'deposit_count'] as const;
+export type OptionalMetricKey = (typeof OPTIONAL_METRIC_KEYS)[number];
+export type Metrics = Record<MetricKey, number> & Partial<Record<OptionalMetricKey, number>>;
 
 export function emptyMetrics(): Metrics {
   return { registrations: 0, first_deposits: 0, qualified_cpa: 0, rvs: 0, deposit: 0, total_commission: 0 };
@@ -25,6 +33,10 @@ export function emptyMetrics(): Metrics {
 
 export function addMetrics(into: Metrics, from: Partial<Metrics>): Metrics {
   for (const k of METRIC_KEYS) into[k] += Number(from[k]) || 0;
+  for (const k of OPTIONAL_METRIC_KEYS) {
+    if (from[k] === undefined || from[k] === null) continue; // ausência não vira 0
+    into[k] = (into[k] ?? 0) + (Number(from[k]) || 0);
+  }
   return into;
 }
 
@@ -39,7 +51,7 @@ export interface StoredManualRow extends Metrics {
 
 // Chaves de coluna reconhecidas (cabeçalho). `email` é coluna própria (matching
 // por e-mail de login, mais confiável que nome/id) — ver resolveAffiliates.
-export type ColumnKey = 'date' | 'affiliate' | 'email' | 'tag' | MetricKey;
+export type ColumnKey = 'date' | 'affiliate' | 'email' | 'tag' | MetricKey | OptionalMetricKey;
 
 // Aliases de coluna (case/acento-insensitive). chave canônica -> apelidos aceitos.
 const COLUMN_ALIASES: Record<ColumnKey, string[]> = {
@@ -56,6 +68,10 @@ const COLUMN_ALIASES: Record<ColumnKey, string[]> = {
   rvs: ['rev', 'rvs', 'revshare', 'rev_share', 'revenue'],
   deposit: ['deposito', 'depositos', 'deposit', 'valor_depositado', 'deposito_valor'],
   total_commission: ['comissao', 'comissoes', 'commission', 'total_commission', 'comissao_total'],
+  // Funil opcional (nem toda casa exporta): clique/visita e QUANTIDADE de depósitos
+  // (diferente de `deposit`, que é o VALOR depositado em R$).
+  visits: ['visitas', 'visita', 'cliques', 'clique', 'clicks', 'visits', 'visit_count'],
+  deposit_count: ['qtd_depositos', 'qtde_depositos', 'quantidade_depositos', 'num_depositos', 'deposit_count', 'deposits_count', 'depositos_qtd'],
 };
 
 const stripKey = (s: string) =>
@@ -77,10 +93,12 @@ export const TEMPLATE_COLUMNS: TemplateColumn[] = [
   { key: 'date', header: 'data', label: 'Data', required: true, help: 'Dia do resultado (AAAA-MM-DD ou DD/MM/AAAA). Preencha na 1ª linha do dia — as linhas abaixo herdam a mesma data até mudar.' },
   { key: 'affiliate', header: 'afiliado', label: 'Afiliado', required: false, help: 'Nome do afiliado (opcional, só p/ leitura). O cruzamento usa o e-mail. Deixe afiliado E e-mail vazios para o total/agregado da casa no dia.' },
   { key: 'email', header: 'email', label: 'E-mail', required: false, help: 'E-mail de login do afiliado na plataforma (ou o e-mail OTG). É por ele que o resultado é cruzado com o afiliado.' },
+  { key: 'visits', header: 'visitas', label: 'Visitas', required: false, help: 'Cliques/visitas no link (opcional — nem toda casa informa).' },
   { key: 'registrations', header: 'cadastros', label: 'Cadastros', required: false, help: 'Quantidade de cadastros (registros).' },
   { key: 'first_deposits', header: 'ftd', label: 'FTD', required: false, help: 'Primeiros depósitos (first-time deposits).' },
   { key: 'qualified_cpa', header: 'cpa', label: 'CPA', required: false, help: 'CPAs qualificados.' },
   { key: 'rvs', header: 'rev', label: 'REV', required: false, help: 'Valor de revenue share (R$).' },
+  { key: 'deposit_count', header: 'qtd_depositos', label: 'Qtd. de depósitos', required: false, help: 'Quantidade de depósitos no dia (opcional — nem toda casa informa).' },
   { key: 'deposit', header: 'deposito', label: 'Depósito', required: false, help: 'Valor depositado (R$).' },
   { key: 'total_commission', header: 'comissao', label: 'Comissão', required: false, help: 'Comissão total (R$).' },
 ];
@@ -91,8 +109,8 @@ export const TEMPLATE_HEADERS: string[] = TEMPLATE_COLUMNS.map((c) => c.header);
 // Linhas de exemplo (só pra aba de instruções — NÃO entram na aba de preenchimento,
 // pra ninguém importar o exemplo por engano). 1ª = atribuída a afiliado; 2ª = agregado.
 export const TEMPLATE_EXAMPLE_ROWS: (string | number)[][] = [
-  ['2026-06-01', 'João Silva', 'joao@email.com', 40, 18, 12, 80, 2400, 2400],
-  ['2026-06-01', '', '', 50, 20, 14, 90, 3000, 3000],
+  ['2026-06-01', 'João Silva', 'joao@email.com', 120, 40, 18, 12, 80, 25, 2400, 2400],
+  ['2026-06-01', '', '', 150, 50, 20, 14, 90, 30, 3000, 3000],
 ];
 
 // Número tolerante a pt-BR (R$ 2.400,50) e a contagens simples. Regras:
@@ -268,9 +286,9 @@ export function parseResultsRows(grid: string[][]): ParseResult {
 
     const row: ParsedRow = { line: lineNo, date: iso, affiliate, email, tag, ...emptyMetrics() };
     let bad = '';
-    for (const k of METRIC_KEYS) {
+    for (const k of [...METRIC_KEYS, ...OPTIONAL_METRIC_KEYS]) {
       const col = result.columns[k];
-      if (col === undefined) continue;
+      if (col === undefined) continue; // métrica opcional sem coluna fica AUSENTE (≠ 0)
       const cell = cellAt(cells, col);
       const n = parsePtNumber(cell);
       if (n === null) { bad = `${k}="${cell}"`; break; }
@@ -499,6 +517,10 @@ export function unattributedByHouse(rows: StoredManualRow[]): Record<string, Met
     const att = attributed[slug] ?? emptyMetrics();
     const diff = emptyMetrics();
     for (const k of METRIC_KEYS) diff[k] = Math.max(0, agg[k] - att[k]);
+    for (const k of OPTIONAL_METRIC_KEYS) {
+      if (agg[k] === undefined) continue; // agregado sem a métrica: segue ausente
+      diff[k] = Math.max(0, agg[k]! - (att[k] ?? 0));
+    }
     out[slug] = diff;
   }
   return out;

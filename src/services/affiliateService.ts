@@ -20,7 +20,7 @@ import { houseCpaToBrl, fetchEurBrlRate, getCachedEurBrlRate } from '../lib/curr
 import { fetchHouseResults } from './houseService';
 import type { AuditLogEntry } from '../lib/auditView';
 import {
-  StoredManualRow, Metrics, METRIC_KEYS,
+  StoredManualRow, Metrics, METRIC_KEYS, OPTIONAL_METRIC_KEYS,
   aggregateByHouse, aggregateByDate, aggregateByAffiliate, deriveManualCommission,
 } from '../lib/houseResults';
 // Núcleo PURO de comissão (movido p/ lib/commission p/ o server.ts reusar a MESMA
@@ -815,7 +815,19 @@ function manualBrandRow(slug: string, m: Metrics): any {
     deposit: m.deposit,
     cpa: 0,
     total_commission: m.total_commission,
+    // Funil opcional: presente só quando a casa reporta (ausência ≠ 0).
+    ...(m.visits !== undefined ? { visits: m.visits } : {}),
+    ...(m.deposit_count !== undefined ? { deposit_count: m.deposit_count } : {}),
   };
+}
+
+// Métricas OPCIONAIS (visits/deposit_count) no merge OTG×manual: só somam quando o
+// lado manual as trouxe — ausência ≠ 0, mesma regra de addMetrics (houseResults).
+function mergeOptionalMetrics(into: any, from: Partial<Metrics>): void {
+  for (const k of OPTIONAL_METRIC_KEYS) {
+    if (from[k] === undefined || from[k] === null) continue;
+    into[k] = (Number(into[k]) || 0) + (Number(from[k]) || 0);
+  }
 }
 
 // Anexa as casas manuais (uma linha por casa) às linhas groupBy=brand da OTG.
@@ -836,6 +848,7 @@ function mergeManualAffiliateRows(otg: any[], byAff: Record<string, Metrics>): a
     const existing = idx.get(id);
     if (existing) {
       for (const k of METRIC_KEYS) existing[k] = (Number(existing[k]) || 0) + m[k];
+      mergeOptionalMetrics(existing, m);
     } else {
       rows.push({ id, affiliate_id: id, ...m, cpa: 0 });
     }
@@ -853,6 +866,7 @@ function mergeManualDateRows(otg: any[], byDate: Record<string, Metrics>): any[]
     const existing = idx.get(date);
     if (existing) {
       for (const k of METRIC_KEYS) existing[k] = (Number(existing[k]) || 0) + m[k];
+      mergeOptionalMetrics(existing, m);
     } else {
       rows.push({ id: date, label: date, ...m });
     }

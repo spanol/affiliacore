@@ -16,6 +16,12 @@ export const HR_METRICS = [
 
 export type HrMetricKey = (typeof HR_METRICS)[number];
 
+// Métricas OPCIONAIS do funil (visits/deposit_count — call Infinity 12/08): só são
+// gravadas quando o payload as trouxe (ausência ≠ 0, e `undefined` não pode ir ao
+// Firestore). Espelha OPTIONAL_METRIC_KEYS de houseResults.ts.
+export const HR_OPTIONAL_METRICS = ['visits', 'deposit_count'] as const;
+export type HrOptionalMetricKey = (typeof HR_OPTIONAL_METRICS)[number];
+
 // id determinístico: casa__data__afiliado (ou 'agg' p/ a linha agregada da casa).
 // Sanitiza '/' porque é proibido em doc id do Firestore. Mesmos (slug,date,aff)
 // → mesmo id → reimport sobrescreve (idempotente), nunca duplica.
@@ -24,9 +30,17 @@ export function hrDocId(slug: string, date: string, affiliateId: string | null):
 }
 
 // Coage as 6 métricas a número (NaN/string inválida/ausente → 0) e descarta
-// quaisquer campos extras do payload (não vaza affiliateLabel/line etc.).
-export function sanitizeMetrics(src: any): Record<HrMetricKey, number> {
-  const out = {} as Record<HrMetricKey, number>;
+// quaisquer campos extras do payload (não vaza affiliateLabel/line etc.). As
+// opcionais só entram quando PRESENTES no payload — nunca viram 0 fabricado nem
+// `undefined` no doc.
+export function sanitizeMetrics(
+  src: any
+): Record<HrMetricKey, number> & Partial<Record<HrOptionalMetricKey, number>> {
+  const out = {} as Record<HrMetricKey, number> & Partial<Record<HrOptionalMetricKey, number>>;
   for (const k of HR_METRICS) out[k] = Number(src?.[k]) || 0;
+  for (const k of HR_OPTIONAL_METRICS) {
+    if (src?.[k] === undefined || src?.[k] === null) continue;
+    out[k] = Number(src[k]) || 0;
+  }
   return out;
 }

@@ -31,6 +31,7 @@ export interface EsportivaApiRow {
   visit_count?: number;
   registration_count?: number;
   ftd_count?: number;
+  deposit_count?: number;
   deposit_total?: number;
   commissions_cpa?: number;
   commissions_rev_share?: number;
@@ -112,6 +113,10 @@ export function adaptEsportivaRows(
       rvs: numOf(r?.commissions_rev_share),
       deposit: numOf(r?.deposit_total),
       total_commission: numOf(r?.commissions_total),
+      // Funil (call Infinity 12/08): a API manda clique e QUANTIDADE de depósitos
+      // por linha — alimentam os cards de funil e o ticket médio/média de depósito.
+      visits: numOf(r?.visit_count),
+      deposit_count: numOf(r?.deposit_count),
     });
   }
 

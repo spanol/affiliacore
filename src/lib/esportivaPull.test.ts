@@ -4,10 +4,10 @@ import { pullWindow } from './housePull';
 
 // Amostra REAL da resposta de julho/2026 (valores conferidos contra o painel).
 const API_ROWS = [
-  { dt: '2026-07-10T00:00:00.000Z', afp: 'infinitw280', visit_count: 40, registration_count: 10, ftd_count: 8, deposit_total: 900, commissions_cpa: 960, commissions_rev_share: 10.5, commissions_total: 970.5 },
-  { dt: '2026-07-10T00:00:00.000Z', afp: 'infinitw292', visit_count: 20, registration_count: 6, ftd_count: 4, deposit_total: 400, commissions_cpa: 480, commissions_rev_share: 5, commissions_total: 485 },
-  { dt: '2026-07-10T00:00:00.000Z', afp: '', visit_count: 5, registration_count: 1, ftd_count: 0, deposit_total: 0, commissions_cpa: 0, commissions_rev_share: -20, commissions_total: -20 },
-  { dt: '2026-07-11T00:00:00.000Z', afp: 'INFINITW280', visit_count: 10, registration_count: 2, ftd_count: 2, deposit_total: 150, commissions_cpa: 240, commissions_rev_share: 1.5, commissions_total: 241.5 },
+  { dt: '2026-07-10T00:00:00.000Z', afp: 'infinitw280', visit_count: 40, registration_count: 10, ftd_count: 8, deposit_count: 25, deposit_total: 900, commissions_cpa: 960, commissions_rev_share: 10.5, commissions_total: 970.5 },
+  { dt: '2026-07-10T00:00:00.000Z', afp: 'infinitw292', visit_count: 20, registration_count: 6, ftd_count: 4, deposit_count: 12, deposit_total: 400, commissions_cpa: 480, commissions_rev_share: 5, commissions_total: 485 },
+  { dt: '2026-07-10T00:00:00.000Z', afp: '', visit_count: 5, registration_count: 1, ftd_count: 0, deposit_count: 0, deposit_total: 0, commissions_cpa: 0, commissions_rev_share: -20, commissions_total: -20 },
+  { dt: '2026-07-11T00:00:00.000Z', afp: 'INFINITW280', visit_count: 10, registration_count: 2, ftd_count: 2, deposit_count: 6, deposit_total: 150, commissions_cpa: 240, commissions_rev_share: 1.5, commissions_total: 241.5 },
 ];
 
 describe('buildMediaReportUrl', () => {
@@ -38,7 +38,15 @@ describe('adaptEsportivaRows', () => {
       rvs: 10.5,
       deposit: 900,
       total_commission: 970.5,
+      visits: 40,
+      deposit_count: 25,
     });
+  });
+
+  it('funil da call 12/08: clique e qtd de depósitos entram na linha do pull', () => {
+    const { rows } = adaptEsportivaRows(API_ROWS, { cpaBase: 120 });
+    expect(rows.map((r) => r.visits)).toEqual([40, 20, 5, 10]);
+    expect(rows.map((r) => r.deposit_count)).toEqual([25, 12, 0, 6]);
   });
 
   it('sem régua de CPA a contagem fica em 0 — não inventa divisor (ausência ≠ zero)', () => {

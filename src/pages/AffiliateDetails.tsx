@@ -6,14 +6,12 @@ import {
   Phone, 
   Calendar, 
   Globe, 
-  TrendingUp, 
-  Shield, 
+  TrendingUp,
   ExternalLink,
   Loader2,
   AlertCircle,
   Clock,
   User,
-  Building,
   Activity,
   HelpCircle,
   ArrowDownRight,
@@ -66,6 +64,7 @@ import BrandConfigEditor from '../components/BrandConfigEditor';
 import CampaignBreakdown from '../components/CampaignBreakdown';
 import DailyPerformanceChart from '../components/DailyPerformanceChart';
 import EntityAuditHistory from '../components/EntityAuditHistory';
+import FunnelGrid from '../components/FunnelGrid';
 import DateRangePicker from '../components/DateRangePicker';
 import InfoTooltip from '../components/InfoTooltip';
 import TrendBadge from '../components/TrendBadge';
@@ -824,80 +823,13 @@ export default function AffiliateDetails() {
                     </div>
                   )}
 
-                  {/* Primary Performance Metrics */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Stage 1: Registrations (clientes que se cadastraram para o afiliado) */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      className="bg-white dark:bg-neutral-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-neutral-800 shadow-sm group hover:border-brand/20 dark:hover:border-white/10 transition-all duration-500"
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="p-3 bg-slate-50 dark:bg-neutral-800 rounded-2xl text-slate-400 group-hover:text-brand dark:group-hover:text-white transition-colors">
-                          <UserPlus size={20} />
-                        </div>
-                        <TrendBadge change={isAllBrands ? percentChange(row.registrations || 0, prevRegistrations ?? 0) : 0} />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-[0.2em]">Cadastros</p>
-                        <h4 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{row.registrations || 0}</h4>
-                        <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-widest mt-2">{isNetworkView ? 'Clientes cadastrados na rede' : 'Clientes cadastrados'}</p>
-                      </div>
-                    </motion.div>
-
-                    {/* Stage 2: FTDs */}
-                    <motion.div 
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 }}
-                      className="bg-white dark:bg-neutral-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-neutral-800 shadow-sm group hover:border-brand/20 dark:hover:border-white/10 transition-all duration-500"
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="p-3 bg-slate-50 dark:bg-neutral-800 rounded-2xl text-slate-400 group-hover:text-brand dark:group-hover:text-white transition-colors">
-                          <Building size={20} />
-                        </div>
-                        <div className="flex items-center gap-2">
-                           <div className="bg-slate-100 dark:bg-neutral-800 px-2 py-1 rounded-lg">
-                             <span className="text-[10px] font-black text-slate-500 dark:text-neutral-400">
-                               {row.registrations > 0 ? ((row.first_deposits / row.registrations) * 100).toFixed(1) : 0}% conv.
-                             </span>
-                           </div>
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-[0.2em]">Primeiros Depósitos</p>
-                        <h4 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{row.first_deposits || 0}</h4>
-                        <div className="flex items-center gap-1.5 mt-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                          <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest leading-none">Contas Ativas</p>
-                        </div>
-                      </div>
-                    </motion.div>
-
-                    {/* Stage 3: Qualified CPA */}
-                    <motion.div 
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 }}
-                      className="bg-white dark:bg-neutral-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-neutral-800 shadow-sm group hover:border-brand/20 dark:hover:border-white/10 transition-all duration-500"
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="p-3 bg-slate-50 dark:bg-neutral-800 rounded-2xl text-slate-400 group-hover:text-brand dark:group-hover:text-white transition-colors">
-                          <Shield size={20} />
-                        </div>
-                        <div className="bg-slate-100 dark:bg-neutral-800 px-2 py-1 rounded-lg">
-                           <span className="text-[10px] font-black text-slate-500 dark:text-neutral-400">
-                             {row.first_deposits > 0 ? ((row.qualified_cpa / row.first_deposits) * 100).toFixed(1) : 0}% conv.
-                           </span>
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-black text-slate-400 dark:text-neutral-400 uppercase tracking-[0.2em]">CPA Qualificado</p>
-                        <h4 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{row.qualified_cpa || 0}</h4>
-                        <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-widest mt-2 opacity-60">Meta Alcançada</p>
-                      </div>
-                    </motion.div>
-                  </div>
+                  {/* Funil na ordem do painel da Esportiva (call Infinity 12/08) —
+                      cliques/qtd de depósitos/ticket médio saem de lib/funnel. */}
+                  <FunnelGrid
+                    rows={[row]}
+                    registrationsBadge={<TrendBadge change={isAllBrands ? percentChange(row.registrations || 0, prevRegistrations ?? 0) : 0} />}
+                    registrationsSubtitle={isNetworkView ? 'Clientes cadastrados na rede' : 'Clientes cadastrados'}
+                  />
 
                   {/* Per-house breakdown (real data from groupBy=brand) */}
                   <BrandBreakdown data={brandResults} config={config} />

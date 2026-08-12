@@ -2,7 +2,7 @@
 // ficar testável e — principalmente — garantir o SHAPE do payload. O `buildImportPayload`
 // copia EXATAMENTE { date, affiliateId, ...6 métricas }; campos só-de-UI do ResolvedRow
 // (`line`, `affiliateLabel`) NÃO podem vazar p/ o backend (R24).
-import { METRIC_KEYS, type ResolveResult } from './houseResults';
+import { METRIC_KEYS, OPTIONAL_METRIC_KEYS, type ResolveResult } from './houseResults';
 import type { ImportResultRow } from '../services/houseService';
 
 // Gatilho do botão "Importar": só habilita com análise presente, ≥1 linha resolvida,
@@ -18,12 +18,14 @@ export function canImport(analysis: ResolveResult | null, parseErrors: ReadonlyA
 }
 
 // Monta o payload enviado a importHouseResults: só date + affiliateId (null = agregado)
-// + as 6 métricas canônicas. O loop sobre METRIC_KEYS é a barreira contra vazar
-// `affiliateLabel`/`line` (não estão em METRIC_KEYS) e o tipo ImportResultRow trava o shape.
+// + as 6 métricas canônicas (+ as opcionais QUANDO a planilha as trouxe — ausência ≠ 0).
+// O loop sobre as listas de métricas é a barreira contra vazar `affiliateLabel`/`line`
+// (não estão nelas) e o tipo ImportResultRow trava o shape.
 export function buildImportPayload(analysis: ResolveResult): ImportResultRow[] {
   return analysis.rows.map((r) => {
     const out: ImportResultRow = { date: r.date, affiliateId: r.affiliateId };
     for (const k of METRIC_KEYS) out[k] = r[k];
+    for (const k of OPTIONAL_METRIC_KEYS) if (r[k] !== undefined) out[k] = r[k];
     return out;
   });
 }

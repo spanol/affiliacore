@@ -53,7 +53,15 @@ describe('adaptLeonBetRows', () => {
       rvs: 3.423,
       deposit: 12.83,
       total_commission: 20.423,
+      deposit_count: 1,
     });
+  });
+
+  it('funil da call 12/08: qtd de depósitos entra; clique fica AUSENTE (a API não manda)', () => {
+    const { rows } = adaptLeonBetRows(API_ROWS);
+    expect(rows.map((r) => r.deposit_count)).toEqual([2, 1, 0]);
+    // ausência ≠ 0: sem visits na fonte, a chave nem existe (a UI mostra "—")
+    expect(rows.every((r) => r.visits === undefined)).toBe(true);
   });
 
   it('o literal "< empty >" da API vira tag VAZIA, não um token de verdade', () => {

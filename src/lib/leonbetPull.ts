@@ -102,6 +102,9 @@ export function adaptLeonBetRows(apiRows: LeonBetApiRow[] | null | undefined): A
       rvs: numOf(r?.revenue_share_profit),
       deposit: numOf(r?.deposits),
       total_commission: numOf(r?.profit),
+      // Qtd de depósitos vem da API; clique NÃO vem (`visits` fica AUSENTE de
+      // propósito — ausência ≠ 0, a UI mostra "—" em vez de um zero enganoso).
+      deposit_count: numOf(r?.deposits_count),
     });
   }
 
