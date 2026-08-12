@@ -82,14 +82,25 @@ export function rateStatus(
   };
 }
 
+// Repasse devido ao afiliado DECOMPOSTO em parcelas (CPA × REV). É a fonte única
+// da fórmula — `calcAffiliatePayout` delega aqui, e o toggle "REV fora do lucro"
+// (call Infinity 12/08) consome só a parcela `cpa` sem reimplementar nada.
+export function calcAffiliatePayoutParts(
+  result: any,
+  config?: AffiliateConfig | null,
+  brandId?: string
+): { cpa: number; rev: number; total: number } {
+  const { cpaValue, revPercentage } = resolveBrandRates(config, brandId);
+  const cpa = num(result?.qualified_cpa) * cpaValue;
+  const rev = num(result?.rvs) * (revPercentage / 100);
+  return { cpa, rev, total: cpa + rev };
+}
+
 // Repasse devido ao afiliado para um result: CPA qualificado × valor de CPA + REV ×
 // (percentual / 100). `brandId` opcional → usa a taxa POR CASA (byBrand) do afiliado;
 // sem ele, a taxa de topo (retrocompat). num() impede NaN de métrica string.
 export function calcAffiliatePayout(result: any, config?: AffiliateConfig | null, brandId?: string): number {
-  const { cpaValue, revPercentage } = resolveBrandRates(config, brandId);
-  const cpa = num(result?.qualified_cpa) * cpaValue;
-  const rev = num(result?.rvs) * (revPercentage / 100);
-  return cpa + rev;
+  return calcAffiliatePayoutParts(result, config, brandId).total;
 }
 
 // Lucro líquido da agência para um result: comissão da casa − repasse ao afiliado.
@@ -117,4 +128,13 @@ export function houseCommissionForRow(row: any, houseRate?: HouseRate | null): n
   if (imported > 0) return imported;
   return num(row?.qualified_cpa) * num(houseRate?.defaultCpa)
     + num(row?.rvs) * (num(houseRate?.defaultRev) / 100);
+}
+
+// Comissão da casa SÓ do eixo CPA — usada quando a casa está com "REV fora do
+// lucro" (toggle da call Infinity 12/08). IGNORA a comissão importada de
+// propósito: ela embute o REV (na Esportiva, `commissions_total` = CPA + rev
+// share) e não há como separá-la; a régua da casa reconstrói a parcela CPA
+// exata (é a mesma divisão que conta os QFTDs no pull).
+export function houseCpaCommissionForRow(row: any, houseRate?: HouseRate | null): number {
+  return num(row?.qualified_cpa) * num(houseRate?.defaultCpa);
 }

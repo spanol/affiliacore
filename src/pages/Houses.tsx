@@ -4,7 +4,7 @@ import { Navigate } from 'react-router-dom';
 import {
   Building2, Plus, Loader2, Pencil, Trash2, X, Upload, Link2, Check, Power,
   Table2, AlertTriangle, FileSpreadsheet, Cloud, Calendar, Download, Sparkles,
-  ChevronDown, ExternalLink, Tag, RefreshCw, Plug,
+  ChevronDown, ExternalLink, Tag, RefreshCw, Plug, TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -454,6 +454,8 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
   const [cpaCurrency, setCpaCurrency] = useState<HouseCpaCurrency>(() => resolveCpaCurrency(house?.cpaCurrency));
   const [defaultRev, setDefaultRev] = useState<string>(house?.defaultRev != null ? String(house.defaultRev) : '');
   const [issPercent, setIssPercent] = useState<string>(house?.issPercent != null ? String(house.issPercent) : '');
+  // Toggle "REV no lucro líquido" (call 12/08). Ausente no doc = true (como sempre foi).
+  const [revInProfit, setRevInProfit] = useState<boolean>(house?.revInProfit !== false);
   const [eurQuote, setEurQuote] = useState<EurBrlQuote>(() => getCachedEurBrlQuote());
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [presetSlug, setPresetSlug] = useState<string | null>(null);
@@ -541,6 +543,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
         cpaCurrency,
         defaultRev: defaultRev.trim() === '' ? null : Number(defaultRev),
         issPercent: issPercent.trim() === '' ? null : Number(issPercent),
+        revInProfit,
         ...(logoBase64 ? { logoBase64 } : {}),
       };
       if (editing && house) {
@@ -816,6 +819,34 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                   </div>
                 </div>
               </Field>
+            )}
+
+            {/* Toggle da call Infinity 12/08: com REV fora, o lucro líquido desta
+                casa no /admin vira CPA-only nos DOIS lados (comissão derivada da
+                régua + repasse só CPA). NÃO muda a comissão exibida ao afiliado.
+                Só p/ casa gerida aqui — na OTG a comissão é opaca, sem split. */}
+            {mode !== 'otg' && (
+              <label className="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 dark:bg-neutral-800/40 border border-slate-100 dark:border-neutral-800 cursor-pointer">
+                <span className="text-sm font-semibold text-slate-700 dark:text-neutral-200 flex flex-col gap-0.5">
+                  <span className="flex items-center gap-2">
+                    <TrendingUp size={15} className={revInProfit ? 'text-emerald-500' : 'text-slate-400'} />
+                    REV compõe o lucro líquido
+                  </span>
+                  <span className="text-[10px] font-normal text-slate-400 dark:text-neutral-500">
+                    Desligado: o lucro desta casa no painel do master considera só o eixo CPA
+                    (comissão pela régua e repasse sem a parcela REV). A comissão do afiliado não muda.
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={revInProfit}
+                  onClick={() => setRevInProfit((v) => !v)}
+                  className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${revInProfit ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-neutral-700'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${revInProfit ? 'translate-x-5' : ''}`} />
+                </button>
+              </label>
             )}
 
             {/* ISS vale para QUALQUER casa (OTG ou manual): o repasse ao afiliado é

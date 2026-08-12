@@ -30,12 +30,14 @@ import {
   resolveBrandRates,
   rateStatus,
   calcAffiliatePayout,
+  calcAffiliatePayoutParts,
   calcNetProfit,
   houseCommissionForRow,
+  houseCpaCommissionForRow,
   type BrandRates,
   type AffiliateConfig,
 } from '../lib/commission';
-export { resolveBrandRates, rateStatus, calcAffiliatePayout, calcNetProfit, houseCommissionForRow };
+export { resolveBrandRates, rateStatus, calcAffiliatePayout, calcAffiliatePayoutParts, calcNetProfit, houseCommissionForRow, houseCpaCommissionForRow };
 export type { BrandRates, AffiliateConfig };
 // Rede de afiliados (upline / "lucro sobre equipe") — núcleo PURO em lib/network.
 import {
@@ -482,6 +484,36 @@ export async function archiveRegistrationRequest(
     const e = await response.json().catch(() => ({}));
     throw new Error(e.error || e.message || `Erro ao arquivar solicitação: ${response.status}`);
   }
+}
+
+// --- Indicação de afiliado pelo especial (call Infinity 12/08 · item 5) ------
+
+export interface AffiliateReferralInput { name: string; email: string; phone?: string; note?: string }
+
+// O gerente (especial) indica alguém; a agência confirma em /solicitacoes. PII
+// server-only (`affiliate_referrals`, rule fechada) — tudo via rotas mediadas.
+export async function createAffiliateReferral(input: AffiliateReferralInput): Promise<{ id: string }> {
+  const response = await authFetch('/api/affiliate-referrals', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    const e = await response.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro ao enviar a indicação: ${response.status}`);
+  }
+  return response.json();
+}
+
+// Indicações do PRÓPRIO chamador (o servidor escopa: admin = todas; especial = as dele).
+export async function fetchAffiliateReferrals(): Promise<CaptureRequest[]> {
+  const response = await authFetch('/api/affiliate-referrals', { headers: { Accept: 'application/json' } });
+  if (!response.ok) {
+    const e = await response.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro ao carregar indicações: ${response.status}`);
+  }
+  const data = await response.json().catch(() => ({}));
+  return Array.isArray((data as any)?.referrals) ? (data as any).referrals : [];
 }
 
 // --- Afiliado nativo Boost + alias de e-mail (Boost-first) ------------------
@@ -1206,20 +1238,35 @@ export function calcManualHouseNetProfit(
   configs: Record<string, AffiliateConfig | undefined>,
   subToSpecialConfig: Record<string, AffiliateConfig> = {}
 ): Record<string, HouseNetProfit> {
-  const nameOf = (slug: string) => getKnownBrands().find((b) => b.slug === slug)?.name ?? slug;
-  const brandKeyOf = (slug: string) => getKnownBrands().find((b) => b.slug === slug)?.id ?? slug;
+  const metaOf = (slug: string) => getKnownBrands().find((b) => b.slug === slug);
+  const nameOf = (slug: string) => metaOf(slug)?.name ?? slug;
+  const brandKeyOf = (slug: string) => metaOf(slug)?.id ?? slug;
+  // Toggle "REV fora do lucro" (call Infinity 12/08): com `revInProfit: false` a
+  // casa entra no lucro CPA-only nos DOIS lados — comissão derivada da régua
+  // (houseCpaCommissionForRow ignora a importada, que embute o REV) e repasse só
+  // da parcela CPA (calcAffiliatePayoutParts). Um lado só deixaria o lucro torto.
+  const revOff = (slug: string) => metaOf(slug)?.revInProfit === false;
+  const cpaRateOf = (slug: string) => {
+    const b = metaOf(slug);
+    return b ? { defaultCpa: houseCpaToBrl(b.defaultCpa, b.cpaCurrency, getCachedEurBrlRate()) } : null;
+  };
   const out: Record<string, HouseNetProfit> = {};
   const ensure = (name: string) => out[name] ?? (out[name] = { commission: 0, payout: 0, netProfit: 0 });
 
   // Comissão da casa = agregado (não-atribuído incluído).
   const byHouse = aggregateByHouse(rows);
-  for (const slug of Object.keys(byHouse)) ensure(nameOf(slug)).commission += byHouse[slug].total_commission;
+  for (const slug of Object.keys(byHouse)) {
+    ensure(nameOf(slug)).commission += revOff(slug)
+      ? houseCpaCommissionForRow(byHouse[slug], cpaRateOf(slug))
+      : byHouse[slug].total_commission;
+  }
 
   // Repasse só das linhas atribuídas.
   for (const r of rows) {
     if (r.affiliateId === null) continue;
     const cfg = subToSpecialConfig[r.affiliateId] || configs[r.affiliateId];
-    ensure(nameOf(r.houseSlug)).payout += calcAffiliatePayout(r, cfg, brandKeyOf(r.houseSlug));
+    const parts = calcAffiliatePayoutParts(r, cfg, brandKeyOf(r.houseSlug));
+    ensure(nameOf(r.houseSlug)).payout += revOff(r.houseSlug) ? parts.cpa : parts.total;
   }
   for (const k of Object.keys(out)) out[k].netProfit = out[k].commission - out[k].payout;
   return out;

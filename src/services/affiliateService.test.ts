@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 // Isola os helpers de parsing — evita os efeitos colaterais de importar o
 // Firebase client (lib/firebase roda um testConnection() no import).
@@ -39,6 +39,7 @@ import {
   buildNetworkTree,
 } from './affiliateService';
 import { StoredManualRow, emptyMetrics, addMetrics } from '../lib/houseResults';
+import { setKnownBrands } from '../lib/brand';
 import fc from 'fast-check';
 
 describe('manualForAffiliates · aceita id único, array e CSV de rede', () => {
@@ -678,6 +679,41 @@ describe('calcManualHouseNetProfit (Fase 2 · lucro por casa manual)', () => {
 
   it('tolera entrada vazia', () => {
     expect(calcManualHouseNetProfit([], configs)).toEqual({});
+  });
+});
+
+describe('toggle REV fora do lucro (revInProfit: false — call Infinity 12/08)', () => {
+  const row = (houseSlug: string, affiliateId: string | null, m: Partial<ReturnType<typeof emptyMetrics>>): StoredManualRow =>
+    ({ houseSlug, date: '2026-08-01', affiliateId, ...addMetrics(emptyMetrics(), m) });
+  const configs = { '123': { affiliateId: '123', cpaValue: 100, revPercentage: 10 } } as any;
+  const esportiva = (revInProfit: boolean | undefined) => [{
+    slug: 'esportiva', name: 'Esportiva Bet', dataSource: 'manual' as const,
+    defaultCpa: 120, cpaCurrency: 'BRL' as const, defaultRev: 30, revInProfit,
+  }];
+  afterEach(() => setKnownBrands(null)); // devolve as casas-semente pros demais testes
+
+  it('com o toggle desligado o lucro vira CPA-only nos DOIS lados', () => {
+    setKnownBrands(esportiva(false));
+    const rows = [
+      // Agregado com comissão IMPORTADA 700 — embute o REV, e por isso é ignorada.
+      row('esportiva', null, { qualified_cpa: 4, rvs: 200, total_commission: 700 }),
+      row('esportiva', '123', { qualified_cpa: 2, rvs: 100, total_commission: 350 }),
+    ];
+    const np = calcManualHouseNetProfit(rows, configs);
+    expect(np['Esportiva Bet'].commission).toBe(4 * 120); // régua CPA-only (480), não os 700 importados
+    expect(np['Esportiva Bet'].payout).toBe(2 * 100);     // só a parcela CPA — os 100×10% de REV ficam fora
+    expect(np['Esportiva Bet'].netProfit).toBe(480 - 200);
+  });
+
+  it('ausente/true mantém o comportamento de sempre (importada + repasse com REV)', () => {
+    setKnownBrands(esportiva(undefined));
+    const rows = [
+      row('esportiva', null, { qualified_cpa: 4, rvs: 200, total_commission: 700 }),
+      row('esportiva', '123', { qualified_cpa: 2, rvs: 100, total_commission: 350 }),
+    ];
+    const np = calcManualHouseNetProfit(rows, configs);
+    expect(np['Esportiva Bet'].commission).toBe(700);          // comissão importada vale
+    expect(np['Esportiva Bet'].payout).toBe(2 * 100 + 100 * 0.1); // CPA + REV (210)
   });
 });
 

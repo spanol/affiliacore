@@ -597,6 +597,16 @@ export default function AdminDashboard() {
                 <div className="flex items-center gap-2 mb-4">
                   <BrandLogo name={h.name} brandId={h.id} size={28} />
                   <span className="text-sm font-bold text-slate-900 dark:text-white truncate">{h.name}</span>
+                  {/* Transparência do toggle (call 12/08): avisa que o lucro desta
+                      casa está CPA-only — o número não embute o REV. */}
+                  {getBrandMeta(h.name)?.revInProfit === false && (
+                    <span
+                      className="ml-auto shrink-0 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                      title="Configurado em /casas: o REV não compõe o lucro líquido desta casa (lucro = eixo CPA)."
+                    >
+                      REV fora do lucro
+                    </span>
+                  )}
                 </div>
                 <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 dark:text-neutral-500">Comissão (casa)</p>
                 <h4 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight mb-3">R$ {h.commission.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h4>

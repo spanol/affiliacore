@@ -28,6 +28,9 @@ export interface House {
   // ISS retido no repasse ao afiliado, em % — VARIA POR CASA (5% / 2% / 2% no
   // legado da Infinity). Ausente = sem retenção. Núcleo em `src/lib/tax.ts`.
   issPercent?: number | null;
+  // Toggle "REV no lucro líquido" (call Infinity 12/08). O servidor normaliza:
+  // ausente = true (REV compõe o lucro, como sempre). Só casas 'manual'.
+  revInProfit?: boolean;
   // Frescor do dado da casa: quando os resultados foram atualizados pela última
   // vez, por qual via, e até que dia eles cobrem. Escrito tanto pelo pull horário
   // quanto pelo upload manual. Lido pelo afiliado (src/lib/freshness.ts).
@@ -59,6 +62,7 @@ export interface HouseInput {
   defaultRev?: number | null;
   cpaCurrency?: HouseCpaCurrency | null;
   issPercent?: number | null;
+  revInProfit?: boolean;
   logoBase64?: string | null;
   // Vínculo com um conector de /integracoes ('' / null desvincula). O servidor
   // valida contra o catálogo e escreve os DOIS lados do vínculo.

@@ -48,7 +48,7 @@ import { normalizeLegalDocInput, computeNextVersion } from './src/lib/legal';
 import { canTransitionWithdrawal, normalizeWithdrawalAmount, type WithdrawalStatus } from './src/lib/withdrawal';
 import { buildNetworkTree, resolveRepasseCap, exceedsRepasseCap } from './src/lib/network';
 import {
-  isPendingSignup, signupToRequest, leadToRequest, buildCaptureFeed, resolveRequestStatus,
+  isPendingSignup, signupToRequest, leadToRequest, referralToRequest, buildCaptureFeed, resolveRequestStatus,
 } from './src/lib/registrationRequests';
 import { resolveSpecialSubIds, resolveDirectSubIds, isDirectDownline, type SpecialRecord } from './src/lib/specialNetwork';
 import {
@@ -2872,9 +2872,10 @@ export function createApp(deps: ServerDeps) {
       return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
     }
     try {
-      const [usersSnap, contactsSnap] = await Promise.all([
+      const [usersSnap, contactsSnap, referralsSnap] = await Promise.all([
         adminDb.collection('users').get(),
         adminDb.collection('contacts').get(),
+        adminDb.collection('affiliate_referrals').get(),
       ]);
       const requests = [
         // `isPendingSignup` é a MESMA regra que a tela usa p/ dizer "pendente" —
@@ -2883,6 +2884,8 @@ export function createApp(deps: ServerDeps) {
           .filter((d) => isPendingSignup(d.data()))
           .map((d) => signupToRequest(d.id, d.data())),
         ...contactsSnap.docs.map((d) => leadToRequest(d.id, d.data())),
+        // 3ª porta (call 12/08): indicação feita por um especial, aguardando o master.
+        ...referralsSnap.docs.map((d) => referralToRequest(d.id, d.data())),
       ];
       return res.json({ requests: buildCaptureFeed(requests) });
     } catch (error: any) {
@@ -2901,10 +2904,11 @@ export function createApp(deps: ServerDeps) {
       const kind = String(req.body?.kind ?? '').trim();
       const id = String(req.body?.id ?? '').trim();
       const archived = req.body?.archived !== false; // default: arquivar
-      if ((kind !== 'signup' && kind !== 'lead') || !id) {
-        return res.status(400).json({ error: 'Informe kind ("signup" | "lead") e id.' });
+      if ((kind !== 'signup' && kind !== 'lead' && kind !== 'referral') || !id) {
+        return res.status(400).json({ error: 'Informe kind ("signup" | "lead" | "referral") e id.' });
       }
-      const ref = adminDb.collection(kind === 'signup' ? 'users' : 'contacts').doc(id);
+      const collectionOf = { signup: 'users', lead: 'contacts', referral: 'affiliate_referrals' } as const;
+      const ref = adminDb.collection(collectionOf[kind]).doc(id);
       const snap = await ref.get();
       if (!snap.exists) return res.status(404).json({ error: 'Solicitação não encontrada.' });
       const before = snap.data() as any;
@@ -2916,7 +2920,7 @@ export function createApp(deps: ServerDeps) {
       const status = archived ? 'archived' : 'pending';
       await ref.set({ requestStatus: status, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
       await writeAuditLog(req, {
-        entityType: kind === 'signup' ? 'user' : 'contact',
+        entityType: kind === 'signup' ? 'user' : kind === 'referral' ? 'affiliate_referral' : 'contact',
         entityId: id,
         entityLabel: String(before?.name ?? before?.email ?? id),
         action: archived ? 'request.archive' : 'request.restore',
@@ -2926,6 +2930,76 @@ export function createApp(deps: ServerDeps) {
     } catch (error: any) {
       console.error('Error archiving registration request:', error);
       return res.status(500).json({ error: error.message || 'Erro interno arquivando solicitação.' });
+    }
+  });
+
+  // --- Indicação de afiliado pelo ESPECIAL (call Infinity 12/08 · item 5) -----
+  // O gerente indica; o MASTER confirma em /solicitacoes (3ª origem da fila), e a
+  // aprovação cria o afiliado + convite e o vincula à rede de quem indicou. É PII
+  // de terceiro sem conta, então a coleção `affiliate_referrals` é server-only
+  // (rule `read, write: if false`) e todo acesso passa por aqui.
+
+  app.post('/api/affiliate-referrals', requireAuth, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const user = (req as any).user;
+      const ownAffiliateId = String(user?.affiliateId ?? '').trim();
+      // Gate: admin OU afiliado especial ATIVO (resolveIsSpecial é a definição
+      // única; o registro vem de resolveSpecialRecord). Sub comum não indica.
+      const special = ownAffiliateId ? await resolveSpecialRecord(ownAffiliateId, { withSubs: false }) : null;
+      if (user?.role !== 'admin' && !resolveIsSpecial(special)) {
+        return res.status(403).json({ error: 'Apenas afiliados especiais podem indicar cadastros.' });
+      }
+      const name = String(req.body?.name ?? '').trim();
+      const email = String(req.body?.email ?? '').trim().toLowerCase();
+      if (!name) return res.status(400).json({ error: 'Informe o nome do indicado.' });
+      // E-mail é obrigatório: é ele que vira convite de login na aprovação.
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: 'Informe um e-mail válido — o convite de acesso vai para ele.' });
+      }
+      const doc = {
+        name,
+        email,
+        phone: String(req.body?.phone ?? '').trim() || null,
+        note: String(req.body?.note ?? '').trim() || null,
+        referrerAffiliateId: ownAffiliateId || null,
+        referrerName: ownAffiliateId ? await affiliateNameOf(ownAffiliateId) : null,
+        referrerUid: String(user?.uid ?? '') || null,
+        requestStatus: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      const ref = await adminDb.collection('affiliate_referrals').add(doc);
+      await writeAuditLog(req, {
+        entityType: 'affiliate_referral',
+        entityId: ref.id,
+        entityLabel: name,
+        action: 'referral.create',
+        metadata: { referrerAffiliateId: ownAffiliateId || null },
+      });
+      return res.json({ id: ref.id });
+    } catch (error: any) {
+      console.error('Error creating affiliate referral:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno criando a indicação.' });
+    }
+  });
+
+  // Lista as indicações: admin vê todas; o especial vê SÓ as próprias (é assim
+  // que ele acompanha "aguardando aprovação" sem enxergar a fila da agência).
+  app.get('/api/affiliate-referrals', requireAuth, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const user = (req as any).user;
+      const ownAffiliateId = String(user?.affiliateId ?? '').trim();
+      let query: admin.firestore.Query = adminDb.collection('affiliate_referrals');
+      if (user?.role !== 'admin') {
+        if (!ownAffiliateId) return res.status(403).json({ error: 'Sem afiliado vinculado.' });
+        query = query.where('referrerAffiliateId', '==', ownAffiliateId);
+      }
+      const snap = await query.get();
+      return res.json({ referrals: buildCaptureFeed(snap.docs.map((d) => referralToRequest(d.id, d.data()))) });
+    } catch (error: any) {
+      console.error('Error listing affiliate referrals:', error);
+      return res.status(500).json({ error: error.message || 'Erro interno listando indicações.' });
     }
   });
 
@@ -3746,6 +3820,8 @@ export function createApp(deps: ServerDeps) {
       cpaCurrency: resolveCpaCurrency(data.cpaCurrency),
       // Alíquota de ISS retida no repasse ao afiliado. VARIA POR CASA (ver src/lib/tax.ts).
       issPercent: Number.isFinite(Number(data.issPercent)) ? Number(data.issPercent) : null,
+      // Toggle "REV no lucro líquido" (call Infinity 12/08). Ausente = true (sempre foi assim).
+      revInProfit: data.revInProfit !== false,
       // Frescor do dado (pull horário OU upload) — o afiliado lê isto no painel.
       // Timestamp vira ISO: o client não tem o SDK admin para desserializar.
       lastResultsSyncAt: data.lastResultsSyncAt?.toDate?.().toISOString?.() ?? data.lastResultsSyncAt ?? null,
@@ -3911,6 +3987,9 @@ export function createApp(deps: ServerDeps) {
         }
       }
       if (body.issPercent !== undefined) patch.issPercent = numOrNull(body.issPercent);
+      // Toggle "REV no lucro líquido" (call 12/08): grava booleano cru; ausente
+      // no doc = true (a leitura normaliza). Mudar isto MUDA o lucro do /admin.
+      if (body.revInProfit !== undefined) patch.revInProfit = body.revInProfit !== false;
       if (body.logoBase64) patch.logo = await uploadHouseLogo((snap.data() as any)?.slug ?? ref.id, String(body.logoBase64));
       else if (body.logo === null) patch.logo = null;
 
@@ -3940,7 +4019,7 @@ export function createApp(deps: ServerDeps) {
       // Auditoria: só os campos que de fato mudaram (antes→depois). 'logo' marcada à
       // parte (não logamos o base64/URL inteiro — só que houve troca).
       const changes = diffChanges(snap.data() as any, patch,
-        ['name', 'brandId', 'registerUrlTemplate', 'active', 'order', 'dataSource', 'defaultCpa', 'defaultRev', 'cpaCurrency', 'issPercent']);
+        ['name', 'brandId', 'registerUrlTemplate', 'active', 'order', 'dataSource', 'defaultCpa', 'defaultRev', 'cpaCurrency', 'issPercent', 'revInProfit']);
       if ('logo' in patch) changes.push({ field: 'logo', before: '(anterior)', after: patch.logo ? '(nova)' : null });
       // `integration` fica fora do diffChanges: no desvínculo o patch carrega um
       // FieldValue.delete(), que o diff leria como valor.

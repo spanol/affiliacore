@@ -83,6 +83,12 @@ export interface BrandMeta {
   defaultRev?: number | null;
   // Moeda em que a CASA paga o CPA. Ausente = 'EUR' (convenção original).
   cpaCurrency?: 'EUR' | 'BRL' | null;
+  // Toggle da call Infinity 12/08: o REV compõe o LUCRO LÍQUIDO desta casa no
+  // /admin? Ausente/true = sim (comportamento de sempre). `false` = o lucro da
+  // casa vira CPA-only nos DOIS lados (comissão derivada da régua + repasse só
+  // CPA) — afeta SÓ o lucro do master; a comissão exibida ao afiliado não muda.
+  // Só faz sentido p/ casas 'manual' (na OTG a comissão é opaca, sem split).
+  revInProfit?: boolean | null;
 }
 
 const normBrandKey = (s?: string | null) => String(s ?? '').trim().toLowerCase();
