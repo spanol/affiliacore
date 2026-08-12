@@ -4,6 +4,7 @@ import {
   resolveRequestStatus,
   signupToRequest,
   leadToRequest,
+  referralToRequest,
   buildCaptureFeed,
   summarizeCapture,
   CaptureRequest,
@@ -136,5 +137,43 @@ describe('summarizeCapture', () => {
 
   it('fila vazia não quebra', () => {
     expect(summarizeCapture([])).toMatchObject({ pending: 0, bySource: [] });
+  });
+
+  it('indicação conta separada (referrals) e entra na fila', () => {
+    const s = summarizeCapture([
+      ...feed,
+      { ...base, id: '5', kind: 'referral', name: 'E', source: 'indicacao-gerente', sourceLabel: 'Indicação do gerente', status: 'pending' },
+    ]);
+    expect(s).toMatchObject({ pending: 4, signups: 2, leads: 1, referrals: 1 });
+  });
+});
+
+describe('referralToRequest (indicação do gerente — call Infinity 12/08)', () => {
+  it('vira solicitação com quem indicou e a observação em presentation', () => {
+    const r = referralToRequest('ref-1', {
+      name: 'Novo Sub',
+      email: 'NOVO@x.com ',
+      phone: '11 98888-0000',
+      note: 'Trabalhou comigo na outra casa',
+      referrerAffiliateId: 'AFF-ESP',
+      referrerName: 'Gerente Um',
+      createdAt: { toDate: () => new Date('2026-08-12T15:00:00.000Z') },
+    });
+    expect(r).toMatchObject({
+      id: 'ref-1',
+      kind: 'referral',
+      name: 'Novo Sub',
+      presentation: 'Trabalhou comigo na outra casa',
+      referrerAffiliateId: 'AFF-ESP',
+      referrerName: 'Gerente Um',
+      sourceLabel: 'Indicação do gerente',
+      status: 'pending',
+      createdAt: '2026-08-12T15:00:00.000Z',
+    });
+  });
+
+  it('sem carimbo de arquivo é PENDENTE; "archived" explícito sai da fila', () => {
+    expect(referralToRequest('a', {}).status).toBe('pending');
+    expect(referralToRequest('a', { requestStatus: 'archived' }).status).toBe('archived');
   });
 });

@@ -59,6 +59,15 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Indicações de afiliado feitas por um ESPECIAL (call Infinity 12/08 · item 5).
+    // PII de terceiro sem conta (nome/e-mail/telefone do indicado) — toda leitura e
+    // escrita passa pelas rotas /api/affiliate-referrals (Admin SDK), que escopam
+    // por papel (admin = tudo; especial = as próprias). Coleção nova, sem leitor
+    // client-side prévio → fechar aqui não tem risco de ordem de deploy.
+    match /affiliate_referrals/{referralId} {
+      allow read, write: if false;
+    }
+
     // B7 · Integrações externas por instância (chave da API da casa + toggle +
     // vínculo com a casa). Segue a rule do auth_totp, não a de `settings`: aqui
     // mora CREDENCIAL DE VERDADE (a chave que puxa o relatório da casa), não um

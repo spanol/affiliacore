@@ -965,6 +965,99 @@ describe('/api/registration-requests (admin-only)', () => {
   });
 });
 
+// Indicação de afiliado pelo ESPECIAL (call Infinity 12/08 · item 5): o gerente
+// indica, o master confirma em /solicitacoes. PII server-only (rule fechada) —
+// o escopo (admin = tudo; especial = as próprias) vive NA ROTA.
+describe('/api/affiliate-referrals (indicação do gerente)', () => {
+  const seed = {
+    users: {
+      'admin-uid': { role: 'admin', name: 'Agência' },
+      'esp-uid': { role: 'client', affiliateId: 'AFF-ESP', isSpecial: true },
+      'sub-uid': { role: 'client', affiliateId: 'AFF-1' },
+      'inativo-uid': { role: 'client', affiliateId: 'AFF-OFF' },
+    },
+    special_affiliates: {
+      'AFF-ESP': { active: true },
+      'AFF-OFF': { active: false }, // registro existe mas NÃO está ativo
+    },
+    affiliates: { 'AFF-ESP': { name: 'Gerente Um' } },
+  };
+
+  it('especial cria a indicação com o carimbo de quem indicou (nome do mirror)', async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/affiliate-referrals')
+      .set('Authorization', 'Bearer esp-uid')
+      .send({ name: 'Novo Sub', email: 'Novo@X.com', phone: '11 98888', note: 'da minha equipe' })
+      .expect(200);
+    const docs = [...(db.__store.get('affiliate_referrals')?.values() ?? [])];
+    expect(docs).toHaveLength(1);
+    expect(docs[0]).toMatchObject({
+      name: 'Novo Sub',
+      email: 'novo@x.com', // normalizado
+      referrerAffiliateId: 'AFF-ESP',
+      referrerName: 'Gerente Um',
+      requestStatus: 'pending',
+    });
+    const logs = [...(db.__store.get('audit_logs')?.values() ?? [])].filter((l: any) => l.action === 'referral.create');
+    expect(logs).toHaveLength(1);
+  });
+
+  it('sub comum e especial INATIVO → 403; sem e-mail válido → 400 (o convite depende dele)', async () => {
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(seed) });
+    await request(app)
+      .post('/api/affiliate-referrals')
+      .set('Authorization', 'Bearer sub-uid')
+      .send({ name: 'X', email: 'x@x.com' })
+      .expect(403);
+    await request(app)
+      .post('/api/affiliate-referrals')
+      .set('Authorization', 'Bearer inativo-uid')
+      .send({ name: 'X', email: 'x@x.com' })
+      .expect(403);
+    await request(app)
+      .post('/api/affiliate-referrals')
+      .set('Authorization', 'Bearer esp-uid')
+      .send({ name: 'Sem Email', email: 'nao-e-email' })
+      .expect(400);
+  });
+
+  it('GET escopa: especial vê SÓ as próprias; admin vê todas', async () => {
+    const db = makeFirestore({
+      ...seed,
+      affiliate_referrals: {
+        r1: { name: 'Meu', email: 'a@x.com', referrerAffiliateId: 'AFF-ESP' },
+        r2: { name: 'De outro', email: 'b@x.com', referrerAffiliateId: 'AFF-OUTRO' },
+      },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const mine = await request(app).get('/api/affiliate-referrals').set('Authorization', 'Bearer esp-uid').expect(200);
+    expect(mine.body.referrals.map((r: any) => r.id)).toEqual(['r1']);
+    const all = await request(app).get('/api/affiliate-referrals').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(all.body.referrals.map((r: any) => r.id).sort()).toEqual(['r1', 'r2']);
+  });
+
+  it('a indicação entra na fila do /api/registration-requests como kind "referral" e arquiva por lá', async () => {
+    const db = makeFirestore({
+      ...seed,
+      affiliate_referrals: {
+        r1: { name: 'Indicado', email: 'i@x.com', referrerAffiliateId: 'AFF-ESP', referrerName: 'Gerente Um' },
+      },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app).get('/api/registration-requests').set('Authorization', 'Bearer admin-uid').expect(200);
+    const ref = res.body.requests.find((r: any) => r.kind === 'referral');
+    expect(ref).toMatchObject({ id: 'r1', name: 'Indicado', referrerAffiliateId: 'AFF-ESP', referrerName: 'Gerente Um', status: 'pending' });
+    await request(app)
+      .post('/api/registration-requests/archive')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ kind: 'referral', id: 'r1' })
+      .expect(200);
+    expect(db.__store.get('affiliate_referrals')?.get('r1')).toMatchObject({ requestStatus: 'archived' });
+  });
+});
+
 describe('/api/tag-aliases (admin-only)', () => {
   const seed = { users: { 'admin-uid': { role: 'admin' }, 'client-uid': { role: 'client', affiliateId: 'AFF-1' } } };
   const logsOf = (db: any, action: string) =>

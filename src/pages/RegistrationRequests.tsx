@@ -13,6 +13,7 @@ import {
   linkAffiliateUser,
   createBoostAffiliates,
   fetchAffiliates,
+  saveAffiliateUpline,
   CaptureRequest,
 } from '../services/affiliateService';
 import { fetchShowcaseConfig } from '../services/showcaseService';
@@ -25,9 +26,11 @@ import { humanizeName, cn } from '../lib/utils';
 // ninguém era notificado; o lead do formulário público só existia no console do
 // Firestore desde que a tela de Contatos saiu (B6).
 //
-// A fila tem DUAS naturezas, e é isso que decide a ação disponível:
-//   · signup → JÁ tem login. Basta vincular a um afiliado (o login passa a valer).
-//   · lead   → NÃO tem login. Resolve criando o afiliado + convite de acesso.
+// A fila tem TRÊS naturezas, e é isso que decide a ação disponível:
+//   · signup   → JÁ tem login. Basta vincular a um afiliado (o login passa a valer).
+//   · lead     → NÃO tem login. Resolve criando o afiliado + convite de acesso.
+//   · referral → indicação de um GERENTE (especial, call 12/08). Resolve como o
+//     lead E vincula o novo afiliado à rede de quem indicou (upline).
 export default function RegistrationRequests() {
   const { profile } = useAuth();
   const { push } = useToast();
@@ -97,18 +100,28 @@ export default function RegistrationRequests() {
     runAction(`link:${r.id}`, () => linkAffiliateUser(r.email, affiliateId).then(() => {}),
       `${r.name || r.email} vinculado(a).`);
 
-  // Cria o afiliado nativo com o nome/e-mail que a pessoa informou. Para o LEAD
-  // já sai com convite (ele precisa criar a senha); para o signup, que já tem
-  // conta, vinculamos o login existente logo em seguida.
+  // Cria o afiliado nativo com o nome/e-mail que a pessoa informou. Para o LEAD e
+  // a INDICAÇÃO já sai com convite (a pessoa precisa criar a senha); para o signup,
+  // que já tem conta, vinculamos o login existente logo em seguida. Indicação ainda:
+  // (1) vincula o novo afiliado à REDE de quem indicou (upline — é o ponto da
+  // feature: o indicado entra na equipe do gerente) e (2) tira a indicação da fila
+  // (diferente do lead, o doc não some sozinho ao virar afiliado).
   const approve = (r: CaptureRequest) =>
     runAction(`approve:${r.id}`, async () => {
       const [created] = await createBoostAffiliates(
         [{ name: r.name || r.email, email: r.email }],
-        { generateInvite: r.kind === 'lead' }
+        { generateInvite: r.kind !== 'signup' }
       );
       if (!created?.affiliateId) throw new Error('O servidor não devolveu o afiliado criado.');
       if (r.kind === 'signup') await linkAffiliateUser(r.email, created.affiliateId);
-    }, r.kind === 'lead' ? 'Afiliado criado e convite gerado.' : 'Afiliado criado e login vinculado.');
+      if (r.kind === 'referral') {
+        if (r.referrerAffiliateId) await saveAffiliateUpline(created.affiliateId, r.referrerAffiliateId);
+        await archiveRegistrationRequest('referral', r.id, true);
+      }
+    },
+    r.kind === 'referral'
+      ? 'Afiliado criado, convite gerado e vinculado à rede do gerente.'
+      : r.kind === 'lead' ? 'Afiliado criado e convite gerado.' : 'Afiliado criado e login vinculado.');
 
   const archive = (r: CaptureRequest, archived: boolean) =>
     runAction(`arch:${r.id}`, () => archiveRegistrationRequest(r.kind, r.id, archived),
@@ -145,11 +158,12 @@ export default function RegistrationRequests() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
             {[
               { key: 'fila', label: 'Na fila', value: String(summary.pending), hint: 'aguardando decisão' },
               { key: 'login', label: 'Já com login', value: String(summary.signups), hint: 'basta vincular a um afiliado' },
               { key: 'lead', label: 'Só contato', value: String(summary.leads), hint: 'resolve com afiliado + convite' },
+              { key: 'indicacoes', label: 'Indicações', value: String(summary.referrals), hint: 'de gerentes — convite + rede' },
               { key: 'arquivadas', label: 'Arquivadas', value: String(summary.archived), hint: 'fora da fila, nada apagado' },
             ].map((c, idx) => (
               <motion.div
@@ -240,10 +254,17 @@ export default function RegistrationRequests() {
                           'px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider',
                           r.kind === 'signup'
                             ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                            : 'bg-slate-100 dark:bg-neutral-800 text-slate-500 dark:text-neutral-400'
+                            : r.kind === 'referral'
+                              ? 'bg-accent-500/10 text-accent-600 dark:text-accent-400'
+                              : 'bg-slate-100 dark:bg-neutral-800 text-slate-500 dark:text-neutral-400'
                         )}>
-                          {r.kind === 'signup' ? 'já tem login' : 'só contato'}
+                          {r.kind === 'signup' ? 'já tem login' : r.kind === 'referral' ? 'indicação' : 'só contato'}
                         </span>
+                        {r.kind === 'referral' && r.referrerName && (
+                          <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-neutral-800 text-slate-500 dark:text-neutral-400">
+                            indicado por {humanizeName(r.referrerName)}
+                          </span>
+                        )}
                         {r.experienced && (
                           <span className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-accent-500/10 text-accent-600 dark:text-accent-400">
                             já foi afiliado
@@ -319,8 +340,10 @@ export default function RegistrationRequests() {
                           >
                             {busy === `approve:${r.id}`
                               ? <Loader2 size={13} className="animate-spin" />
-                              : r.kind === 'lead' ? <Sparkles size={13} /> : <Check size={13} />}
-                            {r.kind === 'lead' ? 'Criar afiliado + convite' : 'Criar afiliado e vincular'}
+                              : r.kind === 'signup' ? <Check size={13} /> : <Sparkles size={13} />}
+                            {r.kind === 'referral'
+                              ? 'Aprovar indicação'
+                              : r.kind === 'lead' ? 'Criar afiliado + convite' : 'Criar afiliado e vincular'}
                           </button>
                           <button
                             type="button"

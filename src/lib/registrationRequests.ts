@@ -16,10 +16,12 @@ import { registrationSourceLabel } from './registrationSource';
 // admin que a resolve. NUNCA inferir "arquivado" de ausência.
 export type RequestStatus = 'pending' | 'archived';
 
-export type RequestKind = 'signup' | 'lead';
+// 'referral' = indicação feita por um afiliado ESPECIAL (call Infinity 12/08):
+// o gerente indica, o master confirma — 3ª porta de entrada da fila.
+export type RequestKind = 'signup' | 'lead' | 'referral';
 
 export interface CaptureRequest {
-  id: string;              // uid (signup) ou doc id (lead)
+  id: string;              // uid (signup) ou doc id (lead/referral)
   kind: RequestKind;
   name: string;
   email: string;
@@ -34,6 +36,9 @@ export interface CaptureRequest {
   status: RequestStatus;
   /** ISO — data do pedido. Null quando o doc antigo não tem carimbo. */
   createdAt: string | null;
+  /** Só da indicação: quem indicou (o especial). O id alimenta o vínculo de rede na aprovação. */
+  referrerAffiliateId?: string;
+  referrerName?: string;
 }
 
 // `users/{uid}` só é SOLICITAÇÃO enquanto não tem afiliado: é exatamente o estado
@@ -85,6 +90,27 @@ export function leadToRequest(id: string, lead: any): CaptureRequest {
   };
 }
 
+// affiliate_referrals/{id} → solicitação. Indicação do gerente (especial): não há
+// login nem lead — a aprovação cria o afiliado, convida e VINCULA à rede de quem
+// indicou (`referrerAffiliateId`). A observação do gerente viaja em `presentation`.
+export function referralToRequest(id: string, doc: any): CaptureRequest {
+  return {
+    id: String(id),
+    kind: 'referral',
+    name: str(doc?.name),
+    email: str(doc?.email),
+    phone: str(doc?.phone),
+    socialMedia: str(doc?.socialMedia),
+    presentation: str(doc?.note),
+    source: 'indicacao-gerente',
+    sourceLabel: 'Indicação do gerente',
+    status: resolveRequestStatus(doc?.requestStatus),
+    createdAt: toIso(doc?.createdAt),
+    referrerAffiliateId: str(doc?.referrerAffiliateId) || undefined,
+    referrerName: str(doc?.referrerName) || undefined,
+  };
+}
+
 // Feed único, mais recente primeiro. Sem data vai para o fim (dado antigo, de
 // antes do carimbo) em vez de disputar o topo com o pedido de hoje.
 export function buildCaptureFeed(requests: CaptureRequest[]): CaptureRequest[] {
@@ -102,6 +128,7 @@ export interface CaptureSummary {
   pending: number;
   signups: number;   // pendentes que JÁ têm login (dá p/ vincular na hora)
   leads: number;     // pendentes sem login (resolve por convite)
+  referrals: number; // pendentes indicados por um gerente (convite + vínculo de rede)
   archived: number;
   bySource: Array<{ source: string; label: string; count: number }>;
 }
@@ -122,6 +149,7 @@ export function summarizeCapture(requests: CaptureRequest[]): CaptureSummary {
     pending: pending.length,
     signups: pending.filter((r) => r.kind === 'signup').length,
     leads: pending.filter((r) => r.kind === 'lead').length,
+    referrals: pending.filter((r) => r.kind === 'referral').length,
     archived: list.length - pending.length,
     bySource: [...counts.entries()]
       .map(([source, e]) => ({ source, label: e.label, count: e.count }))

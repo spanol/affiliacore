@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Loader2, Users, ArrowUpRight, Crown, Save, Percent, Search } from 'lucide-react';
+import { Loader2, Users, ArrowUpRight, Crown, Save, Percent, Search, UserPlus, X, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import {
@@ -11,8 +11,11 @@ import {
   fetchManualResults,
   fetchAffiliateConfigs,
   saveSubAffiliateConfig,
+  createAffiliateReferral,
+  fetchAffiliateReferrals,
   SpecialAffiliate,
   AffiliateConfig,
+  CaptureRequest,
 } from '../services/affiliateService';
 import { producingAffiliateIds } from '../lib/affiliateActivity';
 import { buildPerHousePayout, type HouseMetricRow } from '../lib/perHousePayout';
@@ -57,6 +60,12 @@ export default function SpecialSubAffiliates() {
   // "Status" escopado: o especial NÃO gerencia ativação (admin-only), então o
   // análogo é a ATIVIDADE na rede — se o sub produziu no período selecionado.
   const [activityFilter, setActivityFilter] = useState<'all' | 'producing' | 'idle'>('all');
+  // Indicação de afiliado (call 12/08 · item 5): o gerente indica, a AGÊNCIA
+  // confirma em /solicitacoes — nada é criado daqui; só entra na fila.
+  const [referrals, setReferrals] = useState<CaptureRequest[]>([]);
+  const [referOpen, setReferOpen] = useState(false);
+  const [referForm, setReferForm] = useState({ name: '', email: '', phone: '', note: '' });
+  const [sendingReferral, setSendingReferral] = useState(false);
 
   const ownId = profile?.affiliateId ? String(profile.affiliateId) : '';
 
@@ -72,13 +81,15 @@ export default function SpecialSubAffiliates() {
       const specials = await fetchSpecialAffiliates();
       const mine = specials[ownId] || null;
       const networkIds = [ownId, ...((mine?.subAffiliateIds || []).map(String))];
-      const [split, cfgs, poolData, manual] = await Promise.all([
+      const [split, cfgs, poolData, manual, myReferrals] = await Promise.all([
         fetchResultsForAffiliatesSplit(networkIds, range),
         fetchAffiliateConfigs(),
         fetchAffiliates().catch(() => []),
         // Casas MANUAIS entram na atividade: sem isto, numa instância OTG-free
         // todo sub aparecia como parado. `fetchManualResults` já degrada p/ [].
         fetchManualResults(range).catch(() => []),
+        // Indicações do próprio gerente (o servidor escopa) — acompanhamento.
+        fetchAffiliateReferrals().catch(() => []),
       ]);
       setSpecial(mine);
       setResults(split.rows);
@@ -86,6 +97,7 @@ export default function SpecialSubAffiliates() {
       setManualRows(Array.isArray(manual) ? manual : []);
       setConfigs(cfgs);
       setPool(Array.isArray(poolData) ? poolData : []);
+      setReferrals(Array.isArray(myReferrals) ? myReferrals : []);
       // semente dos inputs editáveis a partir dos configs salvos
       const seed: Record<string, { cpaValue: number | string; revPercentage: number | string }> = {};
       (mine?.subAffiliateIds || []).forEach((id) => {
@@ -105,6 +117,28 @@ export default function SpecialSubAffiliates() {
     if (ownId) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ownId, range.startDate, range.endDate]);
+
+  // Envia a indicação pra fila da agência. O servidor valida (nome + e-mail) e
+  // carimba quem indicou; a criação/convite/vínculo acontecem só na aprovação.
+  const handleSendReferral = async () => {
+    setSendingReferral(true);
+    try {
+      await createAffiliateReferral({
+        name: referForm.name.trim(),
+        email: referForm.email.trim(),
+        phone: referForm.phone.trim() || undefined,
+        note: referForm.note.trim() || undefined,
+      });
+      push({ type: 'success', message: 'Indicação enviada — a agência confirma o cadastro.' });
+      setReferOpen(false);
+      setReferForm({ name: '', email: '', phone: '', note: '' });
+      setReferrals(await fetchAffiliateReferrals().catch(() => referrals));
+    } catch (e: any) {
+      push({ type: 'error', message: e?.message || 'Não foi possível enviar a indicação.' });
+    } finally {
+      setSendingReferral(false);
+    }
+  };
 
   // Config própria do especial PRESERVANDO byBrand (antes descartava a taxa por casa · R10).
   const ownConfig = useMemo<AffiliateConfig>(
@@ -248,8 +282,35 @@ export default function SpecialSubAffiliates() {
           </h1>
           <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">{subIds.length} sub-afiliado(s) vinculado(s). Defina a comissão de cada um e abra os dados individuais.</p>
         </div>
-        <DateRangePicker value={range} onChange={setRange} />
+        <div className="flex flex-col items-start md:items-end gap-3">
+          <DateRangePicker value={range} onChange={setRange} />
+          {/* Indicação (call 12/08): abre a fila da agência, não cria nada aqui. */}
+          <button
+            type="button"
+            onClick={() => setReferOpen(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-accent-500 text-accent-contrast text-[11px] font-bold hover:opacity-90 transition-all shadow-sm"
+          >
+            <UserPlus size={14} /> Indicar afiliado
+          </button>
+        </div>
       </motion.header>
+
+      {/* Indicações aguardando a confirmação da agência — acompanhamento do gerente. */}
+      {referrals.some((r) => r.status !== 'archived') && (
+        <div className="p-4 rounded-2xl border border-slate-200/70 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 shadow-sm">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500 mb-2 flex items-center gap-1.5">
+            <Clock size={12} /> Indicações aguardando aprovação da agência
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {referrals.filter((r) => r.status !== 'archived').map((r) => (
+              <span key={r.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700/60 text-[11px] font-bold text-slate-600 dark:text-neutral-300">
+                {humanizeName(r.name)}
+                <span className="font-medium text-slate-400 dark:text-neutral-500">· {r.email}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {subIds.length === 0 ? (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="p-16 text-center rounded-3xl border border-slate-200/70 dark:border-neutral-800 bg-white dark:bg-neutral-900/60">
@@ -501,6 +562,78 @@ export default function SpecialSubAffiliates() {
             </p>
           </div>
         </motion.div>
+      )}
+
+      {/* Modal de indicação — só coleta e envia pra fila da agência (/solicitacoes).
+          Quem cria o afiliado, convida e vincula à rede é o MASTER, na aprovação. */}
+      {referOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => !sendingReferral && setReferOpen(false)}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200 dark:border-neutral-800 shadow-2xl overflow-hidden"
+          >
+            <div className="p-6 border-b border-slate-100 dark:border-neutral-800 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <UserPlus size={16} className="text-accent-500" /> Indicar afiliado
+              </h3>
+              <button type="button" onClick={() => setReferOpen(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 transition-colors" aria-label="Fechar">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-[12px] text-slate-500 dark:text-neutral-400">
+                A agência confirma o cadastro: o indicado recebe o <b>convite de acesso</b> por e-mail e entra na <b>sua rede</b>.
+              </p>
+              {[
+                { key: 'name' as const, label: 'Nome *', type: 'text', placeholder: 'Nome do indicado' },
+                { key: 'email' as const, label: 'E-mail *', type: 'email', placeholder: 'email@exemplo.com — o convite vai para ele' },
+                { key: 'phone' as const, label: 'Telefone', type: 'tel', placeholder: '(11) 99999-9999 (opcional)' },
+              ].map((f) => (
+                <label key={f.key} className="block">
+                  <span className="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">{f.label}</span>
+                  <input
+                    type={f.type}
+                    value={referForm[f.key]}
+                    onChange={(e) => setReferForm((s) => ({ ...s, [f.key]: e.target.value }))}
+                    placeholder={f.placeholder}
+                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
+                  />
+                </label>
+              ))}
+              <label className="block">
+                <span className="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">Observação</span>
+                <textarea
+                  rows={2}
+                  value={referForm.note}
+                  onChange={(e) => setReferForm((s) => ({ ...s, note: e.target.value }))}
+                  placeholder="Contexto pra agência (opcional)"
+                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white resize-none"
+                />
+              </label>
+            </div>
+            <div className="flex gap-3 p-6 pt-0">
+              <button
+                type="button"
+                onClick={() => setReferOpen(false)}
+                disabled={sendingReferral}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-600 dark:text-neutral-300 hover:border-slate-300 dark:hover:border-neutral-600 transition-all disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={sendingReferral || !referForm.name.trim() || !referForm.email.trim()}
+                onClick={handleSendReferral}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-accent-500 text-accent-contrast text-xs font-bold hover:opacity-90 transition-all disabled:opacity-50"
+              >
+                {sendingReferral ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+                Enviar indicação
+              </button>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   );
