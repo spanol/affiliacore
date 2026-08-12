@@ -2881,6 +2881,8 @@ describe('vitrine AffiliaCore (/api/showcase)', () => {
       name: 'AffiliaCore', // sem VITE_BRAND_NAME no ambiente de teste, cai no default do produto
       description: 'Agencia com 80+ afiliados.',
       siteUrl: 'https://agencia.bet',
+      // logo REAL da instância no card da LP (sem VITE_BRAND_LOGO_* → mono do produto)
+      logoUrl: '/affiliacore/logo.svg',
     });
   });
 

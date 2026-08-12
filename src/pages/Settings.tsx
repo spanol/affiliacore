@@ -269,8 +269,8 @@ export default function Settings() {
             <p className="text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
               Esta chave declara que sua agência <strong>aceita cadastro espontâneo de afiliados</strong> (sem
               convite): a página de cadastro fica aberta e a agência aparece na seção de clientes do site da
-              AffiliaCore (affiliacore.com.br) — com o nome da instância, a apresentação abaixo e, se quiser,
-              o link do seu site. Afiliados que procuram uma agência chegam até você por lá e caem em{' '}
+              AffiliaCore (affiliacore.com.br) — com a sua logo, a apresentação abaixo e um link que por
+              padrão leva ao endereço da sua agência. Afiliados que procuram uma agência chegam até você por lá e caem em{' '}
               <Link to="/solicitacoes" className="font-bold underline decoration-dotted underline-offset-2">Solicitações</Link>,
               já marcados com a origem. Desligada, o cadastro volta a ser somente por convite e nada é exibido
               na vitrine. Você pode alternar quando quiser.
@@ -306,15 +306,19 @@ export default function Settings() {
 
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest ml-1 block">
-                  Site público (opcional)
+                  Link do card (opcional)
                 </label>
                 <input
                   type="url"
                   value={showcaseSiteUrl}
                   onChange={(e) => setShowcaseSiteUrl(e.target.value)}
-                  placeholder="https://suaagencia.com.br"
+                  placeholder="https://instagram.com/suaagencia ou https://wa.me/5511988887777"
                   className="w-full px-4 py-3 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all outline-none"
                 />
+                <p className="text-[10px] text-slate-400 dark:text-neutral-500 ml-1 leading-relaxed">
+                  Deixe vazio para o card levar ao endereço da sua agência. Preencha só se quiser direcionar
+                  o interessado a outro canal — Instagram, WhatsApp (wa.me) ou um site próprio.
+                </p>
               </div>
 
               {showcaseError && (

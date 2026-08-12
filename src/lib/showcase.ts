@@ -20,9 +20,20 @@ export interface ShowcaseConfig {
 
 // Payload público servido à LP. `enabled:false` é a ÚNICA coisa que sai quando a
 // agência não optou — nada do rascunho salvo vaza.
+// `logoUrl` é a logo REAL da instância na variante que lê bem em fundo escuro —
+// a LP a exibe numa plaqueta escura (a mesma do card estático), então uma
+// variante só serve os dois temas da LP. Caminho relativo (`/infinity/...`) é
+// resolvido pela LP contra a origem da instância.
 export type ShowcasePayload =
   | { enabled: false }
-  | { enabled: true; name: string; description: string; siteUrl: string; accent?: string };
+  | {
+      enabled: true;
+      name: string;
+      description: string;
+      siteUrl: string;
+      accent?: string;
+      logoUrl?: string;
+    };
 
 export const SHOWCASE_DESCRIPTION_MAX = 400;
 export const SHOWCASE_URL_MAX = 200;
@@ -66,6 +77,31 @@ function safeAccent(raw: unknown): string | undefined {
   return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : undefined;
 }
 
+// Logo pro payload: só https absoluta ou caminho com raiz (`/x`) — vira src de
+// <img> na LP, então esquema livre não passa. Vazio/inválido → sem logo (a LP
+// cai no avatar de inicial).
+function safeLogoUrl(raw: unknown): string | undefined {
+  const url = String(raw ?? '').trim().slice(0, SHOWCASE_URL_MAX);
+  if (/^https:\/\/./.test(url)) return url;
+  if (/^\/[^/\\]/.test(url)) return url;
+  return undefined;
+}
+
+// A mesma regra do <InstanceLogo/>: par claro/escuro COMPLETO → a variante do
+// tema escuro (a que lê em fundo escuro); par incompleto ou ausente → a mono
+// branca clássica (logoUrl). A plaqueta da LP é sempre escura, então uma
+// variante basta.
+export function resolveShowcaseLogo(brand: {
+  logoUrl?: unknown;
+  logoLightUrl?: unknown;
+  logoDarkUrl?: unknown;
+}): string | undefined {
+  if (brand.logoLightUrl && brand.logoDarkUrl) {
+    return safeLogoUrl(brand.logoDarkUrl) ?? safeLogoUrl(brand.logoUrl);
+  }
+  return safeLogoUrl(brand.logoUrl);
+}
+
 // O estado da vitrine É a declaração de auto-cadastro: ligada = a agência aceita
 // cadastro espontâneo de afiliado (sem convite) e por isso aparece na vitrine;
 // desligada = onboarding só por convite. O /register da instância consulta o
@@ -80,15 +116,17 @@ export function selfRegistrationOpen(payload: unknown): boolean {
 
 export function buildShowcasePayload(
   doc: Partial<ShowcaseConfig> | null | undefined,
-  brand: { name: string; accent?: unknown },
+  brand: { name: string; accent?: unknown; logoUrl?: unknown; logoLightUrl?: unknown; logoDarkUrl?: unknown },
 ): ShowcasePayload {
   if (doc?.enabled !== true) return { enabled: false };
   const accent = safeAccent(brand.accent);
+  const logoUrl = resolveShowcaseLogo(brand);
   return {
     enabled: true,
     name: String(brand.name ?? '').trim() || 'AffiliaCore',
     description: String(doc.description ?? '').trim().slice(0, SHOWCASE_DESCRIPTION_MAX),
     siteUrl: normalizeShowcaseUrl(doc.siteUrl) || '',
     ...(accent ? { accent } : {}),
+    ...(logoUrl ? { logoUrl } : {}),
   };
 }

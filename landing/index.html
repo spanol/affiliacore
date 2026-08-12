@@ -279,6 +279,7 @@ html.light .theme-toggle .ic-moon{display:block}
   background:#1C1014;border:1px solid var(--line);border-radius:12px;padding:17px 20px;
 }
 .proof-mark svg{height:20px;width:auto;display:block}
+.proof-mark img{height:20px;width:auto;max-width:160px;display:block;object-fit:contain}
 .proof-card > div{flex:1;min-width:240px}
 .proof-card > div b{display:block;font-family:var(--display);font-weight:800;font-size:1.02rem;margin-bottom:3px}
 .proof-card > div p{color:var(--muted);font-size:.92rem}
@@ -896,9 +897,30 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       // Conteúdo vem de fora → só textContent (nunca innerHTML), accent validado
       // antes de virar style e link só com https.
       var card = document.createElement('div'); card.className = 'proof-card';
-      var avatar = document.createElement('span'); avatar.className = 'proof-avatar';
-      avatar.textContent = String(d.name).charAt(0).toUpperCase();
-      if (/^#[0-9a-fA-F]{6}$/.test(String(d.accent || ''))) avatar.style.background = d.accent;
+      function makeAvatar() {
+        var avatar = document.createElement('span'); avatar.className = 'proof-avatar';
+        avatar.textContent = String(d.name).charAt(0).toUpperCase();
+        if (/^#[0-9a-fA-F]{6}$/.test(String(d.accent || ''))) avatar.style.background = d.accent;
+        return avatar;
+      }
+      // Logo real da instância (variante clara, servida pela própria instância)
+      // na mesma plaqueta escura do card estático — funciona nos dois temas da
+      // LP. Caminho relativo resolve contra a origem; sem logo (ou 404) o card
+      // cai no avatar de inicial.
+      var mark = makeAvatar();
+      var logo = String(d.logoUrl || '');
+      var logoSrc = '';
+      if (/^https:\/\/./.test(logo)) logoSrc = logo;
+      else if (/^\/[^/\\]/.test(logo)) logoSrc = origin + logo;
+      if (logoSrc) {
+        var plaque = document.createElement('span'); plaque.className = 'proof-mark';
+        var img = document.createElement('img');
+        img.alt = String(d.name).slice(0, 60); img.loading = 'lazy';
+        img.onerror = function () { var av = makeAvatar(); plaque.replaceWith(av); mark = av; };
+        img.src = logoSrc;
+        plaque.appendChild(img);
+        mark = plaque;
+      }
       var body = document.createElement('div');
       var name = document.createElement('b'); name.textContent = String(d.name).slice(0, 60);
       body.appendChild(name);
@@ -918,19 +940,22 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       reg.href = origin + '/register?src=vitrine-affiliacore';
       reg.textContent = 'Cadastrar como afiliado →';
       side.appendChild(reg);
+      // Link do card: por padrão é o endereço da PRÓPRIA agência (a origem que
+      // respondeu a vitrine — não há o que digitar). O siteUrl salvo no painel é
+      // um OVERRIDE opcional pra outro canal (Instagram, wa.me, site próprio).
       var site = String(d.siteUrl || '');
-      if (/^https:\/\//.test(site)) {
-        var a = document.createElement('a'); a.className = 'proof-link';
-        a.target = '_blank'; a.rel = 'noopener nofollow';
-        // src=vitrine-affiliacore → o app da agência carimba a origem em quem se
-        // auto-cadastrar vindo daqui ("a AffiliaCore te manda afiliados", medível).
-        try {
-          var u = new URL(site); u.searchParams.set('src', 'vitrine-affiliacore'); a.href = u.toString();
-        } catch (e) { a.href = site; }
-        a.textContent = site.replace(/^https:\/\//, '').replace(/\/$/, '').slice(0, 40);
-        side.appendChild(a);
-      }
-      card.appendChild(avatar); card.appendChild(body); card.appendChild(side);
+      var dest = /^https:\/\//.test(site) ? site : origin;
+      var a = document.createElement('a'); a.className = 'proof-link';
+      a.target = '_blank'; a.rel = 'noopener nofollow';
+      // src=vitrine-affiliacore → o app da agência carimba a origem em quem se
+      // auto-cadastrar vindo daqui ("a AffiliaCore te manda afiliados", medível).
+      try {
+        var u = new URL(dest); u.searchParams.set('src', 'vitrine-affiliacore'); a.href = u.toString();
+      } catch (e) { a.href = dest; }
+      // Exibição: host+caminho, sem esquema nem query (wa.me com ?text ficaria ilegível).
+      a.textContent = dest.replace(/^https:\/\//, '').split('?')[0].replace(/\/$/, '').slice(0, 40);
+      side.appendChild(a);
+      card.appendChild(mark); card.appendChild(body); card.appendChild(side);
       wrap.appendChild(card);
       wrap.hidden = false; note.hidden = false;
     }).catch(function () {});

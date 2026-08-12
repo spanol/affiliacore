@@ -1935,6 +1935,9 @@ export function createApp(deps: ServerDeps) {
         buildShowcasePayload(snap.exists ? (snap.data() as any) : null, {
           name: BRAND.name,
           accent: process.env.VITE_BRAND_ACCENT,
+          logoUrl: BRAND.logoUrl,
+          logoLightUrl: BRAND.logoLightUrl,
+          logoDarkUrl: BRAND.logoDarkUrl,
         }),
       );
     } catch (error: any) {

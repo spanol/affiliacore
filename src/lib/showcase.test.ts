@@ -3,6 +3,7 @@ import {
   sanitizeShowcase,
   buildShowcasePayload,
   normalizeShowcaseUrl,
+  resolveShowcaseLogo,
   selfRegistrationOpen,
   SHOWCASE_DESCRIPTION_MAX,
 } from './showcase';
@@ -86,6 +87,45 @@ describe('buildShowcasePayload', () => {
 
   it('marca sem nome cai no default do produto', () => {
     expect(buildShowcasePayload({ enabled: true }, { name: '' })).toMatchObject({ name: 'AffiliaCore' });
+  });
+
+  it('logo da instância entra no payload (regra do InstanceLogo: par completo → variante escura)', () => {
+    const p = buildShowcasePayload(
+      { enabled: true },
+      {
+        name: 'Infinity',
+        logoUrl: '/infinity/logo.svg',
+        logoLightUrl: '/infinity/logo-sidebar-dark.svg',
+        logoDarkUrl: '/infinity/logo-sidebar-white.svg',
+      },
+    );
+    expect(p).toMatchObject({ logoUrl: '/infinity/logo-sidebar-white.svg' });
+  });
+
+  it('sem logo utilizável o campo é omitido (LP cai no avatar de inicial)', () => {
+    expect(buildShowcasePayload({ enabled: true }, { name: 'X' })).not.toHaveProperty('logoUrl');
+  });
+});
+
+describe('resolveShowcaseLogo', () => {
+  it('par incompleto conta como "sem par" → mono clássica', () => {
+    expect(resolveShowcaseLogo({ logoUrl: '/x/logo.svg', logoDarkUrl: '/x/dark.svg' })).toBe('/x/logo.svg');
+    expect(resolveShowcaseLogo({ logoUrl: '/x/logo.svg', logoLightUrl: '/x/light.svg' })).toBe('/x/logo.svg');
+  });
+
+  it('aceita https absoluta e caminho com raiz; rejeita esquema livre (vira src de <img> na LP)', () => {
+    expect(resolveShowcaseLogo({ logoUrl: 'https://cdn.x.com/logo.svg' })).toBe('https://cdn.x.com/logo.svg');
+    expect(resolveShowcaseLogo({ logoUrl: '/affiliacore/logo.svg' })).toBe('/affiliacore/logo.svg');
+    expect(resolveShowcaseLogo({ logoUrl: 'javascript:alert(1)' })).toBeUndefined();
+    expect(resolveShowcaseLogo({ logoUrl: '//evil.com/logo.svg' })).toBeUndefined();
+    expect(resolveShowcaseLogo({ logoUrl: 'http://inseguro.com/logo.svg' })).toBeUndefined();
+    expect(resolveShowcaseLogo({})).toBeUndefined();
+  });
+
+  it('par completo com variante escura inválida cai na mono em vez de sumir', () => {
+    expect(
+      resolveShowcaseLogo({ logoUrl: '/x/logo.svg', logoLightUrl: '/x/l.svg', logoDarkUrl: 'data:image/svg+xml,x' }),
+    ).toBe('/x/logo.svg');
   });
 });
 
