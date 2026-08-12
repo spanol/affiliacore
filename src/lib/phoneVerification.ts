@@ -106,6 +106,12 @@ export interface PhoneChallenge {
 
 export type OtpFailureReason = 'not_found' | 'expired' | 'too_many_attempts' | 'wrong_code';
 
+/** Resultado de uma tentativa de código. `reason` só existe quando `ok: false`. */
+export interface OtpAttemptOutcome {
+  ok: boolean;
+  reason?: OtpFailureReason;
+}
+
 /**
  * Decide UMA tentativa de código. Ordem importa: tentativas esgotadas ganham de
  * "código certo" (senão brute-force até acertar ignorando o teto), e expiração
@@ -116,7 +122,7 @@ export function evaluateOtpAttempt(
   phoneE164: string,
   code: unknown,
   nowMs: number,
-): { ok: true } | { ok: false; reason: OtpFailureReason } {
+): OtpAttemptOutcome {
   if (!challenge || typeof challenge.codeHash !== 'string' || !challenge.codeHash) {
     return { ok: false, reason: 'not_found' };
   }
@@ -132,6 +138,13 @@ export function evaluateOtpAttempt(
   return { ok: true };
 }
 
+/** Resultado do gate de envio. `reason`/`retryInMs` só existem quando `ok: false`. */
+export interface SendOtpGate {
+  ok: boolean;
+  reason?: 'cooldown' | 'send_limit';
+  retryInMs?: number;
+}
+
 /**
  * Pode (re)enviar um SMS agora? Cooldown de 60s entre envios + teto de envios
  * por desafio. Desafio EXPIRADO libera (o contador zera no envio novo).
@@ -139,7 +152,7 @@ export function evaluateOtpAttempt(
 export function canSendOtp(
   challenge: PhoneChallenge | null | undefined,
   nowMs: number,
-): { ok: true } | { ok: false; reason: 'cooldown' | 'send_limit'; retryInMs: number } {
+): SendOtpGate {
   if (!challenge) return { ok: true };
   const lastSent = typeof challenge.lastSentAtMs === 'number' ? challenge.lastSentAtMs : 0;
   const expiresAt = typeof challenge.expiresAtMs === 'number' ? challenge.expiresAtMs : 0;
