@@ -19,8 +19,10 @@ import { hrDocId, sanitizeMetrics } from './src/lib/houseResultsDoc';
 import { makeBoostAffiliateId, normalizeEmailKey } from './src/lib/boostAffiliate';
 import { normalizeTag, buildTagIndex } from './src/lib/houseTagImport';
 import {
-  buildMediaReportUrl, adaptEsportivaRows, buildPullPayload, pullWindow, toApiDateTo, ESPORTIVA_API_BASE,
+  buildMediaReportUrl, adaptEsportivaRows, toApiDateTo, ESPORTIVA_API_BASE,
 } from './src/lib/esportivaPull';
+import { buildPullPayload, pullWindow } from './src/lib/housePull';
+import { buildStatisticsUrl, adaptLeonBetRows, LEONBET_API_BASE } from './src/lib/leonbetPull';
 import {
   INTEGRATION_CATALOG, findIntegrationSpec, integrationFromDoc, resolveConnectorSettings,
   sanitizeIntegrationPatch, toPublicIntegration, numericSetting,
@@ -4859,6 +4861,115 @@ export function createApp(deps: ServerDeps) {
   // Rota do CRON (o Cloud Scheduler já aponta pra cá) — e retrocompat do admin.
   app.post('/api/internal/esportiva-pull', allowCronOrAdmin, esportivaPullHandler);
 
+  // Pull da LEON Bet (R2D Partners) — mesma forma do pull da Esportiva acima,
+  // mas mais simples: a API já devolve `cpa_qualified` como CONTAGEM (sem
+  // régua/divisão) e o `end` do range é INCLUSIVO (sem o `+1` do toApiDateTo).
+  // Atraso observado é T+1 (ver leonbetPull.ts) — a janela usa mais dias de
+  // reprocessamento que a Esportiva por causa disso.
+  const leonbetPullHandler: express.RequestHandler = async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    const settings = await connectorSettings('leonbet-r2d');
+    if (!settings?.enabled) {
+      return res.status(503).json({ error: 'Integração desligada em Integrações.' });
+    }
+    const token = settings.apiKey;
+    if (!token) return res.status(503).json({ error: 'Pull não configurado (informe o token em Integrações).' });
+
+    const slug = settings.houseSlug;
+    const requestedSlug = String(req.body?.houseSlug ?? '').trim();
+    if (requestedSlug && requestedSlug !== slug) {
+      return res.status(400).json({ error: `A casa "${requestedSlug}" não tem integração direta de resultados.` });
+    }
+    try {
+      const houseSnap = await adminDb.collection('houses').doc(slug).get();
+      if (!houseSnap.exists) return res.status(404).json({ error: `Casa "${slug}" não encontrada.` });
+      const houseName = (houseSnap.data() as any)?.name ?? slug;
+
+      const days = Number(req.body?.days);
+      // 5 dias de folga: o T+1 confirmado no recon exige mais reprocessamento
+      // do que os 2 dias da Esportiva (que já cobrem a correção de D−1 dela).
+      const { dateFrom, dateTo } = pullWindow(resolveServerToday(), Number.isFinite(days) && days > 0 ? days : 5);
+      const merchant = numericSetting(settings.config, 'merchant', 1);
+      const url = buildStatisticsUrl(dateFrom, dateTo, token, merchant, LEONBET_API_BASE);
+      const response = await fetchImpl(url, { headers: { accept: 'application/json' } });
+      const text = await response.text();
+      let body: any = null;
+      try { body = JSON.parse(text); } catch { body = null; }
+      if (!Array.isArray(body)) {
+        const msg = body && typeof body === 'object' && body.status ? String(body.status) : 'Resposta inesperada da API da casa.';
+        throw new Error(msg);
+      }
+
+      const { rows: pullRows, skipped } = adaptLeonBetRows(body);
+
+      // Tag -> afiliado pelo MESMO índice do import manual (links + apelidos):
+      // uma fonte só, senão a atribuição diverge entre o upload e o cron.
+      const [linksSnap, aliasSnap] = await Promise.all([
+        adminDb.collection('affiliate_links').get(),
+        adminDb.collection('affiliate_tag_aliases').get(),
+      ]);
+      const tagIndex = buildTagIndex(
+        linksSnap.docs.map((d) => d.data() as any),
+        aliasSnap.docs.map((d) => ({ ...(d.data() as any), tag: (d.data() as any)?.tag ?? d.id })),
+      );
+      const payload = buildPullPayload(pullRows, tagIndex as any);
+
+      if (payload.rows.length === 0) {
+        await houseSnap.ref.set({
+          lastResultsCheckAt: admin.firestore.FieldValue.serverTimestamp(),
+          integration: 'leonbet-r2d',
+        }, { merge: true });
+        return res.json({ ok: true, house: slug, dateFrom, dateTo, imported: 0, attributed: 0, pending: [], note: 'A casa não devolveu linhas nessa janela.' });
+      }
+
+      // Mesma semântica do upload: as datas da janela são REESCRITAS, então
+      // reprocessar o dia (o que a rodada faz o tempo todo) nunca duplica.
+      const dates = new Set(payload.dates);
+      const existing = await adminDb.collection('house_results').where('houseSlug', '==', slug).get();
+      const toDelete = existing.docs.filter((d) => dates.has((d.data() as any)?.date));
+
+      const importedAt = admin.firestore.FieldValue.serverTimestamp();
+      const ops: ((b: admin.firestore.WriteBatch) => void)[] = [];
+      toDelete.forEach((d) => ops.push((b) => b.delete(d.ref)));
+      payload.rows.forEach((row) => {
+        const ref = adminDb!.collection('house_results').doc(hrDocId(slug, row.date, row.affiliateId));
+        ops.push((b) => b.set(ref, {
+          houseSlug: slug, date: row.date, affiliateId: row.affiliateId, ...sanitizeMetrics(row),
+          importedByUid: (req as any).user?.uid ?? null, importedAt, source: 'api',
+        }));
+      });
+
+      ops.push((b) => b.set(houseSnap.ref, {
+        lastResultsSyncAt: importedAt,
+        lastResultsCheckAt: importedAt,
+        lastResultsSyncSource: 'api',
+        lastResultsDate: payload.dates[payload.dates.length - 1] ?? null,
+        integration: 'leonbet-r2d',
+      }, { merge: true }));
+
+      ops.push((b) => appendAuditLog(b, req, {
+        entityType: 'house_results', entityId: slug, entityLabel: houseName, action: 'house_results.pull',
+        metadata: {
+          dateFrom, dateTo, imported: payload.rows.length, deleted: toDelete.length,
+          attributed: payload.attributed, pendingTags: payload.pending.map((p) => p.tag),
+          skipped, via: req.headers['x-cron-secret'] ? 'cron' : 'admin',
+        },
+      }));
+
+      await commitChunked(ops);
+
+      return res.json({
+        ok: true, house: slug, dateFrom, dateTo,
+        imported: payload.rows.length, deleted: toDelete.length,
+        attributed: payload.attributed, pending: payload.pending, skipped,
+      });
+    } catch (e: any) {
+      console.error('[leonbet-pull] falhou:', e);
+      return res.status(502).json({ error: e?.message || 'Falha ao puxar o relatório da casa.' });
+    }
+  };
+  app.post('/api/internal/leonbet-pull', allowCronOrAdmin, leonbetPullHandler);
+
   // Registro de CONECTORES de pull POR CASA. A casa declara o seu na flag
   // `integration` do doc dela (auto-carimbada pelo conector a cada rodada) —
   // Esportiva é uma CASA, não um gateway: integração nova (ex.: MyAffiliates)
@@ -4869,6 +4980,10 @@ export function createApp(deps: ServerDeps) {
     'esportiva-tap': {
       configured: async () => !!(await connectorSettings('esportiva-tap'))?.configured,
       handler: esportivaPullHandler,
+    },
+    'leonbet-r2d': {
+      configured: async () => !!(await connectorSettings('leonbet-r2d'))?.configured,
+      handler: leonbetPullHandler,
     },
   };
 

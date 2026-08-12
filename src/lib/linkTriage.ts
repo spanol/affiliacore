@@ -206,8 +206,9 @@ export interface StandbyParseResult {
 }
 
 // Parâmetros de tag usados pelas plataformas de afiliação que aparecem no
-// legado e nas casas BR (Income Access `afp/afp2`, Affilka `btag`, `subid`).
-export const TAG_PARAMS = ['tag', 'afp', 'afp2', 'btag', 'subid', 'sub_id', 'clickid'];
+// legado e nas casas BR (Income Access `afp/afp2`, Affilka `btag`, `subid`,
+// Quintessence/R2D Partners — LEON Bet — `anid`).
+export const TAG_PARAMS = ['tag', 'afp', 'afp2', 'btag', 'subid', 'sub_id', 'clickid', 'anid'];
 
 export function extractTagFromUrl(rawUrl: string): string {
   try {

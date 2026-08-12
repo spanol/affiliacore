@@ -21,6 +21,12 @@ describe('catálogo', () => {
     expect(findIntegrationSpec(null)).toBeNull();
     expect(INTEGRATION_CATALOG.length).toBeGreaterThan(0);
   });
+
+  it('LEON Bet (leonbet-r2d) está no catálogo, sem cpaBase — a API já manda CPA como contagem', () => {
+    const leon = findIntegrationSpec('leonbet-r2d');
+    expect(leon?.scope).toBe('house');
+    expect(leon?.fields.map((f) => f.key)).toEqual(['merchant']);
+  });
 });
 
 describe('maskSecret · a chave nunca sai em claro', () => {

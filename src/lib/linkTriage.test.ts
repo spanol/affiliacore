@@ -174,6 +174,7 @@ describe('extractTagFromUrl', () => {
     ['tag', 'https://casa.bet/r?tag=NakataAgency101', 'NakataAgency101'],
     ['btag (Affilka)', 'https://casa.bet/r?btag=aff42', 'aff42'],
     ['subid', 'https://casa.bet/r?subid=xyz', 'xyz'],
+    ['anid (Quintessence/R2D — LEON Bet)', 'https://9behi4y9oh.com/?serial=61260&creative_id=311&anid=cgverify0811', 'cgverify0811'],
   ])('extrai de %s', (_label, url, expected) => {
     expect(extractTagFromUrl(url)).toBe(expected);
   });

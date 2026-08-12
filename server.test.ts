@@ -3433,6 +3433,151 @@ describe('pull da Esportiva (/api/internal/esportiva-pull)', () => {
 });
 
 // =============================================================================
+// Pull automatico da LEON Bet (R2D Partners / Quintessence)
+// Recon + vinculo tag->afiliado confirmado ao vivo 11-12/08/2026 (ver memoria
+// de sessao). Diferenca central p/ a Esportiva: cpa_qualified ja vem CONTAGEM
+// (sem regua) e a API devolve um array NU (sem envelope `{data:[...]}`).
+// =============================================================================
+describe('pull da LEON Bet (/api/internal/leonbet-pull)', () => {
+  const seed = {
+    users: { 'admin-uid': { role: 'admin' }, 'client-uid': { role: 'client', affiliateId: 'AFF-1' } },
+    houses: { 'leon-bet': { slug: 'leon-bet', name: 'LEON Bet', dataSource: 'manual' } },
+    affiliate_links: {
+      L1: {
+        code: 'L1', affiliateId: 'AFF-1', brandId: 'leon-bet', tag: 'cgverify0811',
+        registerUrl: 'https://9behi4y9oh.com/?serial=61260&creative_id=311&anid=cgverify0811', active: true,
+      },
+    },
+  };
+
+  // Uma tag nossa (cadastro sem deposito ainda), uma orfa com dinheiro de verdade,
+  // e uma linha sem tag no formato LITERAL que a API usa ("< empty >").
+  const apiFetch = (rows?: any[]) => async () => ({
+    ok: true, status: 200,
+    text: async () => JSON.stringify(rows ?? [
+      { transaction_date: '2026-08-12T00:00:00.000Z', anid1: 'cgverify0811', registration_count: 1, first_deposit_count: 0, cpa_qualified: 0, revenue_share_profit: 0, deposits: 0, profit: 0 },
+      { transaction_date: '2026-08-12T00:00:00.000Z', anid1: 'orfa02', registration_count: 1, first_deposit_count: 1, cpa_qualified: 1, revenue_share_profit: 3.42, deposits: 12.83, profit: 20.42 },
+      { transaction_date: '2026-08-12T00:00:00.000Z', an_id: '< empty >', anid1: '< empty >', registration_count: 0, first_deposit_count: 0, cpa_qualified: 0, revenue_share_profit: 2.78, deposits: 10.38, profit: 2.78 },
+    ]),
+  }) as any;
+
+  const withKey = (fn: () => Promise<void>) => async () => {
+    process.env.LEONBET_API_TOKEN = 'token-de-teste';
+    try { await fn(); } finally { delete process.env.LEONBET_API_TOKEN; }
+  };
+
+  it('sem token configurado -> 503 (feature off por instancia)', async () => {
+    delete process.env.LEONBET_API_TOKEN;
+    await request(buildApp({ seed })).post('/api/internal/leonbet-pull').set('Authorization', 'Bearer admin-uid').expect(503);
+  });
+
+  it('afiliado nao dispara o pull (403)', withKey(async () => {
+    await request(buildApp({ seed, fetchImpl: apiFetch() }))
+      .post('/api/internal/leonbet-pull').set('Authorization', 'Bearer client-uid').expect(403);
+  }));
+
+  it('houseSlug de casa SEM integracao direta -> 400 e nada e gravado', withKey(async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch() });
+    const res = await request(app)
+      .post('/api/internal/leonbet-pull').set('Authorization', 'Bearer admin-uid').send({ houseSlug: 'stake' }).expect(400);
+    expect(res.body.error).toMatch(/integra/);
+    expect(db.__store.get('house_results')?.size ?? 0).toBe(0);
+  }));
+
+  it('grava agregado do dia + linha do afiliado; tag orfa COM dinheiro fica pendente; "< empty >" NAO vira tag fantasma', withKey(async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch() });
+    const res = await request(app).post('/api/internal/leonbet-pull').set('Authorization', 'Bearer admin-uid').expect(200);
+
+    expect(res.body).toMatchObject({ ok: true, house: 'leon-bet', attributed: 1 });
+    expect(res.body.pending.map((p: any) => p.tag)).toEqual(['orfa02']);
+
+    const rows = [...(db.__store.get('house_results')?.values() ?? [])];
+    const agg = rows.find((r: any) => r.affiliateId === null);
+    const mine = rows.find((r: any) => r.affiliateId === 'AFF-1');
+    expect(agg.total_commission).toBeCloseTo(23.2, 2); // 0 + 20.42 + 2.78
+    expect(agg.registrations).toBe(2); // 1 (nossa) + 1 (orfa) + 0
+    // cadastro tagueado nosso, AINDA sem deposito — precisa entrar mesmo a R$0
+    expect(mine).toMatchObject({ registrations: 1, deposit: 0, total_commission: 0 });
+  }));
+
+  it('janela VAZIA: 200 com note, carimba checagem + flag, mas NAO mexe no frescor do dado', withKey(async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch([]) });
+    const res = await request(app).post('/api/internal/leonbet-pull').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(res.body).toMatchObject({ ok: true, imported: 0 });
+    const house = db.__store.get('houses')?.get('leon-bet');
+    expect(house.integration).toBe('leonbet-r2d'); // flag chega mesmo sem dado
+    expect(house.lastResultsCheckAt).toBeTruthy();
+    expect(house.lastResultsSyncAt).toBeUndefined();
+  }));
+
+  it('carimba o frescor + a flag integration na casa', withKey(async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch() });
+    await request(app).post('/api/internal/leonbet-pull').set('Authorization', 'Bearer admin-uid').expect(200);
+    const house = db.__store.get('houses')?.get('leon-bet');
+    expect(house.integration).toBe('leonbet-r2d');
+    expect(house.lastResultsSyncSource).toBe('api');
+    expect(house.lastResultsDate).toBe('2026-08-12');
+  }));
+
+  it('rodar de novo REESCREVE o dia em vez de duplicar', withKey(async () => {
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch() });
+    await request(app).post('/api/internal/leonbet-pull').set('Authorization', 'Bearer admin-uid').expect(200);
+    const first = [...(db.__store.get('house_results')?.values() ?? [])].length;
+    await request(app).post('/api/internal/leonbet-pull').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect([...(db.__store.get('house_results')?.values() ?? [])].length).toBe(first);
+  }));
+
+  it('pull POR CASA (/api/houses/:slug/pull) despacha pela flag da casa', withKey(async () => {
+    const flagged = {
+      ...seed,
+      houses: {
+        'leon-bet': { ...seed.houses['leon-bet'], integration: 'leonbet-r2d' },
+        stake: { slug: 'stake', name: 'Stake', dataSource: 'manual' },
+      },
+    };
+    const db = makeFirestore(flagged);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch() });
+    const bad = await request(app).post('/api/houses/stake/pull').set('Authorization', 'Bearer admin-uid').expect(400);
+    expect(bad.body.error).toMatch(/integra/);
+    const ok = await request(app).post('/api/houses/leon-bet/pull').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(ok.body).toMatchObject({ ok: true, house: 'leon-bet' });
+  }));
+
+  it('doc integrations DESLIGADO barra o pull mesmo com token no env (sem redeploy)', withKey(async () => {
+    const db = makeFirestore({ ...seed, integrations: { 'leonbet-r2d': { id: 'leonbet-r2d', enabled: false, apiKey: 'k' } } });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: apiFetch() });
+    const res = await request(app).post('/api/internal/leonbet-pull').set('Authorization', 'Bearer admin-uid').expect(503);
+    expect(res.body.error).toMatch(/deslig/i);
+  }));
+
+  it('usa o merchant configurado na tela na URL da API (nao fica fixo em 1)', withKey(async () => {
+    let calledUrl = '';
+    const fetchImpl = (async (url: string) => {
+      calledUrl = url;
+      return { ok: true, status: 200, text: async () => JSON.stringify([]) };
+    }) as any;
+    const db = makeFirestore({
+      ...seed,
+      integrations: { 'leonbet-r2d': { id: 'leonbet-r2d', enabled: true, apiKey: 'tok', houseId: 'leon-bet', config: { merchant: '3' } } },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl });
+    await request(app).post('/api/internal/leonbet-pull').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(calledUrl).toContain('merchant=3');
+  }));
+
+  it('erro da API (ex.: range invalido) vira 502 com a mensagem dela', withKey(async () => {
+    const fetchImpl = (async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ status: 'Invalid date range' }) })) as any;
+    const res = await request(buildApp({ seed, fetchImpl })).post('/api/internal/leonbet-pull').set('Authorization', 'Bearer admin-uid').expect(502);
+    expect(res.body.error).toMatch(/Invalid date range/);
+  }));
+});
+
+// =============================================================================
 // B7 · Integracoes (/api/integrations) — a chave da casa e' CREDENCIAL: nunca
 // volta ao browser em claro, e a colecao e' server-only (rule `if false`).
 // =============================================================================
