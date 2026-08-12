@@ -1994,13 +1994,23 @@ export interface InviteProfile {
   phone?: string;
   socialMedia?: string;
   cpf?: string;
+  /** Token de uso único da verificação de telefone por SMS (quando a instância exige). */
+  phoneVerificationToken?: string;
 }
 
 export async function acceptInvite(token: string, email: string, password: string, profile?: InviteProfile): Promise<{ uid: string; affiliateId: string }> {
   const response = await fetch('/api/accept-invite', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-    body: JSON.stringify({ token, email, password, phone: profile?.phone, socialMedia: profile?.socialMedia, cpf: profile?.cpf })
+    body: JSON.stringify({
+      token,
+      email,
+      password,
+      phone: profile?.phone,
+      socialMedia: profile?.socialMedia,
+      cpf: profile?.cpf,
+      phoneVerificationToken: profile?.phoneVerificationToken,
+    })
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
