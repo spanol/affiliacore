@@ -4,11 +4,12 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { fetchInvite, acceptInvite } from '../services/affiliateService';
-import { UserPlus, Mail, Lock, AlertCircle, CheckCircle, Loader2, Share2, Phone, IdCard } from 'lucide-react';
+import { UserPlus, Mail, Lock, AlertCircle, CheckCircle, Loader2, Share2, IdCard } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
-import { maskCPF, maskPhone, isValidCPF, isValidPhone } from '../lib/validators';
+import { maskCPF, isValidCPF, isValidPhone } from '../lib/validators';
 import InstanceLogo from '../components/InstanceLogo';
+import PhoneVerificationField, { mergePhoneVerificationState, type PhoneVerificationState } from '../components/PhoneVerificationField';
 
 
 export default function InviteAccept() {
@@ -23,6 +24,17 @@ export default function InviteAccept() {
   const [email, setEmail] = useState('');
   const [socialMedia, setSocialMedia] = useState('');
   const [phone, setPhone] = useState('');
+  // Verificação de telefone por SMS (por instância; o servidor exige o token no
+  // aceite quando ligada — aqui é o gate de UX + o transporte do token).
+  const [phoneVerification, setPhoneVerification] = useState<PhoneVerificationState>({
+    required: false,
+    verified: false,
+    token: null,
+  });
+  // Bailout estrutural: sem ele, todo mount do campo re-renderiza a página à toa.
+  const handlePhoneVerificationChange = React.useCallback((next: PhoneVerificationState) => {
+    setPhoneVerification((prev) => mergePhoneVerificationState(prev, next));
+  }, []);
   const [cpf, setCpf] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -64,6 +76,10 @@ export default function InviteAccept() {
       setError('Telefone inválido. Use o formato (00) 00000-0000.');
       return;
     }
+    if (phoneVerification.required && !phoneVerification.verified) {
+      setError('Confirme seu telefone pelo código enviado por SMS antes de continuar.');
+      return;
+    }
     if (!isValidCPF(cpf)) {
       setError('CPF inválido. Verifique os números digitados.');
       return;
@@ -76,6 +92,7 @@ export default function InviteAccept() {
         phone: trimmedPhone,
         socialMedia: socialMedia.trim(),
         cpf: cpf.trim(),
+        phoneVerificationToken: phoneVerification.token ?? undefined,
       });
       setSuccess(true);
       // Sign the affiliate in so AuthContext loads the profile and redirects.
@@ -176,21 +193,13 @@ export default function InviteAccept() {
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest ml-1">Telefone (WhatsApp)</label>
-          <div className="relative">
-            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500" size={16} />
-            <input
-              type="tel"
-              inputMode="numeric"
-              value={phone}
-              onChange={(e) => setPhone(maskPhone(e.target.value))}
-              required
-              className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-auth-cta/20 focus:border-auth-cta transition-all outline-none"
-              placeholder="(11) 99999-9999"
-            />
-          </div>
-        </div>
+        <PhoneVerificationField
+          value={phone}
+          onChange={setPhone}
+          onVerificationChange={handlePhoneVerificationChange}
+          label="Telefone (WhatsApp)"
+          placeholder="(11) 99999-9999"
+        />
 
         <div className="space-y-1.5">
           <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest ml-1">Rede Social <span className="text-slate-300 dark:text-neutral-600 normal-case font-medium">(opcional)</span></label>

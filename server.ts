@@ -69,6 +69,29 @@ import {
   mfaSatisfied,
   MFA_REQUIRED_CODE,
 } from './src/lib/mfaSession';
+import {
+  normalizeBrPhone,
+  phoneDocId,
+  maskPhoneForLog,
+  generateOtpCode,
+  generateVerificationToken,
+  hashVerificationToken,
+  evaluateOtpAttempt,
+  canSendOtp,
+  buildChallenge,
+  verificationTokenValid,
+  OTP_RESEND_COOLDOWN_MS,
+  OTP_TTL_MS,
+  VERIFICATION_TOKEN_TTL_MS,
+  type PhoneChallenge,
+} from './src/lib/phoneVerification';
+import {
+  resolvePhoneVerificationSetup,
+  buildSmsProvider,
+  buildOtpSmsBody,
+  type SmsProvider,
+  type PhoneVerificationSetup,
+} from './src/lib/smsProvider';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -112,6 +135,12 @@ export interface ServerDeps {
   adminApp: admin.app.App | null;
   adminDb: admin.firestore.Firestore | null;
   fetchImpl?: typeof fetch;
+  /**
+   * Override do provedor de SMS (verificação de telefone). Produção deixa vazio
+   * (resolvido por env via resolvePhoneVerificationSetup); os testes injetam um
+   * provedor que captura o corpo do SMS em vez de enviar.
+   */
+  smsProvider?: SmsProvider;
 }
 
 // Monta o app Express (middlewares + rotas) SEM ouvir porta nem montar Vite/estático —
@@ -667,6 +696,196 @@ export function createApp(deps: ServerDeps) {
     } catch (error) {
       console.error('Erro ao desativar o 2FA:', error);
       res.status(500).json({ error: 'Erro ao desativar o 2FA.' });
+    }
+  });
+
+  // --- Validação de telefone por SMS (OTP) — item 7 da call Infinity ---------
+  // Núcleo puro em src/lib/phoneVerification (código de 6 dígitos hasheado —
+  // nunca em claro —, expiração de 10 min, teto de tentativas); provedor
+  // plugável em src/lib/smsProvider. FAIL-SAFE: sem env configurada a feature
+  // fica OFF e os cadastros seguem exatamente como antes. Estado do desafio em
+  // `phone_verifications/{telefone}` — server-only (rule `read, write: if false`,
+  // coleção NOVA: nasce fechada, sem acoplamento de ordem de deploy).
+  //
+  // Fluxo: send-code (público) → verify-code (público, devolve um token de uso
+  // único) → o token entra no accept-invite (server cria o user já verificado)
+  // ou no /api/phone/attach (auto-cadastro: o user já existe; o servidor carimba
+  // phone + phoneVerified no users/{uid} — campos SERVER-ONLY nas rules, o
+  // cliente não pode se auto-marcar verificado).
+  const phoneSetup = (): PhoneVerificationSetup =>
+    resolvePhoneVerificationSetup(process.env as Record<string, string | undefined>);
+  const smsProviderFor = (setup: PhoneVerificationSetup): SmsProvider | null =>
+    deps.smsProvider ?? buildSmsProvider(setup, fetchImpl);
+  const phoneChallengeRef = (e164: string) => adminDb!.collection('phone_verifications').doc(phoneDocId(e164));
+  const readPhoneChallenge = async (e164: string): Promise<PhoneChallenge | null> => {
+    const snap = await phoneChallengeRef(e164).get();
+    return snap.exists ? ((snap.data() as PhoneChallenge) ?? null) : null;
+  };
+
+  // SMS custa dinheiro e OTP é alvo clássico de abuso (SMS pumping/brute force):
+  // limite POR IP e POR TELEFONE (keyGenerator no corpo), além do cooldown e do
+  // teto de envios POR DESAFIO persistidos no doc (valem entre instâncias/restarts).
+  const phoneSendIpLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Muitos envios de código. Tente novamente em alguns minutos.' },
+  });
+  const phoneSendPhoneLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 6,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => normalizeBrPhone((req.body as any)?.phone) ?? ipKeyGenerator(String(req.ip || '')),
+    message: { error: 'Muitos envios de código para este telefone. Tente novamente mais tarde.' },
+  });
+  const phoneVerifyLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => normalizeBrPhone((req.body as any)?.phone) ?? ipKeyGenerator(String(req.ip || '')),
+    message: { error: 'Muitas tentativas de código. Aguarde alguns minutos.' },
+  });
+
+  // Público: a UI dos cadastros pergunta se a verificação está ligada nesta
+  // instância. O client trata erro de rede como DESLIGADA (fail-open: a falta
+  // do provedor nunca pode trancar o cadastro).
+  app.get('/api/phone/status', (_req, res) => {
+    res.json({ enabled: phoneSetup().enabled });
+  });
+
+  // Público (o afiliado ainda não tem conta no auto-cadastro/convite).
+  app.post('/api/phone/send-code', phoneSendIpLimiter, phoneSendPhoneLimiter, async (req, res) => {
+    const setup = phoneSetup();
+    if (!setup.enabled) {
+      return res.status(503).json({ error: 'Verificação por SMS não está habilitada nesta instância.', code: 'PHONE_VERIFICATION_DISABLED' });
+    }
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const phone = normalizeBrPhone(req.body?.phone);
+      if (!phone) {
+        return res.status(400).json({ error: 'Telefone inválido. Informe um celular brasileiro com DDD.', code: 'PHONE_INVALID' });
+      }
+      const previous = await readPhoneChallenge(phone);
+      const gate = canSendOtp(previous, Date.now());
+      if (!gate.ok) {
+        return res.status(429).json({
+          error: gate.reason === 'cooldown'
+            ? 'Aguarde um instante para reenviar o código.'
+            : 'Limite de envios atingido para este telefone. Tente novamente mais tarde.',
+          code: gate.reason === 'cooldown' ? 'OTP_COOLDOWN' : 'OTP_SEND_LIMIT',
+          retryInMs: gate.retryInMs,
+        });
+      }
+      const provider = smsProviderFor(setup);
+      if (!provider) return res.status(503).json({ error: 'Provedor de SMS indisponível.', code: 'SMS_PROVIDER_UNAVAILABLE' });
+      const code = generateOtpCode();
+      // Envia ANTES de persistir: se o SMS falhar, o desafio anterior fica
+      // intacto (não queima cooldown/teto com um código que nunca chegou).
+      try {
+        await provider.send(phone, buildOtpSmsBody(code, BRAND.shortName));
+      } catch (sendError) {
+        console.error('[phone] falha no envio do SMS:', sendError);
+        return res.status(502).json({ error: 'Não foi possível enviar o SMS agora. Tente novamente.', code: 'SMS_SEND_FAILED' });
+      }
+      await phoneChallengeRef(phone).set({
+        ...buildChallenge(previous, phone, code, Date.now()),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      // O código NUNCA volta na resposta. `dev` avisa a UI que o provedor é o
+      // console (demo/emuladores) — o código está no log do SERVIDOR.
+      return res.json({ sent: true, cooldownMs: OTP_RESEND_COOLDOWN_MS, expiresInMs: OTP_TTL_MS, dev: provider.id === 'console' });
+    } catch (error) {
+      console.error('[phone] erro ao enviar código:', error);
+      return res.status(500).json({ error: 'Erro ao enviar o código de verificação.' });
+    }
+  });
+
+  // Público. Sucesso devolve um token de USO ÚNICO que prova a verificação —
+  // é ele (nunca o "verified" do client) que o accept-invite/attach exigem.
+  app.post('/api/phone/verify-code', phoneVerifyLimiter, async (req, res) => {
+    const setup = phoneSetup();
+    if (!setup.enabled) {
+      return res.status(503).json({ error: 'Verificação por SMS não está habilitada nesta instância.', code: 'PHONE_VERIFICATION_DISABLED' });
+    }
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const phone = normalizeBrPhone(req.body?.phone);
+      if (!phone) {
+        return res.status(400).json({ error: 'Telefone inválido. Informe um celular brasileiro com DDD.', code: 'PHONE_INVALID' });
+      }
+      const challenge = await readPhoneChallenge(phone);
+      const outcome = evaluateOtpAttempt(challenge, phone, req.body?.code, Date.now());
+      if (!outcome.ok) {
+        if (outcome.reason === 'wrong_code') {
+          // Conta a tentativa — 5 erradas travam o desafio (peça código novo).
+          await phoneChallengeRef(phone).set({ attempts: (challenge?.attempts ?? 0) + 1 }, { merge: true });
+          return res.status(400).json({ error: 'Código inválido. Confira o SMS e tente novamente.', code: 'OTP_INVALID' });
+        }
+        if (outcome.reason === 'expired') {
+          return res.status(410).json({ error: 'Código expirado. Peça um novo código.', code: 'OTP_EXPIRED' });
+        }
+        if (outcome.reason === 'too_many_attempts') {
+          return res.status(429).json({ error: 'Muitas tentativas. Peça um novo código.', code: 'OTP_TOO_MANY_ATTEMPTS' });
+        }
+        // not_found — mesma mensagem do código errado (não revela se o número tem desafio).
+        return res.status(400).json({ error: 'Código inválido. Peça um novo código.', code: 'OTP_INVALID' });
+      }
+      const token = generateVerificationToken();
+      await phoneChallengeRef(phone).set({
+        verified: true,
+        verifiedAtMs: Date.now(),
+        tokenHash: hashVerificationToken(token),
+        codeHash: null, // o código aceito não vale de novo (anti-replay)
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      return res.json({ verified: true, verificationToken: token, tokenTtlMs: VERIFICATION_TOKEN_TTL_MS });
+    } catch (error) {
+      console.error('[phone] erro ao verificar código:', error);
+      return res.status(500).json({ error: 'Erro ao verificar o código.' });
+    }
+  });
+
+  // Autenticado: carimba o telefone VERIFICADO no próprio users/{uid} (fluxo do
+  // auto-cadastro, onde a conta é criada pelo client SDK antes da verificação
+  // "pertencer" a alguém). `phone`+`phoneVerified` são server-only nas rules —
+  // esta rota é o ÚNICO caminho de escrita p/ um usuário verificado.
+  app.post('/api/phone/attach', requireAuth, async (req, res) => {
+    const setup = phoneSetup();
+    if (!setup.enabled) {
+      return res.status(503).json({ error: 'Verificação por SMS não está habilitada nesta instância.', code: 'PHONE_VERIFICATION_DISABLED' });
+    }
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const phone = normalizeBrPhone(req.body?.phone);
+      if (!phone) {
+        return res.status(400).json({ error: 'Telefone inválido. Informe um celular brasileiro com DDD.', code: 'PHONE_INVALID' });
+      }
+      const challenge = await readPhoneChallenge(phone);
+      if (!verificationTokenValid(challenge, req.body?.verificationToken, Date.now())) {
+        return res.status(400).json({ error: 'Verificação de telefone inválida ou expirada. Confirme o número novamente.', code: 'PHONE_TOKEN_INVALID' });
+      }
+      const { uid } = (req as any).user;
+      await adminDb.collection('users').doc(uid).set({
+        phone,
+        phoneVerified: true,
+        phoneVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      // Uso único: o mesmo token não carimba duas contas.
+      await phoneChallengeRef(phone).set({ consumedAtMs: Date.now(), consumedByUid: uid }, { merge: true });
+      await writeAuditLog(req, {
+        entityType: 'user',
+        entityId: uid,
+        action: 'user.phone_verified',
+        metadata: { phone: maskPhoneForLog(phone) },
+      });
+      return res.json({ verified: true });
+    } catch (error) {
+      console.error('[phone] erro ao vincular telefone verificado:', error);
+      return res.status(500).json({ error: 'Erro ao registrar a verificação do telefone.' });
     }
   });
 
@@ -3137,6 +3356,23 @@ export function createApp(deps: ServerDeps) {
       const normalizedSocialMedia = String(socialMedia ?? '').trim();
       const normalizedCpf = String(cpf ?? '').trim();
 
+      // Verificação de telefone por SMS (quando LIGADA na instância): o aceite
+      // só conclui com um token de verificação válido pro telefone informado —
+      // o servidor grava o E.164 verificado + phoneVerified (server-only).
+      // Feature OFF → segue exatamente como antes (fail-safe).
+      const phoneVerification = phoneSetup();
+      let verifiedPhone: string | null = null;
+      if (phoneVerification.enabled) {
+        verifiedPhone = normalizeBrPhone(normalizedPhone);
+        if (!verifiedPhone) {
+          return res.status(400).json({ error: 'Telefone inválido. Informe um celular brasileiro com DDD.', code: 'PHONE_INVALID' });
+        }
+        const challenge = await readPhoneChallenge(verifiedPhone);
+        if (!verificationTokenValid(challenge, req.body?.phoneVerificationToken, Date.now())) {
+          return res.status(400).json({ error: 'Confirme seu telefone pelo código SMS antes de concluir o cadastro.', code: 'PHONE_NOT_VERIFIED' });
+        }
+      }
+
       const inviteRef = adminDb.collection('invites').doc(String(token));
       const inviteSnap = await inviteRef.get();
       if (!inviteSnap.exists) {
@@ -3180,7 +3416,10 @@ export function createApp(deps: ServerDeps) {
         role: 'client',
         affiliateId: affId,
         isSpecial,
-        phone: normalizedPhone,
+        phone: verifiedPhone ?? normalizedPhone,
+        ...(verifiedPhone
+          ? { phoneVerified: true, phoneVerifiedAt: admin.firestore.FieldValue.serverTimestamp() }
+          : {}),
         socialMedia: normalizedSocialMedia,
         cpf: normalizedCpf,
         mustChangePassword: false,
@@ -3194,6 +3433,14 @@ export function createApp(deps: ServerDeps) {
         usedByUid: userRecord.uid,
         usedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
+
+      // Consome o desafio de telefone (uso único) — best-effort: a conta já foi
+      // criada, falha aqui não pode derrubar o cadastro.
+      if (verifiedPhone) {
+        await phoneChallengeRef(verifiedPhone)
+          .set({ consumedAtMs: Date.now(), consumedByUid: userRecord.uid }, { merge: true })
+          .catch(() => {});
+      }
 
       // Rota PÚBLICA (sem requireAuth): o autor é o próprio afiliado que se cadastrou.
       // Carimba o user recém-criado em req p/ auditEntry atribuir a ele (não fica nulo).

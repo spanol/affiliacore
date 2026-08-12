@@ -79,7 +79,15 @@ beforeEach(() => {
   vi.clearAllMocks();
   h.createUserWithEmailAndPassword.mockResolvedValue({ user: { uid: 'u1' } });
   h.setDoc.mockResolvedValue(undefined);
-  fetchMock = vi.fn().mockResolvedValue({ json: () => Promise.resolve({ enabled: true, name: 'X' }) });
+  // Roteado por URL: a vitrine (gate do auto-cadastro) fica ABERTA e a
+  // verificação de telefone por SMS fica DESLIGADA por default — cada teste
+  // sobrescreve o que precisar.
+  fetchMock = vi.fn((url: any) => {
+    if (String(url).includes('/api/phone/status')) {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ enabled: false }) });
+    }
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({ enabled: true, name: 'X' }) });
+  });
   vi.stubGlobal('fetch', fetchMock);
 });
 
@@ -125,5 +133,35 @@ describe('Register — gate do auto-cadastro (estado da vitrine)', () => {
     fetchMock.mockResolvedValue({ json: () => Promise.reject(new Error('not json')) });
     await renderRegister();
     expect(screen.getByPlaceholderText('Seu nome')).toBeInTheDocument();
+  });
+});
+
+describe('Register — verificação de telefone por SMS (gate por instância)', () => {
+  it('verificação LIGADA: submit sem confirmar o código é BARRADO (createUser não roda)', async () => {
+    fetchMock.mockImplementation((url: any) => {
+      if (String(url).includes('/api/phone/status')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ enabled: true }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ enabled: true, name: 'X' }) });
+    });
+    await renderRegister();
+    // A UI de verificação aparece.
+    expect(screen.getByText(/Enviar código por SMS/i)).toBeInTheDocument();
+
+    preencher({ email: 'a@b.com', cpf: CPF_VALIDO });
+    await submeter();
+
+    expect(h.createUserWithEmailAndPassword).not.toHaveBeenCalled();
+    expect(screen.getByText(/Confirme seu telefone/i)).toBeInTheDocument();
+  });
+
+  it('verificação DESLIGADA (default): sem botão de código e o cadastro conclui', async () => {
+    await renderRegister();
+    expect(screen.queryByText(/Enviar código por SMS/i)).not.toBeInTheDocument();
+
+    preencher({ email: 'a@b.com', cpf: CPF_VALIDO });
+    await submeter();
+
+    expect(h.createUserWithEmailAndPassword).toHaveBeenCalledTimes(1);
   });
 });

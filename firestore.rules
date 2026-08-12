@@ -29,18 +29,40 @@ service cloud.firestore {
                     && request.resource.data.role == 'client'
                     && request.resource.data.uid == userId
                     && !('affiliateId' in request.resource.data.keys())
-                    && !('isSpecial' in request.resource.data.keys());
+                    && !('isSpecial' in request.resource.data.keys())
+                    && !('phoneVerified' in request.resource.data.keys())
+                    && !('phoneVerifiedAt' in request.resource.data.keys());
       // O próprio usuário atualiza o doc, mas NÃO pode mudar role, o vínculo
       // (affiliateId) NEM a flag isSpecial — senão poderia se reapontar pra outro
       // afiliado (IDOR), se promover a admin, ou se auto-marcar especial e ganhar
-      // acesso à /network e à sub-rede (R6). Esses três campos são server-only
+      // acesso à /network e à sub-rede (R6). Esses campos são server-only
       // (Admin SDK). Admin faz qualquer coisa.
+      //
+      // `phoneVerified`/`phoneVerifiedAt` (validação de telefone por SMS) são a
+      // MESMA classe: só o servidor carimba (POST /api/phone/attach ou o
+      // accept-invite), senão o cliente se auto-marca verificado. E um usuário
+      // VERIFICADO não troca o `phone` pelo client (o selo seguiria um número
+      // nunca verificado) — trocar exige re-verificar pelo /api/phone/attach.
+      // `get(..., null)` porque os campos não existem em contas antigas.
       allow update: if isAdmin()
         || (request.auth.uid == userId
             && request.resource.data.role == resource.data.role
             && request.resource.data.affiliateId == resource.data.affiliateId
-            && request.resource.data.isSpecial == resource.data.isSpecial);
+            && request.resource.data.isSpecial == resource.data.isSpecial
+            && request.resource.data.get('phoneVerified', null) == resource.data.get('phoneVerified', null)
+            && request.resource.data.get('phoneVerifiedAt', null) == resource.data.get('phoneVerifiedAt', null)
+            && (resource.data.get('phoneVerified', null) != true
+                || request.resource.data.get('phone', null) == resource.data.get('phone', null)));
       allow delete: if isAdmin();
+    }
+
+    // Desafios de verificação de telefone por SMS (OTP). Guarda o HASH do código
+    // + hash do token de uso único — material de desafio, não dado de gestão.
+    // Mesma rule do auth_totp: NEM O ADMIN lê pelo SDK do cliente; todo acesso é
+    // pelas rotas /api/phone/* (Admin SDK). Coleção NOVA (nasce fechada, sem
+    // leitor client-side prévio) → sem acoplamento de ORDEM DE DEPLOY.
+    match /phone_verifications/{phoneId} {
+      allow read, write: if false;
     }
 
     // 2FA (TOTP) por usuário: segredo do autenticador + hashes dos códigos de backup.

@@ -4,11 +4,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle, Phone, Share2, IdCard, MailQuestion } from 'lucide-react';
+import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle, Share2, IdCard, MailQuestion } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { cn } from '../lib/utils';
-import { maskCPF, maskPhone, isValidCPF, isValidPhone } from '../lib/validators';
+import { maskCPF, isValidCPF, isValidPhone } from '../lib/validators';
 import InstanceLogo from '../components/InstanceLogo';
+import PhoneVerificationField, { mergePhoneVerificationState, type PhoneVerificationState } from '../components/PhoneVerificationField';
+import { authFetch } from '../lib/api';
 import { readStoredRegistrationSource } from '../lib/registrationSource';
 import { selfRegistrationOpen } from '../lib/showcase';
 
@@ -29,6 +31,17 @@ export default function Register() {
   // Consulta o próprio GET /api/showcase (público). FAIL-OPEN via
   // selfRegistrationOpen: erro de rede ou build antiga não trancam o cadastro.
   const [selfRegOpen, setSelfRegOpen] = useState(true);
+  // Verificação de telefone por SMS (por instância). `required` vem do servidor
+  // (GET /api/phone/status, fail-open); quando ligada, o submit exige `verified`.
+  const [phoneVerification, setPhoneVerification] = useState<PhoneVerificationState>({
+    required: false,
+    verified: false,
+    token: null,
+  });
+  // Bailout estrutural: sem ele, todo mount do campo re-renderiza a página à toa.
+  const handlePhoneVerificationChange = React.useCallback((next: PhoneVerificationState) => {
+    setPhoneVerification((prev) => mergePhoneVerificationState(prev, next));
+  }, []);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -57,6 +70,11 @@ export default function Register() {
 
     if (!isValidPhone(phone)) {
       setError('Telefone inválido. Use o formato (00) 00000-0000.');
+      return;
+    }
+
+    if (phoneVerification.required && !phoneVerification.verified) {
+      setError('Confirme seu telefone pelo código enviado por SMS antes de continuar.');
       return;
     }
 
@@ -120,6 +138,21 @@ export default function Register() {
         setError(`Erro ao salvar perfil: ${firestoreErr.message || 'Verifique as permissões do Firebase.'}`);
         handleFirestoreError(firestoreErr, OperationType.WRITE, currentPath);
         return;
+      }
+
+      // Carimbo SERVER-SIDE do telefone verificado (phone E.164 + phoneVerified
+      // são campos server-only nas rules — o client não pode se auto-marcar).
+      // Best-effort: se falhar, a conta fica sem o selo; nunca trava o cadastro.
+      if (phoneVerification.token) {
+        try {
+          await authFetch('/api/phone/attach', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ phone: phone.trim(), verificationToken: phoneVerification.token }),
+          });
+        } catch {
+          // silencioso de propósito — o cadastro em si já concluiu
+        }
       }
 
       setSuccess(true);
@@ -242,21 +275,13 @@ export default function Register() {
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest ml-1">Telefone</label>
-            <div className="relative">
-              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500" size={16} />
-              <input
-                type="tel"
-                inputMode="numeric"
-                value={phone}
-                onChange={(e) => setPhone(maskPhone(e.target.value))}
-                required
-                className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-auth-cta/20 focus:border-auth-cta transition-all outline-none"
-                placeholder="(11) 98765-4321"
-              />
-            </div>
-          </div>
+          <PhoneVerificationField
+            value={phone}
+            onChange={setPhone}
+            onVerificationChange={handlePhoneVerificationChange}
+            label="Telefone"
+            placeholder="(11) 98765-4321"
+          />
 
           <div className="space-y-1.5">
             <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest ml-1">Rede Social</label>

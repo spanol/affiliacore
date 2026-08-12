@@ -210,6 +210,54 @@ describe('users/{uid}', () => {
     );
   });
 
+  it('create: self com phoneVerified → NEGADO (só o servidor carimba a verificação)', async () => {
+    const db = asClient();
+    await assertFails(
+      setDoc(doc(db, 'users', CLIENT_UID), {
+        uid: CLIENT_UID,
+        role: 'client',
+        phoneVerified: true,
+      }),
+    );
+  });
+
+  it('update: self tenta se auto-marcar phoneVerified:true → NEGADO (server-only)', async () => {
+    await seedDoc('users', CLIENT_UID, {
+      uid: CLIENT_UID,
+      role: 'client',
+      affiliateId: 'AFF-1',
+      isSpecial: false,
+    });
+    await assertFails(
+      updateDoc(doc(asClient(), 'users', CLIENT_UID), { phoneVerified: true }),
+    );
+  });
+
+  it('update: usuário VERIFICADO não troca o phone pelo client (o selo seguiria um número não verificado); NÃO-verificado troca normal', async () => {
+    await seedDoc('users', CLIENT_UID, {
+      uid: CLIENT_UID,
+      role: 'client',
+      affiliateId: 'AFF-1',
+      isSpecial: false,
+      phone: '+5511987654321',
+      phoneVerified: true,
+    });
+    await assertFails(
+      updateDoc(doc(asClient(), 'users', CLIENT_UID), { phone: '+5521999998888' }),
+    );
+    // Sem o selo, o telefone segue editável pelo próprio usuário (Profile).
+    await seedDoc('users', OTHER_UID, {
+      uid: OTHER_UID,
+      role: 'client',
+      affiliateId: 'AFF-2',
+      isSpecial: false,
+      phone: '(11) 98765-4321',
+    });
+    await assertSucceeds(
+      updateDoc(doc(asClient(OTHER_UID), 'users', OTHER_UID), { phone: '(21) 99999-8888' }),
+    );
+  });
+
   it('update/delete: admin faz qualquer coisa; client não deleta o próprio doc', async () => {
     await seedAdmin();
     await seedDoc('users', CLIENT_UID, {
@@ -284,6 +332,38 @@ describe('auth_totp/{uid} (segredo do 2FA — ninguém lê pelo client)', () => 
     await assertFails(getDoc(doc(asAdmin(), 'auth_totp', 'user-1')));
     await assertFails(getDocs(collection(asAdmin(), 'auth_totp')));
     await assertFails(setDoc(doc(asAdmin(), 'auth_totp', 'user-2'), { enabled: true }));
+  });
+});
+
+// =============================================================================
+// phone_verifications — desafio da validação de telefone por SMS (hash do
+// código + hash do token de uso único). Segue a rule do auth_totp: material de
+// desafio, não dado de gestão — todo acesso é pelas rotas /api/phone/*.
+// =============================================================================
+describe('phone_verifications/{phone} (desafio de SMS — server-only)', () => {
+  beforeEach(async () => {
+    await seedDoc('phone_verifications', '5511987654321', {
+      phone: '+5511987654321',
+      codeHash: 'hash-do-codigo',
+      attempts: 0,
+      verified: false,
+    });
+  });
+
+  it('client não lê nem escreve (nem o próprio desafio)', async () => {
+    await assertFails(getDoc(doc(asClient(), 'phone_verifications', '5511987654321')));
+    await assertFails(
+      setDoc(doc(asClient(), 'phone_verifications', '5511987654321'), { verified: true }),
+    );
+  });
+
+  it('nem o ADMIN lê ou escreve pelo client — o acesso legítimo são as rotas /api/phone/*', async () => {
+    await seedAdmin();
+    await assertFails(getDoc(doc(asAdmin(), 'phone_verifications', '5511987654321')));
+    await assertFails(getDocs(collection(asAdmin(), 'phone_verifications')));
+    await assertFails(
+      setDoc(doc(asAdmin(), 'phone_verifications', '5521999998888'), { verified: true }),
+    );
   });
 });
 
