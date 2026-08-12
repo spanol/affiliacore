@@ -5211,7 +5211,17 @@ async function startServer() {
     // Assets têm hash no nome (imutáveis): cache do Express padrão é seguro —
     // um build novo gera um nome novo, então não há staleness.
     // `index: false` para que o index.html passe SEMPRE pelo fallback abaixo.
-    app.use(express.static(distPath, { index: false }));
+    // CORP `cross-origin` SÓ nos estáticos: o helmet global põe `same-origin` em
+    // tudo, e o Chrome bloqueia (ERR_BLOCKED_BY_RESPONSE.NotSameOrigin) a logo da
+    // instância embutida na vitrine de affiliacore.com.br — 200 no curl, imagem
+    // vazia no browser (achado 2026-08-12). O bundle/assets de marca são públicos
+    // por definição; as rotas /api seguem `same-origin`.
+    app.use(
+      express.static(distPath, {
+        index: false,
+        setHeaders: (res) => res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin'),
+      }),
+    );
 
     // Serve o index.html sem cache nem validadores. CRÍTICO: o ETag default do
     // Express é (tamanho + mtime); o index.html tem sempre 555 bytes e o buildpack
