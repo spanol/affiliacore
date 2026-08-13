@@ -8,10 +8,14 @@ import {
   fetchMyPaymentProfile, saveMyPaymentProfile, PaymentProfile,
   fetchAffiliateResultsByBrand, fetchAffiliateConfigs, AffiliateConfig,
   fetchWithdrawals, requestWithdrawal, WithdrawalRequest, WITHDRAWAL_STATUS_LABEL, sumWithdrawalsByStatus,
+  withdrawalHouseName,
 } from '../services/affiliateService';
 import { fetchHouses } from '../services/houseService';
-import { computeNetPayout, issRateMap, type NetPayout } from '../lib/tax';
+import { computeNetPayout, issRateMap } from '../lib/tax';
 import DateRangePicker from '../components/DateRangePicker';
+import BrandFilter from '../components/BrandFilter';
+import BrandLogo from '../components/BrandLogo';
+import { ALL_BRANDS } from '../lib/brand';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
 import { cn } from '../lib/utils';
 
@@ -49,14 +53,19 @@ export default function Financeiro() {
   });
 
   const [range, setRange] = useState<DateRange>(getDefaultRange());
-  // Apuração do período já decomposta em bruto / ISS / líquido (src/lib/tax.ts).
-  const [earned, setEarned] = useState<NetPayout>({ lines: [], gross: 0, iss: 0, net: 0 });
+  // Entradas CRUAS da apuração (linhas por casa + config + alíquotas). A apuração
+  // em si (computeNetPayout, src/lib/tax.ts) sai de um useMemo já recortada pelo
+  // filtro de casa — card e modal leem da MESMA base (agregado == visível).
+  const [payoutInputs, setPayoutInputs] = useState<{ rows: any[]; config: AffiliateConfig | null; iss: Record<string, number> }>({ rows: [], config: null, iss: {} });
   const [loadingEarned, setLoadingEarned] = useState(true);
+  const [houseFilter, setHouseFilter] = useState<string>(ALL_BRANDS);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [loadingWithdrawals, setLoadingWithdrawals] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  // Casa do saque (obrigatória): o afiliado solicita os ganhos de UMA casa por vez.
+  const [withdrawHouse, setWithdrawHouse] = useState('');
   const [requesting, setRequesting] = useState(false);
 
   useEffect(() => {
@@ -107,16 +116,46 @@ export default function Financeiro() {
     ]).then(([brandRows, configs, houses]) => {
       if (!active) return;
       const config = configs[profile.affiliateId!] || null;
-      setEarned(computeNetPayout(brandRows as any[], config, issRateMap(houses as any[])));
+      setPayoutInputs({ rows: Array.isArray(brandRows) ? (brandRows as any[]) : [], config, iss: issRateMap(houses as any[]) });
     }).finally(() => { if (active) setLoadingEarned(false); });
     return () => { active = false; };
   }, [profile?.affiliateId, range.startDate, range.endDate]);
 
+  // Nome de exibição da linha por casa (mesma convenção das linhas groupBy=brand:
+  // `label` quando há, senão a chave). É por NOME que o filtro casa com o snapshot
+  // `houseLabel` gravado nas solicitações.
+  const houseNameOf = (r: any) => String(r?.label ?? r?.id ?? '').trim();
+  const houseNames = useMemo(
+    () => Array.from(new Set(payoutInputs.rows.map(houseNameOf).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [payoutInputs.rows],
+  );
+  const scopedRows = useMemo(
+    () => (houseFilter === ALL_BRANDS ? payoutInputs.rows : payoutInputs.rows.filter((r) => houseNameOf(r) === houseFilter)),
+    [payoutInputs.rows, houseFilter],
+  );
+  // Apuração do período decomposta em bruto / ISS / líquido, já no recorte do filtro.
+  const earned = useMemo(
+    () => computeNetPayout(scopedRows, payoutInputs.config, payoutInputs.iss),
+    [scopedRows, payoutInputs.config, payoutInputs.iss],
+  );
+  // Líquido do período na casa escolhida no MODAL (dica pro afiliado dimensionar o pedido).
+  const withdrawHouseNet = useMemo(() => {
+    if (!withdrawHouse) return null;
+    const rows = payoutInputs.rows.filter((r) => houseNameOf(r) === withdrawHouse);
+    return computeNetPayout(rows, payoutInputs.config, payoutInputs.iss).net;
+  }, [withdrawHouse, payoutInputs.rows, payoutInputs.config, payoutInputs.iss]);
+
+  // O filtro de casa recorta TUDO que está à vista: apuração, cards de saque e a
+  // lista de solicitações. Pedidos antigos sem casa só aparecem em "Todas as casas".
+  const visibleWithdrawals = useMemo(
+    () => (houseFilter === ALL_BRANDS ? withdrawals : withdrawals.filter((w) => withdrawalHouseName(w) === houseFilter)),
+    [withdrawals, houseFilter],
+  );
   const totals = useMemo(() => ({
-    pending: sumWithdrawalsByStatus(withdrawals, ['requested']),
-    approved: sumWithdrawalsByStatus(withdrawals, ['approved']),
-    paid: sumWithdrawalsByStatus(withdrawals, ['paid']),
-  }), [withdrawals]);
+    pending: sumWithdrawalsByStatus(visibleWithdrawals, ['requested']),
+    approved: sumWithdrawalsByStatus(visibleWithdrawals, ['approved']),
+    paid: sumWithdrawalsByStatus(visibleWithdrawals, ['paid']),
+  }), [visibleWithdrawals]);
 
   const set = (field: keyof PaymentProfile, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -137,10 +176,21 @@ export default function Financeiro() {
     }
   };
 
+  // Abre o modal já com a casa pré-selecionada: a do filtro ativo, ou a única
+  // disponível. Com mais de uma e sem filtro, o afiliado escolhe.
+  const openWithdrawModal = () => {
+    setWithdrawHouse(houseFilter !== ALL_BRANDS ? houseFilter : (houseNames.length === 1 ? houseNames[0] : ''));
+    setModalOpen(true);
+  };
+
   const handleRequestWithdrawal = async () => {
     const n = Number(amount.replace(',', '.'));
     if (!Number.isFinite(n) || n <= 0) {
       push({ type: 'error', message: 'Informe um valor válido.' });
+      return;
+    }
+    if (!withdrawHouse) {
+      push({ type: 'error', message: 'Selecione a casa a que o saque se refere.' });
       return;
     }
     if (!form.pixKey?.trim()) {
@@ -149,11 +199,15 @@ export default function Financeiro() {
     }
     setRequesting(true);
     try {
-      await requestWithdrawal(n, note.trim() || undefined);
+      // A chave canônica é o `id` da linha por casa (brandId OTG ou slug manual);
+      // o nome vai junto como snapshot de exibição pro admin.
+      const row = payoutInputs.rows.find((r) => houseNameOf(r) === withdrawHouse);
+      await requestWithdrawal(n, note.trim() || undefined, { houseKey: String(row?.id ?? withdrawHouse), houseLabel: withdrawHouse });
       push({ type: 'success', message: 'Saque solicitado.' });
       setModalOpen(false);
       setAmount('');
       setNote('');
+      setWithdrawHouse('');
       loadWithdrawals();
     } catch (err: any) {
       push({ type: 'error', message: err?.message || 'Erro ao solicitar saque.' });
@@ -183,13 +237,16 @@ export default function Financeiro() {
             Acompanhe sua comissão apurada, solicite saques e cadastre seus dados de pagamento.
           </p>
         </div>
-        <DateRangePicker value={range} onChange={setRange} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <BrandFilter brands={houseNames} value={houseFilter} onChange={setHouseFilter} />
+          <DateRangePicker value={range} onChange={setRange} />
+        </div>
       </header>
 
       {/* Cards da carteira */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-2xl p-4">
-          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500"><DollarSign size={12} /> A receber no período</div>
+          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500"><DollarSign size={12} /> A receber no período{houseFilter !== ALL_BRANDS ? ` · ${houseFilter}` : ''}</div>
           <p className="text-xl font-black text-slate-900 dark:text-white mt-1">{loadingEarned ? <Loader2 size={18} className="animate-spin" /> : fmt(earned.net)}</p>
           {/* O afiliado recebe o LÍQUIDO. Mostrar só o bruto criava a expectativa
               errada — foi assim que o painel legado gerou cobrança. O bruto e a
@@ -216,7 +273,7 @@ export default function Financeiro() {
 
       <div className="flex justify-end">
         <button
-          onClick={() => setModalOpen(true)}
+          onClick={openWithdrawModal}
           className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-accent-500 text-accent-contrast text-xs font-bold hover:bg-accent-400 transition-all shadow-sm shadow-accent-500/20"
         >
           <ArrowDownToLine size={14} /> Solicitar saque
@@ -230,17 +287,25 @@ export default function Financeiro() {
         </div>
         {loadingWithdrawals ? (
           <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-accent-500" size={28} /></div>
-        ) : withdrawals.length === 0 ? (
-          <p className="p-6 text-xs text-slate-500 dark:text-neutral-400">Nenhum saque solicitado ainda.</p>
+        ) : visibleWithdrawals.length === 0 ? (
+          <p className="p-6 text-xs text-slate-500 dark:text-neutral-400">
+            {houseFilter === ALL_BRANDS ? 'Nenhum saque solicitado ainda.' : `Nenhum saque referente a ${houseFilter}.`}
+          </p>
         ) : (
           <div className="divide-y divide-slate-100 dark:divide-neutral-800">
-            {withdrawals.map((w) => {
+            {visibleWithdrawals.map((w) => {
               const st = STATUS_STYLE[w.status] || STATUS_STYLE.requested;
               const Icon = st.icon;
+              const house = withdrawalHouseName(w);
               return (
                 <div key={w.id} className="p-4 flex items-center justify-between gap-3">
                   <div>
                     <p className="font-bold text-slate-900 dark:text-white text-sm">{fmt(w.amount)}</p>
+                    {house && (
+                      <p className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-neutral-400 mt-1">
+                        <BrandLogo name={house} size={14} /> {house}
+                      </p>
+                    )}
                     {w.note && <p className="text-[11px] text-slate-400 dark:text-neutral-500 mt-0.5">{w.note}</p>}
                   </div>
                   <span className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border shrink-0', st.cls)}>
@@ -340,6 +405,22 @@ export default function Financeiro() {
             </div>
             <div className="space-y-4">
               <div>
+                <label className={labelCls}>Casa</label>
+                <select value={withdrawHouse} onChange={(e) => setWithdrawHouse(e.target.value)} className={inputCls}>
+                  <option value="">Selecione a casa</option>
+                  {houseNames.map((h) => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+                {/* Dica, não trava: o valor é livre — o período em tela é só um
+                    recorte e o saque pode se referir a ganhos de outro período. */}
+                {withdrawHouse && withdrawHouseNet !== null && (
+                  <p className="text-[11px] text-slate-400 dark:text-neutral-500 mt-1.5">
+                    Líquido apurado no período nesta casa: <b className="text-slate-600 dark:text-neutral-300">{fmt(withdrawHouseNet)}</b>
+                  </p>
+                )}
+              </div>
+              <div>
                 <label className={labelCls}>Valor (R$)</label>
                 <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" inputMode="decimal" className={inputCls} />
               </div>
@@ -347,7 +428,7 @@ export default function Financeiro() {
                 <label className={labelCls}>Observação (opcional)</label>
                 <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex.: referente a julho" className={inputCls} />
               </div>
-              <p className="text-[11px] text-slate-400 dark:text-neutral-500">O pagamento é feito na chave PIX cadastrada acima. Confira antes de solicitar.</p>
+              <p className="text-[11px] text-slate-400 dark:text-neutral-500">Cada solicitação se refere aos ganhos de UMA casa. O pagamento é feito na chave PIX cadastrada acima — confira antes de solicitar.</p>
             </div>
             <div className="flex items-center gap-2 mt-6">
               <button onClick={() => setModalOpen(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 text-sm font-bold text-slate-600 dark:text-neutral-300">Cancelar</button>

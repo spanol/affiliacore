@@ -82,10 +82,10 @@ export type { LegalDocument, LegalAcceptance };
 
 // Carteira + Saque (Tier 1, sem gateway). Re-exporta os puros.
 import {
-  WITHDRAWAL_STATUSES, WITHDRAWAL_STATUS_LABEL, sumWithdrawalsByStatus,
+  WITHDRAWAL_STATUSES, WITHDRAWAL_STATUS_LABEL, sumWithdrawalsByStatus, withdrawalHouseName,
   type WithdrawalRequest, type WithdrawalStatus,
 } from '../lib/withdrawal';
-export { WITHDRAWAL_STATUSES, WITHDRAWAL_STATUS_LABEL, sumWithdrawalsByStatus };
+export { WITHDRAWAL_STATUSES, WITHDRAWAL_STATUS_LABEL, sumWithdrawalsByStatus, withdrawalHouseName };
 export type { WithdrawalRequest, WithdrawalStatus };
 
 interface Affiliate {
@@ -1677,11 +1677,15 @@ export async function fetchWithdrawals(opts?: { affiliateId?: string; status?: W
   }
 }
 
-export async function requestWithdrawal(amount: number, note?: string): Promise<WithdrawalRequest> {
+export async function requestWithdrawal(
+  amount: number,
+  note?: string,
+  house?: { houseKey: string; houseLabel?: string },
+): Promise<WithdrawalRequest> {
   const resp = await authFetch('/api/withdrawals', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ amount, note }),
+    body: JSON.stringify({ amount, note, houseKey: house?.houseKey, houseLabel: house?.houseLabel }),
   });
   if (!resp.ok) {
     const e = await resp.json().catch(() => ({}));

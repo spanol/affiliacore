@@ -21,9 +21,25 @@ export interface WithdrawalRequest {
   affiliateId: string;
   amount: number;
   status: WithdrawalStatus;
+  // Casa a que o saque se refere (pedido da Infinity, 2026-08-13): o afiliado
+  // solicita os ganhos de UMA casa por vez e o admin vê de qual casa é o pedido.
+  // `houseKey` = chave de marca (brandId OTG ou slug da casa manual, a mesma
+  // convenção de `brandKeyOf`); `houseLabel` = snapshot do nome de exibição no
+  // momento do pedido. Docs antigos não têm os campos (→ null, exibido como "—").
+  houseKey?: string | null;
+  houseLabel?: string | null;
   note?: string | null;
   requestedAt?: any;
   decidedAt?: any;
+}
+
+// Nome de exibição da casa do saque: rótulo se houver, senão a chave crua; null
+// quando o pedido é antigo/sem casa (o chamador decide o placeholder).
+export function withdrawalHouseName(w: Pick<WithdrawalRequest, 'houseKey' | 'houseLabel'> | null | undefined): string | null {
+  const label = String(w?.houseLabel ?? '').trim();
+  if (label) return label;
+  const key = String(w?.houseKey ?? '').trim();
+  return key || null;
 }
 
 // Transições válidas. `paid` e `rejected` são terminais — nada volta deles (um

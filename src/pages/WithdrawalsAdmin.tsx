@@ -3,10 +3,13 @@ import { motion } from 'motion/react';
 import { Wallet, Loader2, Check, X, Banknote, Clock, CheckCircle, XCircle } from 'lucide-react';
 import {
   fetchWithdrawals, decideWithdrawal, fetchAffiliates,
-  WITHDRAWAL_STATUS_LABEL, sumWithdrawalsByStatus,
+  WITHDRAWAL_STATUS_LABEL, sumWithdrawalsByStatus, withdrawalHouseName,
   type WithdrawalRequest,
 } from '../services/affiliateService';
 import { useToast } from '../contexts/ToastContext';
+import BrandFilter from '../components/BrandFilter';
+import BrandLogo from '../components/BrandLogo';
+import { ALL_BRANDS } from '../lib/brand';
 import { cn, humanizeName } from '../lib/utils';
 
 type Tab = 'requested' | 'approved' | 'paid' | 'rejected';
@@ -21,6 +24,7 @@ const STATUS_STYLE: Record<string, { icon: any; cls: string }> = {
 export default function WithdrawalsAdmin() {
   const { push } = useToast();
   const [tab, setTab] = useState<Tab>('requested');
+  const [houseFilter, setHouseFilter] = useState<string>(ALL_BRANDS);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [names, setNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -40,14 +44,25 @@ export default function WithdrawalsAdmin() {
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
-  const filtered = useMemo(() => withdrawals.filter((w) => w.status === tab), [withdrawals, tab]);
+  // Filtro por casa (pedido da Infinity): recorta abas, contadores e o total
+  // pendente juntos — nada à vista fica fora do recorte. Solicitações antigas
+  // sem casa só aparecem em "Todas as casas".
+  const houseNames = useMemo(
+    () => Array.from(new Set(withdrawals.map((w) => withdrawalHouseName(w)).filter((h): h is string => !!h))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [withdrawals],
+  );
+  const visible = useMemo(
+    () => (houseFilter === ALL_BRANDS ? withdrawals : withdrawals.filter((w) => withdrawalHouseName(w) === houseFilter)),
+    [withdrawals, houseFilter],
+  );
+  const filtered = useMemo(() => visible.filter((w) => w.status === tab), [visible, tab]);
   const counts = useMemo(() => ({
-    requested: withdrawals.filter((w) => w.status === 'requested').length,
-    approved: withdrawals.filter((w) => w.status === 'approved').length,
-    paid: withdrawals.filter((w) => w.status === 'paid').length,
-    rejected: withdrawals.filter((w) => w.status === 'rejected').length,
-  }), [withdrawals]);
-  const pendingTotal = sumWithdrawalsByStatus(withdrawals, ['requested']);
+    requested: visible.filter((w) => w.status === 'requested').length,
+    approved: visible.filter((w) => w.status === 'approved').length,
+    paid: visible.filter((w) => w.status === 'paid').length,
+    rejected: visible.filter((w) => w.status === 'rejected').length,
+  }), [visible]);
+  const pendingTotal = sumWithdrawalsByStatus(visible, ['requested']);
 
   const decide = async (w: WithdrawalRequest, status: 'approved' | 'rejected' | 'paid') => {
     setBusy(w.id);
@@ -77,17 +92,20 @@ export default function WithdrawalsAdmin() {
         </p>
       </motion.header>
 
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-neutral-800/60 rounded-2xl w-fit overflow-x-auto">
-        {([['requested', 'Pendentes'], ['approved', 'Aprovados'], ['paid', 'Pagos'], ['rejected', 'Rejeitados']] as [Tab, string][]).map(([t, label]) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={cn('px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap',
-              tab === t ? 'bg-white dark:bg-neutral-900 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-neutral-200')}
-          >
-            {label}{counts[t] ? ` (${counts[t]})` : ''}
-          </button>
-        ))}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-neutral-800/60 rounded-2xl w-fit overflow-x-auto">
+          {([['requested', 'Pendentes'], ['approved', 'Aprovados'], ['paid', 'Pagos'], ['rejected', 'Rejeitados']] as [Tab, string][]).map(([t, label]) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={cn('px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap',
+                tab === t ? 'bg-white dark:bg-neutral-900 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-neutral-200')}
+            >
+              {label}{counts[t] ? ` (${counts[t]})` : ''}
+            </button>
+          ))}
+        </div>
+        <BrandFilter brands={houseNames} value={houseFilter} onChange={setHouseFilter} />
       </motion.div>
 
       {loading ? (
@@ -104,12 +122,18 @@ export default function WithdrawalsAdmin() {
             const st = STATUS_STYLE[w.status] || STATUS_STYLE.requested;
             const Icon = st.icon;
             const pix = (w as any).pixSnapshot;
+            const house = withdrawalHouseName(w);
             return (
               <div key={w.id} className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl p-5 shadow-sm">
                 <div className="flex items-center gap-3 flex-wrap">
                   <div className="min-w-0 flex-1">
                     <h3 className="font-bold text-slate-900 dark:text-white truncate">{humanizeName(names[String(w.affiliateId)] || w.affiliateId)}</h3>
                     <p className="text-xl font-black text-slate-900 dark:text-white mt-1">{fmt(w.amount)}</p>
+                    {/* De QUAL casa são os ganhos deste pedido (pedido da Infinity).
+                        Pedido antigo, sem casa, mostra o placeholder — nunca some. */}
+                    <p className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-neutral-400 mt-1">
+                      {house ? (<><BrandLogo name={house} size={14} /> {house}</>) : 'Casa não informada'}
+                    </p>
                     {w.note && <p className="text-[11px] text-slate-400 dark:text-neutral-500 mt-1">{w.note}</p>}
                     {pix?.pixKey && (
                       <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-1 flex items-center gap-1.5 font-mono">

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { canTransitionWithdrawal, normalizeWithdrawalAmount, sumWithdrawalsByStatus, WithdrawalRequest } from './withdrawal';
+import { canTransitionWithdrawal, normalizeWithdrawalAmount, sumWithdrawalsByStatus, withdrawalHouseName, WithdrawalRequest } from './withdrawal';
 
 describe('canTransitionWithdrawal · máquina de estados sem gateway', () => {
   it('pendente → aprovado/rejeitado; aprovado → pago/rejeitado', () => {
@@ -56,5 +56,18 @@ describe('sumWithdrawalsByStatus', () => {
   it('array vazio/inválido → 0, nunca lança', () => {
     expect(sumWithdrawalsByStatus([])).toBe(0);
     expect(sumWithdrawalsByStatus(null as any)).toBe(0);
+  });
+});
+
+describe('withdrawalHouseName · casa do saque (rótulo > chave > null)', () => {
+  it('prefere o rótulo de exibição; sem rótulo cai na chave crua', () => {
+    expect(withdrawalHouseName({ houseKey: 'esportiva', houseLabel: 'Esportiva Bet' })).toBe('Esportiva Bet');
+    expect(withdrawalHouseName({ houseKey: 'esportiva', houseLabel: null })).toBe('esportiva');
+  });
+  it('pedido antigo/sem casa → null (o chamador decide o placeholder)', () => {
+    expect(withdrawalHouseName({})).toBeNull();
+    expect(withdrawalHouseName({ houseKey: '  ', houseLabel: '' })).toBeNull();
+    expect(withdrawalHouseName(null)).toBeNull();
+    expect(withdrawalHouseName(undefined)).toBeNull();
   });
 });

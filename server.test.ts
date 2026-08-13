@@ -2231,7 +2231,7 @@ describe('carteira + saque (/api/withdrawals)', () => {
   });
 
   it('POST: sem chave PIX cadastrada → 400 (não sabe pra onde pagar)', async () => {
-    const res = await request(buildApp({ seed: baseSeed() })).post('/api/withdrawals').set('Authorization', 'Bearer nopix-uid').send({ amount: 50 }).expect(400);
+    const res = await request(buildApp({ seed: baseSeed() })).post('/api/withdrawals').set('Authorization', 'Bearer nopix-uid').send({ amount: 50, houseKey: 'esportiva' }).expect(400);
     expect(res.body.error).toMatch(/pix/i);
   });
 
@@ -2241,14 +2241,24 @@ describe('carteira + saque (/api/withdrawals)', () => {
     await request(buildApp({ seed: baseSeed() })).post('/api/withdrawals').set('Authorization', 'Bearer aff-uid').send({ amount: 'lixo' }).expect(400);
   });
 
-  it('POST válido: 201, snapshot do PIX capturado, ignora affiliateId forjado do body', async () => {
+  it('POST válido: 201, snapshot do PIX + casa capturados, ignora affiliateId forjado do body', async () => {
     const db = makeFirestore(baseSeed());
     const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
-    const res = await request(app).post('/api/withdrawals').set('Authorization', 'Bearer aff-uid').send({ amount: 150.5, affiliateId: 'affY' }).expect(201);
-    expect(res.body).toMatchObject({ affiliateId: 'affX', amount: 150.5, status: 'requested' });
+    const res = await request(app).post('/api/withdrawals').set('Authorization', 'Bearer aff-uid')
+      .send({ amount: 150.5, affiliateId: 'affY', houseKey: 'esportiva', houseLabel: 'Esportiva Bet' }).expect(201);
+    expect(res.body).toMatchObject({ affiliateId: 'affX', amount: 150.5, status: 'requested', houseKey: 'esportiva', houseLabel: 'Esportiva Bet' });
     expect(res.body.pixSnapshot).toMatchObject({ pixKey: '123.456.789-00', pixKeyType: 'cpf' });
     const audits = [...(db.__store.get('audit_logs')?.values() ?? [])].map((a: any) => a.action);
     expect(audits).toContain('withdrawal.request');
+  });
+
+  it('POST do afiliado SEM casa → 400 (cada saque se refere a UMA casa); admin em nome de outro pode omitir', async () => {
+    const res = await request(buildApp({ seed: baseSeed() })).post('/api/withdrawals').set('Authorization', 'Bearer aff-uid').send({ amount: 50 }).expect(400);
+    expect(res.body.error).toMatch(/casa/i);
+    // Admin registrando um saque combinado por fora não é obrigado a apontar casa
+    // (e docs antigos também não têm) — a UI mostra "Casa não informada".
+    const ok = await request(buildApp({ seed: baseSeed() })).post('/api/withdrawals').set('Authorization', 'Bearer admin-uid').send({ amount: 80, affiliateId: 'affX' }).expect(201);
+    expect(ok.body).toMatchObject({ affiliateId: 'affX', houseKey: null, houseLabel: null });
   });
 
   it('PATCH: client → 403; guarda de transição barra requested→paid direto (409)', async () => {

@@ -4770,6 +4770,8 @@ export function createApp(deps: ServerDeps) {
       affiliateId: x.affiliateId ?? null,
       amount: Number.isFinite(Number(x.amount)) ? Number(x.amount) : 0,
       status: (x.status ?? 'requested') as WithdrawalStatus,
+      houseKey: x.houseKey ?? null,
+      houseLabel: x.houseLabel ?? null,
       note: x.note ?? null,
       pixSnapshot: x.pixSnapshot ?? null,
       requestedAt: x.requestedAt ?? null,
@@ -4814,6 +4816,16 @@ export function createApp(deps: ServerDeps) {
       const amount = normalizeWithdrawalAmount(req.body?.amount);
       if (amount === null) return res.status(400).json({ error: 'Valor inválido (número positivo em R$).' });
 
+      // Casa do saque (pedido da Infinity): o AFILIADO solicita os ganhos de UMA
+      // casa por vez — sem casa, 400. Admin registrando um saque combinado por
+      // fora pode omitir (docs antigos também não têm). O rótulo é snapshot de
+      // exibição (a casa pode ser renomeada depois); a chave é o dado canônico.
+      const houseKey = String(req.body?.houseKey ?? '').trim().slice(0, 120) || null;
+      const houseLabel = String(req.body?.houseLabel ?? '').trim().slice(0, 120) || null;
+      if (!isAdmin && !houseKey) {
+        return res.status(400).json({ error: 'Informe a casa a que o saque se refere.' });
+      }
+
       const profileSnap = await adminDb.collection('payment_profiles').doc(affiliateId).get();
       const profile = profileSnap.exists ? (profileSnap.data() as any) : null;
       if (!profile?.pixKey) {
@@ -4823,6 +4835,7 @@ export function createApp(deps: ServerDeps) {
       const ref = adminDb.collection('withdrawal_requests').doc();
       await ref.set({
         affiliateId, amount, status: 'requested',
+        houseKey, houseLabel,
         note: req.body?.note ? String(req.body.note).slice(0, 500) : null,
         // Snapshot do PIX no momento da solicitação — a chave pode mudar depois; a
         // trilha tem que mostrar pra ONDE foi (ou seria) pago.
@@ -4832,7 +4845,7 @@ export function createApp(deps: ServerDeps) {
       });
       await writeAuditLog(req, {
         entityType: 'withdrawal', entityId: ref.id, entityLabel: await affiliateNameOf(affiliateId),
-        action: 'withdrawal.request', metadata: { affiliateId, amount },
+        action: 'withdrawal.request', metadata: { affiliateId, amount, houseKey, houseLabel },
       });
       return res.status(201).json(withdrawalFromDoc(await ref.get()));
     } catch (e: any) {
@@ -4863,7 +4876,7 @@ export function createApp(deps: ServerDeps) {
       await ref.set({ status: to, note, decidedByUid: (req as any).user?.uid ?? null, decidedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
       await writeAuditLog(req, {
         entityType: 'withdrawal', entityId: id, entityLabel: await affiliateNameOf(String(cur.affiliateId)),
-        action: `withdrawal.${to}`, metadata: { affiliateId: cur.affiliateId, amount: cur.amount },
+        action: `withdrawal.${to}`, metadata: { affiliateId: cur.affiliateId, amount: cur.amount, houseKey: cur.houseKey ?? null, houseLabel: cur.houseLabel ?? null },
       });
       return res.json(withdrawalFromDoc(await ref.get()));
     } catch (e: any) {
