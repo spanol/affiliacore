@@ -8,8 +8,14 @@
 // Config por ENV SERVER-ONLY (nunca VITE_ — credencial não chega ao browser):
 //   PHONE_VERIFICATION_ENABLED  'true' liga (modo dev/console sem credencial);
 //                               'false' desliga mesmo com credencial.
-//   SMS_PROVIDER_ACCOUNT_SID    credencial do Twilio (Account SID)
-//   SMS_PROVIDER_AUTH_TOKEN     credencial do Twilio (Auth Token)
+//   SMS_PROVIDER_ACCOUNT_SID    Account SID do Twilio ("AC..."); identifica a CONTA
+//                               (vai na URL) — é sempre obrigatório.
+//   SMS_PROVIDER_AUTH_TOKEN     o SEGREDO que autentica: Auth Token da conta OU,
+//                               se SMS_PROVIDER_API_KEY_SID estiver setado, o
+//                               Secret da API Key.
+//   SMS_PROVIDER_API_KEY_SID    (opcional) API Key SID "SK...". Preferível ao Auth
+//                               Token: é revogável sozinha, sem derrubar as outras
+//                               instâncias que compartilham a conta.
 //   SMS_PROVIDER_FROM           remetente E.164 (ou Messaging Service SID "MG...")
 //
 // FAIL-SAFE: sem env nenhuma, a feature fica OFF e os fluxos de cadastro seguem
@@ -31,7 +37,17 @@ export type PhoneVerificationMode = 'off' | 'console' | 'twilio';
 export interface PhoneVerificationSetup {
   enabled: boolean;
   mode: PhoneVerificationMode;
-  twilio?: { accountSid: string; authToken: string; from: string };
+  twilio?: TwilioConfig;
+}
+
+export interface TwilioConfig {
+  /** "AC..." — identifica a conta; vai na URL do endpoint. */
+  accountSid: string;
+  /** Auth Token da conta, ou o Secret da API Key quando `apiKeySid` está setado. */
+  authToken: string;
+  /** "SK..." — quando presente, é o usuário do Basic auth no lugar do accountSid. */
+  apiKeySid?: string;
+  from: string;
 }
 
 /**
@@ -50,8 +66,14 @@ export function resolvePhoneVerificationSetup(
   const accountSid = String(env.SMS_PROVIDER_ACCOUNT_SID ?? '').trim();
   const authToken = String(env.SMS_PROVIDER_AUTH_TOKEN ?? '').trim();
   const from = String(env.SMS_PROVIDER_FROM ?? '').trim();
+  const apiKeySid = String(env.SMS_PROVIDER_API_KEY_SID ?? '').trim();
   if (accountSid && authToken && from) {
-    return { enabled: true, mode: 'twilio', twilio: { accountSid, authToken, from } };
+    return {
+      enabled: true,
+      mode: 'twilio',
+      // A API Key é opcional: sem ela o segredo é o Auth Token da conta (modo antigo).
+      twilio: { accountSid, authToken, from, ...(apiKeySid ? { apiKeySid } : {}) },
+    };
   }
   if (flag === 'true') return { enabled: true, mode: 'console' };
   return { enabled: false, mode: 'off' };
@@ -79,9 +101,12 @@ export function consoleSmsProvider(log: (msg: string) => void = console.log): Sm
  * Twilio Programmable Messaging via REST puro (sem SDK — menos uma dependência;
  * o endpoint é um POST form-encoded). `from` aceita número E.164 ou Messaging
  * Service SID. fetch injetável p/ teste.
+ *
+ * Basic auth: o usuário é a API Key SID quando há uma, senão o Account SID —
+ * mas a URL usa SEMPRE o Account SID (a API Key não identifica a conta).
  */
 export function twilioSmsProvider(
-  cfg: { accountSid: string; authToken: string; from: string },
+  cfg: TwilioConfig,
   fetchImpl: typeof fetch = fetch,
 ): SmsProvider {
   return {
@@ -92,7 +117,7 @@ export function twilioSmsProvider(
       // Messaging Service SID começa com "MG"; número cru vai em From.
       if (/^MG/i.test(cfg.from)) params.set('MessagingServiceSid', cfg.from);
       else params.set('From', cfg.from);
-      const auth = Buffer.from(`${cfg.accountSid}:${cfg.authToken}`).toString('base64');
+      const auth = Buffer.from(`${cfg.apiKeySid || cfg.accountSid}:${cfg.authToken}`).toString('base64');
       const response = await fetchImpl(url, {
         method: 'POST',
         headers: {

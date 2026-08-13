@@ -181,3 +181,45 @@ env:
   # FIREBASE_SERVICE_ACCOUNT_KEY e RANKING_CRON_SECRET seguem como SECRETS do
   # base — criar os dois no projeto infinity-affiliacore (playbook §3).
   # O RANKING_CRON_SECRET é o MESMO header do Scheduler do pull horário.
+
+  # --- Validação de telefone por SMS (Twilio) — item 7 da call 12/08 ----------
+  # Bloco COMENTADO de propósito: referenciar secret que ainda não existe quebra
+  # o rollout (`misconfigured-secret`, mesma armadilha do esportiva-api-key
+  # acima). ORDEM para ligar (operador):
+  #   1. Conta Twilio: Account SID ("AC..."), uma API Key ("SK..." + Secret,
+  #      criada em Account → API keys & tokens; o Secret só aparece na criação)
+  #      e o remetente (número E.164 ou Messaging Service SID "MG...", o
+  #      recomendado p/ o Brasil).
+  #   2. Criar os secrets (cola o valor no prompt):
+  #        firebase apphosting:secrets:set sms-provider-account-sid --project infinity-affiliacore
+  #        firebase apphosting:secrets:set sms-provider-api-key-sid --project infinity-affiliacore
+  #        firebase apphosting:secrets:set sms-provider-auth-token --project infinity-affiliacore   # Secret da API Key
+  #        firebase apphosting:secrets:set sms-provider-from --project infinity-affiliacore
+  #      (o set já oferece o grantaccess ao backend; se pulou:
+  #        firebase apphosting:secrets:grantaccess <nome> --project infinity-affiliacore --backend infinity-server)
+  #   3. Validar local antes do deploy: preencher SMS_PROVIDER_* no .env e rodar
+  #        npx tsx scripts/sms/smoke-twilio.ts            # diagnóstico, custo 0
+  #        npx tsx scripts/sms/smoke-twilio.ts --to <seu celular>  # 1 SMS real
+  #   4. DESCOMENTAR o bloco abaixo, commitar e push (push = rollout).
+  # Sem o bloco a feature fica OFF (fail-safe) e os cadastros seguem sem
+  # verificação. Detalhes: PESQUISA-SMS-OTP.md.
+  # - variable: SMS_PROVIDER_ACCOUNT_SID
+  #   secret: sms-provider-account-sid
+  #   availability:
+  #     - RUNTIME
+  # # API Key SID ("SK..."): revogável sozinha, sem derrubar outras instâncias
+  # # que dividam a conta Twilio. O Secret dela vai em SMS_PROVIDER_AUTH_TOKEN.
+  # - variable: SMS_PROVIDER_API_KEY_SID
+  #   secret: sms-provider-api-key-sid
+  #   availability:
+  #     - RUNTIME
+  # - variable: SMS_PROVIDER_AUTH_TOKEN
+  #   secret: sms-provider-auth-token
+  #   availability:
+  #     - RUNTIME
+  # # Remetente: E.164 ou Messaging Service SID ("MG..."). Secret p/ não
+  # # commitar o número da instância no repo.
+  # - variable: SMS_PROVIDER_FROM
+  #   secret: sms-provider-from
+  #   availability:
+  #     - RUNTIME

@@ -32,6 +32,41 @@ describe('resolvePhoneVerificationSetup', () => {
     expect(setup.twilio).toEqual({ accountSid: 'AC123', authToken: 'tok', from: '+15550001111' });
   });
 
+  it('API Key SID entra no setup quando presente', () => {
+    const setup = resolvePhoneVerificationSetup({
+      SMS_PROVIDER_ACCOUNT_SID: 'AC123',
+      SMS_PROVIDER_API_KEY_SID: 'SK456',
+      SMS_PROVIDER_AUTH_TOKEN: 'segredo-da-key',
+      SMS_PROVIDER_FROM: '+15550001111',
+    });
+    expect(setup.twilio).toEqual({
+      accountSid: 'AC123',
+      apiKeySid: 'SK456',
+      authToken: 'segredo-da-key',
+      from: '+15550001111',
+    });
+  });
+
+  it('API Key SID VAZIA não vira campo (senão o Basic auth iria com string vazia)', () => {
+    const setup = resolvePhoneVerificationSetup({
+      SMS_PROVIDER_ACCOUNT_SID: 'AC123',
+      SMS_PROVIDER_API_KEY_SID: '   ',
+      SMS_PROVIDER_AUTH_TOKEN: 'tok',
+      SMS_PROVIDER_FROM: '+15550001111',
+    });
+    expect(setup.twilio).not.toHaveProperty('apiKeySid');
+  });
+
+  it('API Key SOZINHA (sem Account SID) não liga o modo twilio — a URL precisa do AC', () => {
+    expect(
+      resolvePhoneVerificationSetup({
+        SMS_PROVIDER_API_KEY_SID: 'SK456',
+        SMS_PROVIDER_AUTH_TOKEN: 'segredo',
+        SMS_PROVIDER_FROM: '+15550001111',
+      }),
+    ).toEqual({ enabled: false, mode: 'off' });
+  });
+
   it('credencial INCOMPLETA não liga o modo twilio', () => {
     expect(
       resolvePhoneVerificationSetup({ SMS_PROVIDER_ACCOUNT_SID: 'AC123', SMS_PROVIDER_AUTH_TOKEN: 'tok' }),
@@ -86,6 +121,14 @@ describe('twilioSmsProvider', () => {
     expect(params.get('To')).toBe('+5511987654321');
     expect(params.get('From')).toBe('+15550001111');
     expect(params.get('Body')).toBe('ola');
+  });
+
+  it('com API Key: o Basic auth usa a SK, mas a URL segue com o Account SID', async () => {
+    const fetchImpl = vi.fn(async () => ({ ok: true, status: 201, text: async () => '{}' })) as any;
+    await twilioSmsProvider({ ...cfg, apiKeySid: 'SK456' }, fetchImpl).send('+5511987654321', 'ola');
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(String(url)).toBe('https://api.twilio.com/2010-04-01/Accounts/AC123/Messages.json');
+    expect(init.headers.Authorization).toBe(`Basic ${Buffer.from('SK456:secreta').toString('base64')}`);
   });
 
   it('from "MG..." vira MessagingServiceSid em vez de From', async () => {

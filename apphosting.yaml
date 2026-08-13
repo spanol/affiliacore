@@ -141,3 +141,11 @@ env:
     value: sportingbet,superbet
     availability:
       - RUNTIME
+
+  # Validação de telefone por SMS (OTP): os secrets SMS_PROVIDER_* são POR
+  # INSTÂNCIA (apphosting.<instancia>.yaml), NUNCA aqui no base — secret ausente
+  # no projeto quebra o rollout (`misconfigured-secret`), e neutralizar com
+  # 'unused' (truque dos secrets OTG acima) LIGARIA a feature com credencial-lixo,
+  # porque resolvePhoneVerificationSetup ativa o modo twilio com quaisquer três
+  # strings não-vazias. Sem as envs a feature fica OFF (fail-safe). Modelo do
+  # bloco: apphosting.infinity.yaml.
