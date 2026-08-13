@@ -58,14 +58,32 @@ export default function AchievementCard({
         className,
       )}
     >
-      <div className="flex items-start gap-3">
-        {tier.imageUrl ? (
+      {/* Arte da placa: pôster RETRATO, exibido inteiro. `object-cover` num
+          quadrado de 56px cortava o miolo (o "10K EM FATURAMENTO" e o logo
+          ficavam de fora) — a arte É o prêmio, então ela sangra no topo do card
+          com `object-contain` sobre fundo escuro. Bloqueada e com números na
+          tela (afiliado/prévia) aparece apagada: a placa que ele ainda vai
+          ganhar. Sem arte, o card segue com o avatar de ícone de sempre. */}
+      {tier.imageUrl && (
+        <div className="-mx-6 -mt-6 relative rounded-t-2xl overflow-hidden bg-slate-950 border-b border-slate-200/70 dark:border-neutral-800">
           <img
             src={tier.imageUrl}
             alt=""
-            className="w-14 h-14 rounded-xl object-cover border border-slate-200 dark:border-neutral-700 shrink-0"
+            className={cn(
+              'w-full h-56 object-contain transition-all',
+              showProgress && !progress.unlocked && 'opacity-40 grayscale',
+            )}
           />
-        ) : (
+          {showProgress && !progress.unlocked && (
+            <span className="absolute inset-0 flex items-center justify-center text-white/70">
+              <Lock size={26} />
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-start gap-3">
+        {tier.imageUrl ? null : (
           <span
             className={cn(
               'w-14 h-14 rounded-xl flex items-center justify-center shrink-0 border',

@@ -257,7 +257,7 @@ export default function AchievementManagerModal({ tiers, onClose }: Props) {
                     <img
                       src={imageUrl}
                       alt=""
-                      className="w-12 h-12 rounded-xl object-cover border border-slate-200 dark:border-neutral-700 shrink-0"
+                      className="w-12 h-12 rounded-xl object-contain bg-slate-950 border border-slate-200 dark:border-neutral-700 shrink-0"
                     />
                   ) : (
                     <span className="w-12 h-12 rounded-xl bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 flex items-center justify-center text-slate-300 dark:text-neutral-600 shrink-0">
@@ -374,7 +374,7 @@ export default function AchievementManagerModal({ tiers, onClose }: Props) {
                 {sorted.map((tier) => (
                   <div key={tier.id} className="flex items-center gap-3 px-4 py-3">
                     {tier.imageUrl ? (
-                      <img src={tier.imageUrl} alt="" className="shrink-0 w-9 h-9 rounded-xl object-cover border border-slate-200 dark:border-neutral-700" />
+                      <img src={tier.imageUrl} alt="" className="shrink-0 w-9 h-9 rounded-xl object-contain bg-slate-950 border border-slate-200 dark:border-neutral-700" />
                     ) : (
                       <span className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-xl bg-accent-500/10 text-accent-600 dark:text-accent-400">
                         <Award size={16} />

@@ -27,3 +27,9 @@ scripts/otg-approved/snapshot-*.json
 # Runtime local da demo mockada (credenciais, logs e metadados gerados pelo
 # script 1-clique). Nunca versionar.
 .demo-runtime/
+
+# Arte-fonte das placas de conquista da Infinity (pôsteres de 2 MB, arte do
+# CLIENTE). Versiona-se só o webp normalizado que virou data URL no Firestore
+# e o README com a receita — ver scripts/achievements/infinity/README.md.
+scripts/achievements/*/placa-*.png
+scripts/achievements/*/dataurl-*.txt
