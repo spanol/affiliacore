@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { 
+import {
   Users,
   DollarSign,
   BarChart3,
@@ -11,13 +11,18 @@ import {
   Target,
   Banknote,
   Crown,
-  Filter
+  Filter,
+  MousePointerClick,
+  Hash,
+  Divide,
+  Receipt
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, humanizeName } from '../lib/utils';
 import { fetchAffiliates, fetchAllResults, fetchAllResultsByBrand, fetchAllResultsByCampaign, fetchAffiliateConfigs, fetchSpecialAffiliates, fetchManualResults, fetchAffiliateUplines, buildSubToSpecialConfig, buildNetworkNodes, buildNetworkTree, buildEligibleUpline, composeAdminProfit, deriveManualRowsCommission, CampaignRow, SpecialAffiliate } from '../services/affiliateService';
 import DateRangePicker from '../components/DateRangePicker';
 import CampaignBreakdown from '../components/CampaignBreakdown';
+import { buildFunnelItems, sumFunnelTotals, formatFunnelValue, type FunnelItemKey } from '../lib/funnel';
 import AffiliatePerformanceChart from '../components/AffiliatePerformanceChart';
 import BrandFilter from '../components/BrandFilter';
 import BrandLogo from '../components/BrandLogo';
@@ -386,13 +391,25 @@ export default function AdminDashboard() {
     { label: 'Total REV', value: `R$ ${totals.rev.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: TrendingUp, color: 'purple' },
   ];
 
-  // Funil agregado da rede — soma dos dados que antes só apareciam ao abrir um afiliado.
-  const funnel = [
-    { label: 'Cadastros', value: totals.registrations.toLocaleString('pt-BR'), icon: UserPlus },
-    { label: 'Primeiros Depósitos', value: totals.firstDeposits.toLocaleString('pt-BR'), icon: Wallet },
-    { label: 'Valor Depositado', value: `R$ ${totals.deposit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: Banknote },
-    { label: 'CPA Qualificado', value: totals.qualifiedCpa.toLocaleString('pt-BR'), icon: Target },
-  ];
+  // Funil agregado da rede na ORDEM do painel da Esportiva (call 12/08) — a MESMA
+  // base escopada dos `totals` (OTG + agregado manual), então os números batem
+  // card a card. Clique/qtd de depósitos vêm SÓ das casas que reportam (Esportiva/
+  // LEON via pull; planilha com as colunas novas) — ausência vira "—", nunca 0.
+  const FUNNEL_ICONS: Record<FunnelItemKey, typeof UserPlus> = {
+    visits: MousePointerClick,
+    registrations: UserPlus,
+    first_deposits: Wallet,
+    deposit_count: Hash,
+    deposit: Banknote,
+    avg_deposit: Divide,
+    avg_ticket: Receipt,
+    qualified_cpa: Target,
+  };
+  const funnel = buildFunnelItems(sumFunnelTotals([...scopedResults, manualAgg])).map((item) => ({
+    label: item.label,
+    value: formatFunnelValue(item),
+    icon: FUNNEL_ICONS[item.key],
+  }));
 
   // Barras do gráfico — já vêm mescladas (OTG + manual) e ordenadas por comissão
   // de `affiliatePerf`; aqui só renomeamos p/ as chaves que o recharts plota.
