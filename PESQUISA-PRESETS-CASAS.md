@@ -7,8 +7,9 @@
 
 ## TL;DR
 
-1. **26 casas** entraram no catálogo (`src/lib/housePresets.ts`), todas com
-   autorização confirmada do **SPA/MF** e domínio `.bet.br`.
+1. **27 casas** estão no catálogo (`src/lib/housePresets.ts`) — 26 da coleta de
+   28/07 + **Esportiva Bet em 13/08/2026** (ver §4.3) — todas com autorização
+   confirmada do **SPA/MF** e domínio `.bet.br`.
 2. **As cores não foram escolhidas a olho.** Cada uma foi **medida na fonte oficial
    da própria casa** em 28/07/2026 — logo/favicon decodificada pixel a pixel, ou o
    `theme-color` que o site `.bet.br` declara. O campo `colorSource` registra o
@@ -64,7 +65,7 @@ navy+dourado, BetMGM preto+dourado, Blaze escuro+vermelho), o par foi preservado
 fundo = `color`, monograma = `accent`. Sem par declarado, o monograma é o
 branco/quase-preto de **maior contraste medido** sobre o fundo.
 
-## 3. O catálogo (26 casas)
+## 3. O catálogo (27 casas)
 
 Ordenado por notoriedade no BR — é a ordem em que aparecem na grade do seletor.
 
@@ -96,6 +97,7 @@ Ordenado por notoriedade no BR — é a ordem em que aparecem na grade do seleto
 | 24 | BetMGM | `#0b0b0b` + `#b19661` | logo-oficial | Boa Lion S.A. | 2.098, 30/12/2024 | betmgm.bet.br |
 | 25 | Lotogreen | `#1dbf24` | theme-color | Sabiá Administração LTDA | 399, 24/02/2025 | lotogreen.bet.br |
 | 26 | MC Games | `#171d25` + `#f4b942` | theme-color | Sistema Lotérico de Pernambuco LTDA | 2.007, 09/09/2025 | mcgames.bet.br |
+| 27 | Esportiva Bet | `#ff3a00` | logo-oficial | EA Entretenimento e Esportes S.A. | 523, 14/03/2025 | esportiva.bet.br |
 
 > **BR4BET e Lotogreen dividem a mesma portaria** (399) porque são duas marcas da
 > mesma autorizada, a Sabiá Administração. A autorização é da EMPRESA, não da marca —
@@ -112,7 +114,8 @@ nesta coleta. Não estão no catálogo — mas o admin segue livre pra criar a c
 | **Bet da Sorte** | Não localizada na lista consultada | Mas tem `.bet.br` no ar e aparece como autorizada em outra fonte — provável divergência de grafia acentuada ("BETdáSorte"); **reconferir no CSV oficial** |
 | **Zeroum** | Opera por **decisão judicial**, não por autorização administrativa | Patrocina a Chapecoense |
 | **Multibet** | Autorizada (portaria 525, 14/03/2025), mas **o site não respondeu à sondagem** — sem cor medida | Entra assim que a cor for medida |
-| **Esportiva Bet** | Autorização não conferida **e** o favicon do site vem corrompido na origem (byte da assinatura PNG trocado por caractere de substituição UTF-8) | É a casa real da Infinity (`MIGRACAO-INFINITY-LEGADO.md`); só declara `theme-color: #323637`, uma cor de chrome, não de marca |
+| ~~**Esportiva Bet**~~ | ~~Autorização não conferida **e** o favicon do site vem corrompido na origem~~ **ENTROU em 13/08/2026** — ver §4.3 | Era a pendência de favicon corrompido + `theme-color` de chrome; as duas caíram |
+| **LEON Bet** | **Não consta na lista oficial de autorizadas do SPA/MF** (planilha XLSX conferida em 13/08/2026, 0 ocorrências) e não tem `.bet.br` — opera por domínios rotativos `leonNNN.bet` | É casa real da Infinity via R2D Partners (`leonbet-r2d`). Ganhou ícone FORA do catálogo — ver §4.3 |
 
 **Regra de manutenção:** só entra no catálogo quem tem os dois — licença confirmada e
 cor medida na fonte oficial. Sem isso, o preset estaria afirmando algo que não foi
@@ -164,7 +167,7 @@ resolvido na MOLDURA, não descartando as logos: toda logo oficial é embutida n
 **mesma caixa 64×64 com o mesmo raio** do ícone autoral, então a lista continua
 uniforme mesmo misturando as duas origens. Ver §4.2.
 
-## 4.2 O conjunto híbrido (13 oficiais + 13 autorais)
+## 4.2 O conjunto híbrido (14 oficiais + 13 autorais)
 
 Cada logo oficial é normalizada (PNG RGBA, moldura transparente cortada) e embutida
 no SVG do preset como data URI. Dois modos, decididos pela **cobertura opaca medida**
@@ -190,10 +193,10 @@ Nada de "escolhi a olho". Uma logo coletada só vira ícone se passar em todos:
    dele é arte **fotográfica** (um leão), que vira borrão a 36px. **Novibet** media
    1,26:1 contra o navy dela, mas 14,7:1 contra o branco → passou com fundo claro.
 
-**Resultado:** 13 com logo oficial (Betano, Superbet, Sportingbet, Betnacional, KTO,
-Brazino777, Stake, Bet7k, 7Games, Viva Sorte, Pixbet, MC Games, Novibet) e 13
-autorais (bet365, Betfair, Esportes da Sorte, EstrelaBet, Vbet, H2bet, Blaze, Betsson,
-F12.Bet, Aposta Ganha, BR4BET, BetMGM, Lotogreen).
+**Resultado:** 14 com logo oficial (Betano, Superbet, Sportingbet, Betnacional, KTO,
+Brazino777, Stake, Bet7k, 7Games, Viva Sorte, Pixbet, MC Games, Novibet, Esportiva
+Bet) e 13 autorais (bet365, Betfair, Esportes da Sorte, EstrelaBet, Vbet, H2bet,
+Blaze, Betsson, F12.Bet, Aposta Ganha, BR4BET, BetMGM, Lotogreen).
 
 As artes-fonte ficam em **`scripts/house-logos/<slug>.png`** (168 kB no total), fora
 de `public/` porque são material do gerador — quem é servido é só o SVG final. Trocar
@@ -204,10 +207,34 @@ arte correspondente.
 O `officialLogoUrl` também foi enriquecido no caminho: de 6 para **19 casas** com link
 verificado, então "baixar a logo oficial" no seletor resolve mesmo pras autorais.
 
+## 4.3 Adendo 13/08/2026 — Esportiva Bet entra; LEON Bet ganha ícone fora do catálogo
+
+As duas casas reais da Infinity que faltavam:
+
+- **Esportiva Bet (entrou, #27).** As duas pendências de 28/07 caíram: (a) a licença
+  foi conferida na **planilha XLSX oficial do SPA/MF** — a marca ESPORTIVA BET
+  (esportiva.bet.br) pertence à **EA Entretenimento e Esportes S.A.** (CNPJ
+  53.570.592/0001-43), **Portaria SPA/MF nº 523, de 14/03/2025** (alterada pelas
+  portarias 1.885/2025 e 2.449/2025), a MESMA autorização da Bateu Bet — caso
+  idêntico ao BR4BET/Lotogreen; (b) o site passou a servir um
+  **maskable-icon 512×512 decodificável** (`static.esportiva.bet.br/public-assets/`),
+  medido pixel a pixel: cor dominante **`#ff3a00`** (57% dos px opacos), cobertura
+  opaca 100% → `officialIcon: 'tile'`. Contraste branco vs fundo 3,59:1 ✓. Alias
+  `Esportiva` (o slug real na Infinity é `esportiva-bet`, que já casa sozinho).
+- **LEON Bet (fora do catálogo, ícone avulso).** **Não consta na lista oficial do
+  SPA/MF** (0 ocorrências na planilha de 13/08/2026) e não tem `.bet.br` — opera por
+  domínios rotativos (`leonNNN.bet`), caso da mesma família de Vaidebet/Zeroum (§4).
+  Pela regra de manutenção ela NÃO pode entrar em `HOUSE_PRESETS` (o teste trava
+  portaria + `.bet.br` de propósito). O ícone foi gerado com a MESMA moldura
+  (`buildHouseLogoSvg`, modo `tile`) a partir do favicon oficial 228×228 de
+  `leon483.bet` (arte preto/branco sem cor saturada; o manifest declara
+  `theme_color: #000000`) e gravado em **`public/brands/leon-bet.svg`** — pra exibir
+  na instância, o admin sobe esse SVG como logo da casa (upload vence preset).
+
 ## 5. Como usar
 
 **No app** — `/casas` → **Nova casa** → o bloco **"Usar um preset de casa"** abre com a
-grade das 26. Clicar numa:
+grade das 27. Clicar numa:
 - preenche **nome** e **slug** canônicos (ao criar);
 - carrega o **ícone** na cor da casa;
 - mostra a **empresa autorizada + portaria**, um link pro site oficial e, quando
@@ -216,7 +243,7 @@ grade das 26. Clicar numa:
 Para usar a logo real em vez do ícone autoral: baixe pelo link e clique em
 **"Trocar logo"** — o upload manual vence o preset.
 
-**No repo** — os SVGs ficam em `public/brands/presets/<slug>.svg` (26 arquivos), então
+**No repo** — os SVGs ficam em `public/brands/presets/<slug>.svg` (27 arquivos), então
 dá pra usar em qualquer lugar (landing, material comercial) sem passar pelo app.
 
 ## 6. Arquitetura

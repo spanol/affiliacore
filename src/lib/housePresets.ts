@@ -182,6 +182,15 @@ export const HOUSE_PRESETS: HousePreset[] = [
   { slug: 'mcgames', name: 'MC Games', monogram: 'MC', officialIcon: 'tile', color: '#171d25', accent: '#f4b942', colorSource: 'theme-color',
     site: 'mcgames.bet.br',
     legalEntity: 'Sistema Lotérico de Pernambuco LTDA', spaPortaria: 'SPA/MF nº 2.007, de 09/09/2025' },
+  // Casa real da Infinity (MIGRACAO-INFINITY-LEGADO.md). Ficou de fora da coleta de
+  // 28/07 (o favicon vinha corrompido na origem e o theme-color é cor de chrome);
+  // em 13/08 o site passou a servir um maskable-icon 512px — cor medida NELE, e a
+  // licença conferida na planilha oficial do SPA/MF (a autorizada é a mesma empresa
+  // da Bateu Bet, portaria compartilhada — igual ao caso BR4BET/Lotogreen).
+  { slug: 'esportiva-bet', name: 'Esportiva Bet', monogram: 'EB', officialIcon: 'tile', color: '#ff3a00', colorSource: 'logo-oficial',
+    site: 'esportiva.bet.br', officialLogoUrl: 'https://static.esportiva.bet.br/public-assets/maskable-icon-512x512.png',
+    legalEntity: 'EA Entretenimento e Esportes S.A.', spaPortaria: 'SPA/MF nº 523, de 14/03/2025',
+    aliases: ['Esportiva'] }, // o manifest oficial grafa "EsportivaBet", que já normaliza sozinho
 ];
 
 // Busca um preset pelo slug (o mesmo slug que o modal sugere pra casa).
