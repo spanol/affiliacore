@@ -13,6 +13,7 @@ import {
   canRequestTier,
   requestForTier,
   totalsFromBrandRows,
+  resolveAchievementScope,
   type AchievementTotals,
 } from '../lib/achievements';
 import {
@@ -25,6 +26,7 @@ import {
 } from '../services/achievementService';
 import {
   fetchAffiliateResultsByBrand,
+  fetchAllResultsByBrand,
   fetchAffiliateConfigs,
   type AffiliateConfig,
 } from '../services/affiliateService';
@@ -44,6 +46,10 @@ export default function Achievements() {
   const { push } = useToast();
   const isAdmin = profile?.role === 'admin';
   const affiliateId = profile?.affiliateId ? String(profile.affiliateId) : '';
+  const scope = resolveAchievementScope(profile?.role, affiliateId);
+  // Especial ativo: os totais abaixo somam a rede dele. Precisa estar ESCRITO na
+  // tela, senão o número não bate com o "meu desempenho" e parece erro.
+  const countsNetwork = scope === 'scoped' && !!profile?.isSpecial;
 
   const [tiers, setTiers] = useState<AchievementTierDoc[]>([]);
   const [requests, setRequests] = useState<AchievementRequestDoc[]>([]);
@@ -63,8 +69,10 @@ export default function Achievements() {
     loadRequests();
   }, []);
 
-  // Números do próprio afiliado: breakdown POR CASA (já funde OTG + casas
+  // Números que valem para a placa: breakdown POR CASA (já funde OTG + casas
   // manuais) e o repasse somado casa a casa, respeitando a taxa byBrand.
+  // No modo 'scoped' NÃO passamos affiliateId: o servidor escopa sozinho e é isso
+  // que faz a rede entrar para o especial (own + subs, à taxa própria dele).
   useEffect(() => {
     if (!affiliateId) {
       setLoading(false);
@@ -72,8 +80,11 @@ export default function Achievements() {
     }
     let cancelled = false;
     setLoading(true);
+    const range = { startDate: ALL_TIME_START, endDate: todayISO() };
     Promise.all([
-      fetchAffiliateResultsByBrand(affiliateId, { startDate: ALL_TIME_START, endDate: todayISO() }),
+      scope === 'scoped'
+        ? fetchAllResultsByBrand(range)
+        : fetchAffiliateResultsByBrand(affiliateId, range),
       fetchAffiliateConfigs(),
     ])
       .then(([brandRows, configs]: [any[], Record<string, AffiliateConfig>]) => {
@@ -87,7 +98,7 @@ export default function Achievements() {
     return () => {
       cancelled = true;
     };
-  }, [affiliateId]);
+  }, [affiliateId, scope]);
 
   const visibleTiers = useMemo(() => sortTiers(isAdmin ? tiers : activeTiers(tiers)), [tiers, isAdmin]);
   const myRequests = useMemo(
@@ -145,7 +156,9 @@ export default function Achievements() {
           <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">
             {isAdmin
               ? 'Prêmios que o afiliado desbloqueia ao bater metas de faturamento — e a fila de solicitações.'
-              : 'Seja reconhecido pelo seu trabalho: bata a meta, desbloqueie o prêmio e solicite.'}
+              : countsNetwork
+                ? 'Seja reconhecido pelo seu trabalho: bata a meta, desbloqueie o prêmio e solicite. O faturamento conta você e a sua rede.'
+                : 'Seja reconhecido pelo seu trabalho: bata a meta, desbloqueie o prêmio e solicite.'}
           </p>
         </div>
         {isAdmin && (
@@ -167,7 +180,7 @@ export default function Achievements() {
         >
           <div className="p-6 rounded-2xl border bg-white dark:bg-neutral-900/60 border-slate-200/70 dark:border-neutral-800 shadow-sm">
             <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-2">
-              <Target size={13} /> CPAs acumulados
+              <Target size={13} /> CPAs acumulados{countsNetwork ? ' · você + rede' : ''}
             </div>
             <p className="text-2xl font-black text-slate-900 dark:text-white">
               {loading ? '—' : totals.cpas.toLocaleString('pt-BR')}
@@ -198,7 +211,8 @@ export default function Achievements() {
               {loading ? '—' : `${unlockedCount}/${activeTiers(tiers).length}`}
             </p>
             <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-1">
-              Comissão acumulada: {loading ? '—' : formatBRL(totals.commission)}
+              {countsNetwork ? 'Faturamento (você + rede): ' : 'Comissão acumulada: '}
+              {loading ? '—' : formatBRL(totals.commission)}
             </p>
           </div>
         </motion.div>

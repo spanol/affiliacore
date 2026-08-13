@@ -173,6 +173,28 @@ export interface AchievementTotals {
   commission: number;
 }
 
+// De onde saem os totais que valem para a placa.
+//  - 'scoped': o que o SERVIDOR deixa o chamador ver, sem pedir id nenhum. Para o
+//    afiliado comum isso é só ele; para o ESPECIAL ativo é own + subs, porque o
+//    proxy externo e o /api/house-results escopam ambos pela sub-rede. É o modo
+//    padrão desde 13/08: o Maurício quer que a placa conte também os ganhos da
+//    rede, e a régua vira a MESMA já exibida no painel do especial — taxa própria
+//    aplicada sobre a rede inteira (SpecialDashboard, "comissão total").
+//  - 'self': força o próprio id. Só para o ADMIN que também é afiliado — sem isso
+//    ele herdaria a produção da agência inteira e desbloquearia tudo.
+// Quem tem downline mas NÃO é especial ativo cai em 'scoped' e enxerga só a
+// própria produção: a sub-rede é resolvida por `special_affiliates`, não pela
+// árvore de upline sozinha.
+export type AchievementScope = 'scoped' | 'self';
+
+export function resolveAchievementScope(
+  role?: string | null,
+  affiliateId?: string | null,
+): AchievementScope {
+  if (!affiliateId) return 'self'; // sem afiliado vinculado não há o que buscar
+  return role === 'admin' ? 'self' : 'scoped';
+}
+
 /**
  * Totais acumulados a partir do breakdown POR CASA do afiliado
  * (`fetchAffiliateResultsByBrand`, que já funde OTG + casas manuais).

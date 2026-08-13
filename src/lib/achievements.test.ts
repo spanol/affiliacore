@@ -12,6 +12,7 @@ import {
   canRequestTier,
   tierMetaLabel,
   previewTotals,
+  resolveAchievementScope,
   PREVIEW_FRACTION,
   TIER_IMAGE_MAX_CHARS,
   type AchievementTier,
@@ -264,5 +265,24 @@ describe('previewTotals (prévia do card no admin)', () => {
     const t = tier({ metaCpas: 0, metaCommission: 0 });
     expect(previewTotals(t, 'unlocked')).toEqual({ cpas: 0, commission: 0 });
     expect(tierProgress(t, previewTotals(t, 'unlocked')).unlocked).toBe(false);
+  });
+});
+
+describe('resolveAchievementScope (a placa conta a rede)', () => {
+  it('afiliado comum e especial pedem o escopo do servidor', () => {
+    // Mesma decisão para os dois: quem resolve a sub-rede é o servidor
+    // (special_affiliates), então a página não precisa saber quem é especial.
+    expect(resolveAchievementScope('client', 'aff_1')).toBe('scoped');
+    expect(resolveAchievementScope(undefined, 'aff_1')).toBe('scoped');
+  });
+
+  it('admin que também é afiliado fica no próprio id', () => {
+    // Sem isso ele herdaria a produção da agência inteira e desbloquearia tudo.
+    expect(resolveAchievementScope('admin', 'aff_1')).toBe('self');
+  });
+
+  it('sem afiliado vinculado não busca escopo nenhum', () => {
+    expect(resolveAchievementScope('client', '')).toBe('self');
+    expect(resolveAchievementScope('admin', null)).toBe('self');
   });
 });
