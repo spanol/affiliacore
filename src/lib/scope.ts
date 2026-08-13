@@ -45,6 +45,24 @@ export function resolveServerYesterday(now: Date = new Date(), timeZone = 'Ameri
   return `${y}-${m}-${day}`;
 }
 
+// Conjunto de afiliados sobre o qual um ESPECIAL pode agir nos links de
+// divulgação (item 1 da call Infinity 12/08): ele mesmo + a sub-rede já
+// RESOLVIDA (o servidor injeta o registro de resolveSpecialRecord, que deriva
+// os subs da árvore quando `fromNetwork`). Fail-closed: sem afiliado vinculado
+// ou sem registro de especial ATIVO → conjunto VAZIO — sub comum não gera link
+// nem lê link de terceiro (o link dele é emitido pelo gerente ou pela agência).
+export function specialNetworkScope(
+  ownAffiliateId?: string | null,
+  special?: SpecialAffiliateData | null
+): Set<string> {
+  const ownId = ownAffiliateId ? String(ownAffiliateId).trim() : '';
+  if (!ownId || !resolveIsSpecial(special)) return new Set();
+  const subs = Array.isArray(special?.subAffiliateIds)
+    ? special!.subAffiliateIds!.map((s) => String(s)).filter(Boolean)
+    : [];
+  return new Set([ownId, ...subs]);
+}
+
 export interface ScopeInput {
   role?: string | null;
   endpoint: string;

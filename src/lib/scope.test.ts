@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveIsSpecial, resolveServerToday, resolveServerYesterday, resolveScopedAffiliateIds } from './scope';
+import { resolveIsSpecial, resolveServerToday, resolveServerYesterday, resolveScopedAffiliateIds, specialNetworkScope } from './scope';
 
 describe('resolveIsSpecial · definição única (R7)', () => {
   it('só é especial com active === true', () => {
@@ -108,5 +108,32 @@ describe('resolveScopedAffiliateIds · barreira de IDOR do proxy (R4)', () => {
     const special = { active: true, subAffiliateIds: ['s1', 's2'] };
     expect(resolveScopedAffiliateIds({ ...base, role: 'client', special, requestedAffiliateIds: ['me', 's1'] })).toEqual({ scoped: ['me', 's1'] });
     expect(resolveScopedAffiliateIds({ ...base, role: 'client', special, requestedAffiliateIds: ' me , s2 ' })).toEqual({ scoped: ['me', 's2'] });
+  });
+});
+
+describe('specialNetworkScope · escopo dos links de divulgação (item 1 · call 12/08)', () => {
+  it('especial ativo → ele mesmo + subs (ids coagidos a string)', () => {
+    const scope = specialNetworkScope('esp', { active: true, subAffiliateIds: ['s1', 2 as any] });
+    expect([...scope].sort()).toEqual(['2', 'esp', 's1']);
+  });
+
+  it('especial ativo sem subs → só ele mesmo (pode gerar o próprio link)', () => {
+    expect([...specialNetworkScope('esp', { active: true })]).toEqual(['esp']);
+  });
+
+  it('não-especial → conjunto VAZIO (fail-closed: sub comum não gera nem lê link alheio)', () => {
+    expect(specialNetworkScope('sub', null).size).toBe(0);
+    expect(specialNetworkScope('sub', { active: false, subAffiliateIds: ['s1'] }).size).toBe(0);
+    expect(specialNetworkScope('sub', { subAffiliateIds: ['s1'] }).size).toBe(0); // sem active → não é especial (R7)
+  });
+
+  it('sem afiliado vinculado → vazio, mesmo com registro ativo', () => {
+    expect(specialNetworkScope('', { active: true, subAffiliateIds: ['s1'] }).size).toBe(0);
+    expect(specialNetworkScope(null, { active: true }).size).toBe(0);
+  });
+
+  it('ids vazios na lista de subs são descartados', () => {
+    const scope = specialNetworkScope('esp', { active: true, subAffiliateIds: ['', 's1'] });
+    expect([...scope].sort()).toEqual(['esp', 's1']);
   });
 });

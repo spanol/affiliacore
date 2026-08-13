@@ -10,7 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { renderErrorPage } from './errorPage';
 import { isBotUserAgent, appendSubid, clickStatDay } from './src/lib/tracking';
-import { resolveIsSpecial, resolveServerToday, resolveServerYesterday, resolveScopedAffiliateIds } from './src/lib/scope';
+import { resolveIsSpecial, resolveServerToday, resolveServerYesterday, resolveScopedAffiliateIds, specialNetworkScope } from './src/lib/scope';
 import { otgEnabled, marketplaceEnabled } from './src/lib/instance';
 import { resolveBrand } from './src/lib/branding';
 import { computeRankingEntries } from './src/lib/ranking';
@@ -3689,8 +3689,10 @@ export function createApp(deps: ServerDeps) {
     }
   });
 
-  // Lista os links: admin vê todos; afiliado vê só o(s) dele. Os totais de clique
-  // vêm direto do doc do link (incrementados no /go) — leitura barata.
+  // Lista os links: admin vê todos; ESPECIAL vê os da própria rede (own + subs,
+  // como GET /api/affiliate-configs — item 1 da call Infinity 12/08); afiliado
+  // comum vê só o(s) dele. Os totais de clique vêm direto do doc do link
+  // (incrementados no /go) — leitura barata.
   app.get('/api/affiliate-links', requireAuth, async (req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
     try {
@@ -3700,7 +3702,19 @@ export function createApp(deps: ServerDeps) {
         if (!user?.affiliateId) {
           return res.status(403).json({ error: 'Sua conta não está vinculada a um afiliado.' });
         }
-        query = query.where('affiliateId', '==', String(user.affiliateId));
+        const ownId = String(user.affiliateId);
+        const scope = specialNetworkScope(ownId, await resolveSpecialRecord(ownId));
+        if (scope.size > 0) {
+          // Filtro em memória, não `where in`: a sub-rede pode passar de 30 ids
+          // (limite do Firestore) e a coleção já é varrida inteira pelo admin.
+          // O pool de standby (affiliateId null) fica de fora — é da agência.
+          const all = await query.get();
+          const links = all.docs
+            .map((d) => ({ code: d.id, ...(d.data() as any) }))
+            .filter((l: any) => scope.has(String(l.affiliateId ?? '')));
+          return res.json({ links });
+        }
+        query = query.where('affiliateId', '==', ownId);
       }
       const snap = await query.get();
       const links = snap.docs.map((d) => ({ code: d.id, ...(d.data() as any) }));
@@ -3712,7 +3726,9 @@ export function createApp(deps: ServerDeps) {
   });
 
   // Gera o link de um afiliado a partir do TEMPLATE da casa (`registerUrlTemplate`)
-  // + uma tag nossa. Admin only.
+  // + uma tag nossa. Admin OU afiliado especial ativo — o especial só gera para a
+  // PRÓPRIA rede (ele mesmo + subs; item 1 da call Infinity 12/08). Sub comum
+  // segue 403: o link dele é emitido pelo gerente ou pela agência.
   //
   // Por que isto existe sem depender da API da casa: a tag de rastreio é um
   // parâmetro DINÂMICO capturado na visita do jogador — a doc do TAP by Smartico
@@ -3723,13 +3739,28 @@ export function createApp(deps: ServerDeps) {
   // A tag gravada no link já casa o resultado sozinha no próximo import do
   // relatório da casa (`buildTagIndex` indexa a tag do link atribuído) — o que sai
   // daqui NÃO precisa de apelido manual na tela de vínculo.
-  app.post('/api/affiliate-links/generate', requireAdmin, async (req, res) => {
+  app.post('/api/affiliate-links/generate', requireAuth, async (req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
     try {
       const affiliateId = String(req.body?.affiliateId ?? '').trim();
       const brandKey = String(req.body?.brandId ?? '').trim();
       if (!affiliateId) return res.status(400).json({ error: 'affiliateId é obrigatório.' });
       if (!brandKey) return res.status(400).json({ error: 'Escolha a casa: o link sai do template dela.' });
+
+      // Escopo do não-admin: especial ativo, e o alvo dentro da rede dele. O
+      // registro vem RESOLVIDO por resolveSpecialRecord (fonte única da sub-rede);
+      // a regra do conjunto é pura em specialNetworkScope (src/lib/scope.ts).
+      const caller = (req as any).user;
+      if (caller?.role !== 'admin') {
+        const ownId = String(caller?.affiliateId ?? '').trim();
+        const scope = specialNetworkScope(ownId, ownId ? await resolveSpecialRecord(ownId) : null);
+        if (scope.size === 0) {
+          return res.status(403).json({ error: 'Apenas a agência e afiliados especiais geram links.' });
+        }
+        if (!scope.has(affiliateId)) {
+          return res.status(403).json({ error: 'Este afiliado não pertence à sua rede.' });
+        }
+      }
 
       // Casa pela mesma convenção do client (`dealBrandKey`): brandId da OTG
       // quando existe, senão o slug — e o id do doc como último recurso.

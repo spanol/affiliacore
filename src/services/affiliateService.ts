@@ -1406,7 +1406,8 @@ export async function createAffiliateLink(
   return response.json();
 }
 
-// Lista os links acessíveis: admin → todos; afiliado → só os dele.
+// Lista os links acessíveis: admin → todos; especial → os da própria rede
+// (own + subs, escopado no servidor); afiliado comum → só os dele.
 export async function fetchAffiliateLinks(): Promise<AffiliateLink[]> {
   try {
     const response = await authFetch('/api/affiliate-links', { headers: { Accept: 'application/json' } });
@@ -1446,6 +1447,7 @@ export interface GeneratedLink {
 // Gera o link do afiliado a partir do template da casa + a tag (o servidor sugere
 // uma quando não vem). A tag entra na URL e é o que a casa devolve no relatório —
 // ver src/lib/linkGeneration.ts para o porquê de isso não depender da API da casa.
+// Admin gera pra qualquer um; o ESPECIAL só pra própria rede (o servidor escopa).
 export async function generateAffiliateLink(
   affiliateId: string,
   brandId: string,

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Loader2, Users, ArrowUpRight, Crown, Save, Percent, Search, UserPlus, X, Clock } from 'lucide-react';
+import { Loader2, Users, ArrowUpRight, Crown, Save, Percent, Search, UserPlus, X, Clock, Link2, Copy, Check, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import {
@@ -13,10 +13,17 @@ import {
   saveSubAffiliateConfig,
   createAffiliateReferral,
   fetchAffiliateReferrals,
+  fetchAffiliateLinks,
+  generateAffiliateLink,
+  buildGoUrl,
   SpecialAffiliate,
   AffiliateConfig,
   CaptureRequest,
+  type AffiliateLink,
 } from '../services/affiliateService';
+import { fetchHouses, type House } from '../services/houseService';
+import { suggestTag, buildTaggedUrl, tagParamForTemplate } from '../lib/linkGeneration';
+import { extractTagFromUrl } from '../lib/linkTriage';
 import { producingAffiliateIds } from '../lib/affiliateActivity';
 import { buildPerHousePayout, type HouseMetricRow } from '../lib/perHousePayout';
 import { StoredManualRow } from '../lib/houseResults';
@@ -66,6 +73,15 @@ export default function SpecialSubAffiliates() {
   const [referOpen, setReferOpen] = useState(false);
   const [referForm, setReferForm] = useState({ name: '', email: '', phone: '', note: '' });
   const [sendingReferral, setSendingReferral] = useState(false);
+  // Links de divulgação da rede (call 12/08 · item 1): o servidor escopa o GET à
+  // rede do especial e o /generate só aceita alvo dentro dela (ele mesmo + subs).
+  const [links, setLinks] = useState<AffiliateLink[]>([]);
+  const [houses, setHouses] = useState<House[]>([]);
+  const [genFor, setGenFor] = useState<{ id: string; name: string } | null>(null);
+  const [genBrand, setGenBrand] = useState('');
+  const [genTag, setGenTag] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
 
   const ownId = profile?.affiliateId ? String(profile.affiliateId) : '';
 
@@ -81,7 +97,7 @@ export default function SpecialSubAffiliates() {
       const specials = await fetchSpecialAffiliates();
       const mine = specials[ownId] || null;
       const networkIds = [ownId, ...((mine?.subAffiliateIds || []).map(String))];
-      const [split, cfgs, poolData, manual, myReferrals] = await Promise.all([
+      const [split, cfgs, poolData, manual, myReferrals, netLinks, houseList] = await Promise.all([
         fetchResultsForAffiliatesSplit(networkIds, range),
         fetchAffiliateConfigs(),
         fetchAffiliates().catch(() => []),
@@ -90,6 +106,9 @@ export default function SpecialSubAffiliates() {
         fetchManualResults(range).catch(() => []),
         // Indicações do próprio gerente (o servidor escopa) — acompanhamento.
         fetchAffiliateReferrals().catch(() => []),
+        // Links da rede (item 1): o servidor devolve own + subs para o especial.
+        fetchAffiliateLinks().catch(() => []),
+        fetchHouses().catch(() => []),
       ]);
       setSpecial(mine);
       setResults(split.rows);
@@ -98,6 +117,8 @@ export default function SpecialSubAffiliates() {
       setConfigs(cfgs);
       setPool(Array.isArray(poolData) ? poolData : []);
       setReferrals(Array.isArray(myReferrals) ? myReferrals : []);
+      setLinks(Array.isArray(netLinks) ? netLinks : []);
+      setHouses(Array.isArray(houseList) ? houseList : []);
       // semente dos inputs editáveis a partir dos configs salvos
       const seed: Record<string, { cpaValue: number | string; revPercentage: number | string }> = {};
       (mine?.subAffiliateIds || []).forEach((id) => {
@@ -138,6 +159,76 @@ export default function SpecialSubAffiliates() {
     } finally {
       setSendingReferral(false);
     }
+  };
+
+  // --- Links de divulgação da rede (item 1) ---------------------------------
+  // Mesma convenção de chave de marca do LinkTriage/dealBrandKey: brandId da OTG
+  // quando existe, senão o slug da casa manual.
+  const houseKeyOf = (h: House) => String(h.brandId || h.slug || h.id || '');
+
+  const linksByAffiliate = useMemo(() => {
+    const m = new Map<string, AffiliateLink[]>();
+    links.forEach((l) => {
+      const id = String(l.affiliateId ?? '').trim();
+      if (!id) return; // pool de standby nem chega aqui (o servidor já filtra)
+      const list = m.get(id);
+      if (list) list.push(l);
+      else m.set(id, [l]);
+    });
+    return m;
+  }, [links]);
+
+  // Só o link ENTREGÁVEL aparece pra copiar (mesmo critério do /go: ativo + URL).
+  const deliverableLinksOf = (id: string) =>
+    (linksByAffiliate.get(String(id)) ?? []).filter((l) => l.active !== false && String(l.registerUrl ?? '').trim());
+
+  // Tags já em uso na rede — a sugestão nasce sem colidir; o servidor revalida
+  // contra a base INTEIRA na gravação (a visão do especial é parcial de propósito).
+  const takenTags = useMemo(
+    () => links.map((l) => String((l as any).tag ?? '') || extractTagFromUrl(String(l.registerUrl ?? ''))).filter(Boolean),
+    [links],
+  );
+
+  const houseNameOf = (brandKey: string | null | undefined) => {
+    const key = String(brandKey ?? '').trim();
+    if (!key) return '';
+    const h = houses.find((x) => houseKeyOf(x) === key);
+    return h?.name ?? key;
+  };
+
+  const genHouse = useMemo(() => houses.find((h) => houseKeyOf(h) === genBrand) ?? null, [houses, genBrand]);
+  const genTemplate = String(genHouse?.registerUrlTemplate ?? '').trim();
+  // O MESMO builder puro do servidor: o preview é o que vai ser gravado.
+  const genPreview = useMemo(() => buildTaggedUrl(genTemplate, genTag), [genTemplate, genTag]);
+
+  const openGenerate = (id: string, name: string) => {
+    setGenBrand(houses.length === 1 ? houseKeyOf(houses[0]) : '');
+    setGenTag(suggestTag({ name, affiliateId: id }, takenTags));
+    setGenFor({ id: String(id), name });
+  };
+
+  const handleGenerateLink = async () => {
+    if (!genFor) return;
+    const tag = genTag.trim();
+    if (!genBrand) { push({ type: 'error', message: 'Escolha a casa — o link sai do template dela.' }); return; }
+    if (!tag) { push({ type: 'error', message: 'A tag não pode ficar vazia: é ela que a casa devolve no relatório.' }); return; }
+    setGenerating(true);
+    try {
+      const generated = await generateAffiliateLink(genFor.id, genBrand, { tag });
+      push({ type: 'success', message: `Link gerado com a tag ${generated.tag}.` });
+      setGenFor(null);
+      setLinks(await fetchAffiliateLinks().catch(() => links));
+    } catch (e: any) {
+      push({ type: 'error', message: e?.message || 'Falha ao gerar o link.' });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const copyLink = (code: string) => {
+    navigator.clipboard.writeText(buildGoUrl(code));
+    setCopied(code);
+    setTimeout(() => setCopied(null), 2000);
   };
 
   // Config própria do especial PRESERVANDO byBrand (antes descartava a taxa por casa · R10).
@@ -255,6 +346,41 @@ export default function SpecialSubAffiliates() {
     </div>
   );
 
+  // Chip de link: copia o /go e mostra a casa + cliques. Reusado na coluna dos
+  // subs E na faixa "Seus links" (a especial precisa copiar o PRÓPRIO link aqui —
+  // "Meus Links" só existe com o marketplace ligado, e a Infinity o tem desligado).
+  const renderLinkChip = (l: AffiliateLink) => (
+    <button
+      key={l.code}
+      type="button"
+      onClick={() => copyLink(l.code)}
+      title={`Copiar ${buildGoUrl(l.code)}`}
+      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 text-[10px] font-bold text-slate-600 dark:text-neutral-300 hover:border-accent-500/40 hover:text-accent-600 dark:hover:text-accent-400 transition-all"
+    >
+      {copied === l.code ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+      <span className="max-w-[110px] truncate">{houseNameOf(l.brandId) || l.code}</span>
+      <span className="font-medium text-slate-400 dark:text-neutral-500">{(l.clicks ?? 0).toLocaleString('pt-BR')} clique(s)</span>
+    </button>
+  );
+
+  // Links do sub (item 1): chips + "Gerar" pelo template da casa. Reusado na
+  // tabela (desktop) e nos cards (mobile).
+  const renderLinkCell = (id: string, name: string) => {
+    const subLinks = deliverableLinksOf(id);
+    return (
+      <div className="flex flex-col items-start gap-1.5">
+        {subLinks.map(renderLinkChip)}
+        <button
+          type="button"
+          onClick={() => openGenerate(id, name)}
+          className="inline-flex items-center gap-1 text-[10px] font-bold text-accent-600 dark:text-accent-400 hover:opacity-80 transition-opacity"
+        >
+          <Link2 size={11} /> {subLinks.length ? 'Gerar outro' : 'Gerar link'}
+        </button>
+      </div>
+    );
+  };
+
   if (profile && !profile.isSpecial) return <Navigate to="/dashboard" replace />;
 
   if (loading) {
@@ -284,16 +410,37 @@ export default function SpecialSubAffiliates() {
         </div>
         <div className="flex flex-col items-start md:items-end gap-3">
           <DateRangePicker value={range} onChange={setRange} />
-          {/* Indicação (call 12/08): abre a fila da agência, não cria nada aqui. */}
-          <button
-            type="button"
-            onClick={() => setReferOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-accent-500 text-accent-contrast text-[11px] font-bold hover:opacity-90 transition-all shadow-sm"
-          >
-            <UserPlus size={14} /> Indicar afiliado
-          </button>
+          <div className="flex items-center gap-2 flex-wrap md:justify-end">
+            {/* Item 1 (call 12/08): o especial gera o PRÓPRIO link aqui; os já
+                gerados ficam em "Meus Links" (menu) — este botão só cunha. */}
+            <button
+              type="button"
+              onClick={() => openGenerate(ownId, nameFromPool[ownId] || '')}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-slate-200 dark:border-neutral-700 text-[11px] font-bold text-slate-600 dark:text-neutral-300 hover:border-accent-500/40 hover:text-accent-600 dark:hover:text-accent-400 transition-all"
+            >
+              <Link2 size={14} /> Gerar meu link
+            </button>
+            {/* Indicação (call 12/08): abre a fila da agência, não cria nada aqui. */}
+            <button
+              type="button"
+              onClick={() => setReferOpen(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-accent-500 text-accent-contrast text-[11px] font-bold hover:opacity-90 transition-all shadow-sm"
+            >
+              <UserPlus size={14} /> Indicar afiliado
+            </button>
+          </div>
         </div>
       </motion.header>
+
+      {/* Links PRÓPRIOS da especial — copiáveis daqui mesmo (item 1). */}
+      {deliverableLinksOf(ownId).length > 0 && (
+        <div className="p-4 rounded-2xl border border-slate-200/70 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 shadow-sm">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500 mb-2 flex items-center gap-1.5">
+            <Link2 size={12} /> Seus links de divulgação
+          </p>
+          <div className="flex flex-wrap gap-2">{deliverableLinksOf(ownId).map(renderLinkChip)}</div>
+        </div>
+      )}
 
       {/* Indicações aguardando a confirmação da agência — acompanhamento do gerente. */}
       {referrals.some((r) => r.status !== 'archived') && (
@@ -387,6 +534,7 @@ export default function SpecialSubAffiliates() {
                       <th className="px-6 py-4 text-right">Depósitos</th>
                       <th className="px-6 py-4 text-right">CPA Qualif.</th>
                       <th className="px-6 py-4 text-right">Seu ganho</th>
+                      <th className="px-6 py-4">Link de divulgação</th>
                       <th className="px-6 py-4">Comissão CPA (R$)</th>
                       <th className="px-6 py-4">Comissão REV (%)</th>
                       <th className="px-6 py-4 text-right">Ação</th>
@@ -415,6 +563,9 @@ export default function SpecialSubAffiliates() {
                           <td className="px-6 py-4 text-right tabular-nums font-bold text-slate-700 dark:text-neutral-200">{(r.first_deposits || 0).toLocaleString('pt-BR')}</td>
                           <td className="px-6 py-4 text-right tabular-nums font-bold text-slate-700 dark:text-neutral-200">{(r.qualified_cpa || 0).toLocaleString('pt-BR')}</td>
                           <td className="px-6 py-4 text-right tabular-nums font-black text-emerald-600 dark:text-emerald-400">{brl(spread)}</td>
+                          <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                            {renderLinkCell(id, name)}
+                          </td>
                           <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                             <div className="relative w-24">
                               <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 dark:text-neutral-500">R$</span>
@@ -508,6 +659,10 @@ export default function SpecialSubAffiliates() {
                           <Crown size={11} /> Seu ganho
                         </span>
                         <span className="text-sm font-black text-emerald-700 dark:text-emerald-400 tabular-nums">{brl(spread)}</span>
+                      </div>
+                      <div className="pt-3 border-t border-slate-100 dark:border-neutral-800">
+                        <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-2">Link de divulgação</p>
+                        {renderLinkCell(id, name)}
                       </div>
                       <div className="pt-3 border-t border-slate-100 dark:border-neutral-800">
                         <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-2">
@@ -630,6 +785,88 @@ export default function SpecialSubAffiliates() {
               >
                 {sendingReferral ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
                 Enviar indicação
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Modal de geração de link (item 1) — espelha o do master (/links): casa +
+          tag + preview do MESMO builder puro do servidor. O servidor revalida o
+          escopo (rede do especial) e a colisão de tag na gravação. */}
+      {genFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => !generating && setGenFor(null)}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200 dark:border-neutral-800 shadow-2xl overflow-hidden"
+          >
+            <div className="p-6 border-b border-slate-100 dark:border-neutral-800 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Link2 size={16} className="text-accent-500" />
+                {genFor.id === ownId ? 'Gerar meu link' : `Gerar link de ${humanizeName(genFor.name || `#${genFor.id}`)}`}
+              </h3>
+              <button type="button" onClick={() => setGenFor(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 transition-colors" aria-label="Fechar">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-[12px] text-slate-500 dark:text-neutral-400">
+                O link sai do cadastro da casa com a tag abaixo — é ela que a casa devolve no relatório.
+              </p>
+              <label className="block">
+                <span className="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">Casa</span>
+                <select
+                  value={genBrand}
+                  onChange={(e) => setGenBrand(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
+                >
+                  <option value="">Selecione…</option>
+                  {houses.map((h) => (
+                    <option key={h.id} value={houseKeyOf(h)}>{h.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                  Tag ({genTemplate ? tagParamForTemplate(genTemplate) : 'afp'})
+                </span>
+                <input
+                  value={genTag}
+                  onChange={(e) => setGenTag(e.target.value)}
+                  placeholder="minhatag01"
+                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm font-mono outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
+                />
+              </label>
+              {genBrand && !genTemplate ? (
+                <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                  Esta casa não tem link de cadastro configurado — peça à agência para preenchê-lo.
+                </p>
+              ) : genPreview ? (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500 mb-1.5">Destino final</p>
+                  <code className="block px-3 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-[11px] text-slate-700 dark:text-neutral-200 break-all">{genPreview}</code>
+                </div>
+              ) : null}
+            </div>
+            <div className="flex gap-3 p-6 pt-0">
+              <button
+                type="button"
+                onClick={() => setGenFor(null)}
+                disabled={generating}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-600 dark:text-neutral-300 hover:border-slate-300 dark:hover:border-neutral-600 transition-all disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={generating || !genPreview}
+                onClick={handleGenerateLink}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-accent-500 text-accent-contrast text-xs font-bold hover:opacity-90 transition-all disabled:opacity-40"
+              >
+                {generating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                Gerar link
               </button>
             </div>
           </motion.div>

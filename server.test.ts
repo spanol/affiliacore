@@ -3298,6 +3298,76 @@ describe('geracao de link (/api/affiliate-links/generate)', () => {
       .send({ affiliateId: 'AFF-1', brandId: 'esportiva' })
       .expect(403);
   });
+
+  // --- Item 1 (call Infinity 12/08): o ESPECIAL gera para a propria rede -------
+  const specialSeed = {
+    ...seed,
+    users: {
+      ...seed.users,
+      'esp-uid': { role: 'client', affiliateId: 'AFF-ESP', isSpecial: true },
+      'inativo-uid': { role: 'client', affiliateId: 'AFF-OFF' },
+    },
+    special_affiliates: {
+      'AFF-ESP': { active: true, subAffiliateIds: ['AFF-1'] },
+      'AFF-OFF': { active: false, subAffiliateIds: ['AFF-1'] },
+    },
+  };
+
+  it('especial gera para um SUB da rede (201, carimbado com o uid dele)', async () => {
+    const db = makeFirestore(specialSeed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app)
+      .post('/api/affiliate-links/generate')
+      .set('Authorization', 'Bearer esp-uid')
+      .send({ affiliateId: 'AFF-1', brandId: 'esportiva', tag: 'subtag01' })
+      .expect(201);
+    const row = db.__store.get('affiliate_links')?.get(res.body.code);
+    expect(row).toMatchObject({ affiliateId: 'AFF-1', tag: 'subtag01', active: true, createdByUid: 'esp-uid' });
+  });
+
+  it('especial gera o PROPRIO link (201)', async () => {
+    const app = buildApp({ seed: specialSeed });
+    await request(app)
+      .post('/api/affiliate-links/generate')
+      .set('Authorization', 'Bearer esp-uid')
+      .send({ affiliateId: 'AFF-ESP', brandId: 'esportiva', tag: 'meutag01' })
+      .expect(201);
+  });
+
+  it('especial NAO gera para fora da rede (403) — barreira de IDOR do item 1', async () => {
+    const app = buildApp({ seed: specialSeed });
+    const res = await request(app)
+      .post('/api/affiliate-links/generate')
+      .set('Authorization', 'Bearer esp-uid')
+      .send({ affiliateId: 'AFF-9', brandId: 'esportiva', tag: 'x1' })
+      .expect(403);
+    expect(res.body.error).toMatch(/rede/i);
+  });
+
+  it('registro de especial INATIVO nao gera (403, fail-closed)', async () => {
+    const app = buildApp({ seed: specialSeed });
+    await request(app)
+      .post('/api/affiliate-links/generate')
+      .set('Authorization', 'Bearer inativo-uid')
+      .send({ affiliateId: 'AFF-1', brandId: 'esportiva', tag: 'x2' })
+      .expect(403);
+  });
+
+  it('GET escopa o especial a rede (own + subs), sem vazar o pool nem link de fora', async () => {
+    const app = buildApp({
+      seed: {
+        ...specialSeed,
+        affiliate_links: {
+          meu: { code: 'meu', affiliateId: 'AFF-ESP', registerUrl: 'https://casa.bet/r?afp=a' },
+          dosub: { code: 'dosub', affiliateId: 'AFF-1', registerUrl: 'https://casa.bet/r?afp=b' },
+          alheio: { code: 'alheio', affiliateId: 'AFF-9', registerUrl: 'https://casa.bet/r?afp=c' },
+          pool: { code: 'pool', affiliateId: null, registerUrl: 'https://casa.bet/r?afp=d' },
+        },
+      },
+    });
+    const res = await request(app).get('/api/affiliate-links').set('Authorization', 'Bearer esp-uid').expect(200);
+    expect(res.body.links.map((l: any) => l.code).sort()).toEqual(['dosub', 'meu']);
+  });
 });
 
 // =============================================================================
