@@ -7,8 +7,10 @@ import { cn } from '../lib/utils';
 // que existe dentro da dashboard", então tem que ser o MESMO componente, não uma
 // cópia que diverge na próxima mudança de estilo.
 //
-// `compact` esconde o rótulo (só o ícone): é o que cabe na nav da landing ao
-// lado de Entrar/Cadastrar sem espremer os CTAs no mobile.
+// `compact` esconde o rótulo (só o ícone). Nasceu para a nav da landing, onde o
+// rótulo espremia os CTAs no mobile, e passou a valer também no header do app
+// (o texto competia com o sino e o título da página por atenção). O modo COM
+// rótulo continua aqui para quem precisar do switch explicado.
 export default function ThemeToggle({
   compact = false,
   className,

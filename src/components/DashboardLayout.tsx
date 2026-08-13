@@ -350,7 +350,7 @@ export default function DashboardLayout() {
           </h2>
           <div className="flex items-center gap-4">
             <NotificationBell />
-            <ThemeToggle />
+            <ThemeToggle compact />
             <button
               onClick={() => setIsMobileMenuOpen(true)}
               className="lg:hidden p-2 text-slate-500 dark:text-neutral-400 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg"
