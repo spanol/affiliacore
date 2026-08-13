@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { Award, Loader2, Lock, Check, Gift, Target, Trophy, Settings2, Clock } from 'lucide-react';
+import { Award, Loader2, Lock, Check, Gift, Target, Trophy, Settings2, Clock, Wallet } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { cn, humanizeName } from '../lib/utils';
@@ -14,6 +14,7 @@ import {
   requestForTier,
   totalsFromBrandRows,
   resolveAchievementScope,
+  remainingLabel,
   type AchievementTotals,
 } from '../lib/achievements';
 import {
@@ -179,11 +180,18 @@ export default function Achievements() {
           className="grid grid-cols-1 sm:grid-cols-3 gap-4"
         >
           <div className="p-6 rounded-2xl border bg-white dark:bg-neutral-900/60 border-slate-200/70 dark:border-neutral-800 shadow-sm">
+            {/* A placa é medida em R$ ("10K EM FATURAMENTO"), então o número de
+                topo é o faturamento. Os CPAs continuam à vista embaixo: a meta
+                de um tier pode ser em CPAs (metaCpas), e aí é ele que conta. */}
             <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-2">
-              <Target size={13} /> CPAs acumulados{countsNetwork ? ' · você + rede' : ''}
+              <Wallet size={13} /> Faturamento acumulado{countsNetwork ? ' · você + rede' : ''}
             </div>
             <p className="text-2xl font-black text-slate-900 dark:text-white">
-              {loading ? '—' : totals.cpas.toLocaleString('pt-BR')}
+              {loading ? '—' : formatBRL(totals.commission)}
+            </p>
+            <p className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-neutral-400 mt-1">
+              <Target size={12} />
+              {loading ? '—' : `${totals.cpas.toLocaleString('pt-BR')} CPAs acumulados`}
             </p>
           </div>
           <div className="p-6 rounded-2xl border bg-white dark:bg-neutral-900/60 border-slate-200/70 dark:border-neutral-800 shadow-sm">
@@ -211,8 +219,11 @@ export default function Achievements() {
               {loading ? '—' : `${unlockedCount}/${activeTiers(tiers).length}`}
             </p>
             <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-1">
-              {countsNetwork ? 'Faturamento (você + rede): ' : 'Comissão acumulada: '}
-              {loading ? '—' : formatBRL(totals.commission)}
+              {loading
+                ? '—'
+                : activeTiers(tiers).length === 0
+                  ? 'Nenhum prêmio ativo'
+                  : remainingLabel(upcoming, totals) || 'Todas conquistadas'}
             </p>
           </div>
         </motion.div>

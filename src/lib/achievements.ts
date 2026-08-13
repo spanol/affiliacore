@@ -322,6 +322,29 @@ export function canRequestTier(
   return requestForTier(requests, tier.id) === undefined;
 }
 
+const brl = (v: number) =>
+  `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+// Quanto falta para o PRÓXIMO prêmio, na unidade da meta que ainda não foi
+// atingida. Dinheiro tem precedência (é como a placa se anuncia: "10K EM
+// FATURAMENTO"), mas um tier com meta só em CPAs precisa falar em CPAs — senão
+// a tela diz "falta R$ 0,00" num prêmio que está longe. Sem tier (tudo
+// conquistado / nada ativo) → string vazia, e o chamador decide o que dizer.
+export function remainingLabel(
+  tier: Pick<AchievementTier, 'metaCpas' | 'metaCommission'> | null | undefined,
+  totals: AchievementTotals,
+): string {
+  if (!tier) return '';
+  const metaCommission = num(tier.metaCommission);
+  const faltaComissao = metaCommission - num(totals?.commission);
+  if (metaCommission > 0 && faltaComissao > 0) return `Falta ${brl(faltaComissao)} para a próxima`;
+  const metaCpas = num(tier.metaCpas);
+  const faltaCpas = Math.ceil(metaCpas - num(totals?.cpas));
+  if (metaCpas > 0 && faltaCpas > 0)
+    return `${faltaCpas === 1 ? 'Falta 1 CPA' : `Faltam ${faltaCpas.toLocaleString('pt-BR')} CPAs`} para a próxima`;
+  return '';
+}
+
 // Rótulo da meta pra pills/tabelas: "50 CPAs", "R$ 10.000,00" ou os dois.
 export function tierMetaLabel(tier: Pick<AchievementTier, 'metaCpas' | 'metaCommission'>): string {
   const parts: string[] = [];

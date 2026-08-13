@@ -13,6 +13,7 @@ import {
   tierMetaLabel,
   previewTotals,
   resolveAchievementScope,
+  remainingLabel,
   PREVIEW_FRACTION,
   TIER_IMAGE_MAX_CHARS,
   type AchievementTier,
@@ -284,5 +285,45 @@ describe('resolveAchievementScope (a placa conta a rede)', () => {
   it('sem afiliado vinculado não busca escopo nenhum', () => {
     expect(resolveAchievementScope('client', '')).toBe('self');
     expect(resolveAchievementScope('admin', null)).toBe('self');
+  });
+});
+
+describe('remainingLabel (quanto falta para a próxima placa)', () => {
+  const totals = { cpas: 40, commission: 7_652.33 };
+
+  it('meta em R$: fala em dinheiro', () => {
+    expect(remainingLabel(tier({ metaCommission: 10_000 }), totals)).toBe(
+      'Falta R$ 2.347,67 para a próxima',
+    );
+  });
+
+  it('meta só em CPAs: fala em CPAs, nunca "R$ 0,00"', () => {
+    // O bug que esta função existe para impedir: usar a meta de comissão (0)
+    // num tier de CPA anunciava "Falta R$ 0,00" num prêmio ainda distante.
+    const t = tier({ metaCpas: 50, metaCommission: 0 });
+    expect(remainingLabel(t, totals)).toBe('Faltam 10 CPAs para a próxima');
+  });
+
+  it('CPA no singular', () => {
+    expect(remainingLabel(tier({ metaCpas: 41, metaCommission: 0 }), totals)).toBe(
+      'Falta 1 CPA para a próxima',
+    );
+  });
+
+  it('duas metas: dinheiro tem precedência, mas cai pro CPA quando o R$ já foi batido', () => {
+    const t = tier({ metaCpas: 50, metaCommission: 10_000 });
+    expect(remainingLabel(t, totals)).toMatch(/^Falta R\$/);
+    expect(remainingLabel(t, { cpas: 40, commission: 10_000 })).toBe('Faltam 10 CPAs para a próxima');
+  });
+
+  it('sem tier (tudo conquistado) ou meta já atingida → vazio, quem chama decide o texto', () => {
+    expect(remainingLabel(null, totals)).toBe('');
+    expect(remainingLabel(tier({ metaCommission: 1_000 }), totals)).toBe('');
+  });
+
+  it('CPA fracionado arredonda pra cima (não anuncia "faltam 0")', () => {
+    expect(remainingLabel(tier({ metaCpas: 50, metaCommission: 0 }), { cpas: 49.2, commission: 0 })).toBe(
+      'Falta 1 CPA para a próxima',
+    );
   });
 });
