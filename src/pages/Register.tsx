@@ -187,7 +187,7 @@ export default function Register() {
           <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Cadastro por convite</h2>
           <p className="text-sm text-slate-500 dark:text-neutral-400 mb-8">
             No momento, novos afiliados entram por convite da agência. Fale com a gente pela página
-            inicial para pedir o seu acesso — ou, se você já recebeu um link de convite, é só abri-lo.
+            inicial para pedir o seu acesso. Se você já recebeu um link de convite, é só abri-lo.
           </p>
           <Link
             to="/"

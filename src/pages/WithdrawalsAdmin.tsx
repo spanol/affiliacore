@@ -88,7 +88,7 @@ export default function WithdrawalsAdmin() {
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tighter">Saques</h1>
         </div>
         <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">
-          Fila de solicitações de saque dos afiliados. {pendingTotal > 0 && <b className="text-amber-600 dark:text-amber-400">{fmt(pendingTotal)} pendente(s) de aprovação.</b>} Sem gateway — o pagamento (PIX) é feito manualmente fora do sistema; marque "Pago" depois de transferir.
+          Fila de solicitações de saque dos afiliados. {pendingTotal > 0 && <b className="text-amber-600 dark:text-amber-400">{fmt(pendingTotal)} pendente(s) de aprovação.</b>} Sem gateway: o pagamento (PIX) é feito manualmente fora do sistema; marque "Pago" depois de transferir.
         </p>
       </motion.header>
 

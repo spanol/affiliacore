@@ -229,7 +229,7 @@ export default function Network() {
           </h1>
           <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2 max-w-2xl">
             Cada afiliado recebe a produção de toda a subárvore pela taxa própria e repassa cada filho direto
-            pela taxa dele — a diferença é o <strong>lucro sobre equipe</strong>. O custo da agência é a produção
+            pela taxa dele: a diferença é o <strong>lucro sobre equipe</strong>. O custo da agência é a produção
             de cada um pela taxa do <strong>topo</strong> da estrutura.
           </p>
         </div>
@@ -298,7 +298,7 @@ export default function Network() {
                 return (
                   <span
                     key="__unknown__"
-                    title="Afiliados sem casa no cadastro — a produção entra no total, mas não é atribuída a nenhuma casa."
+                    title="Afiliados sem casa no cadastro: a produção entra no total, mas não é atribuída a nenhuma casa."
                     className="inline-flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-xl border border-amber-300/60 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20 text-[11px] font-bold text-amber-700 dark:text-amber-400"
                   >
                     <AlertTriangle size={13} />
@@ -365,10 +365,10 @@ export default function Network() {
                   const linha = (d: typeof g.items[number]) => (
                     <>
                       <strong>{nameOf(d.affiliateId)}</strong>{' '}
-                      {d.reason === 'ciclo' && 'fechava um ciclo na rede — virou topo de estrutura.'}
-                      {d.reason === 'auto-upline' && 'apontava para si mesmo — vínculo ignorado.'}
-                      {d.reason === 'upline-desconhecido' && `tem upline fora do cadastro (#${d.uplineId}) — virou topo.`}
-                      {d.reason === 'upline-inelegivel' && `tem upline (${nameOf(d.uplineId)}) SEM taxa configurada — o vínculo não vale até configurar a comissão dele.`}
+                      {d.reason === 'ciclo' && 'fechava um ciclo na rede e virou topo de estrutura.'}
+                      {d.reason === 'auto-upline' && 'apontava para si mesmo, vínculo ignorado.'}
+                      {d.reason === 'upline-desconhecido' && `tem upline fora do cadastro (#${d.uplineId}) e virou topo.`}
+                      {d.reason === 'upline-inelegivel' && `tem upline (${nameOf(d.uplineId)}) SEM taxa configurada: o vínculo não vale até configurar a comissão dele.`}
                     </>
                   );
                   // Poucos: vale listar um a um, o nome é a informação útil.
@@ -388,7 +388,7 @@ export default function Network() {
                         className="text-left underline decoration-dotted underline-offset-2 hover:opacity-80"
                         aria-expanded={aberto}
                       >
-                        <strong>{g.items.length} vínculos ignorados</strong>{' — '}
+                        <strong>{g.items.length} vínculos ignorados</strong>{': '}
                         {g.reason === 'ciclo' && 'fechavam ciclo na rede'}
                         {g.reason === 'auto-upline' && 'apontavam para si mesmos'}
                         {g.reason === 'upline-desconhecido' && 'upline fora do cadastro'}
@@ -408,12 +408,12 @@ export default function Network() {
                     {a.kind === 'spread-negativo' ? (
                       <>
                         <strong>{nameOf(a.affiliateId)}</strong> paga <strong>{nameOf(a.uplineId!)}</strong> mais do
-                        que recebe ({brl(a.amount ?? 0)}) — a taxa do downline passou do teto do upline.
+                        que recebe ({brl(a.amount ?? 0)}): a taxa do downline passou do teto do upline.
                       </>
                     ) : (
                       <>
                         <strong>{nameOf(a.affiliateId)}</strong> tem produção no período mas <strong>nenhuma taxa
-                        configurada</strong> — o repasse dele sai R$ 0,00 (não é zero real, é falta de configuração).
+                        configurada</strong>: o repasse dele sai R$ 0,00 (não é zero real, é falta de configuração).
                       </>
                     )}
                   </li>

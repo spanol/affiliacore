@@ -74,7 +74,7 @@ export default function DataFreshness({ className }: { className?: string }) {
       </ul>
 
       <p className="text-[11px] text-slate-400 dark:text-neutral-500 mt-4 leading-relaxed">
-        Cliques no seu link são contados na hora. Cadastros, depósitos e CPA vêm do relatório da casa —
+        Cliques no seu link são contados na hora. Cadastros, depósitos e CPA vêm do relatório da casa,
         que é atualizado ao longo do dia e pode fechar o dia anterior com algumas horas de atraso.
       </p>
     </section>

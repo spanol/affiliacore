@@ -567,7 +567,7 @@ export default function AffiliateDetails() {
                     className="pointer-events-none absolute top-full z-30 mt-2 w-64 max-w-[calc(100vw_-_2rem)] right-0 translate-x-0 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 rounded-xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 text-[11px] font-medium normal-case leading-relaxed text-slate-600 dark:text-neutral-300 shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
                   >
                     <strong className="text-green-600 dark:text-green-400">Cadastrado</strong>: o afiliado já criou o próprio acesso à plataforma.{' '}
-                    <strong className="text-yellow-600 dark:text-yellow-400">Pendente</strong>: ainda não se registrou — gere um convite ou cadastre o usuário.
+                    <strong className="text-yellow-600 dark:text-yellow-400">Pendente</strong>: ainda não se registrou. Gere um convite ou cadastre o usuário.
                   </span>
                 </span>
               </div>
@@ -653,10 +653,10 @@ export default function AffiliateDetails() {
           {funnelTotals.funnelOnly && funnelTotals.matched > 0 && !hasResultActivity && (
             <div className="bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/40 rounded-3xl p-6 shadow-sm">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 mb-3 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[11px] font-bold">
-                <Clock size={12} /> Em captação — sem comissão ainda
+                <Clock size={12} /> Em captação, sem comissão ainda
               </div>
               <p className="text-sm text-slate-600 dark:text-neutral-300 leading-relaxed">
-                Este afiliado já gera <strong>cliques e cadastros</strong>, mas ainda não produziu comissão — por isso os números de resultado abaixo aparecem zerados. Os dados de captação vêm do funil da OTG (v1).
+                Este afiliado já gera <strong>cliques e cadastros</strong>, mas ainda não produziu comissão, por isso os números de resultado abaixo aparecem zerados. Os dados de captação vêm do funil da OTG (v1).
               </p>
             </div>
           )}
@@ -754,7 +754,7 @@ export default function AffiliateDetails() {
                               </p>
                             ) : (
                               <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
-                                Não configurado{isAdmin ? ' — defina o valor de CPA nas taxas do afiliado' : ''}
+                                Não configurado{isAdmin ? ': defina o valor de CPA nas taxas do afiliado' : ''}
                               </p>
                             )}
                           </div>
@@ -790,7 +790,7 @@ export default function AffiliateDetails() {
                     <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-accent-500/10 border border-accent-500/20 text-accent-700 dark:text-accent-400">
                       <Users size={15} className="shrink-0" />
                       <p className="text-[11px] font-bold">
-                        Afiliado especial — os números abaixo somam a <strong>rede inteira</strong> (produção própria + sub-afiliados vinculados).
+                        Afiliado especial: os números abaixo somam a <strong>rede inteira</strong> (produção própria + sub-afiliados vinculados).
                       </p>
                     </div>
                   )}

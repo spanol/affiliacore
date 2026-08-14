@@ -66,7 +66,7 @@ export default function LegalAdmin() {
             <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tighter">Jurídico</h1>
           </div>
           <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2 max-w-2xl">
-            Acordo de Afiliação, Código de Conduta e demais documentos que os afiliados veem em "Termos". <b>Revise com um advogado antes de publicar</b> — o conteúdo aqui é o que fica visível/aceitável, mas não é assessoria jurídica.
+            Acordo de Afiliação, Código de Conduta e demais documentos que os afiliados veem em "Termos". <b>Revise com um advogado antes de publicar</b>: o conteúdo aqui é o que fica visível/aceitável, mas não é assessoria jurídica.
           </p>
         </div>
         <button onClick={() => setModal(emptyDraft())} className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-neutral-900 rounded-full text-xs font-bold hover:opacity-90 shadow-sm shrink-0">
@@ -121,7 +121,7 @@ export default function LegalAdmin() {
             <div className="space-y-4">
               {!modal.id && (
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">Slug (identificador estável — não muda depois)</label>
+                  <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">Slug (identificador estável, não muda depois)</label>
                   <input value={modal.slug} onChange={(e) => setModal({ ...modal, slug: e.target.value })} placeholder="acordo-de-afiliacao" className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white outline-none font-mono" />
                 </div>
               )}
@@ -132,7 +132,7 @@ export default function LegalAdmin() {
               <div>
                 <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">Conteúdo (texto puro)</label>
                 <textarea value={modal.content} onChange={(e) => setModal({ ...modal, content: e.target.value })} rows={10} placeholder="Texto do documento..." className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white outline-none font-mono" />
-                {modal.id && <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1.5">Editar o conteúdo aumenta a versão — afiliados que já aceitaram precisam aceitar de novo.</p>}
+                {modal.id && <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1.5">Editar o conteúdo aumenta a versão. Afiliados que já aceitaram precisam aceitar de novo.</p>}
               </div>
               <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-neutral-300">
                 <input type="checkbox" checked={modal.active} onChange={(e) => setModal({ ...modal, active: e.target.checked })} className="accent-accent-500 w-4 h-4" /> Publicado (visível em "Termos" para os afiliados)

@@ -22,7 +22,7 @@ export const SUPPORT_LABEL_MAX = 24;
 export const SUPPORT_LABEL_DEFAULT = 'Suporte';
 
 const PHONE_ERROR =
-  'Telefone inválido — informe o WhatsApp com DDD (ex.: (11) 98888-7777) ou com o código do país.';
+  'Telefone inválido. Informe o WhatsApp com DDD (ex.: (11) 98888-7777) ou com o código do país.';
 
 export interface SupportSanitizeResult {
   ok: boolean;

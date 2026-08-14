@@ -92,7 +92,7 @@ export function consoleSmsProvider(log: (msg: string) => void = console.log): Sm
   return {
     id: 'console',
     async send(toE164: string, body: string) {
-      log(`[sms:dev] SMS para ${maskPhoneForLog(toE164)} → "${body}" (provedor de SMS NÃO configurado — modo dev)`);
+      log(`[sms:dev] SMS para ${maskPhoneForLog(toE164)} → "${body}" (provedor de SMS NÃO configurado; modo dev)`);
     },
   };
 }

@@ -581,7 +581,7 @@ export default function AffiliatesList() {
             {isAdmin && needsConfigCount > 0 && (
               <button
                 onClick={() => setOnlyNeedsConfig((v) => !v)}
-                title="Afiliados sem comissão (CPA/REV) configurada — repasse fica R$ 0"
+                title="Afiliados sem comissão (CPA/REV) configurada: o repasse fica R$ 0"
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider border transition-all',
                   onlyNeedsConfig
@@ -596,7 +596,7 @@ export default function AffiliatesList() {
             {isAdmin && needsAccessCount > 0 && (
               <button
                 onClick={() => setOnlyNeedsAccess((v) => !v)}
-                title="Afiliados sem login criado — eles não conseguem entrar na plataforma. Use 'Gerar acesso' para enviar o convite."
+                title="Afiliados sem login criado: eles não conseguem entrar na plataforma. Use 'Gerar acesso' para enviar o convite."
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider border transition-all',
                   onlyNeedsAccess
@@ -621,8 +621,8 @@ export default function AffiliatesList() {
                   activityFilter === 'all'
                     ? 'Filtrar por produção no período (cadastro, FTD, CPA, comissão ou depósito)'
                     : activityFilter === 'producing'
-                      ? 'Mostrando quem PRODUZIU no período — clique para ver quem não produziu'
-                      : 'Mostrando quem NÃO produziu no período — clique para remover o filtro'
+                      ? 'Mostrando quem PRODUZIU no período. Clique para ver quem não produziu'
+                      : 'Mostrando quem NÃO produziu no período. Clique para remover o filtro'
                 }
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider border transition-all',
@@ -847,7 +847,7 @@ export default function AffiliatesList() {
                               )}
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleOpenSpecial(item); }}
-                                title={specials[affiliateId]?.active ? 'Afiliado especial — gerir sub-rede' : 'Tornar afiliado especial'}
+                                title={specials[affiliateId]?.active ? 'Afiliado especial: gerir sub-rede' : 'Tornar afiliado especial'}
                                 className={cn(
                                   "p-2 rounded-lg transition-all",
                                   specials[affiliateId]?.active
@@ -1107,22 +1107,22 @@ function ListingHelp() {
             Para constar nesta lista e gerar repasse correto, ele precisa de:
           </p>
           <ol className="mt-2 space-y-1.5 text-[11px] leading-relaxed font-medium text-slate-600 dark:text-neutral-300">
-            <li className="flex gap-2"><span className="font-bold text-accent-600 dark:text-accent-400">1.</span><span><b>Produção</b> — {OTG_ENABLED ? 'aparecer no relatório da OTG (ou estar como pré-cadastro).' : 'ter resultados importados de uma casa (planilha) ou cadastro direto na plataforma.'}</span></li>
-            <li className="flex gap-2"><span className="font-bold text-accent-600 dark:text-accent-400">2.</span><span><b>Acesso</b> — um login gerado via convite.</span></li>
-            <li className="flex gap-2"><span className="font-bold text-accent-600 dark:text-accent-400">3.</span><span><b>Comissão</b> — CPA/REV configurados. Sem isso, o repasse fica <b>R$&nbsp;0</b>.</span></li>
+            <li className="flex gap-2"><span className="font-bold text-accent-600 dark:text-accent-400">1.</span><span><b>Produção</b>: {OTG_ENABLED ? 'aparecer no relatório da OTG (ou estar como pré-cadastro).' : 'ter resultados importados de uma casa (planilha) ou cadastro direto na plataforma.'}</span></li>
+            <li className="flex gap-2"><span className="font-bold text-accent-600 dark:text-accent-400">2.</span><span><b>Acesso</b>: um login gerado via convite.</span></li>
+            <li className="flex gap-2"><span className="font-bold text-accent-600 dark:text-accent-400">3.</span><span><b>Comissão</b>: CPA/REV configurados. Sem isso, o repasse fica <b>R$&nbsp;0</b>.</span></li>
           </ol>
           <div className="mt-3 pt-3 border-t border-slate-100 dark:border-neutral-800">
             <p className="text-[11px] font-bold text-slate-700 dark:text-neutral-200">Onde se configura o CPA/REV</p>
             <ul className="mt-1.5 space-y-1.5 text-[11px] leading-relaxed font-medium text-slate-500 dark:text-neutral-400">
-              <li className="flex gap-2"><span className="text-accent-600 dark:text-accent-400 font-bold">•</span><span><b>Aqui</b> — o repasse <b>padrão</b> do afiliado, válido em <b>todas as casas</b> (o que a agência paga a ele).</span></li>
-              <li className="flex gap-2"><span className="text-accent-600 dark:text-accent-400 font-bold">•</span><span><b>Na ficha do afiliado</b> — um <b>override por casa</b> (prioridade só naquela casa) sobre o padrão acima.</span></li>
-              <li className="flex gap-2"><span className="text-accent-600 dark:text-accent-400 font-bold">•</span><span>Em <Link to="/casas" className="font-bold text-accent-600 dark:text-accent-400 hover:underline">Casas</Link> — a <b>Taxa padrão da casa</b> é a <b>receita</b> (o que a casa paga à agência), <b>não</b> o repasse ao afiliado.</span></li>
+              <li className="flex gap-2"><span className="text-accent-600 dark:text-accent-400 font-bold">•</span><span><b>Aqui</b>: o repasse <b>padrão</b> do afiliado, válido em <b>todas as casas</b> (o que a agência paga a ele).</span></li>
+              <li className="flex gap-2"><span className="text-accent-600 dark:text-accent-400 font-bold">•</span><span><b>Na ficha do afiliado</b>: um <b>override por casa</b> (prioridade só naquela casa) sobre o padrão acima.</span></li>
+              <li className="flex gap-2"><span className="text-accent-600 dark:text-accent-400 font-bold">•</span><span>Em <Link to="/casas" className="font-bold text-accent-600 dark:text-accent-400 hover:underline">Casas</Link>: a <b>Taxa padrão da casa</b> é a <b>receita</b> (o que a casa paga à agência), <b>não</b> o repasse ao afiliado.</span></li>
             </ul>
           </div>
           {/* P2: referência ao roster só faz sentido com o módulo OTG ligado. */}
           {OTG_ENABLED && (
             <p className="mt-3 pt-3 border-t border-slate-100 dark:border-neutral-800 text-[11px] leading-relaxed font-medium text-slate-500 dark:text-neutral-400">
-              Aprovados na OTG <b>sem produção</b> ainda não aparecem aqui — ficam em{' '}
+              Aprovados na OTG <b>sem produção</b> ainda não aparecem aqui: ficam em{' '}
               <Link to="/roster-otg" className="font-bold text-accent-600 dark:text-accent-400 hover:underline">Roster OTG</Link> até reconciliar.
             </p>
           )}

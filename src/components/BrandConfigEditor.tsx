@@ -138,7 +138,7 @@ export default function BrandConfigEditor({ affiliateId, brandRows, config, onSa
         <div className="flex items-center gap-1 text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest">
           Comissão do afiliado
           <InfoTooltip
-            text="O Padrão do contrato é o MESMO CPA/REV de Gestão de Afiliados — o repasse ao afiliado, lido por todas as telas (inclusive o lucro da agência). Os overrides por casa têm prioridade só naquela casa. Em branco = usa o padrão. Não confunda com a Taxa padrão da casa (a receita da casa, em Casas)."
+            text="O Padrão do contrato é o MESMO CPA/REV de Gestão de Afiliados: o repasse ao afiliado, lido por todas as telas (inclusive o lucro da agência). Os overrides por casa têm prioridade só naquela casa. Em branco = usa o padrão. Não confunda com a Taxa padrão da casa (a receita da casa, em Casas)."
             align="left"
           />
         </div>

@@ -31,7 +31,7 @@ export interface PrizeSanitizeResult {
   error?: string;
 }
 
-const POSITION_ERROR = `Posição inválida — use um número inteiro entre 1 e ${PRIZE_MAX_POSITION}.`;
+const POSITION_ERROR = `Posição inválida. Use um número inteiro entre 1 e ${PRIZE_MAX_POSITION}.`;
 const TITLE_ERROR = 'Informe o prêmio (título).';
 
 // Aceita number ou string numérica (input do form chega como string). String

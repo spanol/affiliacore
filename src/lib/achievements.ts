@@ -54,8 +54,8 @@ export interface TierSanitizeResult {
 
 const TITLE_ERROR = 'Informe o título do prêmio.';
 const META_ERROR = 'Defina ao menos uma meta (CPAs ou comissão em R$) maior que zero.';
-const ORDER_ERROR = `Ordem inválida — use um número inteiro entre 0 e ${TIER_ORDER_MAX}.`;
-const IMAGE_ERROR = 'Imagem inválida — use uma URL https:// ou uma imagem pequena (data:image/*).';
+const ORDER_ERROR = `Ordem inválida. Use um número inteiro entre 0 e ${TIER_ORDER_MAX}.`;
+const IMAGE_ERROR = 'Imagem inválida. Use uma URL https:// ou uma imagem pequena (data:image/*).';
 
 // Valor de meta vindo de form: aceita number ou string nos DOIS formatos de
 // decimal ('10000.50' e '10.000,50' pt-BR). Diferente de `num()` (que por

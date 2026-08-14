@@ -140,7 +140,7 @@ export default function Integracoes() {
         </div>
         <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2 max-w-2xl">
           Conectores que puxam resultados direto da casa, sem planilha. Ligar, desligar ou trocar a chave
-          vale na hora — não exige nova publicação do sistema.
+          vale na hora, sem exigir nova publicação do sistema.
         </p>
       </motion.header>
 
@@ -217,7 +217,7 @@ export default function Integracoes() {
                         type="password"
                         value={draft.apiKey}
                         onChange={(e) => patchDraft(item.id, { apiKey: e.target.value })}
-                        placeholder={item.hasKey ? `Chave salva (${item.keyMask}) — digite para trocar` : 'Cole a chave fornecida pela casa'}
+                        placeholder={item.hasKey ? `Chave salva (${item.keyMask}). Digite para trocar` : 'Cole a chave fornecida pela casa'}
                         className={cn(inputCls, 'pl-9')}
                       />
                     </div>
@@ -225,7 +225,7 @@ export default function Integracoes() {
                       <p className="text-[11px] text-slate-400 dark:text-neutral-500">
                         {item.keyFromEnv
                           ? 'A chave em uso vem da configuração de ambiente da instância. Salvar uma aqui passa a valer no lugar dela.'
-                          : 'A chave nunca é exibida de volta — salvar sem digitar mantém a atual.'}
+                          : 'A chave nunca é exibida de volta; salvar sem digitar mantém a atual.'}
                       </p>
                       {item.hasKey && !item.keyFromEnv && (
                         <button
@@ -257,7 +257,7 @@ export default function Integracoes() {
                         </select>
                       </div>
                       <p className="text-[11px] text-slate-400 dark:text-neutral-500 mt-2">
-                        É a casa que recebe os resultados puxados — e a que ganha o botão "Atualizar" em Casas.
+                        É a casa que recebe os resultados puxados, e a que ganha o botão "Atualizar" em Casas.
                       </p>
                     </div>
                   )}

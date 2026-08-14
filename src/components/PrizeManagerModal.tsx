@@ -119,7 +119,7 @@ export default function PrizeManagerModal({ prizes, onClose }: Props) {
                 Prêmios do ranking
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-1">
-                Aparecem no pódio e na página pública — o chamariz para novos afiliados.
+                Aparecem no pódio e na página pública: o chamariz para novos afiliados.
               </p>
             </div>
             <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 transition-colors">

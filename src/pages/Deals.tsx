@@ -85,7 +85,7 @@ export default function Deals() {
     setBusy(r.id);
     try {
       await decidePartnership(r.id, status);
-      push({ type: 'success', message: status === 'approved' ? 'Parceria aprovada — taxa aplicada e link emitido.' : status === 'rejected' ? 'Parceria recusada.' : 'Parceria encerrada.' });
+      push({ type: 'success', message: status === 'approved' ? 'Parceria aprovada. Taxa aplicada e link emitido.' : status === 'rejected' ? 'Parceria recusada.' : 'Parceria encerrada.' });
       await load();
     } catch (e: any) {
       push({ type: 'error', message: e?.message || 'Erro ao decidir a parceria.' });

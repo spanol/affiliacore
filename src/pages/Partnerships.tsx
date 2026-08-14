@@ -216,7 +216,7 @@ export default function Partnerships() {
                             <a href={buildGoUrl(r.code!)} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-xl border border-slate-200 dark:border-neutral-700 text-slate-500 hover:text-accent-500"><ExternalLink size={14} /></a>
                           </div>
                         ) : (
-                          <p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">Link em preparação — a casa ainda não tem URL de cadastro configurada. Fale com o administrador.</p>
+                          <p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">Link em preparação: a casa ainda não tem URL de cadastro configurada. Fale com o administrador.</p>
                         );
                       })()}
                     </div>

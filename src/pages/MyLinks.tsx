@@ -71,7 +71,7 @@ export default function MyLinks() {
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="p-16 text-center bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl">
           <Link2 className="mx-auto text-slate-300 dark:text-neutral-600 mb-3" size={40} />
           <h3 className="text-sm font-bold text-slate-800 dark:text-neutral-100">Nenhum link ainda</h3>
-          <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1">Solicite uma parceria em "Parcerias" — ao ser aprovada, o link aparece aqui. O administrador também pode atribuir um link direto a você.</p>
+          <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1">Solicite uma parceria em "Parcerias". Quando ela for aprovada, o link aparece aqui. O administrador também pode atribuir um link direto a você.</p>
         </motion.div>
       ) : (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
@@ -96,7 +96,7 @@ export default function MyLinks() {
                 </div>
                 <div className="mt-4 pt-4 border-t border-slate-100 dark:border-neutral-800">
                   {!card.deliverable ? (
-                    <p className="text-[11px] text-amber-600 dark:text-amber-400">Link indisponível — ainda sem URL de cadastro ou desativado. Fale com o administrador.</p>
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400">Link indisponível: ainda sem URL de cadastro, ou desativado. Fale com o administrador.</p>
                   ) : (
                     <div className="flex items-center gap-2">
                       <code className="flex-1 px-3 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs text-slate-700 dark:text-neutral-200 truncate">{buildGoUrl(card.code)}</code>

@@ -106,7 +106,7 @@ export default function TwoFactorChallenge() {
             onClick={() => { setUseBackup((v) => !v); setCode(''); setError(''); }}
             className="text-[11px] font-bold text-auth-cta dark:text-lp-cta hover:underline"
           >
-            {useBackup ? 'Usar o código do autenticador' : 'Perdi o celular — usar código de backup'}
+            {useBackup ? 'Usar o código do autenticador' : 'Perdi o celular, usar código de backup'}
           </button>
           <button
             type="button"

@@ -428,7 +428,7 @@ export default function Financeiro() {
                 <label className={labelCls}>Observação (opcional)</label>
                 <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex.: referente a julho" className={inputCls} />
               </div>
-              <p className="text-[11px] text-slate-400 dark:text-neutral-500">Cada solicitação se refere aos ganhos de UMA casa. O pagamento é feito na chave PIX cadastrada acima — confira antes de solicitar.</p>
+              <p className="text-[11px] text-slate-400 dark:text-neutral-500">Cada solicitação se refere aos ganhos de UMA casa. O pagamento é feito na chave PIX cadastrada acima. Confira antes de solicitar.</p>
             </div>
             <div className="flex items-center gap-2 mt-6">
               <button onClick={() => setModalOpen(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 text-sm font-bold text-slate-600 dark:text-neutral-300">Cancelar</button>

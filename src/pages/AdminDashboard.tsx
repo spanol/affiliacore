@@ -490,8 +490,8 @@ export default function AdminDashboard() {
                       onClick={metric.toggle.onToggle}
                       aria-pressed={metric.toggle.mode === 'producing'}
                       title={metric.toggle.mode === 'producing'
-                        ? 'Mostrando quem produziu no período — clique para ver a carteira inteira'
-                        : 'Mostrando a carteira inteira — clique para ver só quem produziu no período'}
+                        ? 'Mostrando quem produziu no período. Clique para ver a carteira inteira'
+                        : 'Mostrando a carteira inteira. Clique para ver só quem produziu no período'}
                       className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 text-[10px] font-bold uppercase tracking-wider text-neutral-300 hover:text-white transition-colors"
                     >
                       <Filter size={11} />

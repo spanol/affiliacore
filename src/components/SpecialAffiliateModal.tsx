@@ -169,7 +169,7 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
             <>
               {!affiliate.userUid && (
                 <p className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
-                  Este afiliado ainda não tem conta na plataforma — ele precisará se cadastrar (convite) para acessar a view de especial.
+                  Este afiliado ainda não tem conta na plataforma. Ele precisará se cadastrar (convite) para acessar a view de especial.
                 </p>
               )}
 
@@ -224,7 +224,7 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
                         {orphans.length} afiliado(s) SAEM da estrutura ao salvar
                       </p>
                       <p>
-                        {orphans.map(nameOf).join(', ')} — estavam vinculados só por esta lista, sem
+                        {orphans.map(nameOf).join(', ')}: estavam vinculados só por esta lista, sem
                         upline na <span className="font-semibold">/rede</span>. Sem a aresta, cada um
                         volta a ser topo de estrutura própria e passa a ser pago pela taxa dele, não
                         pela do gerente: <span className="font-semibold">isso muda o custo da agência</span>.
@@ -235,7 +235,7 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
 
                   <p className="mt-2 text-[11px] text-slate-500 dark:text-neutral-400 bg-slate-50 dark:bg-neutral-800/40 border border-slate-100 dark:border-neutral-800 rounded-xl px-3 py-2.5">
                     Ele <span className="font-semibold">enxerga</span> toda a estrutura abaixo, mas só
-                    define a comissão de quem indicou <span className="font-semibold">diretamente</span> —
+                    define a comissão de quem indicou <span className="font-semibold">diretamente</span>;
                     a de quem está mais abaixo é do gerente do meio.
                   </p>
                 </div>

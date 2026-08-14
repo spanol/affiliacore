@@ -228,7 +228,7 @@ export default function ClientDashboard() {
         <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/15 border border-amber-200/70 dark:border-amber-900/40">
           <Clock size={18} className="mt-0.5 shrink-0 text-amber-500" />
           <div>
-            <p className="text-sm font-bold text-amber-800 dark:text-amber-300">Cadastro aprovado — aguardando produção</p>
+            <p className="text-sm font-bold text-amber-800 dark:text-amber-300">Cadastro aprovado, aguardando produção</p>
             <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-0.5">Seu acesso já está ativo. Os resultados aparecem aqui assim que sua operação registrar atividade na casa.</p>
           </div>
         </div>

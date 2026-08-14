@@ -98,13 +98,13 @@ function buildTemplateWorkbook(XLSX: typeof import('xlsx'), houseName?: string):
 
   // Aba de instruções — coluna, descrição, obrigatoriedade + linhas de exemplo.
   const intro: (string | number)[][] = [
-    [houseName ? `Modelo de resultados — ${houseName}` : 'Modelo de resultados'],
+    [houseName ? `Modelo de resultados (${houseName})` : 'Modelo de resultados'],
     ['Preencha a aba "Resultados" (1 linha por dia). Afiliado vazio = total/agregado da casa no dia.'],
     [''],
     ['Coluna', 'Campo', 'Obrigatória?', 'Descrição'],
     ...TEMPLATE_COLUMNS.map((c) => [c.header, c.label, c.required ? 'Sim' : 'Não', c.help]),
     [''],
-    ['Exemplo (não copie esta aba — preencha a aba "Resultados"):'],
+    ['Exemplo (não copie esta aba; preencha a aba "Resultados"):'],
     TEMPLATE_HEADERS,
     ...TEMPLATE_EXAMPLE_ROWS,
   ];

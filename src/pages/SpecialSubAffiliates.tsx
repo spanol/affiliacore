@@ -37,7 +37,7 @@ const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigi
 
 // Sub que ele VÊ mas não repassa (neto na rede N níveis): quem define a comissão é
 // o gerente logo acima dele. Ver "visão ≠ dinheiro" em src/lib/specialNetwork.ts.
-const INDIRECT_HINT = 'Indicado indireto — a comissão dele é definida por quem está acima dele na rede.';
+const INDIRECT_HINT = 'Indicado indireto: a comissão dele é definida por quem está acima dele na rede.';
 
 // Passo 3 · Lista de sub-afiliados do afiliado especial — espelha o "Afiliados" do
 // master, capado à própria rede. Cada sub abre a AffiliateDetails escopada
@@ -150,7 +150,7 @@ export default function SpecialSubAffiliates() {
         phone: referForm.phone.trim() || undefined,
         note: referForm.note.trim() || undefined,
       });
-      push({ type: 'success', message: 'Indicação enviada — a agência confirma o cadastro.' });
+      push({ type: 'success', message: 'Indicação enviada. A agência confirma o cadastro.' });
       setReferOpen(false);
       setReferForm({ name: '', email: '', phone: '', note: '' });
       setReferrals(await fetchAffiliateReferrals().catch(() => referrals));
@@ -210,7 +210,7 @@ export default function SpecialSubAffiliates() {
   const handleGenerateLink = async () => {
     if (!genFor) return;
     const tag = genTag.trim();
-    if (!genBrand) { push({ type: 'error', message: 'Escolha a casa — o link sai do template dela.' }); return; }
+    if (!genBrand) { push({ type: 'error', message: 'Escolha a casa: o link sai do template dela.' }); return; }
     if (!tag) { push({ type: 'error', message: 'A tag não pode ficar vazia: é ela que a casa devolve no relatório.' }); return; }
     setGenerating(true);
     try {
@@ -813,7 +813,7 @@ export default function SpecialSubAffiliates() {
             </div>
             <div className="p-6 space-y-4">
               <p className="text-[12px] text-slate-500 dark:text-neutral-400">
-                O link sai do cadastro da casa com a tag abaixo — é ela que a casa devolve no relatório.
+                O link sai do cadastro da casa com a tag abaixo. É ela que a casa devolve no relatório.
               </p>
               <label className="block">
                 <span className="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">Casa</span>
@@ -841,7 +841,7 @@ export default function SpecialSubAffiliates() {
               </label>
               {genBrand && !genTemplate ? (
                 <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
-                  Esta casa não tem link de cadastro configurado — peça à agência para preenchê-lo.
+                  Esta casa não tem link de cadastro configurado. Peça à agência para preenchê-lo.
                 </p>
               ) : genPreview ? (
                 <div>

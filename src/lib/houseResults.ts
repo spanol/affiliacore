@@ -90,15 +90,15 @@ export interface TemplateColumn {
 }
 
 export const TEMPLATE_COLUMNS: TemplateColumn[] = [
-  { key: 'date', header: 'data', label: 'Data', required: true, help: 'Dia do resultado (AAAA-MM-DD ou DD/MM/AAAA). Preencha na 1ª linha do dia — as linhas abaixo herdam a mesma data até mudar.' },
+  { key: 'date', header: 'data', label: 'Data', required: true, help: 'Dia do resultado (AAAA-MM-DD ou DD/MM/AAAA). Preencha na 1ª linha do dia; as linhas abaixo herdam a mesma data até mudar.' },
   { key: 'affiliate', header: 'afiliado', label: 'Afiliado', required: false, help: 'Nome do afiliado (opcional, só p/ leitura). O cruzamento usa o e-mail. Deixe afiliado E e-mail vazios para o total/agregado da casa no dia.' },
   { key: 'email', header: 'email', label: 'E-mail', required: false, help: 'E-mail de login do afiliado na plataforma (ou o e-mail OTG). É por ele que o resultado é cruzado com o afiliado.' },
-  { key: 'visits', header: 'visitas', label: 'Visitas', required: false, help: 'Cliques/visitas no link (opcional — nem toda casa informa).' },
+  { key: 'visits', header: 'visitas', label: 'Visitas', required: false, help: 'Cliques/visitas no link (opcional; nem toda casa informa).' },
   { key: 'registrations', header: 'cadastros', label: 'Cadastros', required: false, help: 'Quantidade de cadastros (registros).' },
   { key: 'first_deposits', header: 'ftd', label: 'FTD', required: false, help: 'Primeiros depósitos (first-time deposits).' },
   { key: 'qualified_cpa', header: 'cpa', label: 'CPA', required: false, help: 'CPAs qualificados.' },
   { key: 'rvs', header: 'rev', label: 'REV', required: false, help: 'Valor de revenue share (R$).' },
-  { key: 'deposit_count', header: 'qtd_depositos', label: 'Qtd. de depósitos', required: false, help: 'Quantidade de depósitos no dia (opcional — nem toda casa informa).' },
+  { key: 'deposit_count', header: 'qtd_depositos', label: 'Qtd. de depósitos', required: false, help: 'Quantidade de depósitos no dia (opcional; nem toda casa informa).' },
   { key: 'deposit', header: 'deposito', label: 'Depósito', required: false, help: 'Valor depositado (R$).' },
   { key: 'total_commission', header: 'comissao', label: 'Comissão', required: false, help: 'Comissão total (R$).' },
 ];

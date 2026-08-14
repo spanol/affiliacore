@@ -154,7 +154,7 @@ export default function LinkTriage() {
     const brand = genBrand;
     const tag = genTag.trim();
     if (!brand) {
-      push({ type: 'error', message: 'Escolha a casa — o link sai do template dela.' });
+      push({ type: 'error', message: 'Escolha a casa: o link sai do template dela.' });
       return;
     }
     if (!tag) {
@@ -562,8 +562,8 @@ export default function LinkTriage() {
                   Gerar link de {humanizeName(generatingRow.name)}
                 </h3>
                 <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-1">
-                  O link sai do cadastro da casa com a tag abaixo. É a tag que a casa devolve no relatório —
-                  não precisa cunhá-la no painel dela.
+                  O link sai do cadastro da casa com a tag abaixo. É a tag que a casa devolve no relatório,
+                  sem precisar cunhá-la no painel dela.
                 </p>
               </div>
               <div className="p-6 space-y-4">

@@ -166,7 +166,7 @@ export default function Ranking() {
               ? 'Nenhum afiliado gerou comissão neste dia.'
               : isAdmin
                 ? 'Clique em "Gerar ranking do dia" para calcular a partir dos resultados.'
-                : 'Aguarde o ciclo de atualização — a plataforma calcula a partir dos resultados do dia.'}
+                : 'Aguarde o ciclo de atualização: a plataforma calcula a partir dos resultados do dia.'}
           </p>
           {/* Prêmios em jogo: mesmo sem ranking calculado, o chamariz aparece. */}
           {activePrizes(prizes).length > 0 && (

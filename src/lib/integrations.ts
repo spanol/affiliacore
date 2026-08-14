@@ -78,7 +78,7 @@ export const INTEGRATION_CATALOG: IntegrationSpec[] = [
     id: 'leonbet-r2d',
     label: 'LEON Bet (R2D Partners)',
     description:
-      'Puxa o relatório de estatísticas da casa automaticamente (rodada diária), no lugar do export manual. A API já devolve CPA como contagem — não precisa de régua.',
+      'Puxa o relatório de estatísticas da casa automaticamente (rodada diária), no lugar do export manual. A API já devolve CPA como contagem, sem precisar de régua.',
     scope: 'house',
     envKeys: {
       apiKey: 'LEONBET_API_TOKEN',
@@ -92,7 +92,7 @@ export const INTEGRATION_CATALOG: IntegrationSpec[] = [
         label: 'ID da marca (merchant)',
         type: 'number',
         placeholder: '1',
-        hint: 'A conta R2D gerencia LEON/Twin/Slott no mesmo login — 1 = LEON. Confira em "Statistics retrieval API" no painel deles.',
+        hint: 'A conta R2D gerencia LEON/Twin/Slott no mesmo login (1 = LEON). Confira em "Statistics retrieval API" no painel deles.',
       },
     ],
   },

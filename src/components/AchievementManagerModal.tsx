@@ -84,7 +84,7 @@ export default function AchievementManagerModal({ tiers, onClose }: Props) {
     reader.onload = () => {
       const result = String(reader.result ?? '');
       if (result.length > TIER_IMAGE_MAX_CHARS) {
-        push({ type: 'error', message: 'Imagem muito grande — use uma versão menor (até ~300 KB).' });
+        push({ type: 'error', message: 'Imagem muito grande. Use uma versão menor (até ~300 KB).' });
         return;
       }
       setImageUrl(result);
@@ -329,7 +329,7 @@ export default function AchievementManagerModal({ tiers, onClose }: Props) {
                   />
                 </div>
                 <p className="text-[10px] text-slate-400 dark:text-neutral-500 text-center mt-2">
-                  Progresso ilustrativo — cada afiliado vê o próprio número.
+                  Progresso ilustrativo: cada afiliado vê o próprio número.
                 </p>
               </div>
 

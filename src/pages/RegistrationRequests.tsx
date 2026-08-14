@@ -144,7 +144,7 @@ export default function RegistrationRequests() {
             Solicitações de cadastro
           </h1>
           <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2 max-w-2xl">
-            Quem pediu para entrar e ainda <strong>não é afiliado</strong> — tanto quem já criou login
+            Quem pediu para entrar e ainda <strong>não é afiliado</strong>: tanto quem já criou login
             na sua página de cadastro quanto quem só deixou contato pelo formulário. Vincule a um
             afiliado existente, crie um novo, ou arquive.
           </p>
@@ -163,7 +163,7 @@ export default function RegistrationRequests() {
               { key: 'fila', label: 'Na fila', value: String(summary.pending), hint: 'aguardando decisão' },
               { key: 'login', label: 'Já com login', value: String(summary.signups), hint: 'basta vincular a um afiliado' },
               { key: 'lead', label: 'Só contato', value: String(summary.leads), hint: 'resolve com afiliado + convite' },
-              { key: 'indicacoes', label: 'Indicações', value: String(summary.referrals), hint: 'de gerentes — convite + rede' },
+              { key: 'indicacoes', label: 'Indicações', value: String(summary.referrals), hint: 'de gerentes (convite + rede)' },
               { key: 'arquivadas', label: 'Arquivadas', value: String(summary.archived), hint: 'fora da fila, nada apagado' },
             ].map((c, idx) => (
               <motion.div
@@ -188,7 +188,7 @@ export default function RegistrationRequests() {
               <span>
                 O <strong>auto-cadastro está desligado</strong>: sua página de cadastro só aceita quem recebe
                 convite, e a vitrine da AffiliaCore não exibe a agência. Nenhuma solicitação nova vai chegar
-                por aqui enquanto a chave estiver fechada — ligue em{' '}
+                por aqui enquanto a chave estiver fechada. Ligue em{' '}
                 <Link to="/settings" className="underline decoration-dotted underline-offset-2 font-bold">Configurações</Link>.
                 O formulário público de contato continua funcionando normalmente.
               </span>

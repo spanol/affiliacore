@@ -413,7 +413,7 @@ export default function SpecialDashboard() {
       <AffiliatePerformanceChart
         data={affiliateChartData}
         title="Desempenho por afiliado (sua rede)"
-        subtitle="Sua produção + sub-afiliados, por volume de comissão à sua taxa — 5 por vez."
+        subtitle="Sua produção + sub-afiliados, por volume de comissão à sua taxa (5 por vez)."
         infoText="Afiliados da sua rede (você + subs) por comissão no período. Comissão/CPA/REV são o seu ganho à sua taxa, nunca o bruto da casa."
       />
 

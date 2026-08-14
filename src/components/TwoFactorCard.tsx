@@ -153,7 +153,7 @@ export default function TwoFactorCard({ user }: { user: User | null }) {
       {backupCodes && (
         <div className="rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-3">
           <div className="flex items-center gap-2 text-xs font-bold text-amber-800 dark:text-amber-400">
-            <KeyRound size={16} /> Códigos de backup — anote agora
+            <KeyRound size={16} /> Códigos de backup: anote agora
           </div>
           <p className="text-[11px] text-amber-700 dark:text-amber-500">
             Só aparecem desta vez. Cada código substitui o app uma única vez, caso você perca o celular.

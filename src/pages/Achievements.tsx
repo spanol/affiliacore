@@ -156,7 +156,7 @@ export default function Achievements() {
           </h1>
           <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">
             {isAdmin
-              ? 'Prêmios que o afiliado desbloqueia ao bater metas de faturamento — e a fila de solicitações.'
+              ? 'Prêmios que o afiliado desbloqueia ao bater metas de faturamento, e a fila de solicitações.'
               : countsNetwork
                 ? 'Seja reconhecido pelo seu trabalho: bata a meta, desbloqueie o prêmio e solicite. O faturamento conta você e a sua rede.'
                 : 'Seja reconhecido pelo seu trabalho: bata a meta, desbloqueie o prêmio e solicite.'}

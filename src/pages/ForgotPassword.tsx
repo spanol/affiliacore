@@ -69,7 +69,7 @@ export default function ForgotPassword() {
             </p>
             <p className="text-xs text-slate-500 dark:text-neutral-400">
               Não recebeu? Confira o spam / lixo eletrônico. Se não chegar, é provável que esse e-mail
-              ainda <span className="font-bold">não tenha acesso criado</span> — peça o convite a quem administra a plataforma.
+              ainda <span className="font-bold">não tenha acesso criado</span>. Nesse caso, peça o convite a quem administra a plataforma.
             </p>
             <Link to="/login" className="inline-block text-xs font-bold uppercase tracking-wider text-auth-cta dark:text-lp-cta hover:underline">Voltar para o login</Link>
           </div>

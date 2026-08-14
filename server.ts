@@ -1009,7 +1009,7 @@ export function createApp(deps: ServerDeps) {
       const [uplines, specials] = await Promise.all([readUplineMap(), readSpecialsMap()]);
       if (!isDirectDownline(subId, callerAffiliateId, { uplines, specials })) {
         return res.status(403).json({
-          error: 'Este afiliado não é seu indicado direto — a comissão dele é definida por quem está acima dele na rede.',
+          error: 'Este afiliado não é seu indicado direto: a comissão dele é definida por quem está acima dele na rede.',
         });
       }
 
@@ -2028,7 +2028,7 @@ export function createApp(deps: ServerDeps) {
     try {
       const status = String(req.body?.status ?? '').trim();
       if (status !== 'approved' && status !== 'rejected') {
-        return res.status(400).json({ error: 'Status inválido — use approved ou rejected.' });
+        return res.status(400).json({ error: 'Status inválido. Use approved ou rejected.' });
       }
       const ref = adminDb.collection('achievement_requests').doc(String(req.params.id));
       const snap = await ref.get();
@@ -2083,7 +2083,7 @@ export function createApp(deps: ServerDeps) {
       await writeAuditLog(req, {
         entityType: 'achievement_request',
         entityId: ref.id,
-        entityLabel: `${before?.affiliateName ?? before?.affiliateId} — ${before?.tierTitle ?? ''}`,
+        entityLabel: `${before?.affiliateName ?? before?.affiliateId} · ${before?.tierTitle ?? ''}`,
         action: status === 'approved' ? 'achievement_request.approve' : 'achievement_request.reject',
         reason: note || undefined,
       });
@@ -2236,7 +2236,7 @@ export function createApp(deps: ServerDeps) {
       // Logins vinculados ao afiliado.
       const usersSnap = await adminDb.collection('users').where('affiliateId', '==', affiliateId).get();
       if (usersSnap.empty) {
-        return res.status(409).json({ error: 'Este afiliado ainda não tem login Boost vinculado — não há para quem entregar a mensagem.' });
+        return res.status(409).json({ error: 'Este afiliado ainda não tem login vinculado: não há para quem entregar a mensagem.' });
       }
 
       // Nome do afiliado (mirror) e nome do remetente (admin) p/ exibição.
@@ -2444,7 +2444,7 @@ export function createApp(deps: ServerDeps) {
         (u) => String((u.data() as any)?.email || '').trim().toLowerCase() === masterEmail,
       );
       if (matched.length) recipients = matched;
-      else console.warn(`[cron] MASTER_ADMIN_EMAIL "${masterEmail}" sem admin correspondente — lembrete vai a todos os admins.`);
+      else console.warn(`[cron] MASTER_ADMIN_EMAIL "${masterEmail}" sem admin correspondente; lembrete vai a todos os admins.`);
     }
     let title: string;
     let body: string;
@@ -3179,7 +3179,7 @@ export function createApp(deps: ServerDeps) {
       if (!name) return res.status(400).json({ error: 'Informe o nome do indicado.' });
       // E-mail é obrigatório: é ele que vira convite de login na aprovação.
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return res.status(400).json({ error: 'Informe um e-mail válido — o convite de acesso vai para ele.' });
+        return res.status(400).json({ error: 'Informe um e-mail válido: o convite de acesso vai para ele.' });
       }
       const doc = {
         name,
@@ -3777,7 +3777,7 @@ export function createApp(deps: ServerDeps) {
       const template = String(house.registerUrlTemplate ?? '').trim();
       if (!template) {
         return res.status(400).json({
-          error: `A casa "${house.name ?? brandKey}" não tem link de cadastro cadastrado — preencha o campo em /casas.`,
+          error: `A casa "${house.name ?? brandKey}" não tem link de cadastro cadastrado. Preencha o campo em /casas.`,
         });
       }
 
@@ -3881,7 +3881,7 @@ export function createApp(deps: ServerDeps) {
       // o que o admin vê antes de enviar e o que é gravado.
       const { links, invalid } = parseStandbyLinks(String(req.body?.text ?? ''));
       if (links.length === 0) {
-        return res.status(400).json({ error: 'Nenhum link válido — cole URLs http(s), uma por linha.', invalid });
+        return res.status(400).json({ error: 'Nenhum link válido. Cole URLs http(s), uma por linha.', invalid });
       }
       const brandId = req.body?.brandId != null && String(req.body.brandId).trim() !== ''
         ? String(req.body.brandId)
@@ -3948,7 +3948,7 @@ export function createApp(deps: ServerDeps) {
         return res.status(409).json({ error: 'Este link já pertence a outro afiliado. Libere-o para o standby antes.' });
       }
       if (!String(before?.registerUrl ?? '').trim()) {
-        return res.status(400).json({ error: 'Este link não tem URL de cadastro — não há para onde enviar o afiliado.' });
+        return res.status(400).json({ error: 'Este link não tem URL de cadastro: não há para onde enviar o afiliado.' });
       }
       await ref.set(
         {
@@ -4065,7 +4065,7 @@ export function createApp(deps: ServerDeps) {
     } catch (e) {
       if (buffer.length <= INLINE_LOGO_MAX_BYTES) return `data:${mime};base64,${m[3]}`;
       console.error('[houses] Storage indisponível e a logo não cabe inline:', e);
-      throw new Error('O Storage desta instância não está ativado (crie o bucket no console do Firebase) e a imagem passa de 200KB — envie uma imagem menor ou ative o Storage.');
+      throw new Error('O Storage desta instância não está ativado (crie o bucket no console do Firebase) e a imagem passa de 200KB. Envie uma imagem menor ou ative o Storage.');
     }
   };
 
@@ -5673,7 +5673,7 @@ async function publishAppVersion(adminDb: admin.firestore.Firestore | null) {
   if (!adminDb) return;
   const info = readBuildVersion();
   if (!info?.version) {
-    console.warn('App version: version.json não encontrado — pulando publicação.');
+    console.warn('App version: version.json não encontrado; pulando publicação.');
     return;
   }
   try {

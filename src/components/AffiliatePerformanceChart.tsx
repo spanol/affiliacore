@@ -36,7 +36,7 @@ export default function AffiliatePerformanceChart({
   data,
   loading = false,
   title = 'Desempenho por Afiliado',
-  subtitle = 'Top parceiros por volume de comissão — mostra 5 por vez, use o controle para ver os próximos.',
+  subtitle = 'Top parceiros por volume de comissão. Mostra 5 por vez, use o controle para ver os próximos.',
   infoText = 'Top afiliados por volume de comissão no período. Use os controles abaixo para navegar entre as páginas.',
 }: AffiliatePerformanceChartProps) {
   const { theme } = useTheme();

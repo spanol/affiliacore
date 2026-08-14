@@ -94,7 +94,7 @@ export default function Houses() {
       // Régua de CPA trocada no meio do período: a contagem sai de dividir o
       // dinheiro pela base, então resto > 0 é sinal de que a base mudou (§9.5).
       if (r.cpaRemainder) {
-        push({ type: 'error', message: `Atenção: sobrou R$ ${r.cpaRemainder} na conta do CPA — confira o valor do CPA da casa.` });
+        push({ type: 'error', message: `Atenção: sobrou R$ ${r.cpaRemainder} na conta do CPA. Confira o valor do CPA da casa.` });
       }
       await load();
     } catch (e: any) {
@@ -391,7 +391,7 @@ function PresetPicker({
                 {sel.name} <span className="font-mono font-medium text-slate-400 dark:text-neutral-500">· {sel.site}</span>
               </p>
               <p className="text-[10px] text-slate-500 dark:text-neutral-400">
-                {sel.legalEntity} — autorizada pela {sel.spaPortaria}
+                {sel.legalEntity}, autorizada pela {sel.spaPortaria}
               </p>
               <div className="flex flex-wrap gap-3 pt-0.5">
                 <a
@@ -413,7 +413,7 @@ function PresetPicker({
           )}
 
           <p className="text-[10px] leading-relaxed text-slate-400 dark:text-neutral-500">
-            O ícone do preset é gerado na cor de marca da casa — <strong>não é a logo oficial</strong>.
+            O ícone do preset é gerado na cor de marca da casa; <strong>não é a logo oficial</strong>.
             Para usar a logo real, baixe no site da casa e clique em “Trocar logo”.
           </p>
         </div>
@@ -672,8 +672,8 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
               <Field
                 label="brandId (OTG)"
                 hint={mode === 'otg'
-                  ? 'opcional — id da casa na OTG, se conhecido'
-                  : 'id herdado da OTG. As taxas POR CASA dos afiliados estão gravadas sob ele — apagar faz cada um cair na taxa de topo, sem aviso.'}
+                  ? 'opcional: id da casa na OTG, se conhecido'
+                  : 'id herdado da OTG. As taxas POR CASA dos afiliados estão gravadas sob ele; apagar faz cada um cair na taxa de topo, sem aviso.'}
               >
                 <input
                   value={brandId}
@@ -719,14 +719,14 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                           : 'text-amber-600 dark:text-amber-400',
                       )}>
                         {selectedIntegration.configured ? (
-                          <>Integração ativa e com chave configurada — esta casa passa a receber os resultados por ela.</>
+                          <>Integração ativa e com chave configurada: esta casa passa a receber os resultados por ela.</>
                         ) : selectedIntegration.enabled ? (
                           <>Esta integração ainda <b>não tem chave</b>. O vínculo é salvo, mas o pull só funciona depois de informar a chave em Integrações.</>
                         ) : (
                           <>Esta integração está <b>desligada</b>. O vínculo é salvo, mas nada será puxado até religá-la em Integrações.</>
                         )}
                         {selectedIntegration.houseId && selectedIntegration.houseId !== effectiveSlug && (
-                          <> Hoje ela está vinculada a outra casa (<b>{selectedIntegration.houseId}</b>) — salvar move o vínculo para cá.</>
+                          <> Hoje ela está vinculada a outra casa (<b>{selectedIntegration.houseId}</b>); salvar move o vínculo para cá.</>
                         )}
                       </p>
                     )}
@@ -736,7 +736,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
             )}
 
             {mode !== 'otg' && (
-              <Field label="Taxa padrão da casa" hint="RECEITA: o que a casa paga à AGÊNCIA — NÃO é o repasse ao afiliado (esse fica em Afiliados). Usada p/ derivar a comissão quando a planilha não traz a coluna 'comissao'. Informe na MOEDA em que a casa paga: em euro convertemos pela cotação do dia; em real gravamos o valor exato. Sem isto, o lucro por casa fica negativo.">
+              <Field label="Taxa padrão da casa" hint="RECEITA: o que a casa paga à AGÊNCIA. NÃO é o repasse ao afiliado (esse fica em Afiliados). Usada p/ derivar a comissão quando a planilha não traz a coluna 'comissao'. Informe na MOEDA em que a casa paga: em euro convertemos pela cotação do dia; em real gravamos o valor exato. Sem isto, o lucro por casa fica negativo.">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-1">
@@ -759,7 +759,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                               if (!eurQuote.live && defaultCpa.trim() !== '') {
                                 push({
                                   type: 'error',
-                                  message: 'Cotação do euro indisponível agora — sem ela a conversão gravaria um valor errado. Apague o campo para trocar a moeda e digite o valor na moeda nova.',
+                                  message: 'Cotação do euro indisponível agora. Sem ela a conversão gravaria um valor errado; apague o campo para trocar a moeda e digite o valor na moeda nova.',
                                 });
                                 return;
                               }
@@ -799,7 +799,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                     </div>
                     <p className="mt-1 text-[10px] text-slate-400 dark:text-neutral-500">
                       {cpaCurrency === 'BRL' ? (
-                        <>Valor <b>exato</b> pago pela casa — não varia com o câmbio.</>
+                        <>Valor <b>exato</b> pago pela casa, não varia com o câmbio.</>
                       ) : defaultCpa.trim() === '' ? (
                         <>1 € = {formatBrl(eurQuote.rate)}{!eurQuote.live && ' · cotação indisponível'}</>
                       ) : (
@@ -862,7 +862,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                   className={inputCls}
                 />
                 <p className="text-[11px] text-slate-500 dark:text-neutral-400 leading-relaxed sm:pt-3">
-                  A alíquota <b>varia por casa</b>. Em branco = <b>sem retenção</b> — o afiliado
+                  A alíquota <b>varia por casa</b>. Em branco = <b>sem retenção</b>: o afiliado
                   recebe o repasse bruto. O extrato dele mostra bruto, ISS e líquido separados.
                 </p>
               </div>
@@ -1263,10 +1263,10 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
             <div className="rounded-xl bg-slate-50 dark:bg-neutral-800/40 border border-slate-100 dark:border-neutral-800 p-3 text-[11px] text-slate-500 dark:text-neutral-400">
               <p className="font-bold text-slate-600 dark:text-neutral-300 mb-1">Colunas (cabeçalho obrigatório):</p>
               <code className="block font-mono text-[10px] text-slate-500 dark:text-neutral-400">data; afiliado; email; cadastros; ftd; cpa; rev; deposito; comissao</code>
-              <p className="mt-1.5">• <b>data</b> obrigatória — preencha só na 1ª linha do dia (as de baixo herdam). • <b>email</b> = cruzamento com o afiliado (login na plataforma ou e-mail OTG); <b>email e afiliado vazios = agregado da casa</b>. • datas/números pt-BR aceitos.</p>
+              <p className="mt-1.5">• <b>data</b> obrigatória: preencha só na 1ª linha do dia (as de baixo herdam). • <b>email</b> = cruzamento com o afiliado (login na plataforma ou e-mail OTG); <b>email e afiliado vazios = agregado da casa</b>. • datas/números pt-BR aceitos.</p>
               <p className="mt-1.5 flex items-start gap-1.5 text-slate-500 dark:text-neutral-400">
                 <Tag size={12} className="shrink-0 mt-0.5" />
-                <span>Ou suba o <b>relatório da própria casa</b> (ex.: Relatório de Mídia agrupado por <b>Dia + AFP</b>) — ele é reconhecido sozinho e o cruzamento passa a ser pela <b>tag</b>.</span>
+                <span>Ou suba o <b>relatório da própria casa</b> (ex.: Relatório de Mídia agrupado por <b>Dia + AFP</b>): ele é reconhecido sozinho e o cruzamento passa a ser pela <b>tag</b>.</span>
               </p>
             </div>
 
@@ -1294,7 +1294,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                   {sheetInfo && sheetInfo.sheetNames.length > 1 && !sheetInfo.matched && (
                     <p className="px-1 text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
                       <AlertTriangle size={11} className="shrink-0" />
-                      Várias abas e nenhuma bate com “{house.name}”. Lendo a 1ª (“{sheetInfo.sheetName}”) — confira o preview.
+                      Várias abas e nenhuma bate com “{house.name}”. Lendo a 1ª (“{sheetInfo.sheetName}”). Confira o preview.
                     </p>
                   )}
                 </div>
@@ -1366,9 +1366,9 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                     <div>
                       <p className="text-[11px] font-bold text-slate-600 dark:text-neutral-200">Tags do relatório</p>
                       <p className="text-[11px] text-slate-500 dark:text-neutral-400">
-                        Vincule cada tag ao afiliado dono — fica salvo e os próximos relatórios casam sozinhos.
+                        Vincule cada tag ao afiliado dono: fica salvo e os próximos relatórios casam sozinhos.
                         Tag sem vínculo <b>não é importada</b> (nada é atribuído por engano). Descobriu de quem é
-                        depois? Vincule e <b>suba o mesmo arquivo de novo</b> — o dia é reescrito com o que estiver vinculado.
+                        depois? Vincule e <b>suba o mesmo arquivo de novo</b>, que o dia é reescrito com o que estiver vinculado.
                       </p>
                     </div>
 
@@ -1457,7 +1457,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                       <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300">Afiliados não encontrados na plataforma</p>
                       <p className="text-[11px] text-amber-700/70 dark:text-amber-300/60">
                         Cadastre-os como afiliados da casa (passam a cruzar pelo e-mail) ou vincule cada um a um
-                        afiliado já existente. O vínculo é salvo <b>pelo e-mail</b> — linha sem a coluna
+                        afiliado já existente. O vínculo é salvo <b>pelo e-mail</b>: linha sem a coluna
                         <code className="mx-0.5">email</code> preenchida só dá para cadastrar.
                       </p>
                     </div>

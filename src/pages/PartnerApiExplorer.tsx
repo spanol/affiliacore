@@ -18,7 +18,7 @@ type EndpointId = 'pending-affiliates' | 'affiliates' | 'results';
 const ENDPOINTS: { id: EndpointId; label: string; scope: string; desc: string }[] = [
   { id: 'pending-affiliates', label: 'Pendentes', scope: 'pending-affiliates', desc: 'Aprovados na OTG aguardando produção (dado-chave).' },
   { id: 'affiliates', label: 'Afiliados', scope: 'affiliates', desc: 'Reconciliados/ativos (id, nome, marca, link).' },
-  { id: 'results', label: 'Resultados', scope: 'results', desc: 'Produção agregada — SÓ contagem, nada de R$.' },
+  { id: 'results', label: 'Resultados', scope: 'results', desc: 'Produção agregada: SÓ contagem, nada de R$.' },
 ];
 
 const COUNT_FIELDS = ['registrations', 'first_deposits', 'qualified_cpa'];
@@ -101,7 +101,7 @@ export default function PartnerApiExplorer() {
         <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tighter">API do Parceiro · Explorer</h1>
         <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2 max-w-2xl">
           Dispare as rotas abertas ao parceiro e confira a resposta. A auditoria de campos prova que
-          só saem os dados liberados — <strong>cadastro, depósitos e CPA em contagem; nada de valores (R$)</strong>.
+          só saem os dados liberados: <strong>cadastro, depósitos e CPA em contagem; nada de valores (R$)</strong>.
         </p>
       </header>
 
@@ -179,7 +179,7 @@ export default function PartnerApiExplorer() {
           </div>
         )}
         {endpoint === 'affiliates' && (
-          <p className="text-xs text-slate-400 dark:text-neutral-500">Sem parâmetros — retorna todos os reconciliados.</p>
+          <p className="text-xs text-slate-400 dark:text-neutral-500">Sem parâmetros; retorna todos os reconciliados.</p>
         )}
 
         {/* cURL preview + enviar */}
@@ -225,7 +225,7 @@ export default function PartnerApiExplorer() {
                 <ShieldCheck size={18} className="text-emerald-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">Sem valores monetários (R$)</p>
-                  <p className="text-[11px] text-emerald-700/70 dark:text-emerald-400/70">A resposta traz só contagem e identidade — nenhum dos campos de valor da OTG.</p>
+                  <p className="text-[11px] text-emerald-700/70 dark:text-emerald-400/70">A resposta traz só contagem e identidade, nenhum dos campos de valor da OTG.</p>
                 </div>
               </div>
             ) : (
@@ -233,7 +233,7 @@ export default function PartnerApiExplorer() {
                 <AlertTriangle size={18} className="text-red-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-bold text-red-700 dark:text-red-400">Valor monetário detectado!</p>
-                  <p className="text-[11px] text-red-700/80 dark:text-red-400/80">Campos proibidos na resposta: {monetary.join(', ')}. Não deveria acontecer — revisar projeção no servidor.</p>
+                  <p className="text-[11px] text-red-700/80 dark:text-red-400/80">Campos proibidos na resposta: {monetary.join(', ')}. Não deveria acontecer; revisar a projeção no servidor.</p>
                 </div>
               </div>
             )
