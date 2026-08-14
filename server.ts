@@ -13,6 +13,7 @@ import { isBotUserAgent, appendSubid, clickStatDay } from './src/lib/tracking';
 import { resolveIsSpecial, resolveServerToday, resolveServerYesterday, resolveScopedAffiliateIds, specialNetworkScope } from './src/lib/scope';
 import { otgEnabled, marketplaceEnabled } from './src/lib/instance';
 import { resolveBrand } from './src/lib/branding';
+import { resolveStorageBucket } from './src/lib/firebaseConfig';
 import { computeRankingEntries } from './src/lib/ranking';
 import { expandAffiliateIdsParam } from './src/lib/affiliateIdsParam';
 import { hrDocId, sanitizeMetrics } from './src/lib/houseResultsDoc';
@@ -96,8 +97,12 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Bucket do Storage (logos das casas). Default = bucket do projeto; override por env.
-const STORAGE_BUCKET = process.env.FIREBASE_STORAGE_BUCKET || 'agencia-boost-app.firebasestorage.app';
+// Bucket do Storage (logos das casas), resolvido do AMBIENTE da própria instância
+// (override → configs do App Hosting → service account). O default antigo cravava
+// 'agencia-boost-app' (instância 0): instância nova sem a env tentava gravar a logo
+// no bucket de OUTRO cliente. `null` = instância sem Storage — não é erro; o
+// uploadHouseLogo cai no fallback inline (data URL no doc da casa).
+const STORAGE_BUCKET = resolveStorageBucket(process.env);
 
 // Inicializa o Firebase Admin (idempotente). Fica DENTRO de uma função — antes era um
 // side-effect no topo do módulo — p/ que importar este arquivo nos testes (só para
@@ -109,16 +114,16 @@ function initAdmin(): { adminApp: admin.app.App | null; adminDb: admin.firestore
     if (rawServiceAccount) {
       try {
         const serviceAccount = JSON.parse(rawServiceAccount);
-        adminApp = admin.initializeApp({ credential: admin.credential.cert(serviceAccount), storageBucket: STORAGE_BUCKET });
+        adminApp = admin.initializeApp({ credential: admin.credential.cert(serviceAccount), storageBucket: STORAGE_BUCKET ?? undefined });
       } catch {
         // Em App Hosting/Cloud Run o ADC do runtime costuma bastar para acessar os
         // recursos do PRÓPRIO projeto. Se a env existir só como placeholder/override
         // (ex.: 'unused' em instâncias white-label), caímos para ADC em vez de matar
         // a inicialização inteira.
-        adminApp = admin.initializeApp({ storageBucket: STORAGE_BUCKET });
+        adminApp = admin.initializeApp({ storageBucket: STORAGE_BUCKET ?? undefined });
       }
     } else {
-      adminApp = admin.initializeApp({ storageBucket: STORAGE_BUCKET });
+      adminApp = admin.initializeApp({ storageBucket: STORAGE_BUCKET ?? undefined });
     }
     console.log('Firebase Admin initialized');
     return { adminApp, adminDb: adminApp.firestore() };
@@ -4033,6 +4038,13 @@ export function createApp(deps: ServerDeps) {
 
   // Sobe a logo (data URL base64) pro Storage e devolve a URL de download. Usa
   // download-token (compatível com uniform bucket-level access — makePublic falha).
+  // Instância SEM Storage (bucket nunca criado no projeto — caso real: a Infinity
+  // nunca ativou o Storage e o upload da logo da LEON morria em "bucket inexistente",
+  // 2026-08-14): logo pequena é gravada como a PRÓPRIA data URL no doc da casa —
+  // auto-contida, funciona em <img src> e no GET /api/houses sem bucket nenhum.
+  // O teto inline existe porque o doc do Firestore tem limite de 1MiB; acima dele
+  // só com o Storage ativado mesmo.
+  const INLINE_LOGO_MAX_BYTES = 200 * 1024;
   const uploadHouseLogo = async (slug: string, dataUrl: string): Promise<string> => {
     const m = /^data:(image\/(png|jpe?g|webp|svg\+xml));base64,(.+)$/i.exec(String(dataUrl));
     if (!m) throw new Error('Logo inválida (envie PNG, JPG, WEBP ou SVG).');
@@ -4040,15 +4052,21 @@ export function createApp(deps: ServerDeps) {
     const ext = m[2].toLowerCase() === 'jpeg' ? 'jpg' : m[2].toLowerCase().replace('svg+xml', 'svg');
     const buffer = Buffer.from(m[3], 'base64');
     if (buffer.length > 2 * 1024 * 1024) throw new Error('Logo muito grande (máx. 2MB).');
-    const bucket = admin.storage().bucket();
-    const filePath = `house-logos/${slug}-${Date.now()}.${ext}`;
-    const token = crypto.randomUUID();
-    await bucket.file(filePath).save(buffer, {
-      resumable: false,
-      contentType: mime,
-      metadata: { cacheControl: 'public,max-age=31536000', metadata: { firebaseStorageDownloadTokens: token } },
-    });
-    return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media&token=${token}`;
+    try {
+      const bucket = admin.storage().bucket();
+      const filePath = `house-logos/${slug}-${Date.now()}.${ext}`;
+      const token = crypto.randomUUID();
+      await bucket.file(filePath).save(buffer, {
+        resumable: false,
+        contentType: mime,
+        metadata: { cacheControl: 'public,max-age=31536000', metadata: { firebaseStorageDownloadTokens: token } },
+      });
+      return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(filePath)}?alt=media&token=${token}`;
+    } catch (e) {
+      if (buffer.length <= INLINE_LOGO_MAX_BYTES) return `data:${mime};base64,${m[3]}`;
+      console.error('[houses] Storage indisponível e a logo não cabe inline:', e);
+      throw new Error('O Storage desta instância não está ativado (crie o bucket no console do Firebase) e a imagem passa de 200KB — envie uma imagem menor ou ative o Storage.');
+    }
   };
 
   // Semeia as casas-semente (DEFAULT_BRANDS) na 1ª vez que a coleção está vazia,

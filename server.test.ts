@@ -3955,6 +3955,55 @@ describe('integracoes (/api/integrations)', () => {
 });
 
 // =============================================================================
+// Logo da casa SEM Storage — fallback inline (data URL no doc da casa). Caso
+// real: a Infinity nunca ativou o Storage no projeto e o upload da logo da LEON
+// morria em "bucket inexistente" (2026-08-14). Nos testes NÃO existe app default
+// do firebase-admin, então admin.storage() lança — exatamente o cenário da
+// instância sem bucket.
+// =============================================================================
+describe('logo da casa sem Storage (fallback inline)', () => {
+  const logoSeed = {
+    users: { 'admin-uid': { role: 'admin' } },
+    houses: { 'leon-bet': { slug: 'leon-bet', name: 'LEON Bet', dataSource: 'manual' } },
+  };
+  const SVG_DATA_URL = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>').toString('base64')}`;
+
+  it('PATCH com logo pequena grava a PRÓPRIA data URL no doc da casa', async () => {
+    const db = makeFirestore(logoSeed);
+    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .patch('/api/houses/leon-bet')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ logoBase64: SVG_DATA_URL })
+      .expect(200);
+    expect(res.body.logo).toBe(SVG_DATA_URL);
+    expect(db.__store.get('houses')?.get('leon-bet')?.logo).toBe(SVG_DATA_URL);
+  });
+
+  it('POST de casa nova com logo pequena também cai no inline', async () => {
+    const db = makeFirestore({ users: logoSeed.users });
+    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .post('/api/houses')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ name: 'LEON Bet', logoBase64: SVG_DATA_URL })
+      .expect(201);
+    expect(res.body.logo).toBe(SVG_DATA_URL);
+    expect(db.__store.get('houses')?.get('leon-bet')?.logo).toBe(SVG_DATA_URL);
+  });
+
+  it('imagem acima do teto inline (200KB) sem Storage → erro claro, nada gravado', async () => {
+    const db = makeFirestore(logoSeed);
+    const big = `data:image/png;base64,${Buffer.alloc(300 * 1024, 7).toString('base64')}`;
+    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .patch('/api/houses/leon-bet')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ logoBase64: big })
+      .expect(500);
+    expect(res.body.error).toMatch(/storage/i);
+    expect(db.__store.get('houses')?.get('leon-bet')?.logo ?? null).toBeNull();
+  });
+});
+
+// =============================================================================
 // Validação de telefone por SMS (/api/phone) — item 7 da call Infinity
 // =============================================================================
 describe('validação de telefone por SMS (/api/phone)', () => {

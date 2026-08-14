@@ -22,3 +22,42 @@ export function resolveFirebaseConfig<T extends Record<string, unknown>>(
   }
   return fallback;
 }
+
+// Bucket DEFAULT do Storage da instância (logos das casas, server.ts). Mesma
+// filosofia acima: nenhum projeto cravado — o antigo default 'agencia-boost-app'
+// faria uma instância nova sem env gravar a logo no bucket de OUTRO cliente.
+// Ordem: override explícito (FIREBASE_STORAGE_BUCKET) → configs injetadas pelo
+// App Hosting (FIREBASE_WEBAPP_CONFIG / FIREBASE_CONFIG, com derivação
+// `<projectId>.firebasestorage.app` quando só há o projectId) → project_id da
+// service account → null. Null NÃO é erro: instância sem Storage funciona — o
+// uploadHouseLogo grava logo pequena como data URL direto no doc da casa.
+export function resolveStorageBucket(env: Record<string, string | undefined>): string | null {
+  const explicit = String(env.FIREBASE_STORAGE_BUCKET ?? '').trim();
+  if (explicit) return explicit;
+
+  for (const key of ['FIREBASE_WEBAPP_CONFIG', 'FIREBASE_CONFIG']) {
+    const raw = String(env[key] ?? '').trim();
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw);
+      const bucket = typeof parsed?.storageBucket === 'string' ? parsed.storageBucket.trim() : '';
+      if (bucket) return bucket;
+      const projectId = typeof parsed?.projectId === 'string' ? parsed.projectId.trim() : '';
+      if (projectId) return `${projectId}.firebasestorage.app`;
+    } catch {
+      // env quebrada → tenta a próxima fonte
+    }
+  }
+
+  // Placeholder tipo 'unused' (instância white-label) não parseia → segue null.
+  const sa = String(env.FIREBASE_SERVICE_ACCOUNT_KEY ?? '').trim();
+  if (sa) {
+    try {
+      const projectId = JSON.parse(sa)?.project_id;
+      if (typeof projectId === 'string' && projectId.trim()) return `${projectId.trim()}.firebasestorage.app`;
+    } catch {
+      // sem project_id derivável
+    }
+  }
+  return null;
+}
