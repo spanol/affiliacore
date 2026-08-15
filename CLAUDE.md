@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Agência Boost** — an affiliate-management platform (React SPA) for a marketing agency. Admins manage affiliates (CPA/REV configuration, activation status, audit logs, contact inquiries); affiliates ("clients") view their own results. UI text and most domain naming are in **Portuguese (pt-BR)** — match this when writing user-facing strings and error messages.
 
+**COPY (toda string visível ao usuário — UI, toasts, tooltips, erros do `server.ts`, planilha modelo): PROIBIDO travessão/hífen "—" no meio de frase.** É o tique clássico de texto gerado por IA e foi removido do app inteiro em 14/08/2026 (`d7ef2e5`); reintroduzi-lo é regressão. Substitutos, caso a caso: frase curta + complemento → ponto final ("Imagem muito grande. Use uma versão menor."); rótulo + explicação → dois-pontos ("Códigos de backup: anote agora"); causa/consequência → vírgula, ponto-e-vírgula ou conectivo. Usos que CONTINUAM corretos (não "corrija"): `'—'` como placeholder de valor vazio em card/célula, placeholders de `<select>` ("— nenhuma —", "— topo de estrutura —") e o meia-risca "–" de intervalo de datas (`dateRange.ts`). Comentários de código não são copy — travessão à vontade.
+
 Originated as a Google AI Studio applet (see README / `firebase-applet-config.json` / `metadata.json`).
 
 ## Planning & roadmap
