@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import {
   Building2, Plus, Loader2, Pencil, Trash2, X, Upload, Link2, Check, Power,
   Table2, AlertTriangle, FileSpreadsheet, Cloud, Calendar, Download, Sparkles,
@@ -93,8 +93,11 @@ export default function Houses() {
       });
       // Régua de CPA trocada no meio do período: a contagem sai de dividir o
       // dinheiro pela base, então resto > 0 é sinal de que a base mudou (§9.5).
+      // A régua que o conector divide vive no doc da INTEGRAÇÃO (`config.cpaBase`),
+      // não no `defaultCpa` desta tela — a mensagem antiga mandava o admin editar a
+      // casa, onde nenhum ajuste muda o resto da divisão.
       if (r.cpaRemainder) {
-        push({ type: 'error', message: `Atenção: sobrou R$ ${r.cpaRemainder} na conta do CPA. Confira o valor do CPA da casa.` });
+        push({ type: 'error', message: `Atenção: sobrou R$ ${r.cpaRemainder} na conta do CPA. Ajuste a régua do conector em Integrações (valor do CPA na casa).` });
       }
       await load();
     } catch (e: any) {
@@ -735,7 +738,34 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
               </Field>
             )}
 
-            {mode !== 'otg' && (
+            {/* A taxa padrão da casa é uma DECLARAÇÃO: a agência informa o que a casa
+                paga porque ninguém lhe conta. Numa casa com pull isso se inverte — a
+                própria casa conta (comissão, RVS e a parcela CPA vêm na resposta), e o
+                bloco inteiro fica inerte: o REV nunca é lido (a derivação só roda com
+                `total_commission` ausente, e o pull sempre a traz) e o CPA virou um
+                segundo lugar para a MESMA régua que o conector lê de /integracoes. Em
+                vez de pedir de novo um número que já existe, apontamos para a fonte. */}
+            {mode === 'integration' && (
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-neutral-800/40 border border-slate-100 dark:border-neutral-800 space-y-2">
+                <p className="text-xs font-bold text-slate-700 dark:text-neutral-200 flex items-center gap-2">
+                  <Plug size={14} className="text-emerald-500" /> Taxas: quem informa é a casa
+                </p>
+                <p className="text-[11px] leading-relaxed text-slate-500 dark:text-neutral-400">
+                  A comissão, o RVS e a parcela de CPA chegam prontos na resposta da API, então
+                  não há taxa padrão para declarar aqui. Se a casa mudar o valor do CPA, o ajuste
+                  é na régua do conector, em <b>Integrações</b> — é ela que converte o dinheiro
+                  em contagem de CPAs.
+                </p>
+                <Link
+                  to="/integracoes"
+                  className="inline-flex items-center gap-1.5 text-[11px] font-bold text-accent-600 dark:text-accent-400 hover:underline"
+                >
+                  Abrir Integrações <ExternalLink size={11} />
+                </Link>
+              </div>
+            )}
+
+            {mode === 'manual' && (
               <Field label="Taxa padrão da casa" hint="RECEITA: o que a casa paga à AGÊNCIA. NÃO é o repasse ao afiliado (esse fica em Afiliados). Usada p/ derivar a comissão quando a planilha não traz a coluna 'comissao'. Informe na MOEDA em que a casa paga: em euro convertemos pela cotação do dia; em real gravamos o valor exato. Sem isto, o lucro por casa fica negativo.">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -822,9 +852,11 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
             )}
 
             {/* Toggle da call Infinity 12/08: com REV fora, o lucro líquido desta
-                casa no /admin vira CPA-only nos DOIS lados (comissão derivada da
-                régua + repasse só CPA). NÃO muda a comissão exibida ao afiliado.
-                Só p/ casa gerida aqui — na OTG a comissão é opaca, sem split. */}
+                casa no /admin vira CPA-only nos DOIS lados (só a parcela CPA da
+                comissão + repasse só CPA). NÃO muda a comissão exibida ao afiliado.
+                Só p/ casa gerida aqui — na OTG a comissão é opaca, sem split.
+                A parcela CPA sai de `cpa_commission` quando a fonte a separou (todo
+                pull separa) e da régua da casa só na planilha. [[houseCpaCommissionForRow]] */}
             {mode !== 'otg' && (
               <label className="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 dark:bg-neutral-800/40 border border-slate-100 dark:border-neutral-800 cursor-pointer">
                 <span className="text-sm font-semibold text-slate-700 dark:text-neutral-200 flex flex-col gap-0.5">
@@ -834,7 +866,8 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                   </span>
                   <span className="text-[10px] font-normal text-slate-400 dark:text-neutral-500">
                     Desligado: o lucro desta casa no painel do master considera só o eixo CPA
-                    (comissão pela régua e repasse sem a parcela REV). A comissão do afiliado não muda.
+                    (a parcela CPA da comissão e o repasse sem a parcela REV). A comissão do
+                    afiliado não muda.
                   </span>
                 </span>
                 <button
@@ -1245,6 +1278,24 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
           </div>
 
           <div className="p-6 space-y-5 overflow-y-auto">
+            {/* Casa com conector: o upload continua disponível (serve pra tapar
+                buraco em data ANTIGA, fora da janela do robô), mas dentro da janela
+                ele é trabalho perdido — a rodada apaga as datas que vai reescrever
+                antes de gravar. Sem este aviso o dado sumia sozinho em até uma hora,
+                sem erro em lugar nenhum. */}
+            {houseResultsMode(house) === 'integration' && (
+              <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 p-3 text-[11px] text-amber-700/80 dark:text-amber-300/70">
+                <p className="font-bold text-amber-700 dark:text-amber-300 mb-0.5 flex items-center gap-1.5">
+                  <AlertTriangle size={13} /> Esta casa já recebe os resultados sozinha
+                </p>
+                <p>
+                  O robô da integração reescreve os dias que puxa. Uma planilha subida para
+                  uma data dentro da janela dele será substituída na próxima rodada — use o
+                  upload apenas para períodos antigos, que o robô não alcança mais.
+                </p>
+              </div>
+            )}
+
             {/* Planilha modelo */}
             <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 p-3 flex items-center justify-between gap-3">
               <div className="min-w-0 text-[11px] text-amber-700/80 dark:text-amber-300/70">
