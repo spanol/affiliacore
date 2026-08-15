@@ -239,6 +239,10 @@ const FIELD_LABELS: Record<string, string> = {
   brandId: 'Marca (OTG)',
   registerUrlTemplate: 'Link de cadastro',
   active: 'Status',
+  skipped: 'Ignorados',
+  attributed: 'Atribuídos',
+  dateFrom: 'Data inicial',
+  dateTo: 'Data final',
   order: 'Ordem',
   dataSource: 'Origem dos dados',
   defaultCpa: 'CPA padrão',
@@ -247,7 +251,9 @@ const FIELD_LABELS: Record<string, string> = {
   logo: 'Logo',
   // comissão (config.update)
   cpaValue: 'CPA',
+  cpaRemainder: 'Resto do CPA',
   revPercentage: 'REV (%)',
+  pendingTags: 'Tags pendentes',
   // rede de afiliados (network.set_upline / network.clear_upline). O par é
   // proposital: `upline` traz o NOME (legível na tela) e `uplineId`, o id — a
   // verdade auditável, que sobrevive a renomeação do afiliado.
