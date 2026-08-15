@@ -118,23 +118,38 @@ export interface HouseRate {
 }
 
 // Comissão BRUTA da casa (receita da agência) para UMA linha manual (house_results).
-// Usa o `total_commission` importado quando houver (>0); senão DERIVA da taxa PADRÃO
+// Usa o `total_commission` importado quando houver; senão DERIVA da taxa PADRÃO
 // da casa: cpa_qualificado × defaultCpa + rvs × (defaultRev/100). É FALLBACK — não
 // sobrescreve comissão importada. Sem isso, planilha só com contagem de CPA (sem a
 // coluna `comissao`) dá comissão 0 e o lucro do master fica NEGATIVO (0 − repasse).
 // num() guarda contra NaN/ausência. Fonte ÚNICA da derivação (consumida no /admin).
+//
+// ⚠️ "Houver" é `!== 0`, NÃO `> 0`: comissão NEGATIVA é um número real (rev share
+// negativo existe nessas casas e o pull o grava como veio da API), e tratá-la como
+// ausente mandava a linha pro fallback — o prejuízo virava 0 quando a casa não tem
+// taxa padrão e, pior, virava LUCRO quando tem (`qualified_cpa × defaultCpa`). O 0
+// segue caindo na derivação, que é exatamente o caso "planilha sem a coluna".
 export function houseCommissionForRow(row: any, houseRate?: HouseRate | null): number {
   const imported = num(row?.total_commission);
-  if (imported > 0) return imported;
+  if (imported !== 0) return imported;
   return num(row?.qualified_cpa) * num(houseRate?.defaultCpa)
     + num(row?.rvs) * (num(houseRate?.defaultRev) / 100);
 }
 
 // Comissão da casa SÓ do eixo CPA — usada quando a casa está com "REV fora do
-// lucro" (toggle da call Infinity 12/08). IGNORA a comissão importada de
-// propósito: ela embute o REV (na Esportiva, `commissions_total` = CPA + rev
-// share) e não há como separá-la; a régua da casa reconstrói a parcela CPA
-// exata (é a mesma divisão que conta os QFTDs no pull).
+// lucro" (toggle da call Infinity 12/08). IGNORA o `total_commission` de propósito:
+// ele embute o REV (na Esportiva, `commissions_total` = CPA + rev share) e não há
+// como separá-lo depois.
+//
+// PREFERE o dinheiro de CPA que a própria fonte informou (`cpa_commission`, métrica
+// opcional): os dois conectores o entregam EXATO (`commissions_cpa` no TAP,
+// `cpa_profit` na R2D) e reconstruí-lo por `contagem × régua` era um round-trip
+// lossy — a contagem do TAP já NASCE de uma divisão arredondada, e na LEON não há
+// régua nenhuma (o `defaultCpa` da casa fica vazio → a parcela CPA dava R$ 0).
+// Ausência ≠ 0: sem o campo (planilha, linha antiga) cai na régua da casa, que é o
+// comportamento de sempre.
 export function houseCpaCommissionForRow(row: any, houseRate?: HouseRate | null): number {
+  const informed = row?.cpa_commission;
+  if (informed !== undefined && informed !== null) return num(informed);
   return num(row?.qualified_cpa) * num(houseRate?.defaultCpa);
 }
