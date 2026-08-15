@@ -21,6 +21,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { cn, humanizeName } from '../lib/utils';
 import { fetchAffiliates, fetchAllResults, fetchAllResultsByBrand, fetchAllResultsByCampaign, fetchAffiliateConfigs, fetchSpecialAffiliates, fetchManualResults, fetchAffiliateUplines, buildSubToSpecialConfig, buildNetworkNodes, buildNetworkTree, buildEligibleUpline, composeAdminProfit, deriveManualRowsCommission, CampaignRow, SpecialAffiliate } from '../services/affiliateService';
 import DateRangePicker from '../components/DateRangePicker';
+import SetupHealthCard from '../components/SetupHealthCard';
 import CampaignBreakdown from '../components/CampaignBreakdown';
 import { buildFunnelItems, sumFunnelTotals, formatFunnelValue, type FunnelItemKey } from '../lib/funnel';
 import AffiliatePerformanceChart from '../components/AffiliatePerformanceChart';
@@ -436,6 +437,9 @@ export default function AdminDashboard() {
           <BrandFilter brands={availableBrands} value={brandFilter} onChange={setBrandFilter} />
         </div>
       </header>
+
+      {/* Saúde da configuração (F1 · ONBOARDING-AVISOS.md): só aparece com pendência. */}
+      <SetupHealthCard affiliates={affiliates} configs={configs} specials={specials} loading={loading} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {metrics.map((metric, idx) => (

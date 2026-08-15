@@ -1835,14 +1835,15 @@ export async function fetchEntityAuditLogs(entityType: string, entityId: string,
   return fetchAuditLogs({ entityType, entityId, limit });
 }
 
-export async function fetchRegisteredUsers(): Promise<Array<{ uid: string; affiliateId?: string; name?: string; email?: string; role?: string }>> {
+export async function fetchRegisteredUsers(): Promise<Array<{ uid: string; affiliateId?: string; name?: string; email?: string; role?: string; isSpecial?: boolean }>> {
   try {
     const q = query(collection(db, 'users'));
     const snapshot = await getDocs(q);
-    const users: Array<{ uid: string; affiliateId?: string; name?: string; email?: string; role?: string }> = [];
+    const users: Array<{ uid: string; affiliateId?: string; name?: string; email?: string; role?: string; isSpecial?: boolean }> = [];
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
-      users.push({ uid: docSnap.id, affiliateId: data.affiliateId, name: data.name, email: data.email, role: data.role });
+      // isSpecial entra p/ o check de dessincronização especial×login (setupChecks).
+      users.push({ uid: docSnap.id, affiliateId: data.affiliateId, name: data.name, email: data.email, role: data.role, isSpecial: data.isSpecial });
     });
     return users;
   } catch (err) {
