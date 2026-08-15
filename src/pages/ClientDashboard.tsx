@@ -135,7 +135,7 @@ export default function ClientDashboard() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <Loader2 className="w-10 h-10 text-brand dark:text-white animate-spin" />
+        <Loader2 className="w-10 h-10 text-slate-400 dark:text-neutral-500 animate-spin" />
         <p className="text-slate-500 font-medium">Carregando informações realistas...</p>
       </div>
     );
@@ -144,7 +144,7 @@ export default function ClientDashboard() {
   if (!affiliate) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <Loader2 className="w-10 h-10 text-brand dark:text-white animate-spin" />
+        <Loader2 className="w-10 h-10 text-slate-400 dark:text-neutral-500 animate-spin" />
         <p className="text-slate-500 font-medium">Preparando dashboard...</p>
       </div>
     );
