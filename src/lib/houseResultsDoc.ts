@@ -16,10 +16,11 @@ export const HR_METRICS = [
 
 export type HrMetricKey = (typeof HR_METRICS)[number];
 
-// Métricas OPCIONAIS do funil (visits/deposit_count — call Infinity 12/08): só são
-// gravadas quando o payload as trouxe (ausência ≠ 0, e `undefined` não pode ir ao
-// Firestore). Espelha OPTIONAL_METRIC_KEYS de houseResults.ts.
-export const HR_OPTIONAL_METRICS = ['visits', 'deposit_count'] as const;
+// Métricas OPCIONAIS: só são gravadas quando o payload as trouxe (ausência ≠ 0, e
+// `undefined` não pode ir ao Firestore). Espelha OPTIONAL_METRIC_KEYS de
+// houseResults.ts — `visits`/`deposit_count` são funil, `cpa_commission` é a
+// parcela CPA da comissão em DINHEIRO, informada pelos conectores de pull.
+export const HR_OPTIONAL_METRICS = ['visits', 'deposit_count', 'cpa_commission'] as const;
 export type HrOptionalMetricKey = (typeof HR_OPTIONAL_METRICS)[number];
 
 // id determinístico: casa__data__afiliado (ou 'agg' p/ a linha agregada da casa).

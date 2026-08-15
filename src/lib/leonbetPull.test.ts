@@ -97,7 +97,35 @@ describe('adaptLeonBetRows', () => {
   });
 });
 
+// A LEON não tem régua de CPA cadastrada (a contagem já vem pronta), então sem este
+// campo a parcela CPA do lucro — o toggle "REV fora do lucro" — dava R$ 0.
+describe('cpa_commission (parcela CPA em dinheiro)', () => {
+  it('carrega o cpa_profit da API, sem depender de régua', () => {
+    const { rows } = adaptLeonBetRows(API_ROWS);
+    const jul21 = rows.find((r) => r.date === '2026-07-21')!;
+    expect(jul21.cpa_commission).toBe(17);
+    expect(jul21.qualified_cpa).toBe(1);
+  });
+
+  it('dia sem CPA carrega 0 explícito (a fonte informou; não é ausência)', () => {
+    const { rows } = adaptLeonBetRows(API_ROWS);
+    expect(rows.find((r) => r.date === '2026-08-02')!.cpa_commission).toBe(0);
+  });
+
+  it('cpa_profit ausente na resposta vira 0, sem NaN', () => {
+    const { rows } = adaptLeonBetRows([{ ...API_ROWS[0], cpa_profit: undefined }]);
+    expect(rows[0].cpa_commission).toBe(0);
+  });
+});
+
 describe('integração com buildPullPayload (housePull.ts)', () => {
+  it('soma cpa_commission ao agregar o dia (chega inteiro ao house_results)', () => {
+    const { rows } = adaptLeonBetRows(API_ROWS);
+    const { rows: stored } = buildPullPayload(rows, new Map());
+    const jul21 = stored.find((r) => r.date === '2026-07-21' && r.affiliateId === null)!;
+    expect(jul21.cpa_commission).toBe(17);
+  });
+
   it('registro tagueado sem depósito ainda entra no agregado do dia', () => {
     const { rows } = adaptLeonBetRows(API_ROWS);
     const { rows: stored } = buildPullPayload(rows, new Map([['cgverify0811', { affiliateId: 'AFF-1' }]]));

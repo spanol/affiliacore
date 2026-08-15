@@ -8,7 +8,12 @@
 // AUSÊNCIA vira `null` ("—" na UI), nunca um 0 fabricado. Derivada com divisor
 // ausente/zero também é `null` — divisão por zero não vira ticket médio infinito.
 
-import { OPTIONAL_METRIC_KEYS, type OptionalMetricKey } from './houseResults';
+// Opcionais que são DO FUNIL. Deliberadamente uma lista própria, e não o
+// `OPTIONAL_METRIC_KEYS` de houseResults.ts: aquele cresceu para além do funil
+// (ganhou `cpa_commission`, que é dinheiro) e iterá-lo aqui somaria um valor em R$
+// dentro dos totais de contagem. Mesma regra de ausência ≠ 0, escopo diferente.
+const FUNNEL_OPTIONAL_KEYS = ['visits', 'deposit_count'] as const;
+type FunnelOptionalKey = (typeof FUNNEL_OPTIONAL_KEYS)[number];
 
 export interface FunnelTotals {
   /** Cliques/visitas — `undefined` = nenhuma fonte do período informou. */
@@ -33,7 +38,7 @@ export function sumFunnelTotals(rows: any[] | null | undefined): FunnelTotals {
     out.first_deposits += Number(r?.first_deposits) || 0;
     out.deposit += Number(r?.deposit) || 0;
     out.qualified_cpa += Number(r?.qualified_cpa) || 0;
-    for (const k of OPTIONAL_METRIC_KEYS as readonly OptionalMetricKey[]) {
+    for (const k of FUNNEL_OPTIONAL_KEYS as readonly FunnelOptionalKey[]) {
       const v = r?.[k];
       if (v === undefined || v === null) continue;
       out[k] = (out[k] ?? 0) + (Number(v) || 0);

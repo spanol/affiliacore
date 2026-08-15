@@ -102,6 +102,11 @@ export function adaptLeonBetRows(apiRows: LeonBetApiRow[] | null | undefined): A
       rvs: numOf(r?.revenue_share_profit),
       deposit: numOf(r?.deposits),
       total_commission: numOf(r?.profit),
+      // Parcela CPA em dinheiro, direto da API. Aqui ela é ESSENCIAL, não uma
+      // melhoria: a LEON não tem régua de CPA (a contagem já vem pronta, então
+      // `defaultCpa` da casa fica vazio) e sem este campo o toggle "REV fora do
+      // lucro" calculava a parcela CPA como `contagem × 0` = R$ 0.
+      cpa_commission: numOf(r?.cpa_profit),
       // Qtd de depósitos vem da API; clique NÃO vem (`visits` fica AUSENTE de
       // propósito — ausência ≠ 0, a UI mostra "—" em vez de um zero enganoso).
       deposit_count: numOf(r?.deposits_count),

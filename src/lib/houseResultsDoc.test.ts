@@ -66,4 +66,12 @@ describe('sanitizeMetrics (P2.8 · coage as 6 métricas, descarta extras)', () =
     expect(com.visits).toBe(40);
     expect(com.deposit_count).toBe(25);
   });
+
+  it('cpa_commission (dinheiro) grava zero explícito e preserva a ausência', () => {
+    expect(sanitizeMetrics({ registrations: 1 })).not.toHaveProperty('cpa_commission');
+    // 0 informado ≠ ausente: é um dia real sem CPA, e precisa vencer a régua da casa
+    // na hora de calcular a parcela CPA do lucro. [[houseCpaCommissionForRow]]
+    expect(sanitizeMetrics({ registrations: 1, cpa_commission: 0 }).cpa_commission).toBe(0);
+    expect(sanitizeMetrics({ registrations: 1, cpa_commission: '5700' }).cpa_commission).toBe(5700);
+  });
 });

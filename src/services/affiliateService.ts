@@ -21,7 +21,7 @@ import { fetchHouseResults } from './houseService';
 import type { AuditLogEntry } from '../lib/auditView';
 import {
   StoredManualRow, Metrics, METRIC_KEYS, OPTIONAL_METRIC_KEYS,
-  aggregateByHouse, aggregateByDate, aggregateByAffiliate, deriveManualCommission,
+  aggregateByHouse, aggregateByDate, aggregateByAffiliate, deriveManualCommission, cpaCommissionByHouse,
 } from '../lib/houseResults';
 // Núcleo PURO de comissão (movido p/ lib/commission p/ o server.ts reusar a MESMA
 // fórmula). Re-exportado abaixo p/ os call-sites antigos (`from './affiliateService'`).
@@ -1242,9 +1242,10 @@ export function calcManualHouseNetProfit(
   const nameOf = (slug: string) => metaOf(slug)?.name ?? slug;
   const brandKeyOf = (slug: string) => metaOf(slug)?.id ?? slug;
   // Toggle "REV fora do lucro" (call Infinity 12/08): com `revInProfit: false` a
-  // casa entra no lucro CPA-only nos DOIS lados — comissão derivada da régua
-  // (houseCpaCommissionForRow ignora a importada, que embute o REV) e repasse só
-  // da parcela CPA (calcAffiliatePayoutParts). Um lado só deixaria o lucro torto.
+  // casa entra no lucro CPA-only nos DOIS lados — só a parcela CPA da comissão
+  // (houseCpaCommissionForRow ignora a `total_commission`, que embute o REV) e
+  // repasse só da parcela CPA (calcAffiliatePayoutParts). Um lado só deixaria o
+  // lucro torto.
   const revOff = (slug: string) => metaOf(slug)?.revInProfit === false;
   const cpaRateOf = (slug: string) => {
     const b = metaOf(slug);
@@ -1253,11 +1254,14 @@ export function calcManualHouseNetProfit(
   const out: Record<string, HouseNetProfit> = {};
   const ensure = (name: string) => out[name] ?? (out[name] = { commission: 0, payout: 0, netProfit: 0 });
 
-  // Comissão da casa = agregado (não-atribuído incluído).
+  // Comissão da casa = agregado (não-atribuído incluído). Com "REV fora do lucro",
+  // a parcela CPA vem resolvida POR DIA (dinheiro informado pela fonte quando houver,
+  // régua da casa quando não) — ver cpaCommissionByHouse.
   const byHouse = aggregateByHouse(rows);
+  const cpaOnly = cpaCommissionByHouse(rows, cpaRateOf);
   for (const slug of Object.keys(byHouse)) {
     ensure(nameOf(slug)).commission += revOff(slug)
-      ? houseCpaCommissionForRow(byHouse[slug], cpaRateOf(slug))
+      ? (cpaOnly[slug] ?? 0)
       : byHouse[slug].total_commission;
   }
 

@@ -4,7 +4,7 @@
 // recortes (por casa / por afiliado / por data) usados no merge com a OTG. Mantê-lo
 // puro deixa toda a aritmética sensível (sem double-count, "não atribuído") testável.
 
-import { houseCommissionForRow, type HouseRate } from './commission';
+import { houseCommissionForRow, houseCpaCommissionForRow, type HouseRate } from './commission';
 
 // Métricas canônicas — mesmo shape das linhas de `results` da API externa, pra que
 // as linhas manuais somem direto nas visões existentes.
@@ -18,12 +18,19 @@ export const METRIC_KEYS = [
 ] as const;
 export type MetricKey = (typeof METRIC_KEYS)[number];
 
-// Métricas OPCIONAIS do funil (call Infinity 12/08): nem toda fonte as informa —
-// a OTG não manda clique nem qtd de depósitos; uploads antigos não têm as colunas.
-// AUSÊNCIA ≠ 0 (mesma regra das taxas): elas só entram quando a fonte trouxe o
-// campo, e a agregação PRESERVA a ausência (chave indefinida quando nenhuma linha
-// a trouxe) para a UI mostrar "—" em vez de um 0 enganoso.
-export const OPTIONAL_METRIC_KEYS = ['visits', 'deposit_count'] as const;
+// Métricas OPCIONAIS: nem toda fonte as informa — a OTG não manda clique nem qtd
+// de depósitos; uploads antigos não têm as colunas. AUSÊNCIA ≠ 0 (mesma regra das
+// taxas): elas só entram quando a fonte trouxe o campo, e a agregação PRESERVA a
+// ausência (chave indefinida quando nenhuma linha a trouxe) para a UI mostrar "—"
+// em vez de um 0 enganoso.
+//
+// `visits`/`deposit_count` são do FUNIL (call Infinity 12/08). `cpa_commission` é
+// DINHEIRO — a parcela da comissão que veio do eixo CPA, quando a fonte a separa
+// (os conectores de pull separam; a OTG não). Ela existe para que
+// `houseCpaCommissionForRow` não precise reconstruí-la por `contagem × régua`.
+// O funil NÃO itera esta lista (tem a sua própria em lib/funnel.ts) — senão um
+// campo de dinheiro entraria nos totais de contagem.
+export const OPTIONAL_METRIC_KEYS = ['visits', 'deposit_count', 'cpa_commission'] as const;
 export type OptionalMetricKey = (typeof OPTIONAL_METRIC_KEYS)[number];
 export type Metrics = Record<MetricKey, number> & Partial<Record<OptionalMetricKey, number>>;
 
@@ -72,6 +79,11 @@ const COLUMN_ALIASES: Record<ColumnKey, string[]> = {
   // (diferente de `deposit`, que é o VALOR depositado em R$).
   visits: ['visitas', 'visita', 'cliques', 'clique', 'clicks', 'visits', 'visit_count'],
   deposit_count: ['qtd_depositos', 'qtde_depositos', 'quantidade_depositos', 'num_depositos', 'deposit_count', 'deposits_count', 'depositos_qtd'],
+  // Parcela CPA da comissão, em DINHEIRO (≠ `qualified_cpa`, que é CONTAGEM). O
+  // export da Esportiva traz a coluna "CPA" já em R$ — é a armadilha clássica do
+  // arquivo dela, tratada por `adaptHouseTagReport`; aqui os apelidos são só os
+  // explícitos, para que um "cpa" solto continue significando contagem.
+  cpa_commission: ['comissao_cpa', 'comissoes_cpa', 'commissions_cpa', 'cpa_commission', 'cpa_profit', 'valor_cpa'],
 };
 
 const stripKey = (s: string) =>
@@ -441,6 +453,28 @@ function dailyAggregate(rows: StoredManualRow[]): Map<string, Metrics> {
   const out = new Map<string, Metrics>();
   const keys = new Set([...explicit.keys(), ...summed.keys()]);
   for (const key of keys) out.set(key, hasExplicit.has(key) ? explicit.get(key)! : summed.get(key)!);
+  return out;
+}
+
+// Parcela CPA da comissão por CASA — usada só pelas casas com "REV fora do lucro".
+// Resolve POR DIA (sobre a mesma dedup de `dailyAggregate`) em vez de sobre o total
+// da casa, porque a escolha entre "dinheiro informado pela fonte" e "contagem × régua"
+// é POR ORIGEM, e o dia é a menor unidade em que a origem é homogênea: o pull reescreve
+// o dia inteiro, o upload substitui o dia inteiro.
+//
+// Somar a casa toda antes de escolher quebraria justamente na transição: um range que
+// pega dias antigos (gravados sem `cpa_commission`) e dias novos daria um agregado com
+// o campo PRESENTE mas cobrindo só a parte nova — e os dias antigos entrariam como R$ 0
+// em vez de cair na régua. [[houseCpaCommissionForRow]]
+export function cpaCommissionByHouse(
+  rows: StoredManualRow[],
+  rateOf: (slug: string) => HouseRate | null
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [key, metrics] of dailyAggregate(rows)) {
+    const slug = key.split('|')[0];
+    out[slug] = (out[slug] ?? 0) + houseCpaCommissionForRow(metrics, rateOf(slug));
+  }
   return out;
 }
 

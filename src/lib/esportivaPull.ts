@@ -113,6 +113,11 @@ export function adaptEsportivaRows(
       rvs: numOf(r?.commissions_rev_share),
       deposit: numOf(r?.deposit_total),
       total_commission: numOf(r?.commissions_total),
+      // O dinheiro de CPA EXATO, preservado. Ele é o dividendo da conta acima, e
+      // até 08/2026 era descartado depois de virar contagem — quem precisava da
+      // parcela CPA (o toggle "REV fora do lucro") a remontava por
+      // `contagem × régua`, ou seja pela divisão desfeita, arredondamento e tudo.
+      cpa_commission: cpaMoney,
       // Funil (call Infinity 12/08): a API manda clique e QUANTIDADE de depósitos
       // por linha — alimentam os cards de funil e o ticket médio/média de depósito.
       visits: numOf(r?.visit_count),

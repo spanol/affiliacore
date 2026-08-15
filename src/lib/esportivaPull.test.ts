@@ -77,6 +77,32 @@ describe('adaptEsportivaRows', () => {
   });
 });
 
+// O dividendo da conta acima é o dinheiro de CPA EXATO, e ele era descartado assim
+// que virava contagem: quem precisava da parcela CPA remontava `contagem × régua`,
+// desfazendo a divisão com arredondamento e tudo.
+describe('cpa_commission (parcela CPA em dinheiro)', () => {
+  it('preserva o commissions_cpa da API ao lado da contagem derivada', () => {
+    const { rows } = adaptEsportivaRows(API_ROWS, { cpaBase: 120 });
+    expect(rows[0]).toMatchObject({ qualified_cpa: 8, cpa_commission: 960 });
+  });
+
+  it('sobrevive à régua QUEBRADA, onde a contagem não reconstrói o valor', () => {
+    // 5.700/120 = 47,5 → contagem 48. Remontar daria 5.760; o correto é 5.700.
+    const { rows, cpaRemainder } = adaptEsportivaRows(
+      [{ dt: '2026-07-10', afp: 't', commissions_cpa: 5700, commissions_total: 5700 }],
+      { cpaBase: 120 },
+    );
+    expect(rows[0].qualified_cpa).toBe(48);
+    expect(rows[0].cpa_commission).toBe(5700);
+    expect(cpaRemainder).toBe(60);
+  });
+
+  it('sem régua a contagem fica 0, mas o DINHEIRO continua exato', () => {
+    const { rows } = adaptEsportivaRows(API_ROWS, {});
+    expect(rows[0]).toMatchObject({ qualified_cpa: 0, cpa_commission: 960 });
+  });
+});
+
 // buildPullPayload/pullWindow são genéricos (não específicos da Esportiva) —
 // cobertos em housePull.test.ts desde a extração pra housePull.ts (08/2026).
 

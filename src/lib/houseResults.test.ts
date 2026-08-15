@@ -2,9 +2,50 @@ import { describe, it, expect } from 'vitest';
 import {
   parsePtNumber, parseDateToISO, parseResultsCsv, parseResultsRows, buildAffiliateLookup, resolveAffiliates,
   aggregateByHouse, aggregateByDate, aggregateByAffiliate, aggregateByAffiliateHouse,
-  unattributedByHouse, emptyMetrics, addMetrics, deriveManualCommission, StoredManualRow,
+  unattributedByHouse, emptyMetrics, addMetrics, deriveManualCommission, cpaCommissionByHouse, StoredManualRow,
   TEMPLATE_HEADERS, TEMPLATE_COLUMNS,
 } from './houseResults';
+
+// Parcela CPA por casa, resolvida POR DIA. O risco que ela existe para cobrir é a
+// TRANSIÇÃO: linhas gravadas antes de `cpa_commission` existir convivendo no mesmo
+// range com as novas.
+describe('cpaCommissionByHouse', () => {
+  const rate = () => ({ defaultCpa: 120 });
+
+  it('usa o dinheiro informado no dia que o tem e a régua no dia que não tem', () => {
+    const rows: StoredManualRow[] = [
+      // dia novo (pull): dinheiro exato, e a contagem NÃO o reconstrói (48×120=5760)
+      { houseSlug: 'esportiva-bet', date: '2026-08-14', affiliateId: null, registrations: 0, first_deposits: 0, qualified_cpa: 48, rvs: 0, deposit: 0, total_commission: 5800, cpa_commission: 5700 },
+      // dia antigo (sem o campo): cai na régua → 3×120 = 360
+      { houseSlug: 'esportiva-bet', date: '2026-07-02', affiliateId: null, registrations: 0, first_deposits: 0, qualified_cpa: 3, rvs: 0, deposit: 0, total_commission: 400 },
+    ];
+    expect(cpaCommissionByHouse(rows, rate)['esportiva-bet']).toBe(6060);
+  });
+
+  it('somar a casa antes de escolher perderia o dia antigo — por dia, não perde', () => {
+    const rows: StoredManualRow[] = [
+      { houseSlug: 'h', date: '2026-08-14', affiliateId: null, registrations: 0, first_deposits: 0, qualified_cpa: 0, rvs: 0, deposit: 0, total_commission: 0, cpa_commission: 0 },
+      { houseSlug: 'h', date: '2026-07-02', affiliateId: null, registrations: 0, first_deposits: 0, qualified_cpa: 10, rvs: 0, deposit: 0, total_commission: 0 },
+    ];
+    // No agregado da casa o campo estaria PRESENTE (0 + ausente = 0) e zeraria tudo.
+    expect(cpaCommissionByHouse(rows, rate)['h']).toBe(1200);
+  });
+
+  it('respeita a dedup diária (agregado explícito vence as atribuídas do mesmo dia)', () => {
+    const rows: StoredManualRow[] = [
+      { houseSlug: 'h', date: '2026-08-14', affiliateId: null, registrations: 0, first_deposits: 0, qualified_cpa: 0, rvs: 0, deposit: 0, total_commission: 0, cpa_commission: 900 },
+      { houseSlug: 'h', date: '2026-08-14', affiliateId: 'A', registrations: 0, first_deposits: 0, qualified_cpa: 0, rvs: 0, deposit: 0, total_commission: 0, cpa_commission: 600 },
+    ];
+    expect(cpaCommissionByHouse(rows, rate)['h']).toBe(900);
+  });
+
+  it('casa sem régua e sem campo informado não inventa receita', () => {
+    const rows: StoredManualRow[] = [
+      { houseSlug: 'leon-bet', date: '2026-08-14', affiliateId: null, registrations: 0, first_deposits: 0, qualified_cpa: 12, rvs: 0, deposit: 0, total_commission: 300 },
+    ];
+    expect(cpaCommissionByHouse(rows, () => null)['leon-bet']).toBe(0);
+  });
+});
 
 describe('parsePtNumber', () => {
   it('pt-BR com milhar e decimal', () => {
