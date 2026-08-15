@@ -753,7 +753,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                 <p className="text-[11px] leading-relaxed text-slate-500 dark:text-neutral-400">
                   A comissão, o RVS e a parcela de CPA chegam prontos na resposta da API, então
                   não há taxa padrão para declarar aqui. Se a casa mudar o valor do CPA, o ajuste
-                  é na régua do conector, em <b>Integrações</b> — é ela que converte o dinheiro
+                  é na régua do conector, em <b>Integrações</b>: é ela que converte o dinheiro
                   em contagem de CPAs.
                 </p>
                 <Link
@@ -1290,7 +1290,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                 </p>
                 <p>
                   O robô da integração reescreve os dias que puxa. Uma planilha subida para
-                  uma data dentro da janela dele será substituída na próxima rodada — use o
+                  uma data dentro da janela dele será substituída na próxima rodada. Use o
                   upload apenas para períodos antigos, que o robô não alcança mais.
                 </p>
               </div>
