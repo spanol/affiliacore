@@ -4,10 +4,11 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { fetchInvite, acceptInvite } from '../services/affiliateService';
-import { UserPlus, Mail, Lock, AlertCircle, CheckCircle, Loader2, Share2, IdCard } from 'lucide-react';
+import { UserPlus, Mail, Lock, AlertCircle, CheckCircle, Loader2, Share2, IdCard, User, Users } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
-import { cn } from '../lib/utils';
+import { cn, humanizeName } from '../lib/utils';
 import { maskCPF, isValidCPF, isValidPhone } from '../lib/validators';
+import { NETWORK_INVITE_KIND, recruitNameError } from '../lib/networkInvite';
 import InstanceLogo from '../components/InstanceLogo';
 import PhoneVerificationField, { mergePhoneVerificationState, type PhoneVerificationState } from '../components/PhoneVerificationField';
 
@@ -20,6 +21,11 @@ export default function InviteAccept() {
   const [validating, setValidating] = useState(true);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [affiliateName, setAffiliateName] = useState<string | null>(null);
+  // Link de cadastro na REDE de um gerente: o afiliado ainda não existe, então a
+  // tela pede o NOME (no convite pessoal ele já veio do cadastro feito pela agência).
+  const [isNetwork, setIsNetwork] = useState(false);
+  const [referrerName, setReferrerName] = useState<string | null>(null);
+  const [name, setName] = useState('');
 
   const [email, setEmail] = useState('');
   const [socialMedia, setSocialMedia] = useState('');
@@ -49,7 +55,11 @@ export default function InviteAccept() {
       return;
     }
     fetchInvite(token)
-      .then((info) => setAffiliateName(info.affiliateName))
+      .then((info) => {
+        setAffiliateName(info.affiliateName);
+        setIsNetwork(info.kind === NETWORK_INVITE_KIND);
+        setReferrerName(info.referrerName ?? null);
+      })
       .catch((err) => setInviteError(err instanceof Error ? err.message : 'Convite inválido.'))
       .finally(() => setValidating(false));
   }, [token]);
@@ -59,6 +69,13 @@ export default function InviteAccept() {
     if (!token) return;
     setError('');
 
+    if (isNetwork) {
+      const nameError = recruitNameError(name);
+      if (nameError) {
+        setError(nameError);
+        return;
+      }
+    }
     if (password.length < 6) {
       setError('A senha deve ter ao menos 6 caracteres.');
       return;
@@ -89,6 +106,7 @@ export default function InviteAccept() {
     try {
       const normalizedEmail = email.trim().toLowerCase();
       await acceptInvite(token, normalizedEmail, password, {
+        name: isNetwork ? name.trim() : undefined,
         phone: trimmedPhone,
         socialMedia: socialMedia.trim(),
         cpf: cpf.trim(),
@@ -160,8 +178,25 @@ export default function InviteAccept() {
     <>
       <div className="text-center mb-8">
         <InstanceLogo className="h-7 w-auto mx-auto mb-4" />
-        <p className="text-slate-400 dark:text-neutral-500 text-[10px] font-bold uppercase tracking-widest">Ative seu acesso de afiliado</p>
+        <p className="text-slate-400 dark:text-neutral-500 text-[10px] font-bold uppercase tracking-widest">
+          {isNetwork ? 'Crie seu cadastro de afiliado' : 'Ative seu acesso de afiliado'}
+        </p>
       </div>
+
+      {isNetwork && (
+        <div className="mb-6 p-4 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800 flex items-start gap-3">
+          <Users size={16} className="shrink-0 mt-0.5 text-auth-cta dark:text-lp-cta" />
+          <div>
+            <p className="text-[10px] font-black text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-1">Convite de equipe</p>
+            <p className="text-sm font-bold text-slate-900 dark:text-white">
+              {referrerName ? `Você entra na rede de ${humanizeName(referrerName)}.` : 'Você entra na rede de quem te convidou.'}
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-1">
+              Depois do cadastro, seus links de divulgação são liberados pela agência.
+            </p>
+          </div>
+        </div>
+      )}
 
       {affiliateName && (
         <div className="mb-6 p-4 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800">
@@ -178,6 +213,23 @@ export default function InviteAccept() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {isNetwork && (
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest ml-1">Seu nome</label>
+            <div className="relative">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500" size={16} />
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white focus:ring-2 focus:ring-auth-cta/20 focus:border-auth-cta transition-all outline-none"
+                placeholder="Nome e sobrenome"
+              />
+            </div>
+          </div>
+        )}
+
         <div className="space-y-1.5">
           <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest ml-1">Seu e-mail</label>
           <div className="relative">
@@ -268,7 +320,9 @@ export default function InviteAccept() {
           disabled={submitting}
           className="w-full py-4 rounded-2xl font-bold mt-4 flex items-center justify-center gap-2 transition-all disabled:opacity-50 bg-auth-cta text-auth-cta-text hover:bg-auth-cta-hover shadow-lg shadow-auth-cta/20 dark:bg-lp-cta dark:text-lp-cta-text dark:hover:bg-lp-cta-hover dark:shadow-lp-cta/10"
         >
-          {submitting ? <Loader2 size={18} className="animate-spin" /> : <><UserPlus size={18} /> Ativar meu acesso</>}
+          {submitting
+            ? <Loader2 size={18} className="animate-spin" />
+            : <><UserPlus size={18} /> {isNetwork ? 'Criar meu cadastro' : 'Ativar meu acesso'}</>}
         </button>
       </form>
 

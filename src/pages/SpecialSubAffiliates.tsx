@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Loader2, Users, ArrowUpRight, Crown, Save, Percent, Search, UserPlus, X, Clock, Link2, Copy, Check, Sparkles } from 'lucide-react';
+import { Loader2, Users, ArrowUpRight, Crown, Save, Percent, Search, UserPlus, X, Clock, Link2, Copy, Check, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import {
@@ -14,7 +14,8 @@ import {
   createAffiliateReferral,
   fetchAffiliateReferrals,
   fetchAffiliateLinks,
-  generateAffiliateLink,
+  fetchNetworkInvite,
+  createNetworkInvite,
   buildGoUrl,
   SpecialAffiliate,
   AffiliateConfig,
@@ -22,8 +23,7 @@ import {
   type AffiliateLink,
 } from '../services/affiliateService';
 import { fetchHouses, type House } from '../services/houseService';
-import { suggestTag, buildTaggedUrl, tagParamForTemplate } from '../lib/linkGeneration';
-import { extractTagFromUrl } from '../lib/linkTriage';
+import { buildNetworkInviteUrl } from '../lib/networkInvite';
 import { producingAffiliateIds } from '../lib/affiliateActivity';
 import { buildPerHousePayout, type HouseMetricRow } from '../lib/perHousePayout';
 import { StoredManualRow } from '../lib/houseResults';
@@ -73,15 +73,19 @@ export default function SpecialSubAffiliates() {
   const [referOpen, setReferOpen] = useState(false);
   const [referForm, setReferForm] = useState({ name: '', email: '', phone: '', note: '' });
   const [sendingReferral, setSendingReferral] = useState(false);
-  // Links de divulgação da rede (call 12/08 · item 1): o servidor escopa o GET à
-  // rede do especial e o /generate só aceita alvo dentro dela (ele mesmo + subs).
+  // Links de divulgação da rede: o gerente VÊ e COPIA os links da equipe, mas quem
+  // CUNHA o link da casa é a agência (decisão do Maurício, 15/08). O servidor segue
+  // escopando o GET à rede dele.
   const [links, setLinks] = useState<AffiliateLink[]>([]);
   const [houses, setHouses] = useState<House[]>([]);
-  const [genFor, setGenFor] = useState<{ id: string; name: string } | null>(null);
-  const [genBrand, setGenBrand] = useState('');
-  const [genTag, setGenTag] = useState('');
-  const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  // Link de cadastro na rede (15/08): quem entra por ele vira afiliado da equipe
+  // dele na hora, sem passar pela fila da agência.
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [inviteUses, setInviteUses] = useState(0);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
 
   const ownId = profile?.affiliateId ? String(profile.affiliateId) : '';
 
@@ -97,7 +101,7 @@ export default function SpecialSubAffiliates() {
       const specials = await fetchSpecialAffiliates();
       const mine = specials[ownId] || null;
       const networkIds = [ownId, ...((mine?.subAffiliateIds || []).map(String))];
-      const [split, cfgs, poolData, manual, myReferrals, netLinks, houseList] = await Promise.all([
+      const [split, cfgs, poolData, manual, myReferrals, netLinks, houseList, invite] = await Promise.all([
         fetchResultsForAffiliatesSplit(networkIds, range),
         fetchAffiliateConfigs(),
         fetchAffiliates().catch(() => []),
@@ -109,6 +113,8 @@ export default function SpecialSubAffiliates() {
         // Links da rede (item 1): o servidor devolve own + subs para o especial.
         fetchAffiliateLinks().catch(() => []),
         fetchHouses().catch(() => []),
+        // Link de cadastro na rede: pode não existir ainda (o gerente gera na tela).
+        fetchNetworkInvite().catch(() => ({ code: null, uses: 0 })),
       ]);
       setSpecial(mine);
       setResults(split.rows);
@@ -119,6 +125,8 @@ export default function SpecialSubAffiliates() {
       setReferrals(Array.isArray(myReferrals) ? myReferrals : []);
       setLinks(Array.isArray(netLinks) ? netLinks : []);
       setHouses(Array.isArray(houseList) ? houseList : []);
+      setInviteCode(invite?.code ?? null);
+      setInviteUses(Number(invite?.uses ?? 0) || 0);
       // semente dos inputs editáveis a partir dos configs salvos
       const seed: Record<string, { cpaValue: number | string; revPercentage: number | string }> = {};
       (mine?.subAffiliateIds || []).forEach((id) => {
@@ -182,13 +190,6 @@ export default function SpecialSubAffiliates() {
   const deliverableLinksOf = (id: string) =>
     (linksByAffiliate.get(String(id)) ?? []).filter((l) => l.active !== false && String(l.registerUrl ?? '').trim());
 
-  // Tags já em uso na rede — a sugestão nasce sem colidir; o servidor revalida
-  // contra a base INTEIRA na gravação (a visão do especial é parcial de propósito).
-  const takenTags = useMemo(
-    () => links.map((l) => String((l as any).tag ?? '') || extractTagFromUrl(String(l.registerUrl ?? ''))).filter(Boolean),
-    [links],
-  );
-
   const houseNameOf = (brandKey: string | null | undefined) => {
     const key = String(brandKey ?? '').trim();
     if (!key) return '';
@@ -196,33 +197,32 @@ export default function SpecialSubAffiliates() {
     return h?.name ?? key;
   };
 
-  const genHouse = useMemo(() => houses.find((h) => houseKeyOf(h) === genBrand) ?? null, [houses, genBrand]);
-  const genTemplate = String(genHouse?.registerUrlTemplate ?? '').trim();
-  // O MESMO builder puro do servidor: o preview é o que vai ser gravado.
-  const genPreview = useMemo(() => buildTaggedUrl(genTemplate, genTag), [genTemplate, genTag]);
+  // --- Link de cadastro na rede (15/08) -------------------------------------
+  // Emitir é idempotente: sem `rotate` o servidor devolve o link que já existe.
+  const inviteUrl = inviteCode ? buildNetworkInviteUrl(inviteCode) : '';
 
-  const openGenerate = (id: string, name: string) => {
-    setGenBrand(houses.length === 1 ? houseKeyOf(houses[0]) : '');
-    setGenTag(suggestTag({ name, affiliateId: id }, takenTags));
-    setGenFor({ id: String(id), name });
+  const handleNetworkInvite = async (rotate: boolean) => {
+    setInviteBusy(true);
+    try {
+      const invite = await createNetworkInvite({ rotate });
+      setInviteCode(invite.code ?? null);
+      setInviteUses(Number(invite.uses ?? 0) || 0);
+      push({
+        type: 'success',
+        message: rotate ? 'Link novo gerado. O anterior parou de funcionar.' : 'Link de cadastro pronto para compartilhar.',
+      });
+    } catch (e: any) {
+      push({ type: 'error', message: e?.message || 'Falha ao gerar o link de cadastro.' });
+    } finally {
+      setInviteBusy(false);
+    }
   };
 
-  const handleGenerateLink = async () => {
-    if (!genFor) return;
-    const tag = genTag.trim();
-    if (!genBrand) { push({ type: 'error', message: 'Escolha a casa: o link sai do template dela.' }); return; }
-    if (!tag) { push({ type: 'error', message: 'A tag não pode ficar vazia: é ela que a casa devolve no relatório.' }); return; }
-    setGenerating(true);
-    try {
-      const generated = await generateAffiliateLink(genFor.id, genBrand, { tag });
-      push({ type: 'success', message: `Link gerado com a tag ${generated.tag}.` });
-      setGenFor(null);
-      setLinks(await fetchAffiliateLinks().catch(() => links));
-    } catch (e: any) {
-      push({ type: 'error', message: e?.message || 'Falha ao gerar o link.' });
-    } finally {
-      setGenerating(false);
-    }
+  const copyInviteUrl = () => {
+    if (!inviteUrl) return;
+    navigator.clipboard.writeText(inviteUrl);
+    setInviteCopied(true);
+    setTimeout(() => setInviteCopied(false), 2000);
   };
 
   const copyLink = (code: string) => {
@@ -363,22 +363,18 @@ export default function SpecialSubAffiliates() {
     </button>
   );
 
-  // Links do sub (item 1): chips + "Gerar" pelo template da casa. Reusado na
-  // tabela (desktop) e nos cards (mobile).
-  const renderLinkCell = (id: string, name: string) => {
+  // Links do sub: só os chips para copiar. Cunhar o link da casa é da AGÊNCIA
+  // (15/08) — a tag que a casa devolve no relatório sai do cadastro dela.
+  const renderLinkCell = (id: string) => {
     const subLinks = deliverableLinksOf(id);
-    return (
-      <div className="flex flex-col items-start gap-1.5">
-        {subLinks.map(renderLinkChip)}
-        <button
-          type="button"
-          onClick={() => openGenerate(id, name)}
-          className="inline-flex items-center gap-1 text-[10px] font-bold text-accent-600 dark:text-accent-400 hover:opacity-80 transition-opacity"
-        >
-          <Link2 size={11} /> {subLinks.length ? 'Gerar outro' : 'Gerar link'}
-        </button>
-      </div>
-    );
+    if (subLinks.length === 0) {
+      return (
+        <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500">
+          Sem link ainda. Peça à agência.
+        </span>
+      );
+    }
+    return <div className="flex flex-col items-start gap-1.5">{subLinks.map(renderLinkChip)}</div>;
   };
 
   if (profile && !profile.isSpecial) return <Navigate to="/dashboard" replace />;
@@ -411,14 +407,15 @@ export default function SpecialSubAffiliates() {
         <div className="flex flex-col items-start md:items-end gap-3">
           <DateRangePicker value={range} onChange={setRange} />
           <div className="flex items-center gap-2 flex-wrap md:justify-end">
-            {/* Item 1 (call 12/08): o especial gera o PRÓPRIO link aqui; os já
-                gerados ficam em "Meus Links" (menu) — este botão só cunha. */}
+            {/* Link de cadastro na rede (15/08): o caminho SEM fila. A indicação
+                (botão ao lado) continua existindo para quem prefere que a agência
+                confirme antes. */}
             <button
               type="button"
-              onClick={() => openGenerate(ownId, nameFromPool[ownId] || '')}
+              onClick={() => setInviteOpen(true)}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-slate-200 dark:border-neutral-700 text-[11px] font-bold text-slate-600 dark:text-neutral-300 hover:border-accent-500/40 hover:text-accent-600 dark:hover:text-accent-400 transition-all"
             >
-              <Link2 size={14} /> Gerar meu link
+              <Link2 size={14} /> Link de cadastro
             </button>
             {/* Indicação (call 12/08): abre a fila da agência, não cria nada aqui. */}
             <button
@@ -564,7 +561,7 @@ export default function SpecialSubAffiliates() {
                           <td className="px-6 py-4 text-right tabular-nums font-bold text-slate-700 dark:text-neutral-200">{(r.qualified_cpa || 0).toLocaleString('pt-BR')}</td>
                           <td className="px-6 py-4 text-right tabular-nums font-black text-emerald-600 dark:text-emerald-400">{brl(spread)}</td>
                           <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                            {renderLinkCell(id, name)}
+                            {renderLinkCell(id)}
                           </td>
                           <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                             <div className="relative w-24">
@@ -662,7 +659,7 @@ export default function SpecialSubAffiliates() {
                       </div>
                       <div className="pt-3 border-t border-slate-100 dark:border-neutral-800">
                         <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-2">Link de divulgação</p>
-                        {renderLinkCell(id, name)}
+                        {renderLinkCell(id)}
                       </div>
                       <div className="pt-3 border-t border-slate-100 dark:border-neutral-800">
                         <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-2">
@@ -791,11 +788,11 @@ export default function SpecialSubAffiliates() {
         </div>
       )}
 
-      {/* Modal de geração de link (item 1) — espelha o do master (/links): casa +
-          tag + preview do MESMO builder puro do servidor. O servidor revalida o
-          escopo (rede do especial) e a colisão de tag na gravação. */}
-      {genFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => !generating && setGenFor(null)}>
+      {/* Modal do link de cadastro na rede (15/08). Quem entra por ele já nasce
+          afiliado DENTRO da equipe, sem passar pela fila da agência. O que este
+          link NÃO faz é cunhar link de casa: isso continua sendo do master. */}
+      {inviteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => !inviteBusy && setInviteOpen(false)}>
           <motion.div
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -804,70 +801,68 @@ export default function SpecialSubAffiliates() {
           >
             <div className="p-6 border-b border-slate-100 dark:border-neutral-800 flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Link2 size={16} className="text-accent-500" />
-                {genFor.id === ownId ? 'Gerar meu link' : `Gerar link de ${humanizeName(genFor.name || `#${genFor.id}`)}`}
+                <Link2 size={16} className="text-accent-500" /> Link de cadastro na sua rede
               </h3>
-              <button type="button" onClick={() => setGenFor(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 transition-colors" aria-label="Fechar">
+              <button type="button" onClick={() => setInviteOpen(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 transition-colors" aria-label="Fechar">
                 <X size={16} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <p className="text-[12px] text-slate-500 dark:text-neutral-400">
-                O link sai do cadastro da casa com a tag abaixo. É ela que a casa devolve no relatório.
+                Quem se cadastrar por este link entra <b>direto na sua equipe</b>, sem precisar de aprovação da
+                agência. O link de divulgação da casa continua sendo gerado pela agência.
               </p>
-              <label className="block">
-                <span className="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">Casa</span>
-                <select
-                  value={genBrand}
-                  onChange={(e) => setGenBrand(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
-                >
-                  <option value="">Selecione…</option>
-                  {houses.map((h) => (
-                    <option key={h.id} value={houseKeyOf(h)}>{h.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
-                  Tag ({genTemplate ? tagParamForTemplate(genTemplate) : 'afp'})
-                </span>
-                <input
-                  value={genTag}
-                  onChange={(e) => setGenTag(e.target.value)}
-                  placeholder="minhatag01"
-                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm font-mono outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
-                />
-              </label>
-              {genBrand && !genTemplate ? (
-                <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
-                  Esta casa não tem link de cadastro configurado. Peça à agência para preenchê-lo.
+              {inviteCode ? (
+                <>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500 mb-1.5">Seu link</p>
+                    <code className="block px-3 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-[11px] text-slate-700 dark:text-neutral-200 break-all">{inviteUrl}</code>
+                  </div>
+                  <p className="text-[11px] text-slate-400 dark:text-neutral-500">
+                    {inviteUses === 0
+                      ? 'Nenhum cadastro por este link ainda.'
+                      : `${inviteUses.toLocaleString('pt-BR')} cadastro(s) por este link.`}
+                  </p>
+                </>
+              ) : (
+                <p className="text-[11px] font-bold text-slate-500 dark:text-neutral-400">
+                  Você ainda não tem um link. Gere o seu para começar a divulgar.
                 </p>
-              ) : genPreview ? (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500 mb-1.5">Destino final</p>
-                  <code className="block px-3 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-[11px] text-slate-700 dark:text-neutral-200 break-all">{genPreview}</code>
-                </div>
-              ) : null}
+              )}
             </div>
             <div className="flex gap-3 p-6 pt-0">
-              <button
-                type="button"
-                onClick={() => setGenFor(null)}
-                disabled={generating}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-600 dark:text-neutral-300 hover:border-slate-300 dark:hover:border-neutral-600 transition-all disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={generating || !genPreview}
-                onClick={handleGenerateLink}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-accent-500 text-accent-contrast text-xs font-bold hover:opacity-90 transition-all disabled:opacity-40"
-              >
-                {generating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                Gerar link
-              </button>
+              {inviteCode ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={inviteBusy}
+                    onClick={() => handleNetworkInvite(true)}
+                    title="Gera um link novo. Quem tiver o link antigo não consegue mais se cadastrar."
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-600 dark:text-neutral-300 hover:border-slate-300 dark:hover:border-neutral-600 transition-all disabled:opacity-50"
+                  >
+                    {inviteBusy ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                    Gerar link novo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={copyInviteUrl}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-accent-500 text-accent-contrast text-xs font-bold hover:opacity-90 transition-all"
+                  >
+                    {inviteCopied ? <Check size={14} /> : <Copy size={14} />}
+                    {inviteCopied ? 'Copiado' : 'Copiar link'}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  disabled={inviteBusy}
+                  onClick={() => handleNetworkInvite(false)}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-accent-500 text-accent-contrast text-xs font-bold hover:opacity-90 transition-all disabled:opacity-50"
+                >
+                  {inviteBusy ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
+                  Gerar meu link de cadastro
+                </button>
+              )}
             </div>
           </motion.div>
         </div>

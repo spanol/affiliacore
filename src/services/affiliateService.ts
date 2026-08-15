@@ -516,6 +516,42 @@ export async function fetchAffiliateReferrals(): Promise<CaptureRequest[]> {
   return Array.isArray((data as any)?.referrals) ? (data as any).referrals : [];
 }
 
+// --- Link de cadastro na rede do especial (15/08/2026) ----------------------
+// O caminho SEM fila: quem entra pelo link do gerente já nasce afiliado dentro da
+// equipe dele. Cunhar o link da CASA continua sendo do master. Ver lib/networkInvite.
+
+export interface NetworkInviteInfo {
+  /** null = o gerente ainda não gerou nenhum link. */
+  code: string | null;
+  uses: number;
+  createdAt?: string | null;
+  rotated?: boolean;
+}
+
+export async function fetchNetworkInvite(): Promise<NetworkInviteInfo> {
+  const response = await authFetch('/api/network-invite', { headers: { Accept: 'application/json' } });
+  if (!response.ok) {
+    const e = await response.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro ao carregar o link de cadastro: ${response.status}`);
+  }
+  return response.json();
+}
+
+// Idempotente: sem `rotate` devolve o link que já existe. Com `rotate` o antigo é
+// REVOGADO (quem tiver a URL velha deixa de conseguir entrar na rede).
+export async function createNetworkInvite(opts: { rotate?: boolean } = {}): Promise<NetworkInviteInfo> {
+  const response = await authFetch('/api/network-invite', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ rotate: !!opts.rotate }),
+  });
+  if (!response.ok) {
+    const e = await response.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro ao gerar o link de cadastro: ${response.status}`);
+  }
+  return response.json();
+}
+
 // --- Afiliado nativo Boost + alias de e-mail (Boost-first) ------------------
 
 export interface BoostAffiliateInput { name: string; email?: string; house?: string }
@@ -2044,9 +2080,13 @@ export async function createAccessInvite(affiliateId: string, affiliateName?: st
 }
 
 export interface InviteInfo {
-  affiliateId: string;
+  affiliateId: string | null;
   affiliateName: string | null;
   status: string;
+  /** 'network' = link de cadastro na rede de um gerente (a tela pede o NOME). */
+  kind?: string;
+  /** Só do link de rede: nome de quem convidou, para a tela dizer em qual rede ele entra. */
+  referrerName?: string | null;
 }
 
 export async function fetchInvite(token: string): Promise<InviteInfo> {
@@ -2065,6 +2105,8 @@ export interface InviteProfile {
   phone?: string;
   socialMedia?: string;
   cpf?: string;
+  /** Obrigatório no link de rede: o afiliado nasce no aceite, então o nome vem daqui. */
+  name?: string;
   /** Token de uso único da verificação de telefone por SMS (quando a instância exige). */
   phoneVerificationToken?: string;
 }
@@ -2077,6 +2119,7 @@ export async function acceptInvite(token: string, email: string, password: strin
       token,
       email,
       password,
+      name: profile?.name,
       phone: profile?.phone,
       socialMedia: profile?.socialMedia,
       cpf: profile?.cpf,

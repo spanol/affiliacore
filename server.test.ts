@@ -1318,6 +1318,149 @@ describe('convite público (R20)', () => {
 });
 
 // =============================================================================
+// Link de cadastro na REDE do especial (15/08/2026)
+// Tese: o gerente recruta sem passar pela fila da agência. O que o teste protege é
+// (a) só especial ATIVO emite, (b) o link é reutilizável (não vira 'used'), (c) o
+// recém-chegado entra na ÁRVORE (é ela que precifica a rede) e (d) o link nunca
+// ROUBA quem já é de outra equipe.
+// =============================================================================
+describe('link de cadastro na rede (/api/network-invite)', () => {
+  const seed = () => ({
+    users: {
+      'admin-uid': { role: 'admin' },
+      'esp-uid': { role: 'client', affiliateId: 'ESP' },
+      'sub-uid': { role: 'client', affiliateId: 'SUB' },
+    },
+    affiliates: { ESP: { id: 'ESP', name: 'Maurício Gerente' } },
+    special_affiliates: { ESP: { active: true, fromNetwork: true } },
+  });
+
+  it('afiliado comum → 403; especial ativo sem link → code null', async () => {
+    const app = buildApp({ seed: seed() });
+    await request(app).get('/api/network-invite').set('Authorization', 'Bearer sub-uid').expect(403);
+    const res = await request(app).get('/api/network-invite').set('Authorization', 'Bearer esp-uid').expect(200);
+    expect(res.body.code).toBeNull();
+  });
+
+  it('especial DESATIVADO não emite link', async () => {
+    const s = seed();
+    s.special_affiliates.ESP = { active: false, fromNetwork: true };
+    await request(buildApp({ seed: s }))
+      .post('/api/network-invite')
+      .set('Authorization', 'Bearer esp-uid')
+      .expect(403);
+  });
+
+  it('POST cria o link, repete o MESMO em nova chamada e rotate revoga o anterior', async () => {
+    const fs = makeFirestore(seed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: fs });
+    const first = await request(app).post('/api/network-invite').set('Authorization', 'Bearer esp-uid').expect(201);
+    const code = first.body.code as string;
+    expect(code).toBeTruthy();
+    expect(fs.__store.get('invites').get(code).ownerAffiliateId).toBe('ESP');
+
+    // idempotente: sem rotate devolve o que já existe (o gerente já divulgou a URL)
+    const again = await request(app).post('/api/network-invite').set('Authorization', 'Bearer esp-uid').expect(200);
+    expect(again.body.code).toBe(code);
+    expect(again.body.rotated).toBe(false);
+
+    const rotated = await request(app)
+      .post('/api/network-invite')
+      .set('Authorization', 'Bearer esp-uid')
+      .send({ rotate: true })
+      .expect(201);
+    expect(rotated.body.code).not.toBe(code);
+    expect(fs.__store.get('invites').get(code).status).toBe('revoked');
+  });
+
+  it('GET público: link de rede devolve kind + quem convidou; revogado → 410', async () => {
+    const s: any = seed();
+    s.invites = {
+      viva: { kind: 'network', ownerAffiliateId: 'ESP', ownerName: 'Maurício Gerente', status: 'active' },
+      morta: { kind: 'network', ownerAffiliateId: 'ESP', status: 'revoked' },
+    };
+    const app = buildApp({ seed: s });
+    const res = await request(app).get('/api/invites/viva').expect(200);
+    expect(res.body.kind).toBe('network');
+    expect(res.body.referrerName).toBe('Maurício Gerente');
+    await request(app).get('/api/invites/morta').expect(410);
+  });
+
+  it('GET público: dono rebaixado invalida o link (sem precisar revogar)', async () => {
+    const s: any = seed();
+    s.special_affiliates.ESP = { active: false, fromNetwork: true };
+    s.invites = { viva: { kind: 'network', ownerAffiliateId: 'ESP', status: 'active' } };
+    await request(buildApp({ seed: s })).get('/api/invites/viva').expect(410);
+  });
+
+  it('accept sem nome → 400 (o afiliado nasce aqui, então o nome é obrigatório)', async () => {
+    const s: any = seed();
+    s.invites = { viva: { kind: 'network', ownerAffiliateId: 'ESP', status: 'active' } };
+    await request(buildApp({ seed: s }))
+      .post('/api/accept-invite')
+      .send({ token: 'viva', email: 'novo@b.com', password: 'secret123', phone: '11999999999' })
+      .expect(400);
+  });
+
+  it('accept válido: cria afiliado nativo na equipe, e o link NÃO é consumido', async () => {
+    const s: any = seed();
+    s.invites = { viva: { kind: 'network', ownerAffiliateId: 'ESP', status: 'active', uses: 2 } };
+    const fs = makeFirestore(s);
+    const app = createApp({ adminApp: makeAdminApp({ createUser: () => ({ uid: 'novo-uid' }) }), adminDb: fs });
+    const res = await request(app)
+      .post('/api/accept-invite')
+      .send({ token: 'viva', email: 'Novo@B.com', password: 'secret123', phone: '11999999999', name: '  João   Silva ' })
+      .expect(201);
+
+    const affId = res.body.affiliateId as string;
+    expect(affId.startsWith('boost_')).toBe(true);
+    // mirror name-only + status ativo + e-mail (PII) SÓ no alias
+    expect(fs.__store.get('affiliates').get(affId).name).toBe('João Silva');
+    expect(fs.__store.get('affiliates').get(affId).email).toBeUndefined();
+    expect(fs.__store.get('affiliate_statuses').get(affId).status).toBe('active');
+    expect(fs.__store.get('affiliate_email_aliases').get('novo@b.com').affiliateId).toBe(affId);
+    // entrou na ÁRVORE (é ela que precifica a rede)
+    expect(fs.__store.get('affiliate_uplines').get(affId).uplineId).toBe('ESP');
+    // login vinculado ao afiliado NOVO, nunca ao do gerente
+    expect(fs.__store.get('users').get('novo-uid').affiliateId).toBe(affId);
+    expect(fs.__store.get('users').get('novo-uid').role).toBe('client');
+    // reutilizável: segue ativo, só conta o uso
+    const invite = fs.__store.get('invites').get('viva');
+    expect(invite.status).toBe('active');
+    expect(invite.uses).toBe(3);
+  });
+
+  it('especial do modelo ANTIGO (sem fromNetwork) recebe o novo id na lista', async () => {
+    const s: any = seed();
+    s.special_affiliates.ESP = { active: true, subAffiliateIds: ['SUB'] };
+    s.invites = { viva: { kind: 'network', ownerAffiliateId: 'ESP', status: 'active' } };
+    const fs = makeFirestore(s);
+    const app = createApp({ adminApp: makeAdminApp({ createUser: () => ({ uid: 'novo-uid' }) }), adminDb: fs });
+    const res = await request(app)
+      .post('/api/accept-invite')
+      .send({ token: 'viva', email: 'novo@b.com', password: 'secret123', phone: '11999999999', name: 'Ana' })
+      .expect(201);
+    expect(fs.__store.get('special_affiliates').get('ESP').subAffiliateIds).toEqual(['SUB', res.body.affiliateId]);
+  });
+
+  it('não ROUBA quem já é de outra equipe: upline existente é preservado', async () => {
+    const s: any = seed();
+    s.invites = { viva: { kind: 'network', ownerAffiliateId: 'ESP', status: 'active' } };
+    // e-mail já mapeado p/ um afiliado que já tem upline (é da equipe de OUTRO)
+    s.affiliate_email_aliases = { 'velho@b.com': { affiliateId: 'AFF-9', email: 'velho@b.com' } };
+    s.affiliate_uplines = { 'AFF-9': { affiliateId: 'AFF-9', uplineId: 'OUTRO' } };
+    const fs = makeFirestore(s);
+    const app = createApp({ adminApp: makeAdminApp({ createUser: () => ({ uid: 'novo-uid' }) }), adminDb: fs });
+    const res = await request(app)
+      .post('/api/accept-invite')
+      .send({ token: 'viva', email: 'velho@b.com', password: 'secret123', phone: '11999999999', name: 'Velho' })
+      .expect(201);
+    expect(res.body.affiliateId).toBe('AFF-9'); // idempotente por e-mail
+    expect(fs.__store.get('affiliate_uplines').get('AFF-9').uplineId).toBe('OUTRO');
+  });
+});
+
+// =============================================================================
 // R25 — create-user valida o enum de role
 // =============================================================================
 describe('create-user enum de role (R25)', () => {

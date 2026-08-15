@@ -99,6 +99,9 @@ export default function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/register" element={<Register />} />
           <Route path="/convite/:token" element={<InviteAccept />} />
+          {/* Link de cadastro na rede do gerente (aberto, reutilizável). Mesma tela
+              do convite pessoal: o /api/invites/:token diz qual é o caso. */}
+          <Route path="/cadastro/:token" element={<InviteAccept />} />
           
           <Route element={
             <ProtectedRoute>

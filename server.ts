@@ -53,6 +53,9 @@ import {
 } from './src/lib/registrationRequests';
 import { resolveSpecialSubIds, resolveDirectSubIds, isDirectDownline, type SpecialRecord } from './src/lib/specialNetwork';
 import {
+  NETWORK_INVITE_KIND, isNetworkInvite, networkInviteBlock, sanitizeRecruitName, recruitNameError,
+} from './src/lib/networkInvite';
+import {
   BACKUP_CODE_COUNT,
   buildOtpauthUrl,
   consumeBackupCode,
@@ -2944,6 +2947,178 @@ export function createApp(deps: ServerDeps) {
     }
   });
 
+  // --- Link de cadastro na REDE do especial (15/08/2026) ----------------------
+  // O gerente compartilha um link e quem se cadastra por ele já nasce afiliado
+  // DENTRO da equipe dele, sem passar pela fila de /solicitacoes. O que continua
+  // sendo do master: cunhar o link da CASA (a tag que a casa devolve no relatório).
+  // Desenho e invariantes do doc em src/lib/networkInvite.ts.
+
+  // Registro do especial ATIVO de quem chamou, ou null (admin não tem rede própria).
+  const resolveCallerSpecial = async (req: express.Request) => {
+    const ownId = String((req as any).user?.affiliateId ?? '').trim();
+    if (!ownId) return null;
+    const record = await resolveSpecialRecord(ownId, { withSubs: false });
+    return resolveIsSpecial(record) ? { ownId, record } : null;
+  };
+
+  const findNetworkInvite = async (ownerAffiliateId: string) => {
+    const snap = await adminDb!
+      .collection('invites')
+      .where('kind', '==', NETWORK_INVITE_KIND)
+      .where('ownerAffiliateId', '==', ownerAffiliateId)
+      .where('status', '==', 'active')
+      .limit(1)
+      .get();
+    return snap.empty ? null : snap.docs[0];
+  };
+
+  // Afiliado de quem entrou pelo link. Idempotente por e-mail: alias existente
+  // reusa o id (a mesma regra do POST /api/boost-affiliates) em vez de criar um
+  // segundo cadastro para a mesma pessoa. E-mail (PII) só no alias, nunca no mirror.
+  const resolveRecruitAffiliate = async (email: string, name: string, createdByUid: string): Promise<string> => {
+    const emailKey = normalizeEmailKey(email);
+    const aliasRef = emailKey ? adminDb!.collection('affiliate_email_aliases').doc(emailKey) : null;
+    if (aliasRef) {
+      const snap = await aliasRef.get();
+      const existing = snap.exists ? String((snap.data() as any)?.affiliateId ?? '').trim() : '';
+      if (existing) return existing;
+    }
+    const affiliateId = makeBoostAffiliateId(crypto.randomUUID());
+    await adminDb!.collection('affiliates').doc(affiliateId).set({
+      id: affiliateId,
+      name,
+      brand: null,
+      source: 'boost',
+      createdByUid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    await adminDb!.collection('affiliate_statuses').doc(affiliateId).set({
+      status: 'active',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    if (aliasRef) {
+      await aliasRef.set({
+        email: emailKey,
+        affiliateId,
+        name,
+        kind: 'boost',
+        createdByUid,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
+    return affiliateId;
+  };
+
+  // Coloca o recém-chegado DENTRO da rede de quem recrutou, nos DOIS modelos de
+  // especial: a aresta `affiliate_uplines` (que manda no dinheiro e na árvore de N
+  // níveis) e, para o especial do modelo antigo (`fromNetwork !== true`, que não
+  // deriva da árvore), a lista `subAffiliateIds` — sem ela o gerente não veria quem
+  // acabou de entrar. NUNCA rouba upline: quem já é de outra equipe fica onde está.
+  const linkRecruitToNetwork = async (
+    affiliateId: string,
+    ownerId: string,
+    ownerRecord: SpecialRecord | null,
+  ): Promise<void> => {
+    if (!affiliateId || !ownerId || affiliateId === ownerId) return;
+    const upRef = adminDb!.collection('affiliate_uplines').doc(affiliateId);
+    const upSnap = await upRef.get();
+    const current = upSnap.exists ? String((upSnap.data() as any)?.uplineId ?? '').trim() : '';
+    if (current && current !== ownerId) return;
+    if (!current) {
+      // Barreira de CICLO, igual à do POST /api/affiliate-uplines: só é possível
+      // reusando um afiliado que já está ACIMA de quem recruta. Melhor entrar sem
+      // vínculo (o master resolve) do que corromper a árvore que precifica a rede.
+      const currentMap = await readUplineMap();
+      const candidate = { ...currentMap, [affiliateId]: ownerId };
+      const ids = new Set<string>([affiliateId, ownerId, ...Object.keys(candidate), ...Object.values(candidate)]);
+      const tree = buildNetworkTree([...ids].map((id) => ({ affiliateId: id, uplineId: candidate[id] ?? null })));
+      if (tree.dropped.some((d) => d.reason === 'ciclo')) {
+        console.error('[network-invite] vínculo ignorado: criaria ciclo', { affiliateId, ownerId });
+        return;
+      }
+      await upRef.set({
+        affiliateId,
+        uplineId: ownerId,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
+    if (ownerRecord?.fromNetwork === true) return; // a subárvore já o inclui
+    const ref = adminDb!.collection('special_affiliates').doc(ownerId);
+    const snap = await ref.get();
+    const subs = Array.isArray((snap.data() as any)?.subAffiliateIds)
+      ? (snap.data() as any).subAffiliateIds.map((s: any) => String(s))
+      : [];
+    if (subs.includes(affiliateId)) return;
+    await ref.set({
+      subAffiliateIds: [...subs, affiliateId],
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  };
+
+  // O link atual do gerente (ou `code: null` quando ele ainda não gerou nenhum).
+  app.get('/api/network-invite', requireAuth, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const own = await resolveCallerSpecial(req);
+      if (!own) return res.status(403).json({ error: 'Apenas afiliados especiais têm link de cadastro na rede.' });
+      const doc = await findNetworkInvite(own.ownId);
+      if (!doc) return res.json({ code: null, uses: 0, createdAt: null });
+      const data = doc.data() as any;
+      return res.json({
+        code: doc.id,
+        uses: Number(data?.uses ?? 0) || 0,
+        createdAt: serializeTimestamp(data?.createdAt),
+      });
+    } catch (error: any) {
+      console.error('[network-invite] get:', error);
+      return res.status(500).json({ error: error.message || 'Erro ao carregar o link de cadastro.' });
+    }
+  });
+
+  // Cria o link (idempotente: devolve o que já existe). `rotate: true` REVOGA o
+  // atual e emite outro — é o botão de emergência para um link que vazou.
+  app.post('/api/network-invite', requireAuth, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    try {
+      const own = await resolveCallerSpecial(req);
+      if (!own) return res.status(403).json({ error: 'Apenas afiliados especiais têm link de cadastro na rede.' });
+      const rotate = req.body?.rotate === true;
+      const current = await findNetworkInvite(own.ownId);
+      if (current && !rotate) {
+        const data = current.data() as any;
+        return res.json({ code: current.id, uses: Number(data?.uses ?? 0) || 0, rotated: false });
+      }
+      if (current) {
+        await current.ref.set({
+          status: 'revoked',
+          revokedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+      const code = crypto.randomBytes(12).toString('hex');
+      await adminDb.collection('invites').doc(code).set({
+        token: code,
+        kind: NETWORK_INVITE_KIND,
+        ownerAffiliateId: own.ownId,
+        ownerName: await affiliateNameOf(own.ownId),
+        status: 'active',
+        uses: 0,
+        createdByUid: (req as any).user?.uid ?? null,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      // NÃO gravamos o code na trilha (é o segredo do link); só que houve emissão.
+      await writeAuditLog(req, {
+        entityType: 'affiliate',
+        entityId: own.ownId,
+        entityLabel: await affiliateNameOf(own.ownId),
+        action: rotate ? 'network_invite.rotate' : 'network_invite.create',
+      });
+      return res.status(201).json({ code, uses: 0, rotated: !!current });
+    } catch (error: any) {
+      console.error('[network-invite] post:', error);
+      return res.status(500).json({ error: error.message || 'Erro ao gerar o link de cadastro.' });
+    }
+  });
+
   // --- Afiliado nativo Boost (sem OTG) + alias de e-mail ----------------------
   // SECURITY: nome vai no mirror `affiliates` (legível por logado, p/ exibição);
   // e-mail (PII) vai SÓ em affiliate_email_aliases (admin-only). Ver firestore.rules.
@@ -3327,6 +3502,25 @@ export function createApp(deps: ServerDeps) {
         return res.status(404).json({ error: 'Convite não encontrado.' });
       }
       const data = snap.data()!;
+      // Link de cadastro na rede: reutilizável e sem validade — o que o invalida é
+      // a revogação OU o dono ter deixado de ser especial ativo. A tela usa o `kind`
+      // para pedir o NOME (o afiliado ainda não existe) e dizer de quem é a rede.
+      if (isNetworkInvite(data)) {
+        const blocked = networkInviteBlock(data);
+        if (blocked) return res.status(410).json({ error: blocked });
+        const owner = String(data.ownerAffiliateId ?? '').trim();
+        const record = owner ? await resolveSpecialRecord(owner, { withSubs: false }) : null;
+        if (!resolveIsSpecial(record)) {
+          return res.status(410).json({ error: 'Este link de cadastro não está mais ativo. Fale com quem te convidou.' });
+        }
+        return res.json({
+          kind: NETWORK_INVITE_KIND,
+          affiliateId: null,
+          affiliateName: null,
+          referrerName: data.ownerName ?? null,
+          status: 'active',
+        });
+      }
       if (data.status === 'used') {
         return res.status(410).json({ error: 'Este convite já foi utilizado.' });
       }
@@ -3384,21 +3578,36 @@ export function createApp(deps: ServerDeps) {
         return res.status(404).json({ error: 'Convite não encontrado.' });
       }
       const invite = inviteSnap.data()!;
-      if (invite.status === 'used') {
-        return res.status(410).json({ error: 'Este convite já foi utilizado.' });
-      }
-      if (invite.expiresAt?.toMillis && invite.expiresAt.toMillis() < Date.now()) {
-        return res.status(410).json({ error: 'Este convite expirou.' });
+      const network = isNetworkInvite(invite);
+
+      // Link de cadastro na REDE (reutilizável): o que valida não é used/expirado,
+      // e sim o link estar ativo E quem recruta continuar sendo especial ativo.
+      let ownerAffiliateId = '';
+      let ownerSpecial: SpecialRecord | null = null;
+      if (network) {
+        const blocked = networkInviteBlock(invite);
+        if (blocked) return res.status(410).json({ error: blocked });
+        ownerAffiliateId = String(invite.ownerAffiliateId ?? '').trim();
+        ownerSpecial = ownerAffiliateId ? await resolveSpecialRecord(ownerAffiliateId, { withSubs: false }) : null;
+        if (!resolveIsSpecial(ownerSpecial)) {
+          return res.status(410).json({ error: 'Este link de cadastro não está mais ativo. Fale com quem te convidou.' });
+        }
+        // O afiliado ainda não existe: o nome vem de quem está se cadastrando.
+        const nameError = recruitNameError(req.body?.name);
+        if (nameError) return res.status(400).json({ error: nameError });
+      } else {
+        if (invite.status === 'used') {
+          return res.status(410).json({ error: 'Este convite já foi utilizado.' });
+        }
+        if (invite.expiresAt?.toMillis && invite.expiresAt.toMillis() < Date.now()) {
+          return res.status(410).json({ error: 'Este convite expirou.' });
+        }
       }
 
       const normalizedEmail = String(email).trim().toLowerCase();
-      const affiliateName = invite.affiliateName || normalizedEmail;
-      const affId = String(invite.affiliateId);
-
-      // Se este afiliado já foi marcado como especial ANTES de aceitar o convite,
-      // espelha isSpecial no doc novo — senão ele se cadastra sem acesso à /network
-      // (bug recorrente do especial sem flag). Resolvido pelo affiliateId do convite.
-      const isSpecial = resolveIsSpecial(await resolveSpecialRecord(affId, { withSubs: false }));
+      const affiliateName = network
+        ? sanitizeRecruitName(req.body?.name)
+        : (invite.affiliateName || normalizedEmail);
 
       let userRecord: admin.auth.UserRecord;
       try {
@@ -3413,6 +3622,23 @@ export function createApp(deps: ServerDeps) {
         }
         throw error;
       }
+
+      // Afiliado do novo login. Convite pessoal: o id já veio no convite. Link de
+      // rede: o afiliado NASCE aqui (nativo Boost) e é ligado à equipe de quem
+      // recrutou — a criação vem DEPOIS da conta para um e-mail já cadastrado (409)
+      // não deixar afiliado órfão no mirror.
+      let affId: string;
+      if (network) {
+        affId = await resolveRecruitAffiliate(normalizedEmail, affiliateName, userRecord.uid);
+        await linkRecruitToNetwork(affId, ownerAffiliateId, ownerSpecial);
+      } else {
+        affId = String(invite.affiliateId);
+      }
+
+      // Se este afiliado já foi marcado como especial ANTES de aceitar o convite,
+      // espelha isSpecial no doc novo — senão ele se cadastra sem acesso à /network
+      // (bug recorrente do especial sem flag). Resolvido pelo affiliateId do convite.
+      const isSpecial = resolveIsSpecial(await resolveSpecialRecord(affId, { withSubs: false }));
 
       await adminDb.collection('users').doc(userRecord.uid).set({
         uid: userRecord.uid,
@@ -3433,11 +3659,19 @@ export function createApp(deps: ServerDeps) {
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
 
-      await inviteRef.set({
-        status: 'used',
-        usedByUid: userRecord.uid,
-        usedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
+      // O convite PESSOAL é credencial de uma pessoa: queima no primeiro aceite. O
+      // link de rede é canal de captação: segue valendo, só contabiliza o uso.
+      await inviteRef.set(network
+        ? {
+            uses: (Number(invite.uses) || 0) + 1,
+            lastUsedAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastUsedByUid: userRecord.uid,
+          }
+        : {
+            status: 'used',
+            usedByUid: userRecord.uid,
+            usedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true });
 
       // Consome o desafio de telefone (uso único) — best-effort: a conta já foi
       // criada, falha aqui não pode derrubar o cadastro.
@@ -3454,11 +3688,11 @@ export function createApp(deps: ServerDeps) {
         entityType: 'user',
         entityId: userRecord.uid,
         entityLabel: normalizedEmail,
-        action: 'user.accept_invite',
-        metadata: { affiliateId: affId, isSpecial },
+        action: network ? 'user.join_network' : 'user.accept_invite',
+        metadata: { affiliateId: affId, isSpecial, ...(network ? { uplineAffiliateId: ownerAffiliateId } : {}) },
       });
 
-      return res.status(201).json({ uid: userRecord.uid, affiliateId: String(invite.affiliateId) });
+      return res.status(201).json({ uid: userRecord.uid, affiliateId: affId });
     } catch (error: any) {
       console.error('Error accepting invite:', error);
       return res.status(500).json({ error: error.message || 'Erro interno aceitando convite.' });

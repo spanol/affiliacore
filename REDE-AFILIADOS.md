@@ -309,3 +309,48 @@ exato ao baseline. Por isso o modal **avisa em âmbar e nomeia quem sairia** ant
 
 **Dívida que continua aberta:** o teto de repasse no caminho do admin (`PATCH /api/affiliate-configs/:id`).
 `POST /api/affiliate-uplines` **já audita** (`network.set_upline`/`clear_upline`) — a §8.5 está desatualizada.
+
+---
+
+## 10. Link de cadastro na rede (2026-08-15) — o gerente recruta SEM fila
+
+Pedido do Maurício: o afiliado especial precisa de **um link que cadastre gente direto na equipe
+dele, sem aprovação do admin master**. A indicação da call 12/08 (`affiliate_referrals`) continua
+existindo, mas ela ABRE UMA FILA — o master confirma, cria o afiliado e vincula. Este link é o
+caminho sem fila. **Cunhar o link da CASA continua sendo do master** (a tag que a casa devolve no
+relatório), e por isso a geração de link de casa SAIU da tela do especial na mesma entrega.
+
+**Desenho.** Reusa a coleção `invites` (server-only, sem rule → o cliente nunca lê) com
+`kind: 'network'`. Diferenças para o convite pessoal:
+
+| | convite pessoal | link de rede |
+|---|---|---|
+| dono | `affiliateId` (o convidado) | `ownerAffiliateId` (quem recruta) |
+| uso | single-use (`status: 'used'`) | reutilizável, só conta `uses` |
+| validade | 7 dias | não expira; encerra rotacionando |
+| afiliado | já existe | **nasce no aceite** (nativo Boost) |
+
+Os campos têm nomes DIFERENTES de propósito: se algum caminho antigo tratasse este doc como convite
+pessoal, ele falharia em vez de criar um segundo login no MESMO afiliado.
+
+**Rotas.** `GET`/`POST /api/network-invite` (requireAuth, só especial ATIVO; POST idempotente,
+`rotate: true` revoga e emite outro), o `GET /api/invites/:token` público devolvendo `kind` +
+`referrerName`, e o branch de rede no `POST /api/accept-invite`. Núcleo puro em
+`src/lib/networkInvite.ts`; tela pública = a MESMA `InviteAccept` (rota `/cadastro/:token`), que pede
+o NOME quando o convite é de rede.
+
+**Invariantes (testados em `server.test.ts`):**
+
+- **Só especial ativo emite**, e o link **morre junto com o papel**: dono rebaixado → 410 no GET e no
+  aceite, sem precisar revogar nada.
+- **O recém-chegado entra na ÁRVORE** (`affiliate_uplines`), que é quem precifica a rede. Para o
+  especial do modelo ANTIGO (`fromNetwork !== true`, que não deriva da árvore) o id também entra em
+  `special_affiliates.subAffiliateIds` — sem isso o gerente não veria quem acabou de entrar.
+- **NUNCA rouba upline.** O afiliado é idempotente por e-mail (mesma regra do `POST /api/boost-affiliates`);
+  se o e-mail já é de alguém com upline de OUTRO gerente, o vínculo antigo fica de pé.
+- **Barreira de ciclo** igual à do `POST /api/affiliate-uplines`: só alcançável reusando um afiliado
+  que já está acima de quem recruta. Entra sem vínculo (o master resolve) em vez de corromper a árvore.
+- **Nada de dinheiro:** o indicado nasce SEM `affiliate_configs` (ausência ≠ R$ 0). Quem define a
+  taxa dele é o gerente, depois, em "Meus afiliados" (ele é filho DIRETO).
+- Sem mudança em `firestore.rules` (a coleção `invites` já era server-only), então **não há ordem de
+  deploy** a respeitar nesta entrega.
