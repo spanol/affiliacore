@@ -163,12 +163,29 @@ Daí duas regras que ficaram no núcleo: **primeira configuração não cria vig
 (não há passado a proteger) e **o trecho congelado também não afirma zero** para
 um campo que nunca existiu.
 
-**F3 · Leitura.** Carteira e extrato somam por janela
-(`splitRangeByRate`). É onde o cliente vê o efeito.
+**F3 · Leitura da carteira. ✅ ENTREGUE.** É onde o cliente vê o efeito.
 
-**F4 · Resto dos consumidores.** Dashboards, ranking, rede. Aqui vale medir: se
-a divergência for só a cauda do dia da troca, talvez não valha tocar em tudo de
-uma vez.
+A peça que barateou tudo é **`projectConfigAt(config, dia)`**: em vez de ensinar
+cada consumidor a somar por janela, entrega-se a ele a config COMO ELA ERA
+naquele dia, e a conta que já existe continua valendo sem mudar de assinatura.
+A receita para qualquer consumidor vira: `unionRateWindows` → uma busca por
+janela → `projectConfigAt` → a função de sempre → soma.
+
+Na carteira (`Financeiro.tsx`) a config passou a ser buscada ANTES dos
+resultados, porque é ela que diz em quantos pedaços o período se divide. Sem
+troca de taxa no período (o caso de todo o parque hoje) é UMA janela, ou seja,
+uma busca só, exatamente como era. `computeNetPayoutWindows` (`tax.ts`) soma as
+janelas e FUNDE as linhas por casa, para o detalhamento continuar sendo uma
+linha por casa e não uma por casa×janela.
+
+Detalhe que quase passou: o filtro de casa recorta DENTRO de cada janela. Achatar
+as janelas antes de filtrar precificaria linha de julho com a taxa de agosto, que
+é exatamente o que a vigência existe para impedir.
+
+**F4 · Resto dos consumidores.** Dashboards, ranking, rede, extrato
+(`exportExtract.ts`). Todos seguem a mesma receita de 4 passos acima. Vale medir
+antes: se a divergência for só a cauda do dia da troca, talvez não valha tocar em
+tudo de uma vez.
 
 **F5 · Tela.** O gerente vê a vigência ao mudar a taxa ("vale a partir de
 amanhã; o que já foi gerado fica a R$ 100") e o histórico da casa.

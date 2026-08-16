@@ -102,6 +102,39 @@ export function computeNetPayout(
   return { lines, gross, iss, net: cents(gross - iss) };
 }
 
+/**
+ * Apuração somando VÁRIAS JANELAS DE VIGÊNCIA de taxa.
+ *
+ * Cada janela traz as linhas do seu período e a config COMO ELA ERA naquele
+ * período (`projectConfigAt`). É o que faz a mudança de comissão não reprecificar o
+ * que o afiliado já gerou, sem que a conta em si mude: `computeNetPayout` roda
+ * igual, uma vez por janela. Ver PLANO-COMISSAO-VIGENCIA.md.
+ *
+ * As linhas por casa são FUNDIDAS pela chave da marca, para o detalhamento
+ * continuar sendo uma linha por casa, e não uma por casa×janela.
+ *
+ * Quem nunca mudou de taxa (todo o parque hoje) cai numa janela só, e o resultado é
+ * idêntico ao de `computeNetPayout` direto.
+ */
+export function computeNetPayoutWindows(
+  windows: { rows: any[] | null | undefined; config: AffiliateConfig | null | undefined }[] | null | undefined,
+  issByBrand: Record<string, number> | null | undefined,
+): NetPayout {
+  const merged = new Map<string, NetLine>();
+  for (const w of Array.isArray(windows) ? windows : []) {
+    for (const line of computeNetPayout(w?.rows, w?.config, issByBrand).lines) {
+      const prev = merged.get(line.brandKey);
+      merged.set(line.brandKey, prev
+        ? { ...prev, gross: cents(prev.gross + line.gross), iss: cents(prev.iss + line.iss), net: cents(prev.net + line.net) }
+        : line);
+    }
+  }
+  const lines = [...merged.values()];
+  const gross = cents(lines.reduce((s, l) => s + l.gross, 0));
+  const iss = cents(lines.reduce((s, l) => s + l.iss, 0));
+  return { lines, gross, iss, net: cents(gross - iss) };
+}
+
 /** Casas ativas sem alíquota definida — a tela avisa o admin em vez de assumir. */
 export function housesMissingIss<T extends IssHouse & { active?: boolean; name?: string }>(
   houses: T[] | null | undefined,

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { resolveIssPercent, issRateMap, computeNetPayout, housesMissingIss, ISS_MAX_PERCENT } from './tax';
+import { resolveIssPercent, issRateMap, computeNetPayout, computeNetPayoutWindows, housesMissingIss, ISS_MAX_PERCENT } from './tax';
 import type { AffiliateConfig } from './commission';
+import { projectConfigAt, EPOCH_DAY } from './rateHistory';
 
 const config = (over: Partial<AffiliateConfig> = {}): AffiliateConfig =>
   ({ affiliateId: 'A1', cpaValue: 0, revPercentage: 0, ...over } as AffiliateConfig);
@@ -107,6 +108,54 @@ describe('computeNetPayout', () => {
 
   it('entrada vazia/nula devolve zeros', () => {
     expect(computeNetPayout(null, null, null)).toEqual({ lines: [], gross: 0, iss: 0, net: 0 });
+  });
+});
+
+describe('computeNetPayoutWindows · apuração somando janelas de vigência', () => {
+  const iss = issRateMap([{ slug: 'esportiva', issPercent: 2 }]);
+
+  it('uma janela só devolve exatamente o mesmo que computeNetPayout (o parque de hoje)', () => {
+    const rows = [{ id: 'esportiva', qualified_cpa: 10, rvs: 0 }];
+    const cfg = config({ byBrand: { esportiva: { cpaValue: 110 } } } as any);
+    expect(computeNetPayoutWindows([{ rows, config: cfg }], iss)).toEqual(computeNetPayout(rows, cfg, iss));
+  });
+
+  // O caso que a feature existe para resolver: o gerente baixou a comissão de 110
+  // para 80, e o que o afiliado gerou ANTES continua valendo 110.
+  it('soma cada janela com a taxa que valia nela', () => {
+    const cfg = config({
+      byBrand: {
+        esportiva: {
+          cpaValue: 80, since: '2026-08-16',
+          history: [{ from: EPOCH_DAY, to: '2026-08-15', cpaValue: 110 }],
+        },
+      },
+    } as any);
+    const r = computeNetPayoutWindows([
+      { rows: [{ id: 'esportiva', qualified_cpa: 10, rvs: 0 }], config: projectConfigAt(cfg, '2026-08-01') },
+      { rows: [{ id: 'esportiva', qualified_cpa: 10, rvs: 0 }], config: projectConfigAt(cfg, '2026-08-16') },
+    ], iss);
+    expect(r.gross).toBe(1_900); // 10×110 + 10×80, e não 10×80 + 10×80
+    // e o detalhamento continua sendo UMA linha por casa, não uma por casa×janela
+    expect(r.lines).toHaveLength(1);
+    expect(r.lines[0]).toMatchObject({ brandKey: 'esportiva', gross: 1_900 });
+    expect(r.net).toBe(1_862); // ISS 2% sobre o bruto somado
+  });
+
+  it('funde as linhas por casa entre janelas, sem duplicar casa', () => {
+    const cfg = config({ byBrand: { esportiva: { cpaValue: 100 }, leon: { cpaValue: 50 } } } as any);
+    const r = computeNetPayoutWindows([
+      { rows: [{ id: 'esportiva', qualified_cpa: 1, rvs: 0 }, { id: 'leon', qualified_cpa: 1, rvs: 0 }], config: cfg },
+      { rows: [{ id: 'esportiva', qualified_cpa: 2, rvs: 0 }], config: cfg },
+    ], iss);
+    expect(r.lines.map((l) => l.brandKey).sort()).toEqual(['esportiva', 'leon']);
+    expect(r.lines.find((l) => l.brandKey === 'esportiva')!.gross).toBe(300);
+    expect(r.gross).toBe(350);
+  });
+
+  it('entrada vazia/nula devolve zeros', () => {
+    expect(computeNetPayoutWindows(null, null)).toEqual({ lines: [], gross: 0, iss: 0, net: 0 });
+    expect(computeNetPayoutWindows([], {})).toEqual({ lines: [], gross: 0, iss: 0, net: 0 });
   });
 });
 

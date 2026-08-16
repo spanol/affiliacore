@@ -88,16 +88,23 @@ export function isRateConfigured(entry?: BrandRateEntry | null): boolean {
 // estava, na prática, sob a taxa de junho; devolver a ATUAL seria justamente o
 // efeito retroativo que este arquivo existe para impedir.
 export function ratesOn(entry?: BrandRateEntry | null, date?: string): BrandRates {
-  const current = currentRates(entry);
+  const raw = rawRatesOn(entry, date);
+  // `num` só AQUI, na hora de calcular: o dado guarda a ausência, o cálculo a trata
+  // como zero. Os dois comportamentos convivem sem se contaminar.
+  return { cpaValue: num(raw.cpaValue), revPercentage: num(raw.revPercentage) };
+}
+
+// A mesma busca, devolvendo os valores CRUS (com a ausência preservada). Interna
+// porque quem calcula quer número; quem PROJETA a config precisa da ausência.
+function rawRatesOn(entry?: BrandRateEntry | null, date?: string): Partial<BrandRates> {
+  const current = definedOnly({ cpaValue: entry?.cpaValue, revPercentage: entry?.revPercentage });
   if (!date || !isDay(date)) return current;
   const history = cleanHistory(entry?.history);
   if (history.length === 0) return current;
-  // `num` só aqui, na hora de CALCULAR: o trecho guarda a ausência, o cálculo a
-  // trata como zero. Os dois comportamentos convivem sem se contaminar.
   const hit = history.find((s) => date >= s.from && date <= s.to);
-  if (hit) return { cpaValue: num(hit.cpaValue), revPercentage: num(hit.revPercentage) };
+  if (hit) return definedOnly({ cpaValue: hit.cpaValue, revPercentage: hit.revPercentage });
   const oldest = history[0];
-  if (date < oldest.from) return { cpaValue: num(oldest.cpaValue), revPercentage: num(oldest.revPercentage) };
+  if (date < oldest.from) return definedOnly({ cpaValue: oldest.cpaValue, revPercentage: oldest.revPercentage });
   return current;
 }
 
@@ -182,6 +189,28 @@ export function scheduleRateChange(
 // Fatia [from, to] nas fronteiras de vigência, para o consumidor somar janela a
 // janela. Fora de qualquer histórico devolve uma janela só com a taxa atual — que é
 // o caminho de 100% do parque hoje.
+// Fronteiras de vigência de UMA entrada dentro de (from, to]. Percorre por CORTE,
+// nunca dia a dia: um range de um ano não pode custar 365 iterações num cálculo de
+// dinheiro.
+function cutsFor(entry: BrandRateEntry | null | undefined, from: string, to: string): string[] {
+  const out: string[] = [];
+  const push = (d?: string) => { if (isDay(d) && d! > from && d! <= to) out.push(d!); };
+  for (const s of cleanHistory(entry?.history)) {
+    push(s.from);
+    push(addDays(s.to, 1));
+  }
+  push(entry?.since);
+  return out;
+}
+
+function windowsFromCuts(cuts: string[], from: string, to: string): { from: string; to: string }[] {
+  const starts = [...new Set([from, ...cuts])].sort();
+  return starts.map((start, i) => ({
+    from: start,
+    to: i + 1 < starts.length ? prevDay(starts[i + 1]) : to,
+  }));
+}
+
 export function splitRangeByRate(
   entry: BrandRateEntry | null | undefined,
   from: string,
@@ -190,21 +219,49 @@ export function splitRangeByRate(
   if (!isDay(from) || !isDay(to) || from > to) return [];
   const history = cleanHistory(entry?.history);
   if (history.length === 0) return [{ from, to, rates: currentRates(entry) }];
+  return windowsFromCuts(cutsFor(entry, from, to), from, to)
+    .map((w) => ({ ...w, rates: ratesOn(entry, w.from) }));
+}
 
-  // Fronteiras = início de cada segmento + início da vigência atual, recortadas ao
-  // range pedido. Percorre por corte, nunca dia a dia: um range de um ano não pode
-  // custar 365 iterações num cálculo de dinheiro.
-  const cuts = new Set<string>([from]);
-  for (const s of history) {
-    if (s.from > from && s.from <= to) cuts.add(s.from);
-    const after = addDays(s.to, 1);
-    if (after > from && after <= to) cuts.add(after);
+// As janelas de vigência do afiliado INTEIRO no período: a união dos cortes do
+// nível de topo com os de TODAS as casas. Existe porque a apuração busca os
+// resultados de todas as casas de uma vez: uma janela global permite uma busca por
+// janela em vez de uma por casa×janela. No caso comum (ninguém mudou de taxa) é UMA
+// janela, ou seja, exatamente a busca única de hoje.
+export function unionRateWindows(
+  config: AffiliateConfig | null | undefined,
+  from: string,
+  to: string
+): { from: string; to: string }[] {
+  if (!isDay(from) || !isDay(to) || from > to) return [];
+  const cuts = cutsFor(brandRateEntry(config), from, to);
+  for (const entry of Object.values((config as any)?.byBrand ?? {})) {
+    cuts.push(...cutsFor(entry as BrandRateEntry, from, to));
   }
-  const starts = [...cuts].sort();
-  return starts.map((start, i) => {
-    const end = i + 1 < starts.length ? prevDay(starts[i + 1]) : to;
-    return { from: start, to: end, rates: ratesOn(entry, start) };
-  });
+  return windowsFromCuts(cuts, from, to);
+}
+
+// A CONFIG COMO ELA ERA naquele dia. É a peça que evita reescrever os 18
+// consumidores de payout: em vez de ensinar cada um a somar por janela, entrega-se
+// a eles a config histórica e a conta que já existe continua valendo.
+// A ausência é preservada (campo nunca configurado continua ausente), senão a
+// projeção faria `rateStatus` mentir "configurado" numa tela de exibição.
+export function projectConfigAt(
+  config: AffiliateConfig | null | undefined,
+  date: string
+): AffiliateConfig | null | undefined {
+  if (!config || !isDay(date)) return config;
+  const byBrand = (config as any).byBrand;
+  const projected: Record<string, any> = {};
+  for (const [key, entry] of Object.entries(byBrand ?? {})) {
+    projected[key] = rawRatesOn(entry as BrandRateEntry, date);
+  }
+  const { cpaValue, revPercentage, ...rest } = config as any;
+  return {
+    ...rest,
+    ...rawRatesOn(brandRateEntry(config), date),
+    ...(byBrand ? { byBrand: projected } : {}),
+  } as AffiliateConfig;
 }
 
 // A entrada de taxa de uma casa: o override de `byBrand[casa]` quando existe, senão

@@ -11,7 +11,8 @@ import {
   withdrawalHouseName,
 } from '../services/affiliateService';
 import { fetchHouses } from '../services/houseService';
-import { computeNetPayout, issRateMap } from '../lib/tax';
+import { computeNetPayout, computeNetPayoutWindows, issRateMap } from '../lib/tax';
+import { unionRateWindows, projectConfigAt } from '../lib/rateHistory';
 import DateRangePicker from '../components/DateRangePicker';
 import BrandFilter from '../components/BrandFilter';
 import BrandLogo from '../components/BrandLogo';
@@ -53,10 +54,15 @@ export default function Financeiro() {
   });
 
   const [range, setRange] = useState<DateRange>(getDefaultRange());
-  // Entradas CRUAS da apuração (linhas por casa + config + alíquotas). A apuração
-  // em si (computeNetPayout, src/lib/tax.ts) sai de um useMemo já recortada pelo
-  // filtro de casa — card e modal leem da MESMA base (agregado == visível).
-  const [payoutInputs, setPayoutInputs] = useState<{ rows: any[]; config: AffiliateConfig | null; iss: Record<string, number> }>({ rows: [], config: null, iss: {} });
+  // Entradas CRUAS da apuração, uma entrada por JANELA DE VIGÊNCIA de taxa (linhas
+  // do período + a config como ela era naquele período) + as alíquotas. A apuração
+  // em si (computeNetPayoutWindows, src/lib/tax.ts) sai de um useMemo já recortada
+  // pelo filtro de casa — card e modal leem da MESMA base (agregado == visível).
+  // Quem nunca mudou de taxa tem UMA janela, ou seja, o comportamento de sempre.
+  const [payoutInputs, setPayoutInputs] = useState<{
+    windows: { rows: any[]; config: AffiliateConfig | null }[];
+    iss: Record<string, number>;
+  }>({ windows: [], iss: {} });
   const [loadingEarned, setLoadingEarned] = useState(true);
   const [houseFilter, setHouseFilter] = useState<string>(ALL_BRANDS);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
@@ -109,15 +115,31 @@ export default function Financeiro() {
     if (!profile?.affiliateId) { setLoadingEarned(false); return; }
     let active = true;
     setLoadingEarned(true);
-    Promise.all([
-      fetchAffiliateResultsByBrand(profile.affiliateId, range).catch(() => []),
-      fetchAffiliateConfigs().catch(() => ({} as Record<string, AffiliateConfig>)),
-      fetchHouses().catch(() => []),
-    ]).then(([brandRows, configs, houses]) => {
+    const affId = profile.affiliateId;
+    (async () => {
+      const [configs, houses] = await Promise.all([
+        fetchAffiliateConfigs().catch(() => ({} as Record<string, AffiliateConfig>)),
+        fetchHouses().catch(() => []),
+      ]);
       if (!active) return;
-      const config = configs[profile.affiliateId!] || null;
-      setPayoutInputs({ rows: Array.isArray(brandRows) ? (brandRows as any[]) : [], config, iss: issRateMap(houses as any[]) });
-    }).finally(() => { if (active) setLoadingEarned(false); });
+      const config = configs[affId] || null;
+      // A config precede a busca dos resultados porque é ELA que diz em quantos
+      // pedaços o período se divide. Sem troca de taxa no período (o caso comum) é
+      // UMA janela, então continua sendo uma busca só, como sempre foi.
+      const windows = unionRateWindows(config, range.startDate, range.endDate);
+      const spans = windows.length ? windows : [{ from: range.startDate, to: range.endDate }];
+      const fetched = await Promise.all(spans.map((w) =>
+        fetchAffiliateResultsByBrand(affId, { startDate: w.from, endDate: w.to }).catch(() => []),
+      ));
+      if (!active) return;
+      setPayoutInputs({
+        windows: spans.map((w, i) => ({
+          rows: Array.isArray(fetched[i]) ? (fetched[i] as any[]) : [],
+          config: projectConfigAt(config, w.from) ?? null,
+        })),
+        iss: issRateMap(houses as any[]),
+      });
+    })().finally(() => { if (active) setLoadingEarned(false); });
     return () => { active = false; };
   }, [profile?.affiliateId, range.startDate, range.endDate]);
 
@@ -126,24 +148,35 @@ export default function Financeiro() {
   // `houseLabel` gravado nas solicitações.
   const houseNameOf = (r: any) => String(r?.label ?? r?.id ?? '').trim();
   const houseNames = useMemo(
-    () => Array.from(new Set(payoutInputs.rows.map(houseNameOf).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
-    [payoutInputs.rows],
+    () => Array.from(new Set(
+      payoutInputs.windows.flatMap((w) => w.rows.map(houseNameOf)).filter(Boolean),
+    )).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [payoutInputs.windows],
   );
-  const scopedRows = useMemo(
-    () => (houseFilter === ALL_BRANDS ? payoutInputs.rows : payoutInputs.rows.filter((r) => houseNameOf(r) === houseFilter)),
-    [payoutInputs.rows, houseFilter],
+  // O filtro de casa recorta DENTRO de cada janela, preservando o par linha↔config
+  // do período. Achatar as janelas antes de filtrar precificaria linha de julho com
+  // a taxa de agosto, que é exatamente o que a vigência existe para impedir.
+  const scopedWindows = useMemo(
+    () => payoutInputs.windows.map((w) => ({
+      ...w,
+      rows: houseFilter === ALL_BRANDS ? w.rows : w.rows.filter((r) => houseNameOf(r) === houseFilter),
+    })),
+    [payoutInputs.windows, houseFilter],
   );
   // Apuração do período decomposta em bruto / ISS / líquido, já no recorte do filtro.
   const earned = useMemo(
-    () => computeNetPayout(scopedRows, payoutInputs.config, payoutInputs.iss),
-    [scopedRows, payoutInputs.config, payoutInputs.iss],
+    () => computeNetPayoutWindows(scopedWindows, payoutInputs.iss),
+    [scopedWindows, payoutInputs.iss],
   );
   // Líquido do período na casa escolhida no MODAL (dica pro afiliado dimensionar o pedido).
   const withdrawHouseNet = useMemo(() => {
     if (!withdrawHouse) return null;
-    const rows = payoutInputs.rows.filter((r) => houseNameOf(r) === withdrawHouse);
-    return computeNetPayout(rows, payoutInputs.config, payoutInputs.iss).net;
-  }, [withdrawHouse, payoutInputs.rows, payoutInputs.config, payoutInputs.iss]);
+    const windows = payoutInputs.windows.map((w) => ({
+      ...w,
+      rows: w.rows.filter((r) => houseNameOf(r) === withdrawHouse),
+    }));
+    return computeNetPayoutWindows(windows, payoutInputs.iss).net;
+  }, [withdrawHouse, payoutInputs.windows, payoutInputs.iss]);
 
   // O filtro de casa recorta TUDO que está à vista: apuração, cards de saque e a
   // lista de solicitações. Pedidos antigos sem casa só aparecem em "Todas as casas".
@@ -201,7 +234,7 @@ export default function Financeiro() {
     try {
       // A chave canônica é o `id` da linha por casa (brandId OTG ou slug manual);
       // o nome vai junto como snapshot de exibição pro admin.
-      const row = payoutInputs.rows.find((r) => houseNameOf(r) === withdrawHouse);
+      const row = payoutInputs.windows.flatMap((w) => w.rows).find((r) => houseNameOf(r) === withdrawHouse);
       await requestWithdrawal(n, note.trim() || undefined, { houseKey: String(row?.id ?? withdrawHouse), houseLabel: withdrawHouse });
       push({ type: 'success', message: 'Saque solicitado.' });
       setModalOpen(false);

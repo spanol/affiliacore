@@ -4,6 +4,7 @@ import {
   EPOCH_DAY, isDay, addDays, prevDay,
   ratesOn, closeRateSegment, scheduleRateChange, splitRangeByRate,
   brandRateEntry, resolveBrandRatesAt, isRateConfigured,
+  projectConfigAt, unionRateWindows,
   type BrandRateEntry,
 } from './rateHistory';
 import { resolveBrandRates, calcAffiliatePayout, type AffiliateConfig } from './commission';
@@ -241,6 +242,93 @@ describe('resolveBrandRatesAt · irmã datada de resolveBrandRates', () => {
     expect(brandRateEntry({ affiliateId: 'a2', revPercentage: 7 } as any)).toEqual({ revPercentage: 7 });
     expect(isRateConfigured(brandRateEntry(null))).toBe(false);
     expect(isRateConfigured(brandRateEntry({ affiliateId: 'a2', cpaValue: 0 } as any))).toBe(true); // 0 é taxa REAL
+  });
+});
+
+describe('projectConfigAt · a config como ela era naquele dia', () => {
+  const config: AffiliateConfig = {
+    affiliateId: 'a1', cpaValue: 50, since: '2026-08-16',
+    history: [{ from: EPOCH_DAY, to: '2026-08-15', cpaValue: 40 }],
+    byBrand: {
+      betano: {
+        cpaValue: 80, since: '2026-08-16',
+        history: [{ from: EPOCH_DAY, to: '2026-08-15', cpaValue: 100 }],
+      },
+      leon: { cpaValue: 70 },
+    },
+  } as any;
+
+  it('projeta topo e TODAS as casas para a data pedida', () => {
+    const antes = projectConfigAt(config, '2026-07-01') as any;
+    expect(antes.cpaValue).toBe(40);
+    expect(antes.byBrand.betano.cpaValue).toBe(100);
+    expect(antes.byBrand.leon.cpaValue).toBe(70); // casa sem histórico não muda
+  });
+
+  it('projetar HOJE devolve as taxas atuais', () => {
+    const hoje = projectConfigAt(config, '2026-08-20') as any;
+    expect(hoje.cpaValue).toBe(50);
+    expect(hoje.byBrand.betano.cpaValue).toBe(80);
+  });
+
+  // É o que torna a projeção plugável em `computeNetPayout`/`calcAffiliatePayout`
+  // sem tocar em nenhum dos 18 consumidores.
+  it('a config projetada alimenta calcAffiliatePayout direto', () => {
+    const row = { qualified_cpa: 1, total_commission: 0 };
+    expect(calcAffiliatePayout(row, projectConfigAt(config, '2026-07-01'), 'betano')).toBe(100);
+    expect(calcAffiliatePayout(row, projectConfigAt(config, '2026-08-20'), 'betano')).toBe(80);
+  });
+
+  it('preserva a ausência (não faz rateStatus mentir "configurado")', () => {
+    const p = projectConfigAt(config, '2026-07-01') as any;
+    expect('revPercentage' in p).toBe(false);
+    expect('revPercentage' in p.byBrand.betano).toBe(false);
+  });
+
+  it('conserva os outros campos da config e tolera entrada nula/data inválida', () => {
+    expect((projectConfigAt(config, '2026-07-01') as any).affiliateId).toBe('a1');
+    expect(projectConfigAt(null, '2026-07-01')).toBeNull();
+    expect(projectConfigAt(config, 'lixo')).toBe(config);
+  });
+});
+
+describe('unionRateWindows · janelas do afiliado inteiro', () => {
+  const config: AffiliateConfig = {
+    affiliateId: 'a1', cpaValue: 50,
+    byBrand: {
+      betano: { cpaValue: 80, since: '2026-08-16', history: [{ from: EPOCH_DAY, to: '2026-08-15', cpaValue: 100 }] },
+      leon: { cpaValue: 70, since: '2026-08-10', history: [{ from: EPOCH_DAY, to: '2026-08-09', cpaValue: 90 }] },
+    },
+  } as any;
+
+  it('une os cortes de TODAS as casas', () => {
+    expect(unionRateWindows(config, '2026-08-01', '2026-08-20')).toEqual([
+      { from: '2026-08-01', to: '2026-08-09' },
+      { from: '2026-08-10', to: '2026-08-15' },
+      { from: '2026-08-16', to: '2026-08-20' },
+    ]);
+  });
+
+  // O caso de 100% do parque hoje: ninguém mudou de taxa, então a apuração faz
+  // exatamente UMA busca, igual a antes da vigência existir.
+  it('sem histórico nenhum devolve UMA janela (uma busca só, como hoje)', () => {
+    expect(unionRateWindows({ affiliateId: 'a1', cpaValue: 50 } as any, '2026-01-01', '2026-12-31'))
+      .toEqual([{ from: '2026-01-01', to: '2026-12-31' }]);
+  });
+
+  it('corte fora do período pedido não vira janela', () => {
+    expect(unionRateWindows(config, '2026-09-01', '2026-09-30')).toHaveLength(1);
+  });
+
+  it('range inválido devolve vazio', () => {
+    expect(unionRateWindows(config, '2026-08-20', '2026-08-01')).toEqual([]);
+  });
+
+  it('as janelas cobrem o período sem buraco nem sobreposição', () => {
+    const ws = unionRateWindows(config, '2026-08-01', '2026-08-20');
+    expect(ws[0].from).toBe('2026-08-01');
+    expect(ws[ws.length - 1].to).toBe('2026-08-20');
+    for (let i = 1; i < ws.length; i++) expect(ws[i].from).toBe(addDays(ws[i - 1].to, 1));
   });
 });
 
