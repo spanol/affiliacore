@@ -16,15 +16,27 @@ import { num, resolveBrandRates, type BrandRates, type AffiliateConfig } from '.
 // Um trecho ENCERRADO da linha do tempo: a taxa valeu de `from` até `to`, inclusive
 // nas duas pontas. Datas em 'YYYY-MM-DD' (a mesma granularidade de `house_results`,
 // cujo doc id é `slug__date__afiliado` — não faz sentido ser mais fino que o dado).
-export interface RateSegment extends BrandRates {
+// AUSÊNCIA ≠ R$ 0 vale também DENTRO do trecho congelado: se o afiliado nunca teve
+// REV, o trecho não pode afirmar que o REV dele era 0. Por isso as duas taxas são
+// OPCIONAIS aqui e só viram número na hora de calcular (`num`, em `ratesOn`).
+export interface RateSegment extends Partial<BrandRates> {
   from: string;
   to: string;
 }
 
 // A taxa de um afiliado numa casa: o valor vigente + os trechos já encerrados.
-export interface BrandRateEntry extends BrandRates {
+export interface BrandRateEntry extends Partial<BrandRates> {
   since?: string;            // início da vigência ATUAL (ausente = "desde sempre")
   history?: RateSegment[];   // append-only, só o PASSADO
+}
+
+// Descarta chave ausente em vez de gravar `undefined`: o Firestore recusa undefined,
+// e um `revPercentage: undefined` no doc seria lido como campo EXISTENTE por
+// `'revPercentage' in cfg`, ressuscitando o zero fantasma pela porta dos fundos.
+function definedOnly<T extends Record<string, any>>(o: T): Partial<T> {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(o)) if (v !== undefined) out[k] = v;
+  return out as Partial<T>;
 }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -53,12 +65,20 @@ export const prevDay = (day: string) => addDays(day, -1);
 function cleanHistory(history?: RateSegment[] | null): RateSegment[] {
   return (Array.isArray(history) ? history : [])
     .filter((s) => s && isDay(s.from) && isDay(s.to) && s.from <= s.to)
-    .map((s) => ({ from: s.from, to: s.to, cpaValue: num(s.cpaValue), revPercentage: num(s.revPercentage) }))
+    .map((s) => ({ from: s.from, to: s.to, ...definedOnly({ cpaValue: s.cpaValue, revPercentage: s.revPercentage }) }))
     .sort((a, b) => a.from.localeCompare(b.from));
 }
 
 function currentRates(entry?: BrandRateEntry | null): BrandRates {
   return { cpaValue: num(entry?.cpaValue), revPercentage: num(entry?.revPercentage) };
+}
+
+// AUSÊNCIA ≠ R$ 0. Uma entrada sem NENHUMA das duas taxas nunca foi configurada:
+// não há passado a preservar, e inventar um trecho `{cpa: 0}` afirmaria que a taxa
+// dele já foi zero — o mesmo engano que `rateStatus` existe para evitar. Quem chega
+// aqui sem taxa anterior está configurando pela PRIMEIRA vez, o que não é mudança.
+export function isRateConfigured(entry?: BrandRateEntry | null): boolean {
+  return typeof entry?.cpaValue === 'number' || typeof entry?.revPercentage === 'number';
 }
 
 // QUE TAXA VALIA NESTE DIA. Sem `date`, devolve a atual — é o que garante que ligar
@@ -72,10 +92,12 @@ export function ratesOn(entry?: BrandRateEntry | null, date?: string): BrandRate
   if (!date || !isDay(date)) return current;
   const history = cleanHistory(entry?.history);
   if (history.length === 0) return current;
+  // `num` só aqui, na hora de CALCULAR: o trecho guarda a ausência, o cálculo a
+  // trata como zero. Os dois comportamentos convivem sem se contaminar.
   const hit = history.find((s) => date >= s.from && date <= s.to);
-  if (hit) return { cpaValue: hit.cpaValue, revPercentage: hit.revPercentage };
+  if (hit) return { cpaValue: num(hit.cpaValue), revPercentage: num(hit.revPercentage) };
   const oldest = history[0];
-  if (date < oldest.from) return { cpaValue: oldest.cpaValue, revPercentage: oldest.revPercentage };
+  if (date < oldest.from) return { cpaValue: num(oldest.cpaValue), revPercentage: num(oldest.revPercentage) };
   return current;
 }
 
@@ -92,19 +114,33 @@ export function ratesOn(entry?: BrandRateEntry | null, date?: string): BrandRate
 //    substitui a taxa atual, porque nenhum dia correu sob a primeira.
 export function closeRateSegment(
   entry: BrandRateEntry | null | undefined,
-  next: BrandRates,
+  next: Partial<BrandRates>,
   effectiveFrom: string
 ): BrandRateEntry {
-  const current = currentRates(entry);
-  const wanted: BrandRates = { cpaValue: num(next?.cpaValue), revPercentage: num(next?.revPercentage) };
+  if (!isDay(effectiveFrom)) return { ...(entry ?? {}) };
   const history = cleanHistory(entry?.history);
-  if (!isDay(effectiveFrom)) return { ...(entry ?? {}), ...current };
+
+  // A taxa nova é o que veio POR CIMA do que já valia. Completar o par é papel deste
+  // núcleo, não do chamador: um campo que nunca foi configurado e não veio agora
+  // CONTINUA ausente. Completar com 0 lá fora foi o que criou o zero fantasma.
+  const pick = (k: 'cpaValue' | 'revPercentage'): number | undefined =>
+    next && next[k] != null ? num(next[k])
+      : typeof entry?.[k] === 'number' ? entry[k]
+        : undefined;
+  const wanted = definedOnly({ cpaValue: pick('cpaValue'), revPercentage: pick('revPercentage') });
+
+  // Primeira configuração: não há passado a proteger, então grava a taxa e pronto —
+  // sem `since` nem `history`, para não sujar o doc de quem nunca mudou de taxa.
+  if (!isRateConfigured(entry)) return { ...(entry ?? {}), ...wanted };
 
   const last = history[history.length - 1];
-  if (last && effectiveFrom <= last.to) return { ...(entry ?? {}), ...current, history };
+  if (last && effectiveFrom <= last.to) return { ...(entry ?? {}), history };
 
-  if (wanted.cpaValue === current.cpaValue && wanted.revPercentage === current.revPercentage) {
-    return { ...(entry ?? {}), ...current, history };
+  // Salvar o mesmo valor não é mudança: devolve a entrada como estava, sem sequer
+  // criar um `history: []`. Senão o formulário salvo sem alteração viraria diff, e
+  // a trilha de auditoria registraria uma troca de taxa que não houve.
+  if (wanted.cpaValue === entry?.cpaValue && wanted.revPercentage === entry?.revPercentage) {
+    return { ...(entry ?? {}) };
   }
 
   // Desde quando a taxa ATUAL vale? Se a entrada não diz (é o caso de 100% do
@@ -113,15 +149,34 @@ export function closeRateSegment(
   // taxa nova ao passado, o efeito que este arquivo existe para impedir.
   const since = isDay(entry?.since) ? entry!.since!
     : last ? addDays(last.to, 1)
-    : EPOCH_DAY;
+      : EPOCH_DAY;
 
   // Nenhum dia correu sob a taxa atual (mudou no mesmo dia em que ela passou a
   // valer): não há trecho a congelar, só troca.
   const nextHistory = since >= effectiveFrom
     ? history
-    : [...history, { from: since, to: prevDay(effectiveFrom), cpaValue: current.cpaValue, revPercentage: current.revPercentage }];
+    : [...history, {
+      from: since,
+      to: prevDay(effectiveFrom),
+      ...definedOnly({ cpaValue: entry?.cpaValue, revPercentage: entry?.revPercentage }),
+    }];
 
   return { ...(entry ?? {}), ...wanted, since: effectiveFrom, history: nextHistory };
+}
+
+// A REGRA DE NEGÓCIO da troca, num lugar só: a taxa nova vale a partir de AMANHÃ.
+// O dia corrente fica com a taxa antiga porque a granularidade do dado é o dia:
+// um FTD das 10h e outro das 16h caem no mesmo `house_results.date`, e não há como
+// dizer qual veio antes da troca. Ficar com a taxa antiga é a escolha conservadora
+// e a leitura fiel de "não altera o que foi gerado antes da mudança".
+// `today` tem que vir de `resolveServerToday` (dia BR) — nunca de `new Date()` no
+// servidor, que roda em UTC e viraria o dia errado à noite.
+export function scheduleRateChange(
+  entry: BrandRateEntry | null | undefined,
+  next: Partial<BrandRates>,
+  today: string
+): BrandRateEntry {
+  return closeRateSegment(entry, next, addDays(today, 1));
 }
 
 // Fatia [from, to] nas fronteiras de vigência, para o consumidor somar janela a
@@ -162,9 +217,10 @@ export function brandRateEntry(
   const byBrand = (config as any)?.byBrand;
   const override = brandId && byBrand ? byBrand[brandId] : null;
   if (override) return override as BrandRateEntry;
+  // Sem `num` aqui: coagir a ausência para 0 apagaria o sinal de "nunca
+  // configurado" que `isRateConfigured` (e a vigência inteira) depende.
   return {
-    cpaValue: num(config?.cpaValue),
-    revPercentage: num(config?.revPercentage),
+    ...definedOnly({ cpaValue: config?.cpaValue, revPercentage: config?.revPercentage }),
     ...((config as any)?.history ? { history: (config as any).history } : {}),
     ...((config as any)?.since ? { since: (config as any).since } : {}),
   };

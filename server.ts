@@ -44,13 +44,15 @@ import { parseStandbyLinks, extractTagFromUrl } from './src/lib/linkTriage';
 import { buildTaggedUrl, suggestTag } from './src/lib/linkGeneration';
 import { buildResultsNotification, type ResultsNotificationVariant } from './src/lib/resultsNotification';
 import { normalizeDealInput, buildDealLabel, dealBrandKey, dealToBrandRates, buildDraftDealFromHouse } from './src/lib/deal';
-import { canTransition, type PartnershipStatus } from './src/lib/partnership';
+import { canTransition, nextStatusAfterPricing, PARTNERSHIP_STATUS_LABEL, type PartnershipStatus } from './src/lib/partnership';
 import {
   resolveDealType, dealPolicy, effectivePricedBy, sanitizeDealsForViewer, type DealTypeId,
 } from './src/lib/dealType';
 import { normalizeLegalDocInput, computeNextVersion } from './src/lib/legal';
 import { canTransitionWithdrawal, normalizeWithdrawalAmount, type WithdrawalStatus } from './src/lib/withdrawal';
 import { buildNetworkTree, resolveRepasseCap, exceedsRepasseCap, hasConfiguredRate } from './src/lib/network';
+import { scheduleRateChange, brandRateEntry, isRateConfigured, type BrandRateEntry } from './src/lib/rateHistory';
+import { num } from './src/lib/commission';
 import {
   isPendingSignup, signupToRequest, leadToRequest, referralToRequest, buildCaptureFeed, resolveRequestStatus,
 } from './src/lib/registrationRequests';
@@ -286,6 +288,25 @@ export function createApp(deps: ServerDeps) {
   // OFF). Na Boost/instância nº 0 as rotas /api/deals e /api/partnerships respondem
   // 404 (feature inexistente) — zero side effect. Liga com VITE_MARKETPLACE_ENABLED.
   const MARKETPLACE_ENABLED = marketplaceEnabled(process.env.VITE_MARKETPLACE_ENABLED);
+  // --- Escrita de taxa COM VIGÊNCIA (fonte única) ---------------------------
+  // Toda gravação de comissão passa por aqui, nas 4 portas que existem (admin no
+  // /admin, especial no sub-config, gerente na precificação, aprovação de parceria).
+  // Sem uma porta só, uma delas sobrescreveria a taxa e reprecificaria o histórico
+  // enquanto as outras respeitam a vigência — divergência silenciosa, do tipo que
+  // só aparece no extrato do afiliado. Ver PLANO-COMISSAO-VIGENCIA.md.
+  //
+  // Devolve a ENTRADA nova (taxa atual + since + history) pronta p/ merge. Como
+  // `history` é array, o merge do Firestore o substitui inteiro, que é o desejado.
+  const withRateHistory = (
+    before: BrandRateEntry | null | undefined,
+    next: { cpaValue?: number; revPercentage?: number },
+  ): BrandRateEntry => scheduleRateChange(before, next, resolveServerToday());
+
+  // A entrada atual de uma casa (ou do topo, quando brandKey é null) dentro de um
+  // doc de affiliate_configs cru. Espelha a precedência de `resolveBrandRates`.
+  const currentRateEntry = (cfg: any, brandKey: string | null): BrandRateEntry | null =>
+    brandKey ? (cfg?.byBrand?.[brandKey] ?? null) : brandRateEntry(cfg);
+
   const requireMarketplace: express.RequestHandler = (_req, res, next) => {
     if (!MARKETPLACE_ENABLED) {
       return res.status(404).json({ error: 'Módulo de marketplace desativado nesta instância.', code: 'MARKETPLACE_DISABLED' });
@@ -1041,10 +1062,14 @@ export function createApp(deps: ServerDeps) {
       // no MESMO batch da gravação (atômico). [[boost-audit-trail Fase 3]]
       const subRef = adminDb.collection('affiliate_configs').doc(subId);
       const beforeSnap = await subRef.get();
-      const configPatch = { cpaValue: cpa, revPercentage: rev };
+      const beforeCfg = beforeSnap.exists ? (beforeSnap.data() as any) : undefined;
+      // VIGÊNCIA: a taxa nova vale de amanhã; o que o sub já gerou fica com a antiga.
+      // Aqui o gesto é de TOPO (esta rota não tem casa no contexto), então o segmento
+      // é fechado na raiz da config. [[PLANO-COMISSAO-VIGENCIA]]
+      const configPatch = withRateHistory(currentRateEntry(beforeCfg, null), { cpaValue: cpa, revPercentage: rev });
       const changes = diffChanges(
-        beforeSnap.exists ? (beforeSnap.data() as any) : undefined,
-        configPatch,
+        beforeCfg,
+        configPatch as unknown as Record<string, unknown>,
         ['cpaValue', 'revPercentage'],
       );
 
@@ -1549,8 +1574,30 @@ export function createApp(deps: ServerDeps) {
 
       const ref = adminDb.collection('affiliate_configs').doc(id);
       const beforeSnap = await ref.get();
+      const beforeCfg = beforeSnap.exists ? (beforeSnap.data() as any) : undefined;
+
+      // VIGÊNCIA (a mesma regra do gerente vale para o admin, senão o mesmo campo
+      // teria dois comportamentos). O patch é PARCIAL — pode vir só o CPA —, então a
+      // taxa nova é o par COMPLETO: o que veio no corpo por cima do que já valia.
+      // Sem isso, mudar só o CPA fecharia o segmento com um REV zerado.
+      // O patch é PARCIAL (pode vir só o CPA). Completar o par é papel do núcleo,
+      // que preserva a ausência do campo que nunca foi configurado; completar aqui
+      // com `num(cur.revPercentage)` gravaria um REV 0 fantasma em quem só tem CPA.
+      // Passa-se ADIANTE apenas o que veio no corpo.
+      const requested = patch as Record<string, any>;
+      if ('cpaValue' in requested || 'revPercentage' in requested) {
+        Object.assign(requested, withRateHistory(currentRateEntry(beforeCfg, null), requested));
+      }
+      if (requested.byBrand) {
+        const nextByBrand: Record<string, any> = {};
+        for (const [brandId, rates] of Object.entries(requested.byBrand as Record<string, any>)) {
+          nextByBrand[brandId] = withRateHistory(currentRateEntry(beforeCfg, brandId), rates);
+        }
+        requested.byBrand = nextByBrand;
+      }
+
       const changes = diffChanges(
-        beforeSnap.exists ? (beforeSnap.data() as any) : undefined,
+        beforeCfg,
         patch,
         ['cpaValue', 'revPercentage', 'byBrand'],
       );
@@ -4965,8 +5012,12 @@ export function createApp(deps: ServerDeps) {
       if (deal.active === false) {
         return res.status(409).json({ error: 'Este acordo está pausado. Fale com a agência antes de definir a comissão.' });
       }
-      if (!canTransition(from, 'priced', 'upline')) {
-        return res.status(409).json({ error: `Transição inválida (${from} → priced).` });
+      // Reprecificar uma parceria APROVADA é permitido (pedido do cliente, 16/08) e
+      // não a manda de volta para "aguardando link": o link já existe e segue
+      // valendo, muda só a taxa, a partir de amanhã. Ver nextStatusAfterPricing.
+      const nextStatus = nextStatusAfterPricing(from);
+      if (!nextStatus) {
+        return res.status(409).json({ error: `Não dá para definir a comissão de uma parceria ${PARTNERSHIP_STATUS_LABEL[from]?.toLowerCase() ?? from}.` });
       }
 
       const cpa = Number(req.body?.cpaValue) || 0;
@@ -5002,20 +5053,23 @@ export function createApp(deps: ServerDeps) {
 
       // Grava no byBrand[brandKey] (merge, preservando as outras casas) — o gesto é
       // POR CASA. Auditoria de dinheiro no MESMO batch, autor carimbado pelo token.
+      // COM VIGÊNCIA: a taxa nova vale de amanhã, o que já foi gerado fica na antiga.
       const cfgRef = adminDb.collection('affiliate_configs').doc(affiliateId);
       const cfgBefore = await cfgRef.get();
-      const curByBrand = (cfgBefore.exists ? (cfgBefore.data() as any)?.byBrand : null) || {};
-      const nextByBrand = { ...curByBrand, [brandKey]: { cpaValue: cpa, revPercentage: rev } };
-      const cfgChanges = diffChanges(cfgBefore.data() as any, { byBrand: nextByBrand }, ['byBrand']);
+      const cfgData = cfgBefore.exists ? (cfgBefore.data() as any) : undefined;
+      const curByBrand = cfgData?.byBrand || {};
+      const brandEntry = withRateHistory(currentRateEntry(cfgData, brandKey), { cpaValue: cpa, revPercentage: rev });
+      const nextByBrand = { ...curByBrand, [brandKey]: brandEntry };
+      const cfgChanges = diffChanges(cfgData, { byBrand: nextByBrand }, ['byBrand']);
 
       const batch = adminDb.batch();
       batch.set(cfgRef, {
         affiliateId,
-        byBrand: { [brandKey]: { cpaValue: cpa, revPercentage: rev } },
+        byBrand: { [brandKey]: brandEntry },
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
       batch.set(ref, {
-        status: 'priced',
+        status: nextStatus,
         pricedByUid: user?.uid ?? null,
         pricedByAffiliateId: isAdmin ? null : callerAffiliateId,
         pricedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -5131,9 +5185,14 @@ export function createApp(deps: ServerDeps) {
         // casas (merge do mapa) — MESMO caminho auditado do PATCH de config.
         const cfgRef = adminDb.collection('affiliate_configs').doc(affiliateId);
         const cfgBefore = applyDealRates ? await cfgRef.get() : null;
-        const curByBrand = (cfgBefore?.exists ? (cfgBefore.data() as any)?.byBrand : null) || {};
-        const nextByBrand = { ...curByBrand, [brandKey]: { cpaValue: rates.cpaValue, revPercentage: rates.revPercentage } };
-        const cfgChanges = applyDealRates ? diffChanges(cfgBefore?.data() as any, { byBrand: nextByBrand }, ['byBrand']) : [];
+        const cfgData = cfgBefore?.exists ? (cfgBefore.data() as any) : undefined;
+        const curByBrand = cfgData?.byBrand || {};
+        // Mesma vigência das outras portas: conceder a taxa do deal não reprecifica
+        // o que o afiliado já tenha gerado nesta casa (parceria reaberta depois de
+        // encerrada, por exemplo).
+        const brandEntry = withRateHistory(currentRateEntry(cfgData, brandKey), rates);
+        const nextByBrand = { ...curByBrand, [brandKey]: brandEntry };
+        const cfgChanges = applyDealRates ? diffChanges(cfgData, { byBrand: nextByBrand }, ['byBrand']) : [];
 
         // Emite (idempotente por afiliado×brandKey) o link de divulgação p/ o /go.
         let code: string | null = cur.code ?? null;
@@ -5147,7 +5206,7 @@ export function createApp(deps: ServerDeps) {
 
         const batch = adminDb.batch();
         if (applyDealRates) {
-          batch.set(cfgRef, { byBrand: { [brandKey]: { cpaValue: rates.cpaValue, revPercentage: rates.revPercentage } }, affiliateId, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+          batch.set(cfgRef, { byBrand: { [brandKey]: brandEntry }, affiliateId, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
         }
         batch.set(adminDb.collection('affiliate_links').doc(code), {
           code, affiliateId, brandId: brandKey,

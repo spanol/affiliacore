@@ -21,6 +21,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from
 import request from 'supertest';
 import { createApp } from './server';
 import { generateTotpSecret, hashBackupCode, totpCode } from './src/lib/totp';
+import { addDays } from './src/lib/rateHistory';
 
 // Segredo fixo p/ os testes de 2FA — os códigos são gerados de verdade (RFC 6238).
 const SECRET = generateTotpSecret();
@@ -492,7 +493,15 @@ describe('PATCH /api/affiliate-configs/:id — escrita de comissão auditada', (
       .send({ byBrand: { sb: { cpaValue: 350 }, bf: { revPercentage: 25 } } })
       .expect(200);
     const cfg = db.__store.get('affiliate_configs')?.get('AFF-1');
-    expect(cfg.byBrand).toEqual({ sb: { cpaValue: 350 }, bf: { revPercentage: 25 } });
+    // `sb` já tinha taxa (300) → a troca congela o trecho antigo (vigência).
+    expect(cfg.byBrand.sb).toMatchObject({ cpaValue: 350, since: expect.any(String) });
+    expect(cfg.byBrand.sb.history).toEqual([{ from: '1970-01-01', to: expect.any(String), cpaValue: 300 }]);
+    // a intenção original segue de pé: campo omitido NÃO vira 0, nem na taxa atual
+    // nem dentro do trecho congelado.
+    expect('revPercentage' in cfg.byBrand.sb).toBe(false);
+    expect('revPercentage' in cfg.byBrand.sb.history[0]).toBe(false);
+    // `bf` nunca teve taxa → primeira configuração, sem vigência nenhuma.
+    expect(cfg.byBrand.bf).toEqual({ revPercentage: 25 });
     expect(cfg.cpaValue).toBe(200); // topo preservado pelo merge
     const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
     expect(logs).toHaveLength(1);
@@ -2530,6 +2539,38 @@ describe('deals · tipo gerenciado (o gerente precifica, a agência emite o link
     const res = await request(appWith(seed)).post('/api/partnerships').set('Authorization', 'Bearer aff-uid')
       .send({ dealId: 'dg' }).expect(409);
     expect(res.body.error).toMatch(/pausada/i);
+  });
+
+  // Resposta 10 do cliente: reprecificar depois do link, sem alterar o que já foi
+  // gerado. O gesto NÃO manda a parceria de volta para "aguardando link".
+  it('o gerente reprecifica uma parceria APROVADA: ela CONTINUA aprovada', async () => {
+    const seed: any = seedRede();
+    seed.partnership_requests.pg.status = 'approved';
+    seed.partnership_requests.pg.code = 'LINK7';
+    seed.affiliate_configs.affX = { affiliateId: 'affX', byBrand: { betano: { cpaValue: 100 } } };
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).post('/api/partnerships/pg/price').set('Authorization', 'Bearer ger-uid')
+      .send({ cpaValue: 80, revPercentage: 0 }).expect(200);
+
+    const p = db.__store.get('partnership_requests')?.get('pg');
+    expect(p.status).toBe('approved'); // não volta para priced: o link já existe
+    expect(p.code).toBe('LINK7');
+
+    // VIGÊNCIA: a taxa nova é a atual, e o que ele já gerou fica congelado a 100.
+    const entry = db.__store.get('affiliate_configs')?.get('affX').byBrand.betano;
+    expect(entry.cpaValue).toBe(80);
+    expect(entry.history).toEqual([{ from: '1970-01-01', to: expect.any(String), cpaValue: 100 }]);
+    // a vigência nova começa exatamente no dia seguinte ao fim do trecho congelado:
+    // sem buraco e sem sobreposição entre as duas janelas.
+    expect(entry.since).toBe(addDays(entry.history[0].to, 1));
+  });
+
+  it('parceria RECUSADA não aceita precificação', async () => {
+    const seed: any = seedRede();
+    seed.partnership_requests.pg.status = 'rejected';
+    await request(appWith(seed)).post('/api/partnerships/pg/price').set('Authorization', 'Bearer ger-uid')
+      .send({ cpaValue: 80, revPercentage: 0 }).expect(409);
   });
 
   it('casa pausada NÃO derruba quem já foi aprovado antes da pausa', async () => {

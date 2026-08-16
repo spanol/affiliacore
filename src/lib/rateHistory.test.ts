@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 import {
   EPOCH_DAY, isDay, addDays, prevDay,
-  ratesOn, closeRateSegment, splitRangeByRate, brandRateEntry, resolveBrandRatesAt,
+  ratesOn, closeRateSegment, scheduleRateChange, splitRangeByRate,
+  brandRateEntry, resolveBrandRatesAt, isRateConfigured,
   type BrandRateEntry,
 } from './rateHistory';
 import { resolveBrandRates, calcAffiliatePayout, type AffiliateConfig } from './commission';
@@ -96,10 +97,34 @@ describe('closeRateSegment · a troca corta a linha do tempo', () => {
     expect(e.history![0]).toMatchObject({ to: '2026-08-15', cpaValue: 100 });
   });
 
-  it('salvar o MESMO valor não polui a linha do tempo', () => {
+  it('salvar o MESMO valor não polui a linha do tempo (nem cria history vazio)', () => {
     const e = closeRateSegment({ cpaValue: 100, revPercentage: 0, since: '2026-06-01' }, { cpaValue: 100, revPercentage: 0 }, '2026-08-16');
-    expect(e.history).toEqual([]);
+    expect(e.history).toBeUndefined();
     expect(e.since).toBe('2026-06-01');
+  });
+
+  // AUSÊNCIA ≠ R$ 0, a invariante que o resto do app já protege em `rateStatus`.
+  it('primeira configuração não cria vigência (não há passado a proteger)', () => {
+    const e = closeRateSegment(undefined, { revPercentage: 12 }, '2026-08-17');
+    expect(e).toEqual({ revPercentage: 12 });
+    expect(e.history).toBeUndefined();
+    expect(e.since).toBeUndefined();
+  });
+
+  it('patch PARCIAL completa o par com o que já valia, sem inventar o ausente', () => {
+    // Afiliado que só tem CPA: mudar o CPA não pode gravar um REV 0 fantasma.
+    const e = closeRateSegment({ cpaValue: 200 }, { cpaValue: 250 }, '2026-08-17');
+    expect(e.cpaValue).toBe(250);
+    expect('revPercentage' in e).toBe(false);
+    expect(e.history).toEqual([{ from: EPOCH_DAY, to: '2026-08-16', cpaValue: 200 }]);
+    // ...e o trecho congelado também não afirma que o REV dele era zero
+    expect('revPercentage' in e.history![0]).toBe(false);
+  });
+
+  it('o campo que chega agora entra sem apagar o que já existia', () => {
+    const e = closeRateSegment({ cpaValue: 200, since: '2026-06-01' }, { revPercentage: 5 }, '2026-08-17');
+    expect(e).toMatchObject({ cpaValue: 200, revPercentage: 5, since: '2026-08-17' });
+    expect(e.history).toEqual([{ from: '2026-06-01', to: '2026-08-16', cpaValue: 200 }]);
   });
 
   // Vigência retroativa reabriria justamente o problema que isto fecha.
@@ -114,6 +139,17 @@ describe('closeRateSegment · a troca corta a linha do tempo', () => {
     const out = closeRateSegment({ cpaValue: 100, revPercentage: 0 }, { cpaValue: 80, revPercentage: 0 }, 'amanhã');
     expect(out.cpaValue).toBe(100);
     expect(out.history).toBeUndefined();
+  });
+});
+
+describe('scheduleRateChange · a regra "vale a partir de amanhã"', () => {
+  // O dia corrente fica com a taxa ANTIGA: um FTD das 10h e outro das 16h caem no
+  // mesmo `house_results.date`, e não há como saber qual veio antes da troca.
+  it('a troca de hoje só vale amanhã; hoje ainda é a taxa velha', () => {
+    const e = scheduleRateChange({ cpaValue: 100, revPercentage: 0, since: '2026-06-01' }, { cpaValue: 80 }, '2026-08-16');
+    expect(e.since).toBe('2026-08-17');
+    expect(ratesOn(e, '2026-08-16').cpaValue).toBe(100);
+    expect(ratesOn(e, '2026-08-17').cpaValue).toBe(80);
   });
 });
 
@@ -196,7 +232,15 @@ describe('resolveBrandRatesAt · irmã datada de resolveBrandRates', () => {
   it('brandRateEntry espelha a precedência override > topo', () => {
     expect(brandRateEntry(config, 'betano').cpaValue).toBe(80);
     expect(brandRateEntry(config, 'inexistente').cpaValue).toBe(50);
-    expect(brandRateEntry(null).cpaValue).toBe(0);
+  });
+
+  // Coagir a ausência para 0 aqui apagaria o sinal de "nunca configurado" de que a
+  // vigência inteira depende (é o que `isRateConfigured` lê).
+  it('brandRateEntry PRESERVA a ausência em vez de coagir para 0', () => {
+    expect(brandRateEntry(null)).toEqual({});
+    expect(brandRateEntry({ affiliateId: 'a2', revPercentage: 7 } as any)).toEqual({ revPercentage: 7 });
+    expect(isRateConfigured(brandRateEntry(null))).toBe(false);
+    expect(isRateConfigured(brandRateEntry({ affiliateId: 'a2', cpaValue: 0 } as any))).toBe(true); // 0 é taxa REAL
   });
 });
 

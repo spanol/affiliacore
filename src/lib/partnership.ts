@@ -86,6 +86,17 @@ export function canTransition(
   return (allowed[from] || []).includes(to);
 }
 
+// Para onde vai o status quando o gerente define (ou REdefine) a comissão.
+// Não é `canTransition`: reprecificar uma parceria APROVADA não pode mandá-la de
+// volta para "aguardando link" — o link já existe e está funcionando; só a taxa
+// muda, e a partir de amanhã (ver rateHistory.scheduleRateChange). `null` = a
+// parceria não aceita precificação (recusada/encerrada).
+export function nextStatusAfterPricing(from: PartnershipStatus): PartnershipStatus | null {
+  if (from === 'requested' || from === 'priced') return 'priced';
+  if (from === 'approved') return 'approved';
+  return null;
+}
+
 // Uma parceria está "viva" (consome a oferta, gera link) quando solicitada,
 // precificada ou aprovada. Recusada/encerrada libera o deal p/ ser solicitado de
 // novo. `priced` é viva: a oferta já está com o gerente, não pode ser pedida 2×.

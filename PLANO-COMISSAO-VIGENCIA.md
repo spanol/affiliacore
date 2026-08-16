@@ -142,10 +142,26 @@ segmento cortado no dia certo; range que atravessa duas taxas soma as duas;
 config sem `history` idêntica a hoje; property test de que Σ das janelas ==
 payout total quando a taxa não mudou.
 
-**F2 · Escrita.** A rota de precificação (`POST /api/partnerships/:id/price`) e o
-`PATCH /api/affiliate-configs` do admin passam a cortar o segmento em vez de
-sobrescrever. Libera `canTransition('approved', 'priced')`, que hoje está
-bloqueado justamente por isso. Auditoria registra o segmento fechado.
+**F2 · Escrita. ✅ ENTREGUE.** As QUATRO portas que gravam taxa passam pelo helper
+único `withRateHistory` (admin no `/admin`, especial no `sub-config`, gerente na
+precificação, aprovação de parceria). Sem porta única, uma delas sobrescreveria
+enquanto as outras respeitam a vigência, e a divergência só apareceria no extrato
+do afiliado. Reprecificar parceria APROVADA liberado via
+`nextStatusAfterPricing`: ela continua aprovada, o link segue valendo, muda só a
+taxa (mandá-la de volta para "aguardando link" seria errado, o link já existe).
+
+**Duas armadilhas que os testes existentes pegaram**, ambas da família
+"ausência ≠ R$ 0":
+- Completar o par no chamador (`revPercentage: num(cur.revPercentage)`) gravava um
+  **REV 0 fantasma** em quem só tinha CPA. A completação virou papel do núcleo,
+  que preserva o campo ausente.
+- `brandRateEntry` coagia a ausência para 0 via `num()`, o que fazia
+  `isRateConfigured` responder `true` para afiliado sem config nenhuma. Agora só
+  se aplica `num` na hora de CALCULAR (`ratesOn`); o dado guarda a ausência.
+
+Daí duas regras que ficaram no núcleo: **primeira configuração não cria vigência**
+(não há passado a proteger) e **o trecho congelado também não afirma zero** para
+um campo que nunca existiu.
 
 **F3 · Leitura.** Carteira e extrato somam por janela
 (`splitRangeByRate`). É onde o cliente vê o efeito.
@@ -157,15 +173,16 @@ uma vez.
 **F5 · Tela.** O gerente vê a vigência ao mudar a taxa ("vale a partir de
 amanhã; o que já foi gerado fica a R$ 100") e o histórico da casa.
 
-## 7. Em aberto com o cliente
+## 7. Confirmado com o cliente (16/08)
 
-1. **"O que foi gerado antes" é por DIA ou por ciclo de pagamento fechado?** O
-   plano assume dia (a taxa nova vale a partir do dia seguinte à mudança), que é
-   o mais fiel à frase dele e o mais fino que o dado permite. Se for por ciclo
-   (a taxa nova só vale no próximo fechamento semanal/mensal), muda o cálculo do
-   `effectiveFrom` e nada mais.
-2. **O gerente pode mudar a taxa retroativamente?** O plano diz não: vigência
-   sempre para a frente. Retroativo reabriria o problema que ele quer fechar.
-3. **A mesma regra vale para o admin?** O plano diz sim: a taxa do admin no
-   `/admin` passa a ter vigência também. Deixar só o gerente com vigência criaria
+As três premissas foram levadas à equipe e confirmadas como fiéis ao desejo dela:
+
+1. **"O que foi gerado antes" é por DIA.** A taxa nova vale a partir do dia
+   seguinte à mudança (`scheduleRateChange`). O dia corrente fica com a taxa
+   antiga porque a granularidade do dado é o dia: um FTD das 10h e outro das 16h
+   caem no mesmo `house_results.date`, e não há como dizer qual veio antes da
+   troca. Ficar com a antiga é a leitura conservadora e fiel.
+2. **Não há mudança retroativa.** Vigência sempre para a frente;
+   `closeRateSegment` recusa `effectiveFrom` dentro de trecho já fechado.
+3. **A mesma regra vale para o admin.** Deixar só o gerente com vigência criaria
    dois comportamentos para o mesmo campo.
