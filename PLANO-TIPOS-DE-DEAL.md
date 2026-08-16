@@ -282,6 +282,12 @@ de acordo no `POST /api/houses`; `resolveDirectUpline` novo em
 `specialNetwork.ts` para rotear a solicitação ao gerente certo; wrapper
 `pricePartnership` no service. 18 casos de supertest em `server.test.ts`.
 
+**F2.1 · Respostas do cliente (16/08). ✅ ENTREGUE.** `POST /api/partnerships/:id/reject`
+(gerente recusa, mesma guarda da precificação, extraída para
+`loadPartnershipForUpline` para as duas rotas não divergirem); casa pausada
+recusa solicitação nova sem derrubar quem já entrou; `user_notifications` na
+recusa (gerente e admin). Mais 6 casos de supertest.
+
 **F3 · Admin `/acordos`.** Radio, campos condicionais, fila de link.
 
 **F4 · Vitrine do afiliado.** Card e estados.
@@ -306,18 +312,56 @@ link como admin, e conferir que o `byBrand` do afiliado terminou com o valor do
 - O status `priced` só é alcançável em deals `gerenciado`, então nenhuma
   parceria existente muda de estado.
 
-## 9. Decisões em aberto
+## 9. Respostas do cliente (16/08/2026, por WhatsApp)
 
-1. **Baseline, rollover e GGR são informativos?** Premissa: sim (é o que o
-   painel de referência faz). Se algum entrar em cálculo de comissão, o plano
-   muda de tamanho porque encosta em `commission.ts`.
-2. **Casa nova cria o deal ativo ou rascunho?** Premissa: rascunho inativo, pelo
-   precedente dos presets. Se for para nascer ativo, é uma linha, mas a vitrine
-   passa a poder mostrar card vazio.
-3. **Onde vive a fila do gerente?** Premissa: `/network/afiliados`, que já é a
-   tela de "Meus afiliados" dele.
-4. **GGR é percentual ou texto livre?** Premissa: percentual (`number | null`),
-   porque texto livre não dá para comparar entre casas depois.
+| # | Pergunta | Resposta | Efeito |
+|---|---|---|---|
+| 1 | Baseline entra em cálculo? | "Apenas exibição" | Premissa confirmada. `commission.ts` não muda |
+| 2 | Gerente define CPA e Rev? | "A comissão que ele tem disponível: casa só de CPA, só CPA; casa com Rev, ele pode definir o Rev". Não pretendem liberar Rev nas casas de agora | Já é o comportamento: o teto por casa zera o que ele não tem. Falta a TELA só oferecer o campo que ele tem (F5) |
+| 3 | A comissão é por casa? | "Por casa, a critério dele: Esportiva 110 pode repassar 80, LEON 110 pode repassar 70. Controle total do que tem disponível" | Premissa confirmada, é o `byBrand` da rota de precificação |
+| 5 | Esconde o RevShare também? | **Não respondida** (ele leu como repetição da 2 e da 3) | Segue escondendo os dois. Reperguntar |
+| 6/7 | Lista e ordem dos KPIs | "Baseline da casa e roll, que normalmente gira de 1 a 3x. A princípio apenas esses". Ordem vem depois. Está pensando em somar **ticket médio** e **taxa de redepósito** | GGR saiu da lista. Não precisa mexer: `visibleKpis` já omite KPI sem valor, então um deal sem GGR mostra baseline, rollover e ciclo |
+| 9 | Gerente pode recusar? | "Seria bom" | ✅ `POST /api/partnerships/:id/reject` |
+| 10 | Gerente altera a comissão depois? | "Sim, mesmo com o link gerado, **mas com um filtro onde a nova comissão não altere o que foi gerado antes da mudança**" | ⚠️ Ver §10, não implementado |
+| 11 | Pausar casa faz o quê? | "Barrar a entrada de novos dados" | ✅ Casa pausada some da vitrine e recusa solicitação nova, sem tocar em quem já entrou |
+| 12 | Notificar recusa? | "Sim" | ✅ `user_notifications` na recusa, tanto do gerente quanto do admin |
+
+Premissas que continuam de pé por falta de resposta: casa nova nasce rascunho
+inativo; a fila do gerente vive em `/network/afiliados`; GGR é percentual.
+
+## 10. ⚠️ Bloqueado: taxa com vigência (resposta 10)
+
+A segunda metade da resposta 10 não é um ajuste, é uma mudança no núcleo de
+dinheiro, e por isso **não foi implementada junto com o resto**.
+
+**O que existe hoje:** não há ledger. Toda comissão é DERIVADA ao vivo por
+`calcAffiliatePayout(linha, configAtual)`. `src/lib/withdrawal.ts` diz isso com
+todas as letras ("saldo apurado NÃO é recalculado/validado aqui; isso ficaria
+pra uma v2 com ledger"). Consequência: mudar a taxa de 100 para 80 hoje
+**reprecifica todo o histórico**, inclusive o FTD do mês passado. É exatamente o
+que ele pediu para não acontecer, e já é assim para qualquer edição de taxa no
+`/admin` hoje, não só para o gerente.
+
+**O que a resposta pede:** taxa com VIGÊNCIA. `byBrand[casa]` deixa de ser um
+par de números e vira uma linha do tempo (`{ desde: 'YYYY-MM-DD', cpaValue,
+revPercentage }[]`), e o payout de cada linha de resultado passa a escolher a
+taxa da janela em que a linha caiu.
+
+**Por que é caro:** encosta em `calcAffiliatePayout`, que é a fonte única de
+dinheiro do app. Junto vêm a cascata de upline (o spread também precisa ser
+datado, senão o custo da agência diverge do que o afiliado vê), os editores de
+taxa do `/admin`, o ranking, a carteira e o extrato. É o tipo de mudança que o
+`CLAUDE.md` cerca de invariante justamente porque um erro ali é silencioso.
+
+**Alternativa mais barata que resolve 90% do caso dele:** fechar o mês. Um
+`commission_closings/{afiliado}/{mês}` gravado no fechamento congela o valor
+apurado, e a taxa nova só vale do fechamento em diante. Não precisa datar a taxa
+nem tocar em `calcAffiliatePayout`; precisa de um gesto de fechamento que hoje
+não existe.
+
+Enquanto isso não é decidido, **reprecificar depois de aprovado segue bloqueado**
+(`canTransition('approved', 'priced')` é false). Liberar sem a vigência
+entregaria justamente o efeito retroativo que ele quer evitar.
 
 ## Anexo: transcrição da call (15/08/2026, 5min07)
 

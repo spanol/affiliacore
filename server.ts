@@ -4809,6 +4809,13 @@ export function createApp(deps: ServerDeps) {
       if (!dealSnap.exists) return res.status(404).json({ error: 'Acordo não encontrado.' });
       const deal = dealFromDoc(dealSnap);
       if (!deal.active) return res.status(409).json({ error: 'Este acordo não está mais disponível.' });
+      // Casa PAUSADA barra ENTRADA nova (pedido do cliente, 16/08), sem tocar em
+      // quem já está dentro: o afiliado aprovado antes da pausa continua com o link
+      // e com o histórico. Espelha o filtro da vitrine no GET /api/deals.
+      const houseActiveSnap = await adminDb.collection('houses').doc(String(deal.houseId)).get();
+      if (houseActiveSnap.exists && (houseActiveSnap.data() as any)?.active === false) {
+        return res.status(409).json({ error: 'Esta operadora está com a operação pausada. Tente novamente quando ela voltar.' });
+      }
 
       // Idempotência: já existe parceria viva p/ este afiliado×deal? Reusa.
       const existing = await adminDb.collection('partnership_requests').where('affiliateId', '==', affiliateId).get();
@@ -4857,6 +4864,80 @@ export function createApp(deps: ServerDeps) {
     };
   };
 
+  // Guarda COMUM das ações do gerente sobre uma parceria (precificar e recusar).
+  // Fica num helper para as duas rotas não divergirem: a de recusa nasceria com uma
+  // cópia da checagem de escopo, e cópia de barreira é como escopo vaza.
+  // Devolve `{ fail }` (status + mensagem pt-BR) OU o contexto já resolvido.
+  const loadPartnershipForUpline = async (req: express.Request, id: string) => {
+    const user = (req as any).user;
+    const isAdmin = user?.role === 'admin';
+    const callerAffiliateId = user?.affiliateId ? String(user.affiliateId) : '';
+    if (!isAdmin && !callerAffiliateId) {
+      return { fail: { status: 403, error: 'Sua conta não está vinculada a um afiliado.' } };
+    }
+    const ref = adminDb!.collection('partnership_requests').doc(id);
+    const snap = await ref.get();
+    if (!snap.exists) return { fail: { status: 404, error: 'Parceria não encontrada.' } };
+    const cur = snap.data() as any;
+    const affiliateId = String(cur.affiliateId);
+
+    const dealSnap = await adminDb!.collection('deals').doc(String(cur.dealId)).get();
+    if (!dealSnap.exists) return { fail: { status: 404, error: 'Acordo da parceria não existe mais.' } };
+    const deal = dealFromDoc(dealSnap);
+    // Só o TIPO importa para saber se o gerente manda nesta parceria; QUEM pode
+    // gravar é a checagem de identidade logo abaixo, sem reler a árvore 2×.
+    if (dealPolicy(deal).pricedBy !== 'upline') {
+      return { fail: { status: 400, error: 'A comissão deste acordo é definida pela agência, não pelo gerente.' } };
+    }
+    if (!isAdmin) {
+      const special = await resolveSpecialRecord(callerAffiliateId, { withSubs: false });
+      if (!resolveIsSpecial(special)) {
+        return { fail: { status: 403, error: 'Você não é um afiliado especial ativo.' } };
+      }
+      const [uplines, specials] = await Promise.all([readUplineMap(), readSpecialsMap()]);
+      if (!isDirectDownline(affiliateId, callerAffiliateId, { uplines, specials })) {
+        return {
+          fail: {
+            status: 403,
+            error: 'Este afiliado não é seu indicado direto: a comissão dele é definida por quem está acima dele na rede.',
+          },
+        };
+      }
+    }
+    return {
+      ctx: {
+        ref, cur, deal, affiliateId, isAdmin, callerAffiliateId,
+        from: (cur.status ?? 'requested') as PartnershipStatus,
+      },
+    };
+  };
+
+  // Avisa o afiliado quando a parceria dele é RECUSADA (pedido do cliente, 16/08).
+  // Sem isso ele fica esperando um link que não vem, sem sinal nenhum na tela.
+  // Best-effort: nunca derruba a decisão que acabou de ser gravada.
+  const notifyPartnershipRejected = async (affiliateId: string, operatorName: string) => {
+    if (!adminDb || !affiliateId) return;
+    try {
+      const usersSnap = await adminDb.collection('users').where('affiliateId', '==', affiliateId).get();
+      if (usersSnap.empty) return;
+      const batch = adminDb.batch();
+      usersSnap.forEach((u) => {
+        batch.set(adminDb!.collection('user_notifications').doc(), {
+          recipientUid: u.id,
+          affiliateId,
+          type: 'partnership_rejected',
+          title: 'Solicitação de parceria recusada',
+          body: `Sua solicitação para ${operatorName || 'a operadora'} não foi aprovada. Fale com seu gerente para entender os próximos passos.`,
+          readAt: null,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+      await batch.commit();
+    } catch (e) {
+      console.error('[partnerships] falha ao notificar a recusa:', e);
+    }
+  };
+
   // O GERENTE define a comissão do afiliado dele nesta casa (acordo `gerenciado`).
   // É o pedido da call de 15/08: "na Esportiva é 110 que ele tem, ele vai colocar
   // 100, ele vai pegar 10 reais" — o spread é a receita do gerente, e tirar isso do
@@ -4875,31 +4956,14 @@ export function createApp(deps: ServerDeps) {
   app.post('/api/partnerships/:id/price', requireAuth, requireMarketplace, async (req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
     try {
-      const user = (req as any).user;
-      const isAdmin = user?.role === 'admin';
-      const callerAffiliateId = user?.affiliateId ? String(user.affiliateId) : '';
-      if (!isAdmin && !callerAffiliateId) {
-        return res.status(403).json({ error: 'Sua conta não está vinculada a um afiliado.' });
-      }
-
       const id = String(req.params.id || '').trim();
-      const ref = adminDb.collection('partnership_requests').doc(id);
-      const snap = await ref.get();
-      if (!snap.exists) return res.status(404).json({ error: 'Parceria não encontrada.' });
-      const cur = snap.data() as any;
-      const from = (cur.status ?? 'requested') as PartnershipStatus;
-      const affiliateId = String(cur.affiliateId);
+      const loaded = await loadPartnershipForUpline(req, id);
+      if (loaded.fail) return res.status(loaded.fail.status).json({ error: loaded.fail.error });
+      const { ref, cur, deal, affiliateId, isAdmin, callerAffiliateId, from } = loaded.ctx!;
+      const user = (req as any).user;
 
-      const dealSnap = await adminDb.collection('deals').doc(String(cur.dealId)).get();
-      if (!dealSnap.exists) return res.status(404).json({ error: 'Acordo da parceria não existe mais.' });
-      const deal = dealFromDoc(dealSnap);
       if (deal.active === false) {
         return res.status(409).json({ error: 'Este acordo está pausado. Fale com a agência antes de definir a comissão.' });
-      }
-      // Só o TIPO importa aqui (não quem é o gerente): a identidade de quem pode
-      // gravar é checada logo abaixo por isDirectDownline, sem reler a árvore 2×.
-      if (dealPolicy(deal).pricedBy !== 'upline') {
-        return res.status(400).json({ error: 'A comissão deste acordo é definida pela agência, não pelo gerente.' });
       }
       if (!canTransition(from, 'priced', 'upline')) {
         return res.status(409).json({ error: `Transição inválida (${from} → priced).` });
@@ -4918,16 +4982,6 @@ export function createApp(deps: ServerDeps) {
       const brandKey = dealBrandKey(house);
 
       if (!isAdmin) {
-        const special = await resolveSpecialRecord(callerAffiliateId, { withSubs: false });
-        if (!resolveIsSpecial(special)) {
-          return res.status(403).json({ error: 'Você não é um afiliado especial ativo.' });
-        }
-        const [uplines, specials] = await Promise.all([readUplineMap(), readSpecialsMap()]);
-        if (!isDirectDownline(affiliateId, callerAffiliateId, { uplines, specials })) {
-          return res.status(403).json({
-            error: 'Este afiliado não é seu indicado direto: a comissão dele é definida por quem está acima dele na rede.',
-          });
-        }
         const ownCfgSnap = await adminDb.collection('affiliate_configs').doc(callerAffiliateId).get();
         const ownCfg = ownCfgSnap.exists ? (ownCfgSnap.data() as any) : {};
         // Ausência ≠ R$ 0: sem taxa PRÓPRIA nesta casa ele não tem o que repassar, e
@@ -4984,6 +5038,45 @@ export function createApp(deps: ServerDeps) {
     } catch (e: any) {
       console.error('[partnerships] erro ao precificar:', e);
       return res.status(500).json({ error: e?.message || 'Erro ao definir a comissão' });
+    }
+  });
+
+  // O GERENTE recusa a solicitação do filho direto (pedido do cliente, 16/08). Sem
+  // isso ele só teria o botão de aceitar, e uma solicitação que ele não quer atender
+  // ficaria pendurada na fila dele para sempre. Mesma guarda da precificação.
+  // Recusar vale com o acordo PAUSADO: dizer não nunca deve ficar bloqueado.
+  app.post('/api/partnerships/:id/reject', requireAuth, requireMarketplace, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const id = String(req.params.id || '').trim();
+      const loaded = await loadPartnershipForUpline(req, id);
+      if (loaded.fail) return res.status(loaded.fail.status).json({ error: loaded.fail.error });
+      const { ref, cur, deal, affiliateId, isAdmin, callerAffiliateId, from } = loaded.ctx!;
+
+      if (!canTransition(from, 'rejected', 'upline')) {
+        return res.status(409).json({ error: `Transição inválida (${from} → rejected).` });
+      }
+
+      const batch = adminDb.batch();
+      batch.set(ref, {
+        status: 'rejected',
+        decidedByUid: (req as any).user?.uid ?? null,
+        decidedByAffiliateId: isAdmin ? null : callerAffiliateId,
+        decidedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      // Recusa não mexe na taxa: se o gerente já tinha precificado e mudou de ideia,
+      // o que ele gravou no byBrand fica (a comissão histórica não se estorna).
+      appendAuditLog(batch, req, {
+        entityType: 'partnership', entityId: id, entityLabel: buildDealLabel(deal),
+        action: 'partnership.reject',
+        metadata: { affiliateId, dealId: cur.dealId, byAdmin: isAdmin, via: 'upline' },
+      });
+      await batch.commit();
+      await notifyPartnershipRejected(affiliateId, deal.operatorName);
+      return res.json(partnershipFromDoc(await ref.get()));
+    } catch (e: any) {
+      console.error('[partnerships] erro ao recusar:', e);
+      return res.status(500).json({ error: e?.message || 'Erro ao recusar a parceria' });
     }
   });
 
@@ -5081,6 +5174,7 @@ export function createApp(deps: ServerDeps) {
       if (cur.code) batch.set(adminDb.collection('affiliate_links').doc(String(cur.code)), { active: false }, { merge: true });
       appendAuditLog(batch, req, { entityType: 'partnership', entityId: id, entityLabel: buildDealLabel(deal), action: `partnership.${to === 'rejected' ? 'reject' : 'discontinue'}`, metadata: { affiliateId, dealId: cur.dealId } });
       await batch.commit();
+      if (to === 'rejected') await notifyPartnershipRejected(affiliateId, deal.operatorName);
       return res.json(partnershipFromDoc(await ref.get()));
     } catch (e: any) {
       console.error('[partnerships] erro ao decidir:', e);

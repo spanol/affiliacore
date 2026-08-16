@@ -2483,6 +2483,67 @@ describe('deals · tipo gerenciado (o gerente precifica, a agência emite o link
     await request(appWith(seed)).post('/api/partnerships/pg/price').set('Authorization', 'Bearer ger-uid')
       .send({ cpaValue: 100, revPercentage: 0 }).expect(409);
   });
+
+  // Respostas do cliente de 16/08 --------------------------------------------
+  it('o GERENTE recusa a solicitação do filho direto e o afiliado é notificado', async () => {
+    const db = makeFirestore(seedRede());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).post('/api/partnerships/pg/reject').set('Authorization', 'Bearer ger-uid').expect(200);
+
+    expect(db.__store.get('partnership_requests')?.get('pg').status).toBe('rejected');
+    const notifs = [...(db.__store.get('user_notifications')?.values() ?? [])];
+    expect(notifs).toHaveLength(1);
+    expect(notifs[0]).toMatchObject({ recipientUid: 'aff-uid', affiliateId: 'affX', type: 'partnership_rejected' });
+    const audits = [...(db.__store.get('audit_logs')?.values() ?? [])].map((a: any) => a.action);
+    expect(audits).toContain('partnership.reject');
+  });
+
+  it('recusar vale mesmo com o acordo pausado (dizer não nunca fica bloqueado)', async () => {
+    const seed: any = seedRede();
+    seed.deals.dg.active = false;
+    await request(appWith(seed)).post('/api/partnerships/pg/reject').set('Authorization', 'Bearer ger-uid').expect(200);
+  });
+
+  it('a rota de recusa usa a MESMA guarda: neto e não-especial são barrados', async () => {
+    const seed: any = seedRede();
+    seed.partnership_requests.pn = { affiliateId: 'neto', dealId: 'dg', status: 'requested', code: null };
+    await request(appWith(seed)).post('/api/partnerships/pn/reject').set('Authorization', 'Bearer ger-uid').expect(403);
+    const semEspecial: any = seedRede();
+    semEspecial.special_affiliates.gerente.active = false;
+    await request(appWith(semEspecial)).post('/api/partnerships/pg/reject').set('Authorization', 'Bearer ger-uid').expect(403);
+  });
+
+  it('a recusa pelo ADMIN também notifica o afiliado', async () => {
+    const db = makeFirestore(seedRede());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).patch('/api/partnerships/pg').set('Authorization', 'Bearer admin-uid')
+      .send({ status: 'rejected' }).expect(200);
+    const notifs = [...(db.__store.get('user_notifications')?.values() ?? [])];
+    expect(notifs[0]).toMatchObject({ affiliateId: 'affX', type: 'partnership_rejected' });
+  });
+
+  // Pausar barra ENTRADA nova, sem tocar em quem já está dentro.
+  it('casa pausada recusa solicitação NOVA de parceria', async () => {
+    const seed: any = seedRede();
+    seed.houses.betano.active = false;
+    delete seed.partnership_requests.pg;
+    const res = await request(appWith(seed)).post('/api/partnerships').set('Authorization', 'Bearer aff-uid')
+      .send({ dealId: 'dg' }).expect(409);
+    expect(res.body.error).toMatch(/pausada/i);
+  });
+
+  it('casa pausada NÃO derruba quem já foi aprovado antes da pausa', async () => {
+    const seed: any = seedRede();
+    seed.houses.betano.active = false;
+    seed.partnership_requests.pg.status = 'approved';
+    seed.partnership_requests.pg.code = 'LINK9';
+    seed.affiliate_links = { LINK9: { code: 'LINK9', affiliateId: 'affX', brandId: 'betano', active: true } };
+    const db = makeFirestore(seed);
+    await request(createApp({ adminApp: makeAdminApp(), adminDb: db })).get('/api/deals')
+      .set('Authorization', 'Bearer aff-uid').expect(200);
+    expect(db.__store.get('partnership_requests')?.get('pg').status).toBe('approved');
+    expect(db.__store.get('affiliate_links')?.get('LINK9').active).toBe(true);
+  });
 });
 
 // =============================================================================

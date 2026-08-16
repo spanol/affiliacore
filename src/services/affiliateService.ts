@@ -1642,6 +1642,20 @@ export async function pricePartnership(
   return resp.json();
 }
 
+// GERENTE (ou admin) recusa a solicitação do filho direto. Vale mesmo com o acordo
+// pausado: dizer não nunca fica bloqueado. O afiliado é notificado.
+export async function rejectPartnershipAsUpline(id: string): Promise<PartnershipRequest> {
+  const resp = await authFetch(`/api/partnerships/${encodeURIComponent(id)}/reject`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+  });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro na API: ${resp.status}`);
+  }
+  return resp.json();
+}
+
 // Admin decide a parceria: 'approved' aplica a taxa do deal no byBrand + emite o link.
 export async function decidePartnership(id: string, status: 'approved' | 'rejected' | 'discontinued'): Promise<PartnershipRequest> {
   const resp = await authFetch(`/api/partnerships/${encodeURIComponent(id)}`, {
