@@ -165,19 +165,22 @@ Sequência, toda ela reusando o que já está no ar:
    especial carimbado pelo token. Igual ao que `/api/special/sub-config` já faz.
 6. Status vai para `priced`.
 
-### 4.3 Achado: o teto de repasse ignora a taxa por casa
+### 4.3 O teto de repasse tem que ser POR CASA na rota nova
 
-`server.ts:1025` chama `resolveRepasseCap(ownCfg)` **sem `brandId`**. Ou seja: o
-teto de hoje é a taxa de TOPO do gerente, mesmo quando ele tem override por casa
-em `byBrand`. Isso contraria o invariante do `CLAUDE.md` ("Taxa POR CASA
-sobrepõe a de topo") e, no cenário da Infinity, dá o teto errado nos dois
-sentidos: gerente com 110 na Esportiva e topo em 0 não conseguiria repassar
-nada; gerente com topo alto e casa baixa repassaria acima do que recebe.
+`server.ts:1025` chama `resolveRepasseCap(ownCfg)` **sem `brandId`**, então o
+teto de hoje é a taxa de TOPO do gerente.
 
-Correção: passar `brandKey` nos dois call sites (a rota nova e a
-`/api/special/sub-config` existente). É seguro por construção, do mesmo jeito
-que o `CLAUDE.md` já registra para `calcAffiliatePayout`: quem não tem override
-cai na taxa de topo, então é no-op para o resto do parque.
+**Correção de rumo (16/08, ao implementar):** na primeira leitura registrei isso
+aqui como defeito dos dois call sites. Está errado quanto ao antigo. A
+`/api/special/sub-config` grava a taxa de **topo** do sub e não tem casa nenhuma
+no contexto: comparar topo com topo é o certo ali, e passar um `brandKey`
+arbitrário seria pior. O defeito só existe onde o gesto é por casa, que é
+exatamente a rota nova: no cenário da call o gerente tem 110 **na Esportiva**
+com topo zerado, e o teto de topo o impediria de repassar até R$ 1.
+
+Então: `resolveRepasseCap(ownCfg, brandKey)` só na rota de precificação. Cai na
+taxa de topo para quem não tem override, igual ao que o `CLAUDE.md` já registra
+para `calcAffiliatePayout`. Coberto pelo teste "teto de repasse é POR CASA".
 
 ### 4.4 Achado: hoje a gravação vai para a taxa de topo
 
@@ -197,9 +200,16 @@ deal** e emite o link. Se isso rodar num deal `gerenciado`, os R$ 110 do deal
 sobrescrevem os R$ 100 que o gerente definiu, e a agência passa a pagar o
 afiliado como se fosse o gerente. O spread evapora sem erro na tela.
 
-Regra: no tipo `gerenciado` a aprovação **só emite o link** e muda o status.
-A taxa foi gravada no passo do gerente e é intocável ali. Teste de regressão
-obrigatório na Fase 2, com asserção sobre o valor final do `byBrand`.
+**Regra final (mais simples que a do rascunho):** a taxa do deal é aplicada
+quando a aprovação vem de `requested`, e **não** quando vem de `priced`. O
+estado já carrega a informação, então não é preciso consultar o tipo. O caso
+bonito que isso cobre de graça: afiliado sem gerente num deal gerenciado é
+aprovado direto de `requested` e recebe os termos da oferta, que é o correto,
+porque sem intermediário não há spread para descontar.
+
+Coberto pelo teste "aprovar a partir de priced emite o link e PRESERVA a taxa do
+gerente", que assere o valor final do `byBrand` e a ausência de `config.update`
+na trilha.
 
 ### 4.6 O link continua sendo do master
 
@@ -209,9 +219,14 @@ com o invariante que o repo já tem. O que muda é só a **fila**: passa a exist
 uma aba de parcerias em `priced` esperando o link.
 
 O motivo que ele deu ("a Esportiva a gente pausou e o gerente sem querer deixa o
-afiliado iniciar") pede uma trava a mais, que hoje não existe: **desativar uma
-casa deve desativar os deals dela**, e a loja não deve listar deal de casa
-inativa. Sem isso, pausar a casa em `/casas` não tira a oferta da vitrine.
+afiliado iniciar") pede uma trava a mais, que hoje não existe: pausar a casa em
+`/casas` não tira a oferta da vitrine.
+
+**Como ficou:** o `GET /api/deals` **filtra na leitura** os deals de casa
+inativa para quem não é admin, em vez de desativar os deals em cascata. O gesto
+fica reversível (reativar a casa devolve a oferta sem tocar em dado) e o admin
+continua vendo o acordo na lista dele. A precificação e a emissão de link também
+recusam acordo pausado.
 
 ### 4.7 Casos de borda
 
@@ -252,18 +267,20 @@ de pendência.
 
 Cada fase entrega com teste, como manda o `REVIEW-TEST-PLAN.md`.
 
-**F1 · Núcleo puro.** `src/lib/dealType.ts` (catálogo + política +
-`sanitizeDealForViewer`), campos novos e validação por tipo em `deal.ts`,
-`canTransition` ciente da política em `partnership.ts`. Testes colocados,
+**F1 · Núcleo puro. ✅ ENTREGUE (`e609965`).** `src/lib/dealType.ts` (catálogo +
+política + `sanitizeDealForViewer` + `effectivePricedBy`), campos novos e
+validação por tipo em `deal.ts` (+ `buildDraftDealFromHouse`), `canTransition`
+ciente de quem precifica e rótulos por audiência em `partnership.ts`. 71 testes,
 incluindo o invariante `showRatesToAffiliate` × `kpis` e a retrocompatibilidade
-de `canTransition` sem política.
+de `canTransition` sem o parâmetro novo.
 
-**F2 · Servidor.** Sanitização no `GET /api/deals`; rota nova de precificação;
-`PATCH` de aprovação sem reescrever taxa em `gerenciado`; `resolveRepasseCap`
-com `brandKey` nos dois call sites; criação do deal rascunho no `POST /api/houses`;
-desativar casa desativa deals. Tudo coberto por supertest em `server.test.ts`
-(com `// @vitest-environment node` no topo, como manda a convenção), com o teste
-de regressão do §4.5 em destaque.
+**F2 · Servidor. ✅ ENTREGUE.** Sanitização e filtro de casa pausada no
+`GET /api/deals`; `POST /api/partnerships/:id/price` (gerente, reusando
+`resolveIsSpecial` + `isDirectDownline` + teto por casa); `PATCH` de aprovação
+com transição ciente do tipo e sem reescrever taxa vinda de `priced`; rascunho
+de acordo no `POST /api/houses`; `resolveDirectUpline` novo em
+`specialNetwork.ts` para rotear a solicitação ao gerente certo; wrapper
+`pricePartnership` no service. 18 casos de supertest em `server.test.ts`.
 
 **F3 · Admin `/acordos`.** Radio, campos condicionais, fila de link.
 

@@ -63,15 +63,23 @@ import {
   type Deal, type DealModel, type PaymentCycle, type DealCurrency,
 } from '../lib/deal';
 import {
-  PARTNERSHIP_STATUS_LABEL, selectAvailableDeals, joinPartnerships,
-  type PartnershipRequest, type PartnershipStatus,
+  PARTNERSHIP_STATUS_LABEL, partnershipStatusLabel, selectAvailableDeals, joinPartnerships,
+  type PartnershipRequest, type PartnershipStatus, type PartnershipAudience,
 } from '../lib/partnership';
+import {
+  DEAL_TYPES, DEAL_TYPE_POLICY, DEAL_KPI_LABEL, dealPolicy, effectivePricedBy, visibleKpis,
+  type DealTypeId, type DealKpiId, type DealTypePolicy,
+} from '../lib/dealType';
 export {
   buildDealLabel, DEAL_MODELS, PAYMENT_CYCLES, DEAL_CURRENCIES,
   DEAL_MODEL_LABEL, PAYMENT_CYCLE_LABEL,
-  PARTNERSHIP_STATUS_LABEL, selectAvailableDeals, joinPartnerships,
+  PARTNERSHIP_STATUS_LABEL, partnershipStatusLabel, selectAvailableDeals, joinPartnerships,
+  DEAL_TYPES, DEAL_TYPE_POLICY, DEAL_KPI_LABEL, dealPolicy, effectivePricedBy, visibleKpis,
 };
-export type { Deal, DealModel, PaymentCycle, DealCurrency, PartnershipRequest, PartnershipStatus };
+export type {
+  Deal, DealModel, PaymentCycle, DealCurrency, PartnershipRequest, PartnershipStatus,
+  PartnershipAudience, DealTypeId, DealKpiId, DealTypePolicy,
+};
 
 // Jurídico versionado (Tier 1, modo soft). Re-exporta os puros.
 import { hasAcceptedLatest, type LegalDocument, type LegalAcceptance } from '../lib/legal';
@@ -1607,6 +1615,25 @@ export async function requestPartnership(dealId: string, affiliateId?: string): 
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ dealId, ...(affiliateId ? { affiliateId } : {}) }),
+  });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro na API: ${resp.status}`);
+  }
+  return resp.json();
+}
+
+// GERENTE (ou admin) define a comissão do afiliado nesta casa, num acordo do tipo
+// `gerenciado`. O servidor barra neto, teto de repasse e gerente sem taxa na casa.
+// Leva a parceria de 'requested' para 'priced' (esperando o link da agência).
+export async function pricePartnership(
+  id: string,
+  rates: { cpaValue: number; revPercentage: number }
+): Promise<PartnershipRequest> {
+  const resp = await authFetch(`/api/partnerships/${encodeURIComponent(id)}/price`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(rates),
   });
   if (!resp.ok) {
     const e = await resp.json().catch(() => ({}));

@@ -43,15 +43,18 @@ import { sanitizeShowcase, buildShowcasePayload } from './src/lib/showcase';
 import { parseStandbyLinks, extractTagFromUrl } from './src/lib/linkTriage';
 import { buildTaggedUrl, suggestTag } from './src/lib/linkGeneration';
 import { buildResultsNotification, type ResultsNotificationVariant } from './src/lib/resultsNotification';
-import { normalizeDealInput, buildDealLabel, dealBrandKey, dealToBrandRates } from './src/lib/deal';
+import { normalizeDealInput, buildDealLabel, dealBrandKey, dealToBrandRates, buildDraftDealFromHouse } from './src/lib/deal';
 import { canTransition, type PartnershipStatus } from './src/lib/partnership';
+import {
+  resolveDealType, dealPolicy, effectivePricedBy, sanitizeDealsForViewer, type DealTypeId,
+} from './src/lib/dealType';
 import { normalizeLegalDocInput, computeNextVersion } from './src/lib/legal';
 import { canTransitionWithdrawal, normalizeWithdrawalAmount, type WithdrawalStatus } from './src/lib/withdrawal';
-import { buildNetworkTree, resolveRepasseCap, exceedsRepasseCap } from './src/lib/network';
+import { buildNetworkTree, resolveRepasseCap, exceedsRepasseCap, hasConfiguredRate } from './src/lib/network';
 import {
   isPendingSignup, signupToRequest, leadToRequest, referralToRequest, buildCaptureFeed, resolveRequestStatus,
 } from './src/lib/registrationRequests';
-import { resolveSpecialSubIds, resolveDirectSubIds, isDirectDownline, type SpecialRecord } from './src/lib/specialNetwork';
+import { resolveSpecialSubIds, resolveDirectSubIds, isDirectDownline, resolveDirectUpline, type SpecialRecord } from './src/lib/specialNetwork';
 import {
   NETWORK_INVITE_KIND, isNetworkInvite, networkInviteBlock, sanitizeRecruitName, recruitNameError,
 } from './src/lib/networkInvite';
@@ -289,6 +292,12 @@ export function createApp(deps: ServerDeps) {
     }
     next();
   };
+
+  // Tipo de deal padrão da instância. Só decide o que é criado SEM humano escolhendo
+  // (o rascunho que nasce junto com a casa) e o pré-marcado do radio em /acordos —
+  // o tipo real vive em cada deal. Ausente/desconhecido = 'direto', então instância
+  // que nunca ouviu falar disso não muda de comportamento. Ver src/lib/dealType.ts.
+  const DEAL_TYPE_DEFAULT: DealTypeId = resolveDealType(process.env.VITE_DEAL_TYPE_DEFAULT);
 
   // --- Auditoria (server-authoritative) -------------------------------------
   // Cada mutação de admin grava em `audit_logs`: QUEM (autor carimbado pelo token,
@@ -4471,6 +4480,31 @@ export function createApp(deps: ServerDeps) {
       });
       // Casa nova já nascendo integrada: o vínculo vale nos DOIS docs.
       if (wantedIntegration) await applyIntegrationLink(wantedIntegration, slug);
+      // ...e já nascendo com o acordo, p/ o admin não recadastrar a operadora em
+      // /acordos. RASCUNHO (inativo): card sem baseline nem taxa na vitrine é pior
+      // que card nenhum, e é a mesma decisão dos presets (PESQUISA-PRESETS-DEALS).
+      // Nunca derruba a criação da casa: falha aqui só vai ao console.
+      if (MARKETPLACE_ENABLED) {
+        try {
+          const draft = buildDraftDealFromHouse({ slug, name: cleanName }, DEAL_TYPE_DEFAULT);
+          if (draft) {
+            const dealRef = adminDb.collection('deals').doc();
+            await dealRef.set({
+              ...draft,
+              label: buildDealLabel(draft),
+              createdByUid: (req as any).user?.uid ?? null,
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            await writeAuditLog(req, {
+              entityType: 'deal', entityId: dealRef.id, entityLabel: buildDealLabel(draft),
+              action: 'deal.create', metadata: { via: 'house.create', houseId: slug, draft: true },
+            });
+          }
+        } catch (e) {
+          console.error('[houses] casa criada, mas o rascunho de acordo falhou:', e);
+        }
+      }
       await writeAuditLog(req, {
         entityType: 'house', entityId: slug, entityLabel: cleanName, action: 'house.create',
         metadata: { dataSource: dataSource === 'otg' ? 'otg' : 'manual', integration: wantedIntegration || null },
@@ -4608,6 +4642,12 @@ export function createApp(deps: ServerDeps) {
       geo: x.geo ?? '',
       active: x.active !== false,
       order: Number.isFinite(Number(x.order)) ? Number(x.order) : 0,
+      // Tipo + KPIs da vitrine. Deal ANTIGO não tem `type` e resolve como 'direto'
+      // na leitura: é o que dispensa migração. Ver src/lib/dealType.ts.
+      type: resolveDealType(x.type),
+      baseline: Number.isFinite(Number(x.baseline)) ? Number(x.baseline) : 0,
+      rollover: Number.isFinite(Number(x.rollover)) ? Number(x.rollover) : 0,
+      ggrPercentage: Number.isFinite(Number(x.ggrPercentage)) ? Number(x.ggrPercentage) : null,
     };
   };
   const partnershipFromDoc = (d: admin.firestore.DocumentSnapshot) => {
@@ -4626,17 +4666,31 @@ export function createApp(deps: ServerDeps) {
     };
   };
 
-  // Lista deals. Admin vê todos; afiliado vê só os ATIVOS (ofertas do marketplace).
+  // Lista deals. Admin vê todos; afiliado vê só os ATIVOS de CASA ATIVA, e com as
+  // taxas já cortadas quando o tipo do deal as esconde dele.
+  //
+  // Duas coisas aqui não são cosméticas:
+  // 1. A SANITIZAÇÃO é do servidor. Esconder o CPA só na tela deixa o valor no JSON,
+  //    a um devtools de distância. Ver sanitizeDealForViewer.
+  // 2. Casa PAUSADA some da vitrine. É o risco que o cliente descreveu na call de
+  //    15/08: operação pausa a Esportiva e o afiliado ainda vê a oferta lá. Filtrar
+  //    na leitura (em vez de desativar os deals em cascata) mantém o gesto
+  //    reversível: reativar a casa devolve a oferta sem tocar em dado.
   app.get('/api/deals', requireAuth, requireMarketplace, async (req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
     try {
-      const snap = await adminDb.collection('deals').get();
       const isAdmin = (req as any).user?.role === 'admin';
+      const [snap, housesSnap] = await Promise.all([
+        adminDb.collection('deals').get(),
+        isAdmin ? Promise.resolve(null) : adminDb.collection('houses').get(),
+      ]);
+      const pausedHouses = new Set<string>();
+      housesSnap?.forEach((d) => { if ((d.data() as any)?.active === false) pausedHouses.add(d.id); });
       const deals = snap.docs
         .map(dealFromDoc)
-        .filter((d) => isAdmin || d.active)
+        .filter((d) => isAdmin || (d.active && !pausedHouses.has(String(d.houseId))))
         .sort((a, b) => a.order - b.order || a.operatorName.localeCompare(b.operatorName, 'pt-BR'));
-      return res.json({ deals });
+      return res.json({ deals: sanitizeDealsForViewer(deals, isAdmin ? 'admin' : 'affiliate') });
     } catch (e: any) {
       console.error('[deals] erro ao listar:', e);
       return res.status(500).json({ error: 'Erro ao listar acordos' });
@@ -4786,6 +4840,153 @@ export function createApp(deps: ServerDeps) {
     }
   });
 
+  // Resolve QUEM precifica esta parceria. Num acordo `gerenciado` é o gerente do
+  // afiliado, mas só quando existe um elegível: afiliado no topo da estrutura, ou
+  // cujo upline deixou de ser especial ativo, cai na fila do admin — senão a
+  // solicitação ficaria presa em `requested` sem ninguém para atender.
+  const resolvePartnershipPricing = async (deal: { type?: any }, affiliateId: string) => {
+    const policy = dealPolicy(deal as any);
+    if (policy.pricedBy !== 'upline') return { policy, pricedBy: 'admin' as const, uplineId: null as string | null };
+    const [uplines, specials] = await Promise.all([readUplineMap(), readSpecialsMap()]);
+    const uplineId = resolveDirectUpline(affiliateId, { uplines, specials });
+    const eligible = !!uplineId && resolveIsSpecial(specials[uplineId]);
+    return {
+      policy,
+      pricedBy: effectivePricedBy(policy, eligible),
+      uplineId: eligible ? uplineId : null,
+    };
+  };
+
+  // O GERENTE define a comissão do afiliado dele nesta casa (acordo `gerenciado`).
+  // É o pedido da call de 15/08: "na Esportiva é 110 que ele tem, ele vai colocar
+  // 100, ele vai pegar 10 reais" — o spread é a receita do gerente, e tirar isso do
+  // suporte é metade do valor da feature.
+  //
+  // Reusa as guardas que já estavam no ar, em vez de reinventar escopo:
+  //  - resolveIsSpecial: definição ÚNICA de especial ativo.
+  //  - isDirectDownline: VISÃO ≠ DINHEIRO. Ele enxerga a subárvore inteira mas só
+  //    precifica o filho DIRETO; mexer na taxa de um neto mudaria o spread do
+  //    gerente do meio pelas costas dele.
+  //  - resolveRepasseCap POR CASA: aqui o gesto é por casa, então o teto tem que
+  //    olhar o byBrand do gerente (no /api/special/sub-config, que grava a taxa de
+  //    TOPO, o teto de topo continua sendo o certo).
+  // O admin também pode chamar: é a saída para gerente que sumiu, senão a
+  // solicitação fica travada esperando alguém que não vem.
+  app.post('/api/partnerships/:id/price', requireAuth, requireMarketplace, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const user = (req as any).user;
+      const isAdmin = user?.role === 'admin';
+      const callerAffiliateId = user?.affiliateId ? String(user.affiliateId) : '';
+      if (!isAdmin && !callerAffiliateId) {
+        return res.status(403).json({ error: 'Sua conta não está vinculada a um afiliado.' });
+      }
+
+      const id = String(req.params.id || '').trim();
+      const ref = adminDb.collection('partnership_requests').doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: 'Parceria não encontrada.' });
+      const cur = snap.data() as any;
+      const from = (cur.status ?? 'requested') as PartnershipStatus;
+      const affiliateId = String(cur.affiliateId);
+
+      const dealSnap = await adminDb.collection('deals').doc(String(cur.dealId)).get();
+      if (!dealSnap.exists) return res.status(404).json({ error: 'Acordo da parceria não existe mais.' });
+      const deal = dealFromDoc(dealSnap);
+      if (deal.active === false) {
+        return res.status(409).json({ error: 'Este acordo está pausado. Fale com a agência antes de definir a comissão.' });
+      }
+      // Só o TIPO importa aqui (não quem é o gerente): a identidade de quem pode
+      // gravar é checada logo abaixo por isDirectDownline, sem reler a árvore 2×.
+      if (dealPolicy(deal).pricedBy !== 'upline') {
+        return res.status(400).json({ error: 'A comissão deste acordo é definida pela agência, não pelo gerente.' });
+      }
+      if (!canTransition(from, 'priced', 'upline')) {
+        return res.status(409).json({ error: `Transição inválida (${from} → priced).` });
+      }
+
+      const cpa = Number(req.body?.cpaValue) || 0;
+      const rev = Number(req.body?.revPercentage) || 0;
+      if (cpa < 0 || rev < 0) return res.status(400).json({ error: 'Valores não podem ser negativos.' });
+
+      // Chave do byBrand pela CASA do deal (brandId OTG ou slug manual), a mesma que
+      // a aprovação usa — senão a taxa não casaria com a agregação por casa.
+      const houseSnap = await adminDb.collection('houses').doc(String(deal.houseId)).get();
+      const house = houseSnap.exists
+        ? houseFromDoc(houseSnap)
+        : { id: String(deal.houseId), slug: String(deal.houseId), brandId: null } as any;
+      const brandKey = dealBrandKey(house);
+
+      if (!isAdmin) {
+        const special = await resolveSpecialRecord(callerAffiliateId, { withSubs: false });
+        if (!resolveIsSpecial(special)) {
+          return res.status(403).json({ error: 'Você não é um afiliado especial ativo.' });
+        }
+        const [uplines, specials] = await Promise.all([readUplineMap(), readSpecialsMap()]);
+        if (!isDirectDownline(affiliateId, callerAffiliateId, { uplines, specials })) {
+          return res.status(403).json({
+            error: 'Este afiliado não é seu indicado direto: a comissão dele é definida por quem está acima dele na rede.',
+          });
+        }
+        const ownCfgSnap = await adminDb.collection('affiliate_configs').doc(callerAffiliateId).get();
+        const ownCfg = ownCfgSnap.exists ? (ownCfgSnap.data() as any) : {};
+        // Ausência ≠ R$ 0: sem taxa PRÓPRIA nesta casa ele não tem o que repassar, e
+        // um teto zerado daria a mensagem errada ("o teto é R$ 0") para um problema
+        // que é da agência resolver.
+        if (!hasConfiguredRate(ownCfg, brandKey)) {
+          return res.status(400).json({
+            error: 'Você ainda não tem taxa nesta casa. Peça à agência antes de definir a comissão do seu afiliado.',
+          });
+        }
+        const cap = resolveRepasseCap(ownCfg, brandKey);
+        if (exceedsRepasseCap({ cpaValue: cpa, revPercentage: rev }, cap)) {
+          return res.status(400).json({
+            error: `A comissão do afiliado não pode passar da sua taxa nesta casa (teto: R$ ${cap.cpaValue}/CPA e ${cap.revPercentage}% REV).`,
+          });
+        }
+      }
+
+      // Grava no byBrand[brandKey] (merge, preservando as outras casas) — o gesto é
+      // POR CASA. Auditoria de dinheiro no MESMO batch, autor carimbado pelo token.
+      const cfgRef = adminDb.collection('affiliate_configs').doc(affiliateId);
+      const cfgBefore = await cfgRef.get();
+      const curByBrand = (cfgBefore.exists ? (cfgBefore.data() as any)?.byBrand : null) || {};
+      const nextByBrand = { ...curByBrand, [brandKey]: { cpaValue: cpa, revPercentage: rev } };
+      const cfgChanges = diffChanges(cfgBefore.data() as any, { byBrand: nextByBrand }, ['byBrand']);
+
+      const batch = adminDb.batch();
+      batch.set(cfgRef, {
+        affiliateId,
+        byBrand: { [brandKey]: { cpaValue: cpa, revPercentage: rev } },
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      batch.set(ref, {
+        status: 'priced',
+        pricedByUid: user?.uid ?? null,
+        pricedByAffiliateId: isAdmin ? null : callerAffiliateId,
+        pricedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      if (cfgChanges.length) {
+        appendAuditLog(batch, req, {
+          entityType: 'affiliate_config', entityId: affiliateId,
+          entityLabel: await affiliateNameOf(affiliateId),
+          action: 'config.update', changes: cfgChanges,
+          metadata: { via: 'partnership/price', brandKey, dealId: cur.dealId },
+        });
+      }
+      appendAuditLog(batch, req, {
+        entityType: 'partnership', entityId: id, entityLabel: buildDealLabel(deal),
+        action: 'partnership.price',
+        metadata: { affiliateId, dealId: cur.dealId, brandKey, cpaValue: cpa, revPercentage: rev, byAdmin: isAdmin },
+      });
+      await batch.commit();
+      return res.json(partnershipFromDoc(await ref.get()));
+    } catch (e: any) {
+      console.error('[partnerships] erro ao precificar:', e);
+      return res.status(500).json({ error: e?.message || 'Erro ao definir a comissão' });
+    }
+  });
+
   // Decide uma parceria (admin): approve | reject | discontinue. canTransition barra
   // pulos inválidos. Na APROVAÇÃO: aplica a taxa do deal no byBrand do afiliado (mesmo
   // batch auditado do config.update) e emite o affiliate_links (código do /go).
@@ -4802,16 +5003,31 @@ export function createApp(deps: ServerDeps) {
       if (!['approved', 'rejected', 'discontinued'].includes(to)) {
         return res.status(400).json({ error: 'status deve ser approved, rejected ou discontinued.' });
       }
-      if (!canTransition(from, to)) {
-        return res.status(409).json({ error: `Transição inválida (${from} → ${to}).` });
-      }
 
       const affiliateId = String(cur.affiliateId);
       const dealSnap = await adminDb.collection('deals').doc(String(cur.dealId)).get();
       if (!dealSnap.exists) return res.status(404).json({ error: 'Acordo da parceria não existe mais.' });
       const deal = dealFromDoc(dealSnap);
 
+      // Num acordo gerenciado com gerente elegível, `requested → approved` é BARRADO:
+      // o caminho passa por `priced`, senão o admin aprovaria antes do gerente
+      // definir a comissão (e, pior, gravaria a taxa do deal — ver abaixo).
+      const { pricedBy } = await resolvePartnershipPricing(deal, affiliateId);
+      if (!canTransition(from, to, pricedBy)) {
+        return res.status(409).json({
+          error: from === 'requested' && to === 'approved' && pricedBy === 'upline'
+            ? 'O gerente deste afiliado ainda não definiu a comissão dele.'
+            : `Transição inválida (${from} → ${to}).`,
+        });
+      }
+
       if (to === 'approved') {
+        // A taxa do DEAL só é aplicada quando a aprovação vem direto de `requested`
+        // (acordo direto, ou gerenciado sem gerente elegível: sem intermediário, o
+        // afiliado recebe os termos da oferta). Vindo de `priced`, a taxa JÁ foi
+        // gravada pelo gerente e reescrevê-la aqui trocaria os R$ 100 dele pelos
+        // R$ 110 do deal, apagando o spread sem erro na tela. Aqui só sai o link.
+        const applyDealRates = from === 'requested';
         // Resolve a chave do byBrand pela CASA do deal (brandId OTG ou slug manual).
         const houseSnap = await adminDb.collection('houses').doc(String(deal.houseId)).get();
         const house = houseSnap.exists ? houseFromDoc(houseSnap) : { id: String(deal.houseId), slug: String(deal.houseId), brandId: null, registerUrlTemplate: null } as any;
@@ -4821,10 +5037,10 @@ export function createApp(deps: ServerDeps) {
         // Aplica a taxa no affiliate_configs.byBrand[brandKey] preservando as outras
         // casas (merge do mapa) — MESMO caminho auditado do PATCH de config.
         const cfgRef = adminDb.collection('affiliate_configs').doc(affiliateId);
-        const cfgBefore = await cfgRef.get();
-        const curByBrand = (cfgBefore.exists ? (cfgBefore.data() as any)?.byBrand : null) || {};
+        const cfgBefore = applyDealRates ? await cfgRef.get() : null;
+        const curByBrand = (cfgBefore?.exists ? (cfgBefore.data() as any)?.byBrand : null) || {};
         const nextByBrand = { ...curByBrand, [brandKey]: { cpaValue: rates.cpaValue, revPercentage: rates.revPercentage } };
-        const cfgChanges = diffChanges(cfgBefore.data() as any, { byBrand: nextByBrand }, ['byBrand']);
+        const cfgChanges = applyDealRates ? diffChanges(cfgBefore?.data() as any, { byBrand: nextByBrand }, ['byBrand']) : [];
 
         // Emite (idempotente por afiliado×brandKey) o link de divulgação p/ o /go.
         let code: string | null = cur.code ?? null;
@@ -4837,7 +5053,9 @@ export function createApp(deps: ServerDeps) {
         }
 
         const batch = adminDb.batch();
-        batch.set(cfgRef, { byBrand: { [brandKey]: { cpaValue: rates.cpaValue, revPercentage: rates.revPercentage } }, affiliateId, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        if (applyDealRates) {
+          batch.set(cfgRef, { byBrand: { [brandKey]: { cpaValue: rates.cpaValue, revPercentage: rates.revPercentage } }, affiliateId, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        }
         batch.set(adminDb.collection('affiliate_links').doc(code), {
           code, affiliateId, brandId: brandKey,
           registerUrl: registerUrl ? String(registerUrl) : null,
@@ -4851,7 +5069,7 @@ export function createApp(deps: ServerDeps) {
         if (cfgChanges.length) {
           appendAuditLog(batch, req, { entityType: 'affiliate_config', entityId: affiliateId, entityLabel: await affiliateNameOf(affiliateId), action: 'config.update', changes: cfgChanges });
         }
-        appendAuditLog(batch, req, { entityType: 'partnership', entityId: id, entityLabel: buildDealLabel(deal), action: 'partnership.approve', metadata: { affiliateId, dealId: cur.dealId, brandKey, cpaValue: rates.cpaValue, revPercentage: rates.revPercentage, linkIssued: !!registerUrl } });
+        appendAuditLog(batch, req, { entityType: 'partnership', entityId: id, entityLabel: buildDealLabel(deal), action: 'partnership.approve', metadata: { affiliateId, dealId: cur.dealId, brandKey, ratesFrom: applyDealRates ? 'deal' : 'gerente', ...(applyDealRates ? { cpaValue: rates.cpaValue, revPercentage: rates.revPercentage } : {}), linkIssued: !!registerUrl } });
         await batch.commit();
         return res.json(partnershipFromDoc(await ref.get()));
       }

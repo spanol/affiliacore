@@ -129,3 +129,14 @@ export function isDirectDownline(
   const tree = buildScopeTree({ ...ctx, ids: [...(ctx.ids ?? []), sub, caller] });
   return tree.uplineOf[sub] === caller;
 }
+
+// O mesmo laço pelo outro lado: `isDirectDownline` pergunta "é filho de fulano?",
+// este pergunta "filho de QUEM?". Devolve null para quem está no topo da estrutura.
+// Existe para ROTEAR: num acordo gerenciado a solicitação do afiliado tem que cair
+// na fila de um gerente específico, e sem upline ela cairia na de ninguém.
+export function resolveDirectUpline(subId: string, ctx: ScopeTreeInput): string | null {
+  const sub = String(subId || '');
+  if (!sub) return null;
+  const tree = buildScopeTree({ ...ctx, ids: [...(ctx.ids ?? []), sub] });
+  return tree.uplineOf[sub] ?? null;
+}

@@ -2279,6 +2279,210 @@ describe('deals + parcerias (P2)', () => {
     expect(db.__store.get('partnership_requests')?.get('p1').status).toBe('discontinued');
     expect(db.__store.get('affiliate_links')?.get('LINK1').active).toBe(false);
   });
+
+  // Casa PAUSADA some da vitrine do afiliado. É o risco que o cliente descreveu:
+  // operação pausa a Esportiva e o afiliado ainda vê a oferta lá. Filtrado na
+  // LEITURA, não em cascata: reativar a casa devolve a oferta sem tocar em dado.
+  it('casa pausada tira a oferta do afiliado, mas o admin continua vendo o acordo', async () => {
+    const seed: any = baseSeed();
+    seed.houses.betano.active = false;
+    const affRes = await request(buildApp({ seed })).get('/api/deals').set('Authorization', 'Bearer aff-uid').expect(200);
+    expect(affRes.body.deals.map((d: any) => d.id)).toEqual([]);
+    const admRes = await request(buildApp({ seed })).get('/api/deals').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(admRes.body.deals.map((d: any) => d.id).sort()).toEqual(['d1', 'd2']);
+  });
+
+  it('POST /api/houses cria o acordo junto, como RASCUNHO inativo', async () => {
+    const db = makeFirestore(baseSeed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).post('/api/houses').set('Authorization', 'Bearer admin-uid')
+      .send({ name: 'Esportiva Bet' }).expect(201);
+    const drafts = [...(db.__store.get('deals')?.values() ?? [])].filter((d: any) => d.houseId === 'esportiva-bet');
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0]).toMatchObject({ operatorName: 'Esportiva Bet', active: false, cpaValue: 0, baseline: 0, type: 'direto' });
+    const audits = [...(db.__store.get('audit_logs')?.values() ?? [])].map((a: any) => a.action);
+    expect(audits).toContain('deal.create');
+  });
+});
+
+// =============================================================================
+// Tipos de deal (call Infinity 15/08). No tipo `gerenciado` o CPA não sai do
+// servidor para o afiliado, o GERENTE define a comissão do filho direto e só a
+// agência emite o link. Ver PLANO-TIPOS-DE-DEAL.md e src/lib/dealType.ts.
+// =============================================================================
+describe('deals · tipo gerenciado (o gerente precifica, a agência emite o link)', () => {
+  beforeAll(() => { process.env.VITE_MARKETPLACE_ENABLED = 'true'; });
+  afterAll(() => { delete process.env.VITE_MARKETPLACE_ENABLED; });
+
+  // Estrutura: affX é filho DIRETO de `gerente`; `neto` é filho de affX (2 níveis
+  // abaixo do gerente). affSolo não tem upline nenhum.
+  const seedRede = () => ({
+    users: {
+      'admin-uid': { role: 'admin' },
+      'aff-uid': { role: 'client', affiliateId: 'affX' },
+      'ger-uid': { role: 'client', affiliateId: 'gerente' },
+      'solo-uid': { role: 'client', affiliateId: 'affSolo' },
+    },
+    houses: {
+      betano: { slug: 'betano', name: 'Betano', brandId: null, registerUrlTemplate: 'https://betano.example/aff', dataSource: 'manual' },
+    },
+    deals: {
+      dg: {
+        houseId: 'betano', operatorName: 'Betano', model: 'cpa', cpaValue: 110, revPercentage: 0,
+        cycle: 'semanal', currency: 'BRL', geo: 'Brasil', active: true,
+        type: 'gerenciado', baseline: 10, rollover: 2, ggrPercentage: null,
+      },
+    },
+    affiliate_uplines: { affX: { uplineId: 'gerente' }, neto: { uplineId: 'affX' } },
+    special_affiliates: { gerente: { active: true, fromNetwork: true } },
+    // O gerente recebe 110 NESTA CASA (override por casa), com topo zerado: é o
+    // caso que o teto de topo erraria.
+    affiliate_configs: { gerente: { affiliateId: 'gerente', byBrand: { betano: { cpaValue: 110, revPercentage: 0 } } } },
+    partnership_requests: { pg: { affiliateId: 'affX', dealId: 'dg', status: 'requested', code: null } },
+  });
+  const appWith = (seed: any) => createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(seed) });
+
+  // Esconder o CPA na tela deixaria o valor no JSON, a um devtools de distância.
+  it('GET /api/deals: o afiliado NÃO recebe as taxas de um acordo gerenciado; o admin recebe', async () => {
+    const seed = seedRede();
+    const aff = await request(appWith(seed)).get('/api/deals').set('Authorization', 'Bearer aff-uid').expect(200);
+    expect(aff.body.deals[0]).not.toHaveProperty('cpaValue');
+    expect(aff.body.deals[0]).not.toHaveProperty('revPercentage');
+    expect(aff.body.deals[0]).toMatchObject({ baseline: 10, rollover: 2 }); // os KPIs seguem indo
+    const adm = await request(appWith(seed)).get('/api/deals').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(adm.body.deals[0].cpaValue).toBe(110);
+  });
+
+  it('acordo DIRETO continua abrindo as taxas para o afiliado (regressão zero)', async () => {
+    const seed: any = seedRede();
+    seed.deals.dg.type = 'direto';
+    const aff = await request(appWith(seed)).get('/api/deals').set('Authorization', 'Bearer aff-uid').expect(200);
+    expect(aff.body.deals[0].cpaValue).toBe(110);
+  });
+
+  it('deal ANTIGO (sem campo type) resolve como direto e não esconde nada', async () => {
+    const seed: any = seedRede();
+    delete seed.deals.dg.type;
+    const aff = await request(appWith(seed)).get('/api/deals').set('Authorization', 'Bearer aff-uid').expect(200);
+    expect(aff.body.deals[0].cpaValue).toBe(110);
+  });
+
+  it('o GERENTE precifica o filho direto: grava byBrand[casa], vai p/ priced e audita', async () => {
+    const db = makeFirestore(seedRede());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).post('/api/partnerships/pg/price').set('Authorization', 'Bearer ger-uid')
+      .send({ cpaValue: 100, revPercentage: 0 }).expect(200);
+
+    expect(db.__store.get('affiliate_configs')?.get('affX').byBrand.betano).toEqual({ cpaValue: 100, revPercentage: 0 });
+    const p = db.__store.get('partnership_requests')?.get('pg');
+    expect(p.status).toBe('priced');
+    expect(p.pricedByAffiliateId).toBe('gerente');
+    const audits = [...(db.__store.get('audit_logs')?.values() ?? [])].map((a: any) => a.action);
+    expect(audits).toContain('config.update');
+    expect(audits).toContain('partnership.price');
+    // O link NÃO sai aqui: emitir é da agência.
+    expect([...(db.__store.get('affiliate_links')?.values() ?? [])]).toHaveLength(0);
+  });
+
+  // O teto tem que olhar o byBrand: o gerente tem 110 NA CASA e topo zerado. Com o
+  // teto de topo (o que a rota antiga usa, e que lá está certo porque o gesto é de
+  // topo) ele não conseguiria repassar nem R$ 1.
+  it('teto de repasse é POR CASA: 100 passa, 120 não', async () => {
+    await request(appWith(seedRede())).post('/api/partnerships/pg/price').set('Authorization', 'Bearer ger-uid')
+      .send({ cpaValue: 100, revPercentage: 0 }).expect(200);
+    const res = await request(appWith(seedRede())).post('/api/partnerships/pg/price').set('Authorization', 'Bearer ger-uid')
+      .send({ cpaValue: 120, revPercentage: 0 }).expect(400);
+    expect(res.body.error).toMatch(/teto/i);
+  });
+
+  it('VISÃO ≠ DINHEIRO: o gerente do topo não precifica o NETO', async () => {
+    const seed: any = seedRede();
+    seed.partnership_requests.pn = { affiliateId: 'neto', dealId: 'dg', status: 'requested', code: null };
+    const res = await request(appWith(seed)).post('/api/partnerships/pn/price').set('Authorization', 'Bearer ger-uid')
+      .send({ cpaValue: 50, revPercentage: 0 }).expect(403);
+    expect(res.body.error).toMatch(/indicado direto/i);
+  });
+
+  // Ausência ≠ R$ 0: sem taxa própria na casa ele não tem o que repassar, e um teto
+  // zerado daria a mensagem errada para um problema que é da agência resolver.
+  it('gerente SEM taxa na casa é barrado com mensagem própria, não com teto zero', async () => {
+    const seed: any = seedRede();
+    delete seed.affiliate_configs.gerente;
+    const res = await request(appWith(seed)).post('/api/partnerships/pg/price').set('Authorization', 'Bearer ger-uid')
+      .send({ cpaValue: 10, revPercentage: 0 }).expect(400);
+    expect(res.body.error).toMatch(/ainda não tem taxa nesta casa/i);
+  });
+
+  it('quem não é especial ativo não precifica ninguém', async () => {
+    const seed: any = seedRede();
+    seed.special_affiliates.gerente.active = false;
+    await request(appWith(seed)).post('/api/partnerships/pg/price').set('Authorization', 'Bearer ger-uid')
+      .send({ cpaValue: 100, revPercentage: 0 }).expect(403);
+  });
+
+  it('a agência não pula o gerente: requested → approved dá 409 num gerenciado', async () => {
+    const res = await request(appWith(seedRede())).patch('/api/partnerships/pg')
+      .set('Authorization', 'Bearer admin-uid').send({ status: 'approved' }).expect(409);
+    expect(res.body.error).toMatch(/ainda não definiu a comissão/i);
+  });
+
+  // O TESTE-CHAVE do plano. Aprovar vindo de `priced` NÃO pode reescrever o byBrand:
+  // trocaria os R$ 100 do gerente pelos R$ 110 do deal e apagaria o spread dele sem
+  // erro nenhum na tela.
+  it('aprovar a partir de priced emite o link e PRESERVA a taxa do gerente', async () => {
+    const seed: any = seedRede();
+    seed.partnership_requests.pg.status = 'priced';
+    seed.affiliate_configs.affX = { affiliateId: 'affX', byBrand: { betano: { cpaValue: 100, revPercentage: 0 } } };
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).patch('/api/partnerships/pg').set('Authorization', 'Bearer admin-uid')
+      .send({ status: 'approved' }).expect(200);
+
+    expect(db.__store.get('affiliate_configs')?.get('affX').byBrand.betano).toEqual({ cpaValue: 100, revPercentage: 0 });
+    const links = [...(db.__store.get('affiliate_links')?.values() ?? [])];
+    expect(links).toHaveLength(1);
+    expect(links[0]).toMatchObject({ affiliateId: 'affX', brandId: 'betano', active: true });
+    expect(db.__store.get('partnership_requests')?.get('pg').status).toBe('approved');
+    // Nenhum config.update: a aprovação não tocou em dinheiro.
+    const audits = [...(db.__store.get('audit_logs')?.values() ?? [])].map((a: any) => a.action);
+    expect(audits).not.toContain('config.update');
+    expect(audits).toContain('partnership.approve');
+  });
+
+  // Sem gerente elegível a solicitação ficaria presa em `requested` para sempre.
+  it('afiliado SEM gerente cai na fila do admin, que aprova direto com a taxa do deal', async () => {
+    const seed: any = seedRede();
+    seed.partnership_requests.ps = { affiliateId: 'affSolo', dealId: 'dg', status: 'requested', code: null };
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).patch('/api/partnerships/ps').set('Authorization', 'Bearer admin-uid')
+      .send({ status: 'approved' }).expect(200);
+    // Sem intermediário não há spread: ele recebe os termos da oferta.
+    expect(db.__store.get('affiliate_configs')?.get('affSolo').byBrand.betano).toEqual({ cpaValue: 110, revPercentage: 0 });
+  });
+
+  it('o admin também pode precificar (saída para gerente que sumiu)', async () => {
+    const db = makeFirestore(seedRede());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).post('/api/partnerships/pg/price').set('Authorization', 'Bearer admin-uid')
+      .send({ cpaValue: 90, revPercentage: 0 }).expect(200);
+    expect(db.__store.get('affiliate_configs')?.get('affX').byBrand.betano).toEqual({ cpaValue: 90, revPercentage: 0 });
+  });
+
+  it('acordo DIRETO recusa a rota de precificação (a taxa é da agência)', async () => {
+    const seed: any = seedRede();
+    seed.deals.dg.type = 'direto';
+    const res = await request(appWith(seed)).post('/api/partnerships/pg/price').set('Authorization', 'Bearer ger-uid')
+      .send({ cpaValue: 100, revPercentage: 0 }).expect(400);
+    expect(res.body.error).toMatch(/definida pela agência/i);
+  });
+
+  it('acordo PAUSADO não aceita precificação', async () => {
+    const seed: any = seedRede();
+    seed.deals.dg.active = false;
+    await request(appWith(seed)).post('/api/partnerships/pg/price').set('Authorization', 'Bearer ger-uid')
+      .send({ cpaValue: 100, revPercentage: 0 }).expect(409);
+  });
 });
 
 // =============================================================================

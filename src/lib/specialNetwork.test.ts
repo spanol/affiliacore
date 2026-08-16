@@ -6,6 +6,7 @@ import {
   resolveSpecialSubIds,
   resolveDirectSubIds,
   isDirectDownline,
+  resolveDirectUpline,
   type SpecialRecord,
 } from './specialNetwork';
 import { buildNetworkNodes, buildNetworkTree, uplineMapFromSpecials, buildEligibleUpline } from './network';
@@ -105,6 +106,32 @@ describe('resolveDirectSubIds (o que a TELA deixa editar)', () => {
 
   it('sem registro → vazio', () => {
     expect(resolveDirectSubIds('gerente', null, { uplines: UPLINES })).toEqual([]);
+  });
+});
+
+describe('resolveDirectUpline (roteia a solicitação para a fila do gerente)', () => {
+  const ctx = { uplines: UPLINES };
+
+  it('devolve o pai direto, não a raiz da estrutura', () => {
+    expect(resolveDirectUpline('ponta', ctx)).toBe('lider');
+    expect(resolveDirectUpline('lider', ctx)).toBe('gerente');
+  });
+
+  it('topo da estrutura → null (a solicitação cai na fila do admin)', () => {
+    expect(resolveDirectUpline('topo', ctx)).toBeNull();
+    expect(resolveDirectUpline('desconhecido', ctx)).toBeNull();
+    expect(resolveDirectUpline('', ctx)).toBeNull();
+  });
+
+  it('é o espelho exato de isDirectDownline', () => {
+    expect(isDirectDownline('ponta', resolveDirectUpline('ponta', ctx)!, ctx)).toBe(true);
+  });
+
+  it('modelo antigo: o vínculo de special_affiliates também é aresta', () => {
+    const specials: Record<string, SpecialRecord> = {
+      esp: { affiliateId: 'esp', active: true, subAffiliateIds: ['s1'] },
+    };
+    expect(resolveDirectUpline('s1', { specials })).toBe('esp');
   });
 });
 
