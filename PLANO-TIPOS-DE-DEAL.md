@@ -288,7 +288,28 @@ de acordo no `POST /api/houses`; `resolveDirectUpline` novo em
 recusa solicitação nova sem derrubar quem já entrou; `user_notifications` na
 recusa (gerente e admin). Mais 6 casos de supertest.
 
-**F3 · Admin `/acordos`.** Radio, campos condicionais, fila de link.
+**F3 · Admin `/acordos`. ✅ ENTREGUE.** Radio de tipo alimentado pelo CATÁLOGO
+(`DEAL_TYPES.map`, nunca lista fixa na página: um 3º tipo aparece sozinho),
+campos de KPI dirigidos pela política, badge de tipo no card e a aba "Aguardando
+link" com a fila de `priced`. Núcleo puro em `src/lib/dealsAdmin.ts` (rascunho do
+formulário, filas, badge, mensagem do toast) + `DEAL_TYPE_DEFAULT` no
+`instanceClient.ts`, lendo a MESMA env que o servidor. 39 testes.
+
+Três decisões que valem registrar:
+- **CPA e RevShare seguem sempre editáveis pelo admin**, em qualquer tipo. Eles
+  são o que a CASA paga à AGÊNCIA; esconder do AFILIADO é outra coisa, e quem faz
+  isso é o servidor. Confundir os dois deixaria o campo que alimenta o `byBrand`
+  na aprovação sem tela para ser preenchido.
+- **O toast de aprovação mudou.** Vindo de `priced`, "Taxa aplicada e link
+  emitido" seria mentira: a taxa é a do gerente e é preservada. Agora é "Link
+  emitido. A comissão definida pelo gerente foi mantida.".
+- **GGR é o único campo em que vazio ≠ zero** (vazio = a casa não tem GGR).
+  Por isso ele não passa pelo esvaziamento de zero dos outros números: abrir e
+  salvar um acordo com GGR 0% o converteria em `null` em silêncio.
+
+⚠️ Enquanto a F5 (fila do gerente) não existe, **nada leva uma parceria a
+`priced` pela interface** — só a rota `POST /api/partnerships/:id/price`. A aba
+nova funciona, mas fica vazia numa verificação pela tela.
 
 **F4 · Vitrine do afiliado.** Card e estados.
 
