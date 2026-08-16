@@ -65,6 +65,11 @@ export function resolveBrandRates(config?: AffiliateConfig | null, brandId?: str
   };
 }
 
+// VIGÊNCIA: a irmã DATADA desta função é `resolveBrandRatesAt`, em
+// `src/lib/rateHistory.ts` (mora lá porque a linha do tempo importa deste arquivo,
+// e o contrário criaria ciclo). Sem data ela devolve exatamente o que esta devolve.
+// Não são fontes concorrentes: use esta quando não há dia em mãos, aquela quando há.
+
 // Distingue "configurado como 0" de "ainda não configurado": um 0 cru é uma taxa
 // real; a AUSÊNCIA (sem cpaValue de topo e sem override por casa) NÃO deve virar
 // "R$0/CPA" enganoso no display. `brandId` informado → considera o override da casa
