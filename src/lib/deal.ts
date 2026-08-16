@@ -6,6 +6,7 @@
 // PESQUISA-AFFILITY.md (modelo marketplace) e [[boost-productization]].
 
 import { num, BrandRates } from './commission';
+import { resolveDealType, dealPolicy, type DealTypeId } from './dealType';
 
 // Modelo de remuneração do acordo. pt-BR no display; chave estável no dado.
 export type DealModel = 'cpa' | 'revshare' | 'hybrid';
@@ -19,14 +20,22 @@ export interface Deal {
   houseId: string;            // doc id em `houses` (= slug nas casas manuais)
   operatorName: string;       // nome da operadora (denormalizado p/ label/exibição)
   model: DealModel;
-  cpaValue: number;           // R$ por CPA qualificado (0 quando revshare puro)
-  revPercentage: number;      // % de RevShare (0 quando CPA puro)
+  // OPCIONAIS DE PROPÓSITO: num deal cujo tipo esconde as taxas do afiliado, o
+  // SERVIDOR remove os dois campos da resposta (sanitizeDealForViewer). O tipo
+  // reflete o que de fato chega ao client; quem escreve sempre grava os dois.
+  cpaValue?: number;          // R$ por CPA qualificado (0 quando revshare puro)
+  revPercentage?: number;     // % de RevShare (0 quando CPA puro)
   cycle: PaymentCycle;
   currency: DealCurrency;
   geo: string;                // mercado/país (ex.: "Brasil", "México"); livre
   active: boolean;
   order?: number;
   updatedAt?: any;
+  // --- tipo de deal + KPIs da vitrine (2026-08-15) ---------------------------
+  type?: DealTypeId;          // ausente = 'direto' (resolvido na leitura, sem migração)
+  baseline?: number;          // R$; informativo, NÃO entra no núcleo de comissão
+  rollover?: number;          // multiplicador (2 = "rollover 2x"); informativo
+  ggrPercentage?: number | null; // % de GGR quando a casa tem; informativo
 }
 
 export const DEAL_MODELS: DealModel[] = ['cpa', 'revshare', 'hybrid'];
@@ -93,6 +102,24 @@ export function normalizeDealInput(raw: any): { deal?: Omit<Deal, 'id'>; error?:
   if (model === 'revshare' && revPercentage <= 0) return { error: 'Acordo RevShare precisa de um percentual maior que zero.' };
   if (model === 'hybrid' && cpaValue <= 0 && revPercentage <= 0) return { error: 'Acordo híbrido precisa de CPA ou RevShare.' };
 
+  // Tipo + KPIs da vitrine. O tipo é o eixo de POLÍTICA (quem vê a taxa, quem
+  // precifica); as taxas acima seguem sendo o que a CASA paga à agência, em
+  // qualquer tipo. Ver dealType.ts.
+  const type = resolveDealType(raw?.type);
+  const active = raw?.active !== false;
+  const baseline = num(raw?.baseline);
+  const rollover = num(raw?.rollover);
+  const ggrPercentage = raw?.ggrPercentage == null || raw?.ggrPercentage === '' ? null : num(raw.ggrPercentage);
+  if (baseline < 0 || rollover < 0 || (ggrPercentage != null && ggrPercentage < 0)) {
+    return { error: 'Baseline, rollover e GGR não podem ser negativos.' };
+  }
+  // A vitrine de um acordo que esconde as taxas é construída em torno da baseline:
+  // publicar sem ela deixaria o afiliado com um card sem número nenhum. Só vale na
+  // PUBLICAÇÃO — rascunho (inativo) pode estar incompleto de propósito.
+  if (active && dealPolicy({ type }).kpis.includes('baseline') && baseline <= 0) {
+    return { error: 'Informe a baseline antes de publicar este acordo na vitrine.' };
+  }
+
   return {
     deal: {
       houseId,
@@ -103,8 +130,44 @@ export function normalizeDealInput(raw: any): { deal?: Omit<Deal, 'id'>; error?:
       cycle,
       currency,
       geo: String(raw?.geo ?? '').trim(),
-      active: raw?.active !== false,
+      active,
+      type,
+      baseline,
+      rollover,
+      ggrPercentage,
       ...(Number.isFinite(Number(raw?.order)) ? { order: Number(raw.order) } : {}),
     },
+  };
+}
+
+// Rascunho de acordo criado JUNTO com a casa (`POST /api/houses`), para o admin não
+// precisar recadastrar a operadora em /acordos. Nasce INATIVO: um card sem baseline
+// nem taxa na vitrine é pior que card nenhum, e é a mesma decisão que
+// PESQUISA-PRESETS-DEALS.md tomou para os presets ("nunca publica direto no
+// marketplace sem o admin revisar").
+// NÃO passa por normalizeDealInput de propósito: o validador exige CPA > 0 para o
+// modelo `cpa`, o que é certo na publicação e errado num rascunho vazio.
+// Devolve null quando a casa não tem identidade (sem slug/id ou sem nome).
+export function buildDraftDealFromHouse(
+  house: { id?: string | null; slug?: string | null; name?: string | null },
+  type: DealTypeId = 'direto'
+): Omit<Deal, 'id'> | null {
+  const houseId = String(house?.slug ?? house?.id ?? '').trim();
+  const operatorName = String(house?.name ?? '').trim();
+  if (!houseId || !operatorName) return null;
+  return {
+    houseId,
+    operatorName,
+    model: 'cpa',
+    cpaValue: 0,
+    revPercentage: 0,
+    cycle: 'mensal',
+    currency: 'BRL',
+    geo: '',
+    active: false,
+    type: resolveDealType(type),
+    baseline: 0,
+    rollover: 0,
+    ggrPercentage: null,
   };
 }

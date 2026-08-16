@@ -6,16 +6,46 @@
 
 import { Deal, buildDealLabel } from './deal';
 
-export type PartnershipStatus = 'requested' | 'approved' | 'rejected' | 'discontinued';
+// `priced` é o estado do meio dos acordos GERENCIADOS: o gerente já definiu a
+// comissão do afiliado, falta a agência emitir o link. Não é alcançável em acordo
+// direto, então nenhuma parceria existente muda de estado. Ver dealType.ts.
+export type PartnershipStatus = 'requested' | 'priced' | 'approved' | 'rejected' | 'discontinued';
 
-export const PARTNERSHIP_STATUSES: PartnershipStatus[] = ['requested', 'approved', 'rejected', 'discontinued'];
+export const PARTNERSHIP_STATUSES: PartnershipStatus[] = ['requested', 'priced', 'approved', 'rejected', 'discontinued'];
 
 export const PARTNERSHIP_STATUS_LABEL: Record<PartnershipStatus, string> = {
   requested: 'Solicitada',
+  priced: 'Aguardando link',
   approved: 'Aprovada',
   rejected: 'Recusada',
   discontinued: 'Encerrada',
 };
+
+// O MESMO estado tem nomes diferentes conforme quem olha: "Solicitada" não diz nada
+// ao gerente que precisa agir, e "Aguardando link" não diz nada ao afiliado que está
+// esperando o gerente. Fonte única dos rótulos por audiência.
+// `pricedBy` importa porque "Solicitada" quer dizer coisas diferentes: num acordo
+// direto o afiliado espera a AGÊNCIA, num gerenciado ele espera o GERENTE dele.
+// Passe o valor EFETIVO (effectivePricedBy), não o da política crua: afiliado sem
+// gerente elegível espera a agência mesmo num deal gerenciado.
+export type PartnershipAudience = 'admin' | 'affiliate' | 'upline';
+
+export function partnershipStatusLabel(
+  status: PartnershipStatus,
+  audience: PartnershipAudience = 'admin',
+  pricedBy: 'admin' | 'upline' = 'admin'
+): string {
+  if (audience === 'affiliate') {
+    if (status === 'requested') return pricedBy === 'upline' ? 'Aguardando seu gerente' : 'Em análise';
+    if (status === 'priced') return 'Aguardando o link';
+  }
+  if (audience === 'upline') {
+    if (status === 'requested') return 'Defina a comissão';
+    if (status === 'priced') return 'Aguardando o link da agência';
+  }
+  if (audience === 'admin' && status === 'priced') return 'Pronta para o link';
+  return PARTNERSHIP_STATUS_LABEL[status] ?? '';
+}
 
 export interface PartnershipRequest {
   id: string;
@@ -35,10 +65,20 @@ export interface PartnershipRequest {
 // recusada; uma aprovada pode ser encerrada (deal descontinuado). Nada "revive" uma
 // recusada/encerrada (o afiliado solicita de novo → nova request). Barra transição
 // inválida no server (fonte da regra). Idempotente: mesmo→mesmo é permitido.
-export function canTransition(from: PartnershipStatus, to: PartnershipStatus): boolean {
+//
+// `pricedBy` vem do tipo do deal (effectivePricedBy): quando é o GERENTE quem
+// precifica, `requested` NÃO vai direto para `approved` — passa por `priced`, que é
+// o que separa "o gerente definiu a comissão" de "a agência emitiu o link".
+// Omitir o parâmetro reproduz exatamente o comportamento de antes do tipo de deal.
+export function canTransition(
+  from: PartnershipStatus,
+  to: PartnershipStatus,
+  pricedBy: 'admin' | 'upline' = 'admin'
+): boolean {
   if (from === to) return true;
   const allowed: Record<PartnershipStatus, PartnershipStatus[]> = {
-    requested: ['approved', 'rejected'],
+    requested: pricedBy === 'upline' ? ['priced', 'rejected'] : ['approved', 'rejected'],
+    priced: ['approved', 'rejected'],
     approved: ['discontinued'],
     rejected: [],
     discontinued: [],
@@ -46,10 +86,11 @@ export function canTransition(from: PartnershipStatus, to: PartnershipStatus): b
   return (allowed[from] || []).includes(to);
 }
 
-// Uma parceria está "viva" (consome a oferta, gera link) quando solicitada ou
-// aprovada. Recusada/encerrada libera o deal p/ ser solicitado de novo.
+// Uma parceria está "viva" (consome a oferta, gera link) quando solicitada,
+// precificada ou aprovada. Recusada/encerrada libera o deal p/ ser solicitado de
+// novo. `priced` é viva: a oferta já está com o gerente, não pode ser pedida 2×.
 export function isActivePartnership(status: PartnershipStatus): boolean {
-  return status === 'requested' || status === 'approved';
+  return status === 'requested' || status === 'priced' || status === 'approved';
 }
 
 // OFERTAS DISPONÍVEIS = deals ATIVOS que o afiliado ainda não tem parceria VIVA.
