@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { pluralize } from '../lib/plural';
 import { useParams, useNavigate } from 'react-router';
 import { 
   ArrowLeft, 
@@ -1287,7 +1288,7 @@ export default function AffiliateDetails() {
                 <div className="min-w-0">
                   <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm truncate">CPA da rede</h3>
                   <p className="text-[11px] text-slate-400 dark:text-neutral-500 truncate">
-                    {humanizeName(affiliate.name || affiliate.label)} · {Math.max(0, networkCadastros.length - 1)} sub-afiliado(s) vinculado(s)
+                    {humanizeName(affiliate.name || affiliate.label)} · {pluralize(Math.max(0, networkCadastros.length - 1), 'sub-afiliado vinculado', 'sub-afiliados vinculados')}
                   </p>
                 </div>
               </div>

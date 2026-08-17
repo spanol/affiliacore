@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { pluralize } from '../lib/plural';
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import { Crown, X, Save, Loader2, Search, Network as NetworkIcon } from 'lucide-react';
@@ -197,7 +198,7 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest">Equipe derivada da árvore</p>
                     <span className="text-[10px] font-bold text-accent-600 dark:text-accent-400">
-                      {uplines ? `${derivedSubs.length} afiliado(s)` : 'carregando…'}
+                      {uplines ? pluralize(derivedSubs.length, 'afiliado') : 'carregando…'}
                     </span>
                   </div>
                   <div className="max-h-52 overflow-y-auto rounded-xl border border-slate-100 dark:border-neutral-800 divide-y divide-slate-100 dark:divide-neutral-800">
@@ -221,7 +222,7 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
                   {orphans.length > 0 && (
                     <div className="mt-2 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2.5">
                       <p className="font-bold mb-1">
-                        {orphans.length} afiliado(s) SAEM da estrutura ao salvar
+                        {pluralize(orphans.length, 'afiliado SAI', 'afiliados SAEM')} da estrutura ao salvar
                       </p>
                       <p>
                         {orphans.map(nameOf).join(', ')}: estavam vinculados só por esta lista, sem
@@ -243,7 +244,7 @@ export default function SpecialAffiliateModal({ affiliate, allAffiliates, specia
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest">Sub-afiliados</p>
-                  <span className="text-[10px] font-bold text-accent-600 dark:text-accent-400">{subs.length} selecionado(s)</span>
+                  <span className="text-[10px] font-bold text-accent-600 dark:text-accent-400">{pluralize(subs.length, 'selecionado')}</span>
                 </div>
                 <div className="relative mb-2">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-400" size={14} />

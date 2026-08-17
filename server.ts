@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { pluralize } from './src/lib/plural';
 import crypto from 'crypto';
 import fs from 'fs';
 import express from 'express';
@@ -2509,7 +2510,7 @@ export function createApp(deps: ServerDeps) {
     let body: string;
     if (outcome.ok && outcome.count > 0) {
       title = `Ranking de ${date} gerado`;
-      body = `O ranking diário foi gerado automaticamente com ${outcome.count} afiliado(s). Confira em /ranking.`;
+      body = `O ranking diário foi gerado automaticamente com ${pluralize(outcome.count, 'afiliado')}. Confira em /ranking.`;
     } else if (outcome.ok) {
       title = `Ranking de ${date} sem dados`;
       body = `A geração automática rodou, mas não há resultados registrados para ${date}. Verifique em /ranking.`;

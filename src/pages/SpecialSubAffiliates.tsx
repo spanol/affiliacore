@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { pluralize } from '../lib/plural';
 import { motion } from 'motion/react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Loader2, Users, ArrowUpRight, Crown, Save, Percent, Search, UserPlus, X, Clock, Link2, Copy, Check, RefreshCw } from 'lucide-react';
@@ -413,7 +414,7 @@ export default function SpecialSubAffiliates() {
     >
       {copied === l.code ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
       <span className="max-w-[110px] truncate">{houseNameOf(l.brandId) || l.code}</span>
-      <span className="font-medium text-slate-400 dark:text-neutral-500">{(l.clicks ?? 0).toLocaleString('pt-BR')} clique(s)</span>
+      <span className="font-medium text-slate-400 dark:text-neutral-500">{pluralize(l.clicks ?? 0, 'clique')}</span>
     </button>
   );
 
@@ -456,7 +457,7 @@ export default function SpecialSubAffiliates() {
             </span>
             Meus afiliados
           </h1>
-          <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">{subIds.length} sub-afiliado(s) vinculado(s). Defina a comissão de cada um e abra os dados individuais.</p>
+          <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">{pluralize(subIds.length, 'sub-afiliado vinculado', 'sub-afiliados vinculados')}. Defina a comissão de cada um e abra os dados individuais.</p>
         </div>
         <div className="flex flex-col items-start md:items-end gap-3">
           <DateRangePicker value={range} onChange={setRange} />
@@ -853,7 +854,7 @@ export default function SpecialSubAffiliates() {
 
           <div className="p-4 bg-slate-50/60 dark:bg-neutral-800/20 border-t border-slate-100 dark:border-neutral-800 flex items-center justify-between">
             <p className="text-[10px] text-slate-400 dark:text-neutral-500 font-bold uppercase tracking-widest">
-              Exibindo {filteredSubs.length} de {subIds.length} sub-afiliado(s)
+              Exibindo {filteredSubs.length} de {pluralize(subIds.length, 'sub-afiliado')}
             </p>
           </div>
         </motion.div>
@@ -964,7 +965,7 @@ export default function SpecialSubAffiliates() {
                   <p className="text-[11px] text-slate-400 dark:text-neutral-500">
                     {inviteUses === 0
                       ? 'Nenhum cadastro por este link ainda.'
-                      : `${inviteUses.toLocaleString('pt-BR')} cadastro(s) por este link.`}
+                      : `${pluralize(inviteUses, 'cadastro')} por este link.`}
                   </p>
                 </>
               ) : (

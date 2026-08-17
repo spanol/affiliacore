@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { pluralize } from '../lib/plural';
 import { motion } from 'motion/react';
 import {
   Users,
@@ -680,7 +681,7 @@ export default function AdminDashboard() {
                   <span className="shrink-0 w-6 h-6 rounded-lg bg-slate-100 dark:bg-neutral-800 text-slate-500 dark:text-neutral-400 text-[11px] font-black flex items-center justify-center">{i + 1}</span>
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-slate-800 dark:text-white truncate">{s.name}</p>
-                    <p className="text-[10px] text-slate-400 dark:text-neutral-500">{s.subs} sub-afiliado(s)</p>
+                    <p className="text-[10px] text-slate-400 dark:text-neutral-500">{pluralize(s.subs, 'sub-afiliado')}</p>
                   </div>
                 </div>
                 <span className="shrink-0 text-sm font-black text-slate-900 dark:text-white tabular-nums">R$ {s.commission.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>

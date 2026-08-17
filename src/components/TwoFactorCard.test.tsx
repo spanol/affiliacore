@@ -106,7 +106,7 @@ describe('TwoFactorCard', () => {
     routeTotp({ status: STATUS_ON, disable: json({ enabled: false }) });
 
     render(<TwoFactorCard user={user} />);
-    expect(await screen.findByText(/7 código\(s\) de backup restante/i)).toBeInTheDocument();
+    expect(await screen.findByText(/7 códigos de backup restantes/i)).toBeInTheDocument();
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /desativar 2fa/i }));

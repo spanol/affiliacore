@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { pluralize } from '../lib/plural';
 import { motion } from 'motion/react';
 import { Link2, Loader2, Copy, Check, MousePointerClick, ExternalLink } from 'lucide-react';
 import {
@@ -59,7 +60,7 @@ export default function MyLinks() {
           </span>
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tighter">Meus Links</h1>
           {cards.length > 0 && (
-            <span className="px-2.5 py-1 rounded-full bg-accent-500/15 text-accent-500 text-[11px] font-bold">{cards.length} link(s) · {totalClicks} clique(s)</span>
+            <span className="px-2.5 py-1 rounded-full bg-accent-500/15 text-accent-500 text-[11px] font-bold">{pluralize(cards.length, 'link')} · {pluralize(totalClicks, 'clique')}</span>
           )}
         </div>
         <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">Seus links de divulgação, um por casa. Compartilhe e acompanhe os cliques.</p>

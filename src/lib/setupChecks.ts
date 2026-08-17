@@ -15,6 +15,7 @@
 
 import { housesMissingIss, type IssHouse } from './tax';
 import { num } from './commission';
+import { pluralize } from './plural';
 
 export type SetupSeverity = 'critical' | 'warning' | 'info';
 
@@ -137,7 +138,7 @@ export function checkAffiliatesSemTaxa(
   return {
     id: 'afiliados-sem-taxa',
     severity: 'warning',
-    title: `${missing.length} afiliado(s) sem taxa configurada`,
+    title: `${pluralize(missing.length, 'afiliado')} sem taxa configurada`,
     detail:
       'Sem CPA ou REV definidos o repasse aparece como R$ 0 no painel. Ausência de taxa não é taxa zero: defina os valores na lista de afiliados.',
     fixRoute: '/affiliates',
@@ -167,7 +168,7 @@ export function checkAffiliatesSemAcesso(
   return {
     id: 'afiliados-sem-acesso',
     severity: 'info',
-    title: `${missing.length} afiliado(s) sem login na plataforma`,
+    title: `${pluralize(missing.length, 'afiliado')} sem login na plataforma`,
     detail:
       'Eles não conseguem entrar e não recebem notificações nem mensagens diretas. Gere o convite de acesso na lista de afiliados.',
     fixRoute: '/affiliates',
@@ -203,7 +204,7 @@ export function checkEspeciaisSemFlag(
   return {
     id: 'especiais-sem-flag',
     severity: 'critical',
-    title: `${broken.length} afiliado(s) especial(is) sem acesso ao painel da equipe`,
+    title: `${pluralize(broken.length, 'afiliado especial', 'afiliados especiais')} sem acesso ao painel da equipe`,
     detail:
       'O registro de especial está ativo mas o login não carrega a marcação, então a pessoa entra e não vê a equipe. Abra o especial na lista de afiliados e salve de novo para sincronizar.',
     fixRoute: '/affiliates',
@@ -231,7 +232,7 @@ export function checkCasasSemIss(houses: SetupHouse[] | null | undefined): Setup
   return {
     id: 'casas-sem-iss',
     severity: 'warning',
-    title: `${missing.length} casa(s) sem alíquota de ISS`,
+    title: `${pluralize(missing.length, 'casa')} sem alíquota de ISS`,
     detail:
       'Outras casas desta instância têm retenção configurada; nas casas sem alíquota o repasse sai bruto, sem retenção nenhuma.',
     fixRoute: '/casas',
@@ -260,7 +261,7 @@ export function checkCasasManuaisSemRegua(
   return {
     id: 'casas-sem-regua',
     severity: 'info',
-    title: `${missing.length} casa(s) manual(is) sem taxa padrão`,
+    title: `${pluralize(missing.length, 'casa manual', 'casas manuais')} sem taxa padrão`,
     detail:
       'Se uma planilha vier sem a coluna de comissão, a comissão da casa entra como R$ 0 e o lucro do período fica distorcido. Defina o CPA ou REV padrão da casa.',
     fixRoute: '/casas',
@@ -381,7 +382,7 @@ export function checkCasasOtgSemFonte(
   return {
     id: 'casas-otg-sem-fonte',
     severity: 'warning',
-    title: `${orphans.length} casa(s) com origem OTG numa instância sem OTG`,
+    title: `${pluralize(orphans.length, 'casa')} com origem OTG numa instância sem OTG`,
     detail:
       'A integração OTG está desligada nesta instância, então essas casas não recebem dado de nenhuma fonte. Troque a origem para upload manual ou vincule um conector.',
     fixRoute: '/casas',
@@ -418,7 +419,7 @@ export function checkCasasSemAcordo(
   return {
     id: 'casas-sem-acordo',
     severity: 'info',
-    title: `${missing.length} casa(s) sem acordo na vitrine`,
+    title: `${pluralize(missing.length, 'casa')} sem acordo na vitrine`,
     detail:
       'O afiliado só solicita o link das casas que têm acordo publicado. O rascunho de cada uma já está pronto na tela de acordos, com a taxa padrão da casa.',
     fixRoute: '/acordos',

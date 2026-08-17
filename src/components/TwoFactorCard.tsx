@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { pluralize } from '../lib/plural';
 import type { User } from 'firebase/auth';
 import { ShieldCheck, ShieldAlert, QrCode, AlertCircle, CheckCircle, Smartphone, KeyRound, Copy } from 'lucide-react';
 import {
@@ -206,7 +207,7 @@ export default function TwoFactorCard({ user }: { user: User | null }) {
         <div className="space-y-3">
           <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs">
             Seu login já está protegido com um código do autenticador.
-            <span className="block mt-1 font-bold">{backupRemaining} código(s) de backup restante(s).</span>
+            <span className="block mt-1 font-bold">{pluralize(backupRemaining, 'código de backup restante', 'códigos de backup restantes')}.</span>
           </div>
           <div className="flex flex-wrap gap-2">
             <button

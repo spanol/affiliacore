@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { pluralize } from '../lib/plural';
 import { motion } from 'motion/react';
 import { Navigate, Link } from 'react-router-dom';
 import { Network as NetworkIcon, Loader2, AlertTriangle, CornerDownRight, Users, ArrowRight, Pencil } from 'lucide-react';
@@ -259,7 +260,7 @@ export default function Network() {
               { key: 'direto', label: 'Repasse direto', value: brl(payouts.directTotal), hint: `produção própria × taxa própria${houseSuffix}` },
               { key: 'equipe', label: 'Lucro sobre equipe', value: brl(payouts.overrideTotal), hint: `override pago aos uplines${houseSuffix}` },
               { key: 'custo', label: 'Custo total da agência', value: brl(payouts.agencyCost), hint: `Σ dos topos de estrutura${houseSuffix}` },
-              { key: 'estrutura', label: 'Estrutura', value: `${tree.roots.length} topo(s) · ${maxDepth} nível(is)`, hint: `${tree.ids.length} afiliados na rede · não muda com o filtro` },
+              { key: 'estrutura', label: 'Estrutura', value: `${pluralize(tree.roots.length, 'topo')} · ${pluralize(maxDepth, 'nível', 'níveis')}`, hint: `${tree.ids.length} afiliados na rede · não muda com o filtro` },
             ].map((c, idx) => (
               <motion.div
                 key={c.key}
@@ -303,7 +304,7 @@ export default function Network() {
                   >
                     <AlertTriangle size={13} />
                     Sem casa no cadastro
-                    <span className="font-medium opacity-70">· {s.affiliates} afiliado(s)</span>
+                    <span className="font-medium opacity-70">· {pluralize(s.affiliates, 'afiliado')}</span>
                   </span>
                 );
               }
@@ -324,7 +325,7 @@ export default function Network() {
                   <BrandLogo name={s.house} size={18} />
                   {s.house}
                   <span className="font-medium text-slate-400 dark:text-neutral-500">
-                    · {s.affiliates} afiliado(s)
+                    · {pluralize(s.affiliates, 'afiliado')}
                   </span>
                   {/* Origem do dado: API da casa vs. planilha/pull. "Ambas" avisa que
                       o número da casa está sendo alimentado pelos dois caminhos. */}
@@ -533,7 +534,7 @@ export default function Network() {
           </motion.section>
 
           <p className="text-[11px] text-slate-400 dark:text-neutral-500 px-1">
-            {Object.keys(rootConfig).length} afiliado(s) são cobrados pela taxa do topo da estrutura deles.{' '}
+            {pluralize(Object.keys(rootConfig).length, 'afiliado é cobrado pela taxa do topo da estrutura dele', 'afiliados são cobrados pela taxa do topo da estrutura deles')}.{' '}
             <Link to="/admin" className="inline-flex items-center gap-1 font-bold hover:text-slate-600 dark:hover:text-neutral-300">
               Ver no lucro da agência <ArrowRight size={11} />
             </Link>

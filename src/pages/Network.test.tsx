@@ -95,7 +95,7 @@ describe('/rede · árvore e decomposição do repasse', () => {
     expect(cardValue('direto')).toBe('R$ 600,00');
     expect(cardValue('equipe')).toBe('R$ 300,00');
     expect(cardValue('custo')).toBe('R$ 900,00');
-    expect(cardValue('estrutura')).toBe('1 topo(s) · 3 nível(is)');
+    expect(cardValue('estrutura')).toBe('1 topo · 3 níveis');
   });
 
   it('só a linha em edição monta o <select> (rede grande não vira N×N options)', async () => {
@@ -152,7 +152,7 @@ describe('/rede · anomalias e gate de papel', () => {
   it('sem vínculo nenhum, todo mundo é topo e o override é zero', async () => {
     h.uplines = {};
     await renderPage();
-    expect(cardValue('estrutura')).toBe('3 topo(s) · 1 nível(is)');
+    expect(cardValue('estrutura')).toBe('3 topos · 1 nível');
     expect(cardValue('equipe')).toBe('R$ 0,00');
     expect(cardValue('custo')).toBe(cardValue('direto'));
   });
@@ -188,8 +188,8 @@ describe('/rede · fontes dos dados e filtro por casa', () => {
   it('lista as casas de onde vieram os números, com quantos afiliados cada uma', async () => {
     await renderPage();
     expect(screen.getByText('Dados de')).toBeInTheDocument();
-    expect(screen.getByTitle('Ver só Superbet')).toHaveTextContent('2 afiliado(s)');
-    expect(screen.getByTitle('Ver só Betano')).toHaveTextContent('1 afiliado(s)');
+    expect(screen.getByTitle('Ver só Superbet')).toHaveTextContent('2 afiliados');
+    expect(screen.getByTitle('Ver só Betano')).toHaveTextContent('1 afiliado');
   });
 
   it('distingue a origem: casa da OTG × casa gerida aqui', async () => {

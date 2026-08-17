@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { pluralize } from '../lib/plural';
 import { motion } from 'motion/react';
 import { Navigate, Link } from 'react-router-dom';
 import {
@@ -85,11 +86,11 @@ export default function Houses() {
     try {
       const r = await pullHouseResults(house.slug);
       const pend = r.pending?.length
-        ? ` · ${r.pending.length} tag(s) sem dono: ${r.pending.slice(0, 3).map((p) => p.tag).join(', ')}`
+        ? ` · ${pluralize(r.pending.length, 'tag')} sem dono: ${r.pending.slice(0, 3).map((p) => p.tag).join(', ')}`
         : '';
       push({
         type: r.pending?.length ? 'info' : 'success',
-        message: `${r.imported} linha(s) de ${r.dateFrom} a ${r.dateTo} · ${r.attributed} atribuída(s)${pend}`,
+        message: `${pluralize(r.imported, 'linha')} de ${r.dateFrom} a ${r.dateTo} · ${pluralize(r.attributed, 'atribuída')}${pend}`,
       });
       // Régua de CPA trocada no meio do período: a contagem sai de dividir o
       // dinheiro pela base, então resto > 0 é sinal de que a base mudou (§9.5).
@@ -1083,7 +1084,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
     try {
       const created = await createBoostAffiliates(toCreate, { generateInvite });
       const invites = created.filter((c) => c.invite).length;
-      push({ type: 'success', message: `Cadastrado(s) ${created.length} afiliado(s) na plataforma${invites ? ` · ${invites} convite(s) gerado(s)` : ''}.` });
+      push({ type: 'success', message: `${pluralize(created.length, 'afiliado cadastrado', 'afiliados cadastrados')} na plataforma${invites ? ` · ${pluralize(invites, 'convite gerado', 'convites gerados')}` : ''}.` });
       await loadMeta();
     } catch (e: any) {
       push({ type: 'error', message: e?.message || 'Erro ao cadastrar afiliados.' });
@@ -1221,7 +1222,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
       // justamente o que foi atribuído. Ele fica de fora até alguém dar dono à tag.
       const rows = buildImportPayload(tagMode ? { ...analysis, rows: attributedRows(analysis.rows) } : analysis);
       const res = await importHouseResults(house.slug, rows);
-      push({ type: 'success', message: `Importado: ${res.imported} linhas em ${res.dates.length} dia(s).` });
+      push({ type: 'success', message: `Importado: ${pluralize(res.imported, 'linha')} em ${pluralize(res.dates.length, 'dia')}.` });
       setText('');
       clearFile();
       setAnalysis(null);
@@ -1380,7 +1381,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2 text-[11px] font-bold">
                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                    <Check size={12} /> {previewRows.length} linha(s) {tagMode ? 'a importar' : 'ok'}
+                    <Check size={12} /> {pluralize(previewRows.length, 'linha')} {tagMode ? 'a importar' : 'ok'}
                   </span>
                   {parseErrors.length > 0 && (
                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
@@ -1391,8 +1392,8 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                       <AlertTriangle size={12} />
                       {tagMode
-                        ? `${tagTotals.pendingTags} tag(s) sem vínculo`
-                        : `${analysis.unresolved.length} afiliado(s) não encontrado(s)`}
+                        ? `${pluralize(tagTotals.pendingTags, 'tag')} sem vínculo`
+                        : `${pluralize(analysis.unresolved.length, 'afiliado não encontrado', 'afiliados não encontrados')}`}
                     </span>
                   )}
                   {tagMode && (
@@ -1442,7 +1443,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                                 {s.tag || 'sem tag'}
                               </span>
                               <span className="text-slate-400 dark:text-neutral-500">
-                                {' '}· {formatBrl(s.total_commission)} · {s.qualified_cpa} CPA · {s.days} dia(s)
+                                {' '}· {formatBrl(s.total_commission)} · {s.qualified_cpa} CPA · {pluralize(s.days, 'dia')}
                               </span>
                               {s.affiliateId && (
                                 <span className="text-emerald-600 dark:text-emerald-400">
@@ -1615,7 +1616,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
                       </tbody>
                     </table>
                     {previewRows.length > 8 && (
-                      <p className="px-2 py-1.5 text-[10px] text-slate-400 dark:text-neutral-500 border-t border-slate-100 dark:border-neutral-800">+{previewRows.length - 8} linha(s)…</p>
+                      <p className="px-2 py-1.5 text-[10px] text-slate-400 dark:text-neutral-500 border-t border-slate-100 dark:border-neutral-800">+{pluralize(previewRows.length - 8, 'linha')}…</p>
                     )}
                   </div>
                 )}

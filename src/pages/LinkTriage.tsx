@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { pluralize } from '../lib/plural';
 import { motion } from 'motion/react';
 import {
   Link2,
@@ -204,7 +205,7 @@ export default function LinkTriage() {
       const result = await importStandbyLinks(importText, brandKey || null);
       push({
         type: 'success',
-        message: `${result.created} link(s) importado(s)${result.skipped ? ` · ${result.skipped} já existia(m)` : ''}.`,
+        message: `${pluralize(result.created, 'link importado', 'links importados')}${result.skipped ? ` · ${pluralize(result.skipped, 'já existia', 'já existiam')}` : ''}.`,
       });
       setImportText('');
       setShowImport(false);
@@ -524,10 +525,10 @@ export default function LinkTriage() {
                 />
                 <div className="flex items-center justify-between text-[11px] font-bold">
                   <span className="text-emerald-600 dark:text-emerald-400">
-                    {importPreview.links.length} link(s) válido(s)
+                    {pluralize(importPreview.links.length, 'link válido', 'links válidos')}
                   </span>
                   {importPreview.invalid.length > 0 && (
-                    <span className="text-red-500">{importPreview.invalid.length} linha(s) inválida(s)</span>
+                    <span className="text-red-500">{pluralize(importPreview.invalid.length, 'linha inválida', 'linhas inválidas')}</span>
                   )}
                 </div>
                 <button

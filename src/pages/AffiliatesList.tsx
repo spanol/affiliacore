@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { pluralize } from '../lib/plural';
 import { motion } from 'motion/react';
 import {
   Users,
@@ -236,7 +237,7 @@ export default function AffiliatesList() {
     setSyncing(true);
     try {
       const result = await syncAffiliates();
-      const extra = result.reconciled ? ` · ${result.reconciled} pré-cadastro(s) reconciliado(s)` : '';
+      const extra = result.reconciled ? ` · ${pluralize(result.reconciled, 'pré-cadastro reconciliado', 'pré-cadastros reconciliados')}` : '';
       push({ type: 'success', message: `${result.synced} afiliados sincronizados da API externa.${extra}` });
       await loadData();
     } catch (err) {
@@ -259,7 +260,7 @@ export default function AffiliatesList() {
         email: r.email ?? null, phone: r.phone ?? null, registerUrl: r.registerUrl ?? null,
       }));
       const result = await importPendingAffiliates(clean);
-      push({ type: 'success', message: `${result.imported} importado(s) · ${result.reconciled} já no relatório.` });
+      push({ type: 'success', message: `${pluralize(result.imported, 'importado')} · ${result.reconciled} já no relatório.` });
       setImportModal(false);
       await loadData();
     } catch (err) {

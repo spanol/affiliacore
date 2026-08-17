@@ -98,7 +98,7 @@ export default function RegistrationRequests() {
   // painel vazio. Só faz sentido p/ signup (lead não tem conta).
   const link = (r: CaptureRequest, affiliateId: string) =>
     runAction(`link:${r.id}`, () => linkAffiliateUser(r.email, affiliateId).then(() => {}),
-      `${r.name || r.email} vinculado(a).`);
+      `Vínculo criado para ${r.name || r.email}.`);
 
   // Cria o afiliado nativo com o nome/e-mail que a pessoa informou. Para o LEAD e
   // a INDICAÇÃO já sai com convite (a pessoa precisa criar a senha); para o signup,

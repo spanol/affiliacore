@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { pluralize } from '../lib/plural';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Loader2, DollarSign, UserPlus, Wallet, Target, Crown, HelpCircle, Users, BarChart3, TrendingUp, MousePointerClick, Hash, Divide, Receipt } from 'lucide-react';
@@ -293,7 +294,7 @@ export default function SpecialDashboard() {
             </span>
             {humanizeName(profile?.name || '') || 'Sua rede'}
           </h1>
-          <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">{subIds.length} sub-afiliado(s) + sua produção.</p>
+          <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">{pluralize(subIds.length, 'sub-afiliado')} + sua produção.</p>
         </div>
         <div className="flex flex-col items-start md:items-end gap-3">
           <DateRangePicker value={range} onChange={setRange} />
