@@ -15,6 +15,11 @@ import {
   type DealDraft, type HouseDraftCard,
 } from '../lib/dealsAdmin';
 import { DEAL_TYPE_DEFAULT } from '../lib/instanceClient';
+import {
+  fetchFxQuotes, getCachedFxQuotes, resolveFxRate, formatBrl,
+  CURRENCY_LABEL, CURRENCY_SYMBOL, type FxQuotes, type MoneyCurrency,
+} from '../lib/currency';
+import { dealFxSpec } from '../lib/deal';
 import { useToast } from '../contexts/ToastContext';
 import { cn, humanizeName } from '../lib/utils';
 
@@ -95,6 +100,23 @@ export default function Deals() {
   // aviso de que as taxas ficam ocultas para o afiliado.
   const policy = useMemo(() => dealPolicy(modal ? { type: modal.type } : null), [modal?.type]);
   const shows = (kpi: Parameters<typeof adminEditsKpi>[1]) => adminEditsKpi(modal?.type, kpi);
+
+  // Cotações do dia p/ a prévia do modal. Sem rede o cache devolve o fallback, e a
+  // prévia diz "estimada" em vez de sumir.
+  const [fxQuotes, setFxQuotes] = useState<FxQuotes>(() => getCachedFxQuotes());
+  useEffect(() => { fetchFxQuotes().then(setFxQuotes).catch(() => {}); }, []);
+
+  // O que o acordo aberto no modal usaria de cotação, e o CPA já em R$. `null` = a
+  // cotação fixa foi escolhida e ainda não digitada.
+  const dealRate = useMemo(() => {
+    if (!modal) return null;
+    const payload = buildDealPayload(modal);
+    return resolveFxRate(dealFxSpec(payload), fxQuotes);
+  }, [modal?.currency, modal?.fxMode, modal?.fxRate, fxQuotes]);
+  const dealCpaBrl = useMemo(() => {
+    const cpa = Number(String(modal?.cpaValue ?? '').replace(',', '.'));
+    return dealRate != null && Number.isFinite(cpa) && cpa > 0 ? cpa * dealRate : null;
+  }, [modal?.cpaValue, dealRate]);
 
   const saveDeal = async () => {
     if (!modal) return;
@@ -446,7 +468,11 @@ export default function Deals() {
                     editáveis pelo admin. O tipo `gerenciado` os esconde do AFILIADO,
                     e quem faz isso é o servidor (sanitizeDealForViewer). */}
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">CPA (R$)</label>
+                  {/* O rótulo segue a MOEDA do acordo: com "CPA (R$)" fixo, um acordo
+                      em dólar pedia o valor na unidade errada. */}
+                  <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">
+                    CPA ({CURRENCY_SYMBOL[modal.currency as MoneyCurrency] ?? modal.currency})
+                  </label>
                   <input data-testid="campo-cpa" type="number" min="0" step="0.01" value={modal.cpaValue} onChange={(e) => setModal({ ...modal, cpaValue: e.target.value })} placeholder="0,00" className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white outline-none" />
                 </div>
                 <div>
@@ -460,7 +486,9 @@ export default function Deals() {
                 )}
                 {shows('baseline') && (
                   <div>
-                    <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">{DEAL_KPI_LABEL.baseline} (R$)</label>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">
+                      {DEAL_KPI_LABEL.baseline} ({CURRENCY_SYMBOL[modal.currency as MoneyCurrency] ?? modal.currency})
+                    </label>
                     <input data-testid="campo-baseline" type="number" min="0" step="0.01" value={modal.baseline} onChange={(e) => setModal({ ...modal, baseline: e.target.value })} placeholder="0,00" className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white outline-none" />
                     <p className="text-[10px] text-slate-400 dark:text-neutral-500 mt-1">Obrigatória para publicar na vitrine.</p>
                   </div>
@@ -488,10 +516,85 @@ export default function Deals() {
                 )}
                 <div>
                   <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">Moeda</label>
-                  <select data-testid="campo-moeda" value={modal.currency} onChange={(e) => setModal({ ...modal, currency: e.target.value as DealCurrency })} className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white outline-none">
-                    {DEAL_CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  {/* Trocar a moeda liga a conversão: um acordo estrangeiro sai de
+                      "não converter" (a leitura do dado ANTIGO) para a cotação do
+                      dia, que é o que o admin espera ao escolher dólar agora. */}
+                  <select
+                    data-testid="campo-moeda"
+                    value={modal.currency}
+                    onChange={(e) => {
+                      const currency = e.target.value as DealCurrency;
+                      const foreign = currency !== 'BRL';
+                      setModal({
+                        ...modal,
+                        currency,
+                        fxMode: foreign ? (modal.fxMode === 'none' ? 'live' : modal.fxMode) : 'none',
+                        fxRate: foreign ? modal.fxRate : '',
+                      });
+                    }}
+                    className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white outline-none"
+                  >
+                    {DEAL_CURRENCIES.map((c) => (
+                      <option key={c} value={c}>{CURRENCY_LABEL[c as MoneyCurrency] ? `${CURRENCY_LABEL[c as MoneyCurrency]} (${CURRENCY_SYMBOL[c as MoneyCurrency]})` : c}</option>
+                    ))}
                   </select>
                 </div>
+
+                {/* Câmbio do acordo. O valor digitado acima está NA MOEDA; o que o
+                    afiliado recebe é convertido e CONGELADO na aprovação da parceria
+                    (dealToBrandRates), então a cotação daqui é a que vai valer. */}
+                {modal.currency !== 'BRL' && (
+                  <div className="col-span-2 p-3 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700">
+                    <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">
+                      Cotação do acordo
+                    </label>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {([['live', 'Do dia'], ['fixed', 'Fixa'], ['none', 'Sem conversão']] as const).map(([m, label]) => (
+                        <button
+                          key={m}
+                          type="button"
+                          data-testid={`regime-deal-${m}`}
+                          onClick={() => setModal({ ...modal, fxMode: m })}
+                          className={cn(
+                            'px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-colors',
+                            modal.fxMode === m
+                              ? 'bg-accent-500 text-accent-contrast border-accent-500'
+                              : 'border-slate-200 dark:border-neutral-700 text-slate-500 dark:text-neutral-400 hover:bg-slate-100 dark:hover:bg-neutral-800',
+                          )}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                      {modal.fxMode === 'fixed' && (
+                        <div className="relative flex-1 min-w-[9rem]">
+                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500 text-sm font-semibold">R$</span>
+                          <input
+                            data-testid="campo-cotacao"
+                            type="text"
+                            inputMode="decimal"
+                            value={modal.fxRate}
+                            onChange={(e) => setModal({ ...modal, fxRate: e.target.value.replace(/[^0-9.,]/g, '').replace(/([.,])(?=.*[.,])/g, '') })}
+                            placeholder={`por 1 ${CURRENCY_SYMBOL[modal.currency as MoneyCurrency] ?? modal.currency}`}
+                            className="w-full pl-9 pr-3 py-2 bg-white dark:bg-neutral-900/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white outline-none"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <p data-testid="previa-cambio" className="text-[10px] text-slate-400 dark:text-neutral-500 mt-2">
+                      {modal.fxMode === 'none' ? (
+                        <span className="text-amber-600 dark:text-amber-400">Sem conversão: o número acima será tratado como reais no repasse ao afiliado.</span>
+                      ) : dealRate == null ? (
+                        <span className="text-amber-600 dark:text-amber-400">Informe a cotação fixa para converter.</span>
+                      ) : (
+                        <>
+                          {modal.fxMode === 'fixed' ? 'Cotação fixa' : 'Cotação do dia'}: 1 {CURRENCY_SYMBOL[modal.currency as MoneyCurrency]} = {formatBrl(dealRate)}
+                          {dealCpaBrl != null && <> · CPA ≈ <b className="text-emerald-600 dark:text-emerald-400">{formatBrl(dealCpaBrl)}</b></>}
+                          . A conversão é congelada na aprovação de cada parceria.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                )}
                 {shows('geo') && (
                   <div>
                     <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">{DEAL_KPI_LABEL.geo} / Geo</label>

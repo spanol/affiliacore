@@ -10,7 +10,7 @@ import {
 } from './dealType';
 import { formatDealKpiValue } from './dealShowcase';
 import { num } from './commission';
-import { resolveCpaCurrency } from './currency';
+import { resolveCpaCurrency, resolveFxMode, parseHouseCpaInput, type FxMode } from './currency';
 import type { Deal, DealModel, PaymentCycle, DealCurrency } from './deal';
 import type { PartnershipRequest, PartnershipStatus } from './partnership';
 
@@ -31,6 +31,10 @@ export interface DealDraft {
   minCpaGoal: string;
   cycle: PaymentCycle;
   currency: DealCurrency;
+  // Regime da cotação + a cotação fixa (texto no input, número no payload). Só
+  // valem em moeda estrangeira; em real o câmbio não existe.
+  fxMode: FxMode;
+  fxRate: string;
   geo: string;
   active: boolean;
 }
@@ -60,6 +64,7 @@ export function emptyDealDraft(type: DealTypeId = 'direto'): DealDraft {
     houseId: '', operatorName: '', type: resolveDealType(type), model: 'cpa',
     cpaValue: '', revPercentage: '', baseline: '', rollover: '', ggrPercentage: '',
     minCpaGoal: '', cycle: 'mensal', currency: 'BRL', geo: '', active: true,
+    fxMode: 'none', fxRate: '',
   };
 }
 
@@ -86,6 +91,10 @@ export function draftFromDeal(deal: Deal): DealDraft {
     rollover: numToField(deal.rollover),
     ggrPercentage: ggrToField(deal.ggrPercentage),
     minCpaGoal: numToField(deal.minCpaGoal),
+    // Acordo ANTIGO não tem regime e resolve como 'none': o modal abre mostrando
+    // "não converter", e é o admin que decide ligar a conversão. Ver deal.ts.
+    fxMode: resolveFxMode(deal.fxMode, 'none'),
+    fxRate: deal.fxRate != null ? String(deal.fxRate) : '',
     cycle: deal.cycle,
     currency: deal.currency,
     geo: deal.geo,
@@ -112,6 +121,10 @@ export function buildDealPayload(draft: DealDraft): Partial<Deal> {
     rollover: fieldToNum(draft.rollover),
     ggrPercentage: isBlank(draft.ggrPercentage) ? null : fieldToNum(draft.ggrPercentage),
     minCpaGoal: fieldToNum(draft.minCpaGoal),
+    fxMode: draft.fxMode,
+    // Vazio vira null (e o validador recusa 'fixed' sem cotação) — nunca 0, que
+    // seria uma cotação configurada de zero real por dólar.
+    fxRate: isBlank(draft.fxRate) ? null : parseHouseCpaInput(draft.fxRate, 'BRL'),
     cycle: draft.cycle,
     currency: draft.currency,
     geo: draft.geo,
@@ -169,6 +182,8 @@ export interface DraftHouse {
   defaultCpa?: number | null;
   defaultRev?: number | null;
   cpaCurrency?: string | null;
+  fxMode?: string | null;
+  fxRate?: number | null;
 }
 
 // Chave da casa no acordo. O `houseId` do deal é o SLUG (= doc id das casas), e é
@@ -204,7 +219,10 @@ export function draftFromHouse(house: DraftHouse, type: DealTypeId = 'direto'): 
     cpaValue: cpa > 0 ? String(cpa) : '',
     revPercentage: rev > 0 ? String(rev) : '',
     currency: cpa > 0 ? (resolveCpaCurrency(house?.cpaCurrency) as DealCurrency) : 'BRL',
-    active: true,
+    // O REGIME acompanha a moeda copiada: sugerir "US$ 100" sem dizer por qual
+    // cotação deixaria o acordo em `none`, ou seja, US$ 100 pagos como R$ 100.
+    fxMode: cpa > 0 ? resolveFxMode(house?.fxMode, 'live') : 'none',
+    fxRate: house?.fxRate != null ? String(house.fxRate) : '',
   };
 }
 

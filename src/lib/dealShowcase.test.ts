@@ -32,6 +32,14 @@ describe('formatDealKpiValue', () => {
     expect(formatDealKpiValue('baseline', deal({ baseline: 1250.5 }))).toBe('R$ 1.250,50');
   });
 
+  // O acordo é escrito na moeda dele: traduzir "US$ 100" para "R$ 100" no rótulo
+  // seria dizer outra coisa que não está no contrato. A conversão acontece na
+  // aprovação da parceria, não aqui.
+  it('usa a MOEDA do acordo nos valores em dinheiro', () => {
+    expect(formatDealKpiValue('cpa', deal({ cpaValue: 100, currency: 'USD' }))).toMatch(/US\$\s?100,00/);
+    expect(formatDealKpiValue('baseline', deal({ baseline: 30, currency: 'EUR' }))).toMatch(/€\s?30,00/);
+  });
+
   it('formata rollover como multiplicador e os percentuais com %', () => {
     expect(formatDealKpiValue('rollover', deal({ rollover: 2 }))).toBe('2x');
     expect(formatDealKpiValue('ggr', deal({ ggrPercentage: 30 }))).toBe('30%');

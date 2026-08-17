@@ -5,7 +5,7 @@
 import { authFetch } from '../lib/api';
 import { BrandMeta, setKnownBrands } from '../lib/brand';
 import { StoredManualRow, Metrics } from '../lib/houseResults';
-import { HouseCpaCurrency, resolveCpaCurrency } from '../lib/currency';
+import { HouseCpaCurrency, resolveCpaCurrency, resolveFxMode, type FxMode } from '../lib/currency';
 
 export interface House {
   id: string;        // doc id (= slug)
@@ -22,9 +22,13 @@ export interface House {
   // `comissao` importada. REV em %. Só relevante p/ casas 'manual'.
   defaultCpa?: number | null;
   defaultRev?: number | null;
-  // Moeda em que a casa paga o CPA: 'EUR' converte pela cotação ao vivo, 'BRL' é o
-  // valor exato. Ausente = 'EUR' (o defaultCpa histórico está todo em euro).
+  // Moeda em que a casa paga o CPA: moeda estrangeira converte pela cotação, 'BRL'
+  // é o valor exato. Ausente = 'EUR' (o defaultCpa histórico está todo em euro).
   cpaCurrency?: HouseCpaCurrency | null;
+  // Regime da cotação: 'live' = do dia (AwesomeAPI), 'fixed' = a que a agência
+  // digitou em `fxRate`. Ausente = 'live' (o que a casa em euro sempre fez).
+  fxMode?: FxMode | null;
+  fxRate?: number | null;
   // ISS retido no repasse ao afiliado, em % — VARIA POR CASA (5% / 2% / 2% no
   // legado da Infinity). Ausente = sem retenção. Núcleo em `src/lib/tax.ts`.
   issPercent?: number | null;
@@ -61,6 +65,8 @@ export interface HouseInput {
   defaultCpa?: number | null;
   defaultRev?: number | null;
   cpaCurrency?: HouseCpaCurrency | null;
+  fxMode?: FxMode | null;
+  fxRate?: number | null;
   issPercent?: number | null;
   revInProfit?: boolean;
   logoBase64?: string | null;
@@ -82,9 +88,12 @@ export function houseToBrandMeta(h: House): BrandMeta {
     dataSource: h.dataSource,
     defaultCpa: h.defaultCpa ?? null,
     defaultRev: h.defaultRev ?? null,
-    // A moeda viaja junto com o valor: quem deriva a comissão (houseRateOf) só tem
-    // o BrandMeta em mãos e precisa saber se converte ou não.
+    // A moeda E o regime de cotação viajam junto com o valor: quem deriva a comissão
+    // (houseRateOf) só tem o BrandMeta em mãos e precisa saber se converte, e por
+    // qual taxa. Sem o regime aqui, a casa de cotação fixa cairia na do dia.
     cpaCurrency: resolveCpaCurrency(h.cpaCurrency),
+    fxMode: resolveFxMode(h.fxMode, 'live'),
+    fxRate: h.fxRate ?? null,
   };
 }
 

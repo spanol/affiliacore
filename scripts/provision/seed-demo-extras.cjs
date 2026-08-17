@@ -162,11 +162,14 @@ const RUAS = ['Rua das Palmeiras', 'Av. Brasil', 'Rua XV de Novembro', 'Av. Paul
 // Casas extras (manuais). defaultCpa em EUR (convenção /casas), defaultRev em %.
 // A Esportiva entra COM conector (integrations/esportiva-tap) p/ mostrar o pull
 // automático — espelha o setup real da Infinity.
+// A moeda + o regime de cotação (17/08) aparecem aqui p/ a demo mostrar os TRÊS
+// casos: euro pela cotação do dia (a convenção antiga), dólar com cotação FIXA e
+// real sem conversão. Casa sem os campos resolve como euro/do dia, como sempre.
 const EXTRA_HOUSES = [
   { slug: 'kto', name: 'KTO', defaultCpa: 20, defaultRev: 30 },
-  { slug: 'novibet', name: 'Novibet', defaultCpa: 19, defaultRev: 28 },
+  { slug: 'novibet', name: 'Novibet', defaultCpa: 19, defaultRev: 28, cpaCurrency: 'USD', fxMode: 'fixed', fxRate: 5.4 },
   { slug: 'vaidebet', name: 'Vai de Bet', defaultCpa: 17, defaultRev: 25 },
-  { slug: 'esportiva', name: 'Esportiva Bet', defaultCpa: 18, defaultRev: 26 },
+  { slug: 'esportiva', name: 'Esportiva Bet', defaultCpa: 120, defaultRev: 26, cpaCurrency: 'BRL' },
 ];
 // Tag `afp` de propósito: está em TAG_PARAMS (src/lib/linkTriage.ts) — a triagem
 // de /links reconhece a tag em uso; `wm` não seria reconhecida.
@@ -259,6 +262,9 @@ async function main() {
     // aqui a flag da casa; o alvo (houseId) vai no doc integrations/esportiva-tap.
     ...(h.slug === 'esportiva' ? { integration: 'esportiva-tap' } : {}),
     defaultCpa: h.defaultCpa, defaultRev: h.defaultRev,
+    cpaCurrency: h.cpaCurrency ?? 'EUR',
+    fxMode: h.fxMode ?? 'live',
+    fxRate: h.fxRate ?? null,
     createdByUid: adminUid, createdAt: daysAgoTs(65), updatedAt: daysAgoTs(65),
   })));
   ['superbet', 'betano', 'betmgm'].forEach((slug) => writes.push((b) => b.set(
@@ -437,6 +443,11 @@ async function main() {
     // Ciclo D30+ e meta mínima de CPA (pedido da Infinity, 17/08/2026): a demo tem
     // que mostrar os dois, senão o card e o modal seguem parecendo os de antes.
     { slug: 'kto', model: 'cpa', cpaValue: 240, revPercentage: 0, cycle: 'd30mais', currency: 'BRL', geo: 'Brasil', active: true, type: 'direto', minCpaGoal: 3 },
+    // Acordo em DÓLAR com cotação FIXA (17/08): a conversão p/ R$ acontece na
+    // aprovação da parceria e congela ali. Ver src/lib/currency.ts.
+    { slug: 'novibet', model: 'cpa', cpaValue: 45, revPercentage: 0, cycle: 'mensal', currency: 'USD', geo: 'Brasil', active: true, type: 'direto', minCpaGoal: 4, fxMode: 'fixed', fxRate: 5.4 },
+    // ...e um em EURO pela cotação do dia, o outro regime.
+    { slug: 'betmgm', model: 'hybrid', cpaValue: 30, revPercentage: 15, cycle: 'quinzenal', currency: 'EUR', geo: 'Portugal', active: true, type: 'direto', fxMode: 'live' },
     { slug: 'esportiva', model: 'cpa', cpaValue: 300, revPercentage: 0, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'gerenciado', baseline: 2500, rollover: 2, ggrPercentage: null, minCpaGoal: 10 },
     { slug: 'vaidebet', model: 'hybrid', cpaValue: 250, revPercentage: 20, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'gerenciado', baseline: 1500, rollover: 3, ggrPercentage: 30 },
   ];
@@ -451,6 +462,7 @@ async function main() {
       cpaValue: d.cpaValue, revPercentage: d.revPercentage, cycle: d.cycle,
       currency: d.currency, geo: d.geo, active: d.active, order: i,
       type: d.type, minCpaGoal: d.minCpaGoal ?? 0,
+      fxMode: d.fxMode ?? 'none', fxRate: d.fxRate ?? null,
       ...(d.type === 'gerenciado' ? { baseline: d.baseline, rollover: d.rollover, ggrPercentage: d.ggrPercentage ?? null } : {}),
       label: dealLabel(d), createdByUid: adminUid,
       createdAt: daysAgoTs(60 - i), updatedAt: daysAgoTs(between(1, 30)),

@@ -35,8 +35,10 @@ import {
   svgToDataUrl,
 } from '../lib/housePresets';
 import {
-  fetchEurBrlRate, eurToBrl, formatBrl, getCachedEurBrlQuote, EurBrlQuote,
+  fetchFxQuotes, formatBrl, getCachedFxQuotes, resolveFxMode, resolveFxRate,
+  MONEY_CURRENCIES, CURRENCY_SYMBOL, CURRENCY_LABEL,
   HouseCpaCurrency, resolveCpaCurrency, parseHouseCpaInput, convertHouseCpaInput,
+  type FxQuotes, type FxMode, type FxSpec, type ForeignCurrency,
 } from '../lib/currency';
 import { fetchIntegrations, type PublicIntegration } from '../services/integrationService';
 import { houseResultsMode, houseModePayload, type HouseResultsMode } from '../lib/integrations';
@@ -456,17 +458,36 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
   // (com centavos) não cabia na régua de euro inteiro.
   const [defaultCpa, setDefaultCpa] = useState<string>(house?.defaultCpa != null ? String(house.defaultCpa) : '');
   const [cpaCurrency, setCpaCurrency] = useState<HouseCpaCurrency>(() => resolveCpaCurrency(house?.cpaCurrency));
+  // Regime da cotação (pedido Infinity 17/08): do dia (AwesomeAPI) ou a fixa que a
+  // agência digitou. Casa antiga não tem o campo e resolve como 'live', que é o que
+  // ela sempre fez — trocar esse default reinterpretaria o CPA de quem já existe.
+  const [fxMode, setFxMode] = useState<FxMode>(() => resolveFxMode(house?.fxMode, 'live'));
+  const [fxRate, setFxRate] = useState<string>(house?.fxRate != null ? String(house.fxRate) : '');
   const [defaultRev, setDefaultRev] = useState<string>(house?.defaultRev != null ? String(house.defaultRev) : '');
   const [issPercent, setIssPercent] = useState<string>(house?.issPercent != null ? String(house.issPercent) : '');
   // Toggle "REV no lucro líquido" (call 12/08). Ausente no doc = true (como sempre foi).
   const [revInProfit, setRevInProfit] = useState<boolean>(house?.revInProfit !== false);
-  const [eurQuote, setEurQuote] = useState<EurBrlQuote>(() => getCachedEurBrlQuote());
+  const [fxQuotes, setFxQuotes] = useState<FxQuotes>(() => getCachedFxQuotes());
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [presetSlug, setPresetSlug] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Cotação EUR→BRL ao vivo (AwesomeAPI) p/ o preview do CPA em R$.
-  useEffect(() => { fetchEurBrlRate().then(setEurQuote).catch(() => {}); }, []);
+  // Cotações do dia (AwesomeAPI) p/ o preview do CPA em R$.
+  useEffect(() => { fetchFxQuotes().then(setFxQuotes).catch(() => {}); }, []);
+
+  // O que a casa vai usar de fato para converter. `null` = cotação fixa escolhida e
+  // ainda não informada: nesse estado a tela mostra o pedido em vez de um número.
+  const fxSpec: FxSpec = {
+    currency: cpaCurrency,
+    fxMode,
+    fxRate: parseHouseCpaInput(fxRate, 'BRL'),
+  };
+  const effectiveRate = resolveFxRate(fxSpec, fxQuotes);
+  // Trocar a moeda CONVERTE o valor digitado, e converter exige cotação confiável:
+  // no modo do dia, uma cotação que ainda é o fallback gravaria um número errado
+  // para sempre (o valor em R$ é GRAVADO, não recalculado a cada render).
+  const canConvertFrom = (c: HouseCpaCurrency) =>
+    c === 'BRL' || fxMode === 'fixed' || (fxQuotes[c as ForeignCurrency]?.live ?? false);
 
   // Conectores registrados em /integracoes — é de lá que sai a lista de opções
   // do modo "Pull automático". Falha de rede não trava o modal: sem lista, o
@@ -532,6 +553,13 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
       push({ type: 'error', message: 'Escolha a integração que vai puxar os resultados desta casa.' });
       return;
     }
+    // Cotação fixa sem valor gravaria um CPA que não converte, e o sintoma seria
+    // comissão da casa zerada. O servidor recusa também; aqui é só a mensagem perto
+    // do campo. Só cobra quando há CPA a converter.
+    if (cpaCurrency !== 'BRL' && fxMode === 'fixed' && fxSpec.fxRate == null && defaultCpa.trim() !== '') {
+      push({ type: 'error', message: `Informe a cotação fixa (R$ por 1 ${CURRENCY_SYMBOL[cpaCurrency]}) ou use a cotação do dia.` });
+      return;
+    }
     setSaving(true);
     try {
       const payload: HouseInput = {
@@ -541,10 +569,13 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
         registerUrlTemplate: registerUrlTemplate.trim() || null,
         active,
         ...houseModePayload(mode, integrationId),
-        // Valor na moeda escolhida (EUR inteiro / BRL com centavos) + a moeda, que
-        // viajam SEMPRE juntos: é ela que decide se o número será convertido.
+        // Valor na moeda escolhida (EUR inteiro / BRL e USD com centavos) + a moeda
+        // e o regime, que viajam SEMPRE juntos: são eles que decidem se o número
+        // será convertido e por qual taxa.
         defaultCpa: parseHouseCpaInput(defaultCpa, cpaCurrency),
         cpaCurrency,
+        fxMode,
+        fxRate: fxSpec.fxRate,
         defaultRev: defaultRev.trim() === '' ? null : Number(defaultRev),
         issPercent: issPercent.trim() === '' ? null : Number(issPercent),
         revInProfit,
@@ -767,7 +798,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
             )}
 
             {mode === 'manual' && (
-              <Field label="Taxa padrão da casa" hint="RECEITA: o que a casa paga à AGÊNCIA. NÃO é o repasse ao afiliado (esse fica em Afiliados). Usada p/ derivar a comissão quando a planilha não traz a coluna 'comissao'. Informe na MOEDA em que a casa paga: em euro convertemos pela cotação do dia; em real gravamos o valor exato. Sem isto, o lucro por casa fica negativo.">
+              <Field label="Taxa padrão da casa" hint="RECEITA: o que a casa paga à AGÊNCIA. NÃO é o repasse ao afiliado (esse fica em Afiliados). Usada p/ derivar a comissão quando a planilha não traz a coluna 'comissao'. Informe na MOEDA em que a casa paga: em moeda estrangeira você escolhe se a conversão segue a cotação do dia ou uma cotação fixa; em real gravamos o valor exato. Sem isto, o lucro por casa fica negativo.">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-1">
@@ -776,25 +807,22 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                           digitado (preserva o R$ efetivo) — senão "30" viraria R$ 30
                           e a comissão da casa despencaria sem ninguém notar. */}
                       <div className="flex rounded-lg border border-slate-200 dark:border-neutral-700 overflow-hidden">
-                        {(['EUR', 'BRL'] as const).map((c) => (
+                        {MONEY_CURRENCIES.map((c) => (
                           <button
                             key={c}
                             type="button"
+                            data-testid={`moeda-casa-${c}`}
                             onClick={() => {
                               if (c === cpaCurrency) return;
-                              // Sem cotação AO VIVO não dá p/ converter: o valor em R$
-                              // é GRAVADO (não recalculado a cada render como o euro),
-                              // então converter pelo fallback congelaria o número errado
-                              // — €30 viraria R$ 180 em vez de R$ 177 e ficaria assim.
                               // Campo vazio pode trocar à vontade (não há o que converter).
-                              if (!eurQuote.live && defaultCpa.trim() !== '') {
+                              if (defaultCpa.trim() !== '' && (!canConvertFrom(cpaCurrency) || !canConvertFrom(c))) {
                                 push({
                                   type: 'error',
-                                  message: 'Cotação do euro indisponível agora. Sem ela a conversão gravaria um valor errado; apague o campo para trocar a moeda e digite o valor na moeda nova.',
+                                  message: 'Cotação indisponível agora. Sem ela a conversão gravaria um valor errado; apague o campo para trocar a moeda e digite o valor na moeda nova.',
                                 });
                                 return;
                               }
-                              setDefaultCpa(convertHouseCpaInput(defaultCpa, cpaCurrency, c, eurQuote.rate));
+                              setDefaultCpa(convertHouseCpaInput(defaultCpa, fxSpec, { ...fxSpec, currency: c }, fxQuotes));
                               setCpaCurrency(c);
                             }}
                             className={cn(
@@ -804,37 +832,39 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                                 : 'text-slate-500 dark:text-neutral-400 hover:bg-slate-100 dark:hover:bg-neutral-800'
                             )}
                           >
-                            {c === 'EUR' ? '€ EUR' : 'R$ BRL'}
+                            {CURRENCY_SYMBOL[c]} {c}
                           </button>
                         ))}
                       </div>
                     </div>
                     <div className="relative">
                       <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500 text-sm font-semibold">
-                        {cpaCurrency === 'BRL' ? 'R$' : '€'}
+                        {CURRENCY_SYMBOL[cpaCurrency]}
                       </span>
                       <input
                         type="text"
-                        inputMode={cpaCurrency === 'BRL' ? 'decimal' : 'numeric'}
+                        inputMode={cpaCurrency === 'EUR' ? 'numeric' : 'decimal'}
                         value={defaultCpa}
                         onChange={(e) => setDefaultCpa(
-                          // EUR é inteiro (a casa informa euro cheio); BRL aceita
-                          // centavos com um separador só (vírgula ou ponto).
-                          cpaCurrency === 'BRL'
-                            ? e.target.value.replace(/[^0-9.,]/g, '').replace(/([.,])(?=.*[.,])/g, '')
-                            : e.target.value.replace(/[^0-9]/g, '')
+                          // EUR é inteiro (a casa informa euro cheio); real e dólar
+                          // aceitam centavos com um separador só (vírgula ou ponto).
+                          cpaCurrency === 'EUR'
+                            ? e.target.value.replace(/[^0-9]/g, '')
+                            : e.target.value.replace(/[^0-9.,]/g, '').replace(/([.,])(?=.*[.,])/g, '')
                         )}
-                        placeholder={cpaCurrency === 'BRL' ? 'ex.: 120,00' : 'ex.: 30'}
-                        className={`${inputCls} ${cpaCurrency === 'BRL' ? 'pl-9' : 'pl-7'}`}
+                        placeholder={cpaCurrency === 'EUR' ? 'ex.: 30' : 'ex.: 120,00'}
+                        className={`${inputCls} ${cpaCurrency === 'EUR' ? 'pl-7' : 'pl-9'}`}
                       />
                     </div>
                     <p className="mt-1 text-[10px] text-slate-400 dark:text-neutral-500">
                       {cpaCurrency === 'BRL' ? (
                         <>Valor <b>exato</b> pago pela casa, não varia com o câmbio.</>
+                      ) : effectiveRate == null ? (
+                        <span className="text-amber-600 dark:text-amber-400">Informe a cotação fixa abaixo para converter.</span>
                       ) : defaultCpa.trim() === '' ? (
-                        <>1 € = {formatBrl(eurQuote.rate)}{!eurQuote.live && ' · cotação indisponível'}</>
+                        <>1 {CURRENCY_SYMBOL[cpaCurrency]} = {formatBrl(effectiveRate)}{fxMode === 'live' && !fxQuotes[cpaCurrency as ForeignCurrency]?.live && ' · cotação indisponível'}</>
                       ) : (
-                        <>≈ <b className="text-emerald-600 dark:text-emerald-400">{formatBrl(eurToBrl(Number(defaultCpa), eurQuote.rate))}</b> por CPA · 1 € = {formatBrl(eurQuote.rate)}{!eurQuote.live && ' (estimada)'}</>
+                        <>≈ <b className="text-emerald-600 dark:text-emerald-400">{formatBrl(Number(defaultCpa) * effectiveRate)}</b> por CPA · 1 {CURRENCY_SYMBOL[cpaCurrency]} = {formatBrl(effectiveRate)}{fxMode === 'fixed' ? ' (fixa)' : !fxQuotes[cpaCurrency as ForeignCurrency]?.live ? ' (estimada)' : ''}</>
                       )}
                     </p>
                   </div>
@@ -848,6 +878,55 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                       className={inputCls}
                     />
                   </div>
+
+                  {/* Regime da cotação — só existe em moeda estrangeira (o real vale 1).
+                      "Do dia" é o que a casa em euro sempre fez; "fixa" atende quem
+                      fechou o contrato numa cotação e não quer o câmbio mexendo no
+                      número. Ver src/lib/currency.ts. */}
+                  {cpaCurrency !== 'BRL' && (
+                    <div className="col-span-2 p-3 rounded-xl bg-slate-50 dark:bg-neutral-800/40 border border-slate-100 dark:border-neutral-800">
+                      <span className="block mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                        Cotação do {CURRENCY_LABEL[cpaCurrency].toLowerCase()}
+                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {([['live', 'Do dia'], ['fixed', 'Fixa']] as const).map(([m, label]) => (
+                          <button
+                            key={m}
+                            type="button"
+                            data-testid={`regime-casa-${m}`}
+                            onClick={() => setFxMode(m)}
+                            className={cn(
+                              'px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-colors',
+                              fxMode === m
+                                ? 'bg-accent-500 text-accent-contrast border-accent-500'
+                                : 'border-slate-200 dark:border-neutral-700 text-slate-500 dark:text-neutral-400 hover:bg-slate-100 dark:hover:bg-neutral-800'
+                            )}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                        {fxMode === 'fixed' && (
+                          <div className="relative flex-1 min-w-[9rem]">
+                            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500 text-sm font-semibold">R$</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              data-testid="cotacao-fixa-casa"
+                              value={fxRate}
+                              onChange={(e) => setFxRate(e.target.value.replace(/[^0-9.,]/g, '').replace(/([.,])(?=.*[.,])/g, ''))}
+                              placeholder={`por 1 ${CURRENCY_SYMBOL[cpaCurrency]}`}
+                              className={`${inputCls} pl-9`}
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <p className="mt-2 text-[10px] text-slate-400 dark:text-neutral-500">
+                        {fxMode === 'fixed'
+                          ? 'A conversão usa sempre esta cotação. O câmbio do mercado não mexe no valor.'
+                          : 'A conversão acompanha a cotação do dia, então a comissão da casa varia com o câmbio.'}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </Field>
             )}

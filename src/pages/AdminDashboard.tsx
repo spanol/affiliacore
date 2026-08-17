@@ -34,7 +34,7 @@ import { withKnownBrandNames } from '../lib/knownHouses';
 import { StoredManualRow, aggregateByHouse, aggregateByAffiliate, emptyMetrics, addMetrics } from '../lib/houseResults';
 import { buildAffiliatePerformance, indexPerformanceById } from '../lib/adminAffiliatePerformance';
 import { fetchHouses, syncKnownBrandsFrom } from '../services/houseService';
-import { fetchEurBrlRate, getCachedEurBrlRate } from '../lib/currency';
+import { fetchFxQuotes, getCachedFxQuotes, type FxQuotes } from '../lib/currency';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
 import { producingAffiliateIds } from '../lib/affiliateActivity';
 import { readAffiliateCountMode, writeAffiliateCountMode, AffiliateCountMode } from '../lib/affiliateCountMode';
@@ -65,8 +65,9 @@ export default function AdminDashboard() {
   // Rede de afiliados: aresta filho→upline (affiliate_uplines). Alimenta o
   // "lucro sobre equipe" que a agência paga ALÉM do repasse direto.
   const [uplines, setUplines] = useState<Record<string, string>>({});
-  // Cotação EUR→BRL (AwesomeAPI) — converte o CPA das casas (gravado em EUR) p/ R$.
-  const [eurRate, setEurRate] = useState<number>(() => getCachedEurBrlRate());
+  // Cotações do dia (AwesomeAPI) — convertem o CPA das casas em moeda estrangeira
+  // p/ R$. Casa de cotação FIXA ignora isto e usa a taxa dela (src/lib/currency.ts).
+  const [fxQuotes, setFxQuotes] = useState<FxQuotes>(() => getCachedFxQuotes());
 
   // Lista de afiliados (com brand) — base do filtro e do mapa id→marca.
   useEffect(() => {
@@ -102,16 +103,16 @@ export default function AdminDashboard() {
     async function getResults() {
       try {
         setLoading(true);
-        // O registro de casas (defaultCpa) e a cotação EUR→BRL PRECISAM estar prontos
+        // O registro de casas (defaultCpa) e as cotações PRECISAM estar prontos
         // ANTES de buscar/derivar a comissão das casas manuais: `fetchAllResultsByBrand`
         // (fonte do card "COMISSÃO (CASA)") deriva a comissão manual via getKnownBrands()
         // + cotação em cache. Em cold load (prod), esse registro ainda só tem as sementes
         // OTG (o DashboardLayout o popula em paralelo, async) → casa manual saía R$ 0,00
         // na comissão enquanto o lucro (reativo) vinha certo. Carregamos aqui de forma
         // DETERMINÍSTICA. [[boost-house-cpa-eur]]
-        const [houses, eur] = await Promise.all([fetchHouses(), fetchEurBrlRate()]);
+        const [houses, fx] = await Promise.all([fetchHouses(), fetchFxQuotes()]);
         if (houses.length) syncKnownBrandsFrom(houses);
-        setEurRate(eur.rate);
+        setFxQuotes(fx);
 
         const [allResults, cfgs, campaigns, specialData, byBrand, manual, uplineMap] = await Promise.all([
           fetchAllResults(range),
@@ -156,7 +157,7 @@ export default function AdminDashboard() {
   // de CPA dá comissão 0 e o lucro do master fica NEGATIVO (0 − repasse). Enriquecemos
   // num ÚNICO ponto p/ que headline (manualAgg) e cards por casa (composeAdminProfit)
   // saiam da MESMA base. [[houseCommissionForRow]]
-  const manualRowsD = useMemo(() => deriveManualRowsCommission(manualRows, eurRate), [manualRows, eurRate]);
+  const manualRowsD = useMemo(() => deriveManualRowsCommission(manualRows, fxQuotes), [manualRows, fxQuotes]);
 
   // Linhas manuais no escopo da marca (ALL = todas; senão só as casas manuais cujo
   // nome canônico bate com o filtro). Casa OTG selecionada → nenhuma manual.

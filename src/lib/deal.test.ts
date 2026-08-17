@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildDealLabel, dealBrandKey, dealToBrandRates, normalizeDealInput, buildDraftDealFromHouse,
-  PAYMENT_CYCLES, PAYMENT_CYCLE_LABEL,
+  PAYMENT_CYCLES, PAYMENT_CYCLE_LABEL, dealFxSpec,
 } from './deal';
 
 describe('buildDealLabel · padrão Operadora-Modelo-Ciclo-Moeda-Geo', () => {
@@ -63,6 +63,73 @@ describe('meta mínima de CPA', () => {
   });
   it('rascunho criado junto com a casa nasce sem meta', () => {
     expect(buildDraftDealFromHouse({ slug: 'leon-bet', name: 'LEON Bet' })?.minCpaGoal).toBe(0);
+  });
+});
+
+describe('moeda do acordo · converte de verdade (pedido Infinity 17/08)', () => {
+  const QUOTES = {
+    EUR: { rate: 6, live: true, fetchedAt: 1 },
+    USD: { rate: 5.4, live: true, fetchedAt: 1 },
+  };
+  const base = { houseId: 'leon-bet', operatorName: 'LEON Bet', model: 'cpa', cpaValue: 100 };
+
+  // ESTE é o teste que protege o dado que já existe: até 17/08 a moeda era etiqueta
+  // e o número ia cru para o byBrand. Um acordo antigo em dólar não pode acordar
+  // valendo 5x mais só porque a conversão passou a existir.
+  it('acordo ANTIGO (sem regime) NÃO converte — o número segue sendo reais', () => {
+    expect(dealFxSpec({ currency: 'USD' }).fxMode).toBe('none');
+    expect(dealToBrandRates({ cpaValue: 100, currency: 'USD' }, QUOTES))
+      .toEqual({ cpaValue: 100, revPercentage: 0 });
+  });
+
+  it('cotação do dia converte pelo câmbio; REV nunca converte', () => {
+    const rates = dealToBrandRates({ cpaValue: 100, revPercentage: 20, currency: 'USD', fxMode: 'live' }, QUOTES);
+    expect(rates).toEqual({ cpaValue: 540, revPercentage: 20 });
+  });
+
+  it('cotação fixa ignora o mercado', () => {
+    expect(dealToBrandRates({ cpaValue: 100, currency: 'USD', fxMode: 'fixed', fxRate: 5 }, QUOTES))
+      .toEqual({ cpaValue: 500, revPercentage: 0 });
+  });
+
+  // A aprovação recusa em cima deste null, em vez de gravar taxa inventada.
+  it('fixa SEM cotação devolve null (a aprovação tem que recusar)', () => {
+    expect(dealToBrandRates({ cpaValue: 100, currency: 'EUR', fxMode: 'fixed' }, QUOTES)).toBeNull();
+  });
+
+  it('acordo em real não depende de cotação nenhuma', () => {
+    expect(dealToBrandRates({ cpaValue: 120.5, currency: 'BRL', fxMode: 'live' }))
+      .toEqual({ cpaValue: 120.5, revPercentage: 0 });
+  });
+
+  it('grava o regime e a cotação informados', () => {
+    const { deal } = normalizeDealInput({ ...base, currency: 'USD', fxMode: 'fixed', fxRate: 5.4 });
+    expect(deal?.fxMode).toBe('fixed');
+    expect(deal?.fxRate).toBe(5.4);
+  });
+
+  it('recusa cotação fixa sem valor', () => {
+    expect(normalizeDealInput({ ...base, currency: 'EUR', fxMode: 'fixed' }).error).toMatch(/cotação fixa/i);
+    expect(normalizeDealInput({ ...base, currency: 'EUR', fxMode: 'fixed', fxRate: 0 }).error).toMatch(/cotação fixa/i);
+  });
+
+  it('em real a cotação vai a null, não a um número morto no doc', () => {
+    const { deal } = normalizeDealInput({ ...base, currency: 'BRL', fxMode: 'fixed', fxRate: 5.4 });
+    expect(deal?.fxRate).toBeNull();
+  });
+
+  // Editar o nome de um acordo antigo não pode ligar conversão de brinde: o
+  // normalizador só respeita o regime que CHEGOU.
+  it('edição sem regime mantém "não converte"', () => {
+    const { deal } = normalizeDealInput({ ...base, currency: 'USD', operatorName: 'LEON Bet BR' });
+    expect(deal?.fxMode).toBe('none');
+    expect(deal?.fxRate).toBeNull();
+  });
+
+  it('moeda legada fora do trio (crypto) não converte', () => {
+    expect(dealFxSpec({ currency: 'crypto', fxMode: 'live' }).currency).toBe('BRL');
+    expect(dealToBrandRates({ cpaValue: 100, currency: 'crypto', fxMode: 'live' }, QUOTES))
+      .toEqual({ cpaValue: 100, revPercentage: 0 });
   });
 });
 

@@ -248,6 +248,9 @@ const FIELD_LABELS: Record<string, string> = {
   defaultCpa: 'CPA padrão',
   defaultRev: 'REV padrão',
   cpaCurrency: 'Moeda do CPA',
+  fxMode: 'Regime da cotação',
+  fxRate: 'Cotação fixa',
+  minCpaGoal: 'Meta mínima de CPA',
   logo: 'Logo',
   // comissão (config.update)
   cpaValue: 'CPA',

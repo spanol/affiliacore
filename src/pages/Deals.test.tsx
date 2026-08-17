@@ -163,6 +163,42 @@ describe('/acordos · payload salvo', () => {
     expect(payload.cpaValue).toBe(110);
   });
 
+  it('escolher dólar liga a conversão e a cotação vai no payload', async () => {
+    await renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /Novo acordo/ }));
+    fireEvent.change(screen.getByTestId('campo-casa'), { target: { value: 'esportiva' } });
+    fireEvent.change(field('cpa')!, { target: { value: '100' } });
+    // Em real não há câmbio a escolher: o bloco nem existe.
+    expect(screen.queryByTestId('regime-deal-live')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('campo-moeda'), { target: { value: 'USD' } });
+    // Moeda estrangeira nasce em "cotação do dia" (e não em "sem conversão", que é
+    // só a leitura do dado antigo).
+    expect(screen.getByTestId('regime-deal-live')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('regime-deal-fixed'));
+    fireEvent.change(screen.getByTestId('campo-cotacao'), { target: { value: '5,40' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })); });
+    const payload = h.createDeal.mock.calls[0][0];
+    expect(payload.currency).toBe('USD');
+    expect(payload.fxMode).toBe('fixed');
+    expect(payload.fxRate).toBe(5.4);
+  });
+
+  it('voltar para real desliga a conversão e limpa a cotação', async () => {
+    await renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /Novo acordo/ }));
+    fireEvent.change(screen.getByTestId('campo-casa'), { target: { value: 'esportiva' } });
+    fireEvent.change(field('cpa')!, { target: { value: '100' } });
+    fireEvent.change(screen.getByTestId('campo-moeda'), { target: { value: 'EUR' } });
+    fireEvent.click(screen.getByTestId('regime-deal-fixed'));
+    fireEvent.change(screen.getByTestId('campo-cotacao'), { target: { value: '6' } });
+    fireEvent.change(screen.getByTestId('campo-moeda'), { target: { value: 'BRL' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })); });
+    const payload = h.createDeal.mock.calls[0][0];
+    expect(payload.currency).toBe('BRL');
+    expect(payload.fxMode).toBe('none');
+    expect(payload.fxRate).toBeNull();
+  });
+
   it('o ciclo D30+ e a meta mínima chegam no payload', async () => {
     await renderPage();
     fireEvent.click(screen.getByRole('button', { name: /Novo acordo/ }));

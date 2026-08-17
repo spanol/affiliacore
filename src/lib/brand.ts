@@ -4,6 +4,7 @@
 // marcas (ex.: SportingBet). O campo `brand` pode vir como objeto {name} ou string.
 
 import { houseLogoOrPreset } from './housePresets';
+import type { FxMode, HouseCpaCurrency } from './currency';
 
 export const ALL_BRANDS = '__all__';
 
@@ -82,7 +83,12 @@ export interface BrandMeta {
   defaultCpa?: number | null;
   defaultRev?: number | null;
   // Moeda em que a CASA paga o CPA. Ausente = 'EUR' (convenção original).
-  cpaCurrency?: 'EUR' | 'BRL' | null;
+  cpaCurrency?: HouseCpaCurrency | null;
+  // Regime da cotação (escolha da agência): 'live' = cotação do dia, 'fixed' = a
+  // que a agência digitou em `fxRate`. Ausente = 'live', que é o que a casa em euro
+  // sempre fez. Ver src/lib/currency.ts.
+  fxMode?: FxMode | null;
+  fxRate?: number | null; // R$ por 1 unidade da moeda; só vale no modo 'fixed'
   // Toggle da call Infinity 12/08: o REV compõe o LUCRO LÍQUIDO desta casa no
   // /admin? Ausente/true = sim (comportamento de sempre). `false` = o lucro da
   // casa vira CPA-only nos DOIS lados (comissão derivada da régua + repasse só

@@ -57,7 +57,19 @@ describe('houseToBrandMeta', () => {
       defaultCpa: null,
       defaultRev: null,
       cpaCurrency: 'EUR',
+      // Casa antiga não declara regime: resolve como 'live', que é o que ela sempre
+      // fez. O regime viaja junto do valor porque quem deriva a comissão
+      // (houseRateOf) só tem o BrandMeta em mãos.
+      fxMode: 'live',
+      fxRate: null,
     });
+  });
+
+  it('carrega a cotação FIXA da casa para quem deriva a comissão', () => {
+    const meta = houseToBrandMeta(makeHouse({ cpaCurrency: 'USD', fxMode: 'fixed', fxRate: 5.4 }));
+    expect(meta.cpaCurrency).toBe('USD');
+    expect(meta.fxMode).toBe('fixed');
+    expect(meta.fxRate).toBe(5.4);
   });
 
   it('preserva a taxa padrão da casa (defaultCpa/defaultRev) quando definida', () => {

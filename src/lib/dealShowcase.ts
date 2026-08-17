@@ -13,7 +13,8 @@
 
 import { num } from './commission';
 import { pluralize } from './plural';
-import { PAYMENT_CYCLE_LABEL, type Deal } from './deal';
+import { formatMoney } from './currency';
+import { PAYMENT_CYCLE_LABEL, dealCurrency, type Deal } from './deal';
 import { DEAL_KPI_LABEL, dealPolicy, visibleKpis, type DealKpiId } from './dealType';
 import type { PartnershipRequest, PartnershipStatus } from './partnership';
 
@@ -28,10 +29,14 @@ const pct = (v: any) => `${num(v).toLocaleString('pt-BR', { maximumFractionDigit
 // "ausência ≠ R$ 0" do lado do afiliado.
 export function formatDealKpiValue(kpi: DealKpiId, deal?: Deal | null): string | null {
   const positive = (v: any) => (v != null && v !== '' && num(v) > 0 ? num(v) : null);
+  // Os valores em dinheiro do acordo são escritos NA MOEDA DELE: mostrar "R$ 100"
+  // num acordo fechado em dólar seria uma tradução errada do contrato. A conversão
+  // p/ real acontece na aprovação (dealToBrandRates), não no rótulo.
+  const money = (v: number) => formatMoney(v, dealCurrency(deal));
   switch (kpi) {
     case 'cpa': {
       const v = positive(deal?.cpaValue);
-      return v == null ? null : brl(v);
+      return v == null ? null : money(v);
     }
     case 'revshare': {
       const v = positive(deal?.revPercentage);
@@ -39,7 +44,7 @@ export function formatDealKpiValue(kpi: DealKpiId, deal?: Deal | null): string |
     }
     case 'baseline': {
       const v = positive(deal?.baseline);
-      return v == null ? null : brl(v);
+      return v == null ? null : money(v);
     }
     case 'rollover': {
       const v = positive(deal?.rollover);

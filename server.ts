@@ -30,7 +30,11 @@ import {
   sanitizeIntegrationPatch, toPublicIntegration, numericSetting,
   type ConnectorSettings, type IntegrationDoc,
 } from './src/lib/integrations';
-import { houseCpaToBrl, resolveCpaCurrency, parseEurBrlRate, FALLBACK_EUR_BRL } from './src/lib/currency';
+import {
+  houseCpaToBrl, resolveCpaCurrency, resolveFxMode, resolveFxRate, resolveMoneyCurrency,
+  normalizeFxInput, parseEurBrlRate, parseFxRate,
+  FALLBACK_EUR_BRL, FALLBACK_USD_BRL, type FxQuotes,
+} from './src/lib/currency';
 import { DEFAULT_BRANDS } from './src/lib/brand';
 import { projectPartnerResults } from './src/lib/partnerResults';
 import { pullApprovedRoster, isOtgLinksConfigured } from './otgLinksPull';
@@ -44,7 +48,7 @@ import { sanitizeShowcase, buildShowcasePayload } from './src/lib/showcase';
 import { parseStandbyLinks, extractTagFromUrl } from './src/lib/linkTriage';
 import { buildTaggedUrl, suggestTag } from './src/lib/linkGeneration';
 import { buildResultsNotification, type ResultsNotificationVariant } from './src/lib/resultsNotification';
-import { normalizeDealInput, buildDealLabel, dealBrandKey, dealToBrandRates, buildDraftDealFromHouse } from './src/lib/deal';
+import { normalizeDealInput, buildDealLabel, dealBrandKey, dealToBrandRates, dealFxSpec, buildDraftDealFromHouse } from './src/lib/deal';
 import { canTransition, nextStatusAfterPricing, PARTNERSHIP_STATUS_LABEL, type PartnershipStatus } from './src/lib/partnership';
 import {
   resolveDealType, dealPolicy, effectivePricedBy, sanitizeDealsForViewer, type DealTypeId,
@@ -2357,21 +2361,30 @@ export function createApp(deps: ServerDeps) {
   // daily_rankings/{data} — que todo afiliado lê (leaderboard público com nomes).
   const isoDateRe = /^\d{4}-\d{2}-\d{2}$/;
 
-  // Cotação EUR→BRL p/ derivar a comissão das casas manuais no ranking (defaultCpa em
-  // EUR). Best-effort via o fetch INJETADO (mesma DI da OTG) → testável e sem rede real
-  // nos testes; nunca lança, cai no FALLBACK_EUR_BRL. Espelha currency.ts (client) sem o
-  // cache de módulo do browser. Usa .text()+JSON.parse (igual ao proxy OTG).
-  async function fetchEurBrlForRanking(): Promise<number> {
+  // Cotações do dia p/ derivar a comissão das casas manuais em moeda estrangeira.
+  // Best-effort via o fetch INJETADO (mesma DI da OTG) → testável e sem rede real nos
+  // testes; nunca lança, cai nos fallbacks. Espelha currency.ts (client) sem o cache de
+  // módulo do browser. Usa .text()+JSON.parse (igual ao proxy OTG).
+  async function fetchFxQuotesForServer(): Promise<FxQuotes> {
+    const fallback: FxQuotes = {
+      EUR: { rate: FALLBACK_EUR_BRL, live: false, fetchedAt: 0 },
+      USD: { rate: FALLBACK_USD_BRL, live: false, fetchedAt: 0 },
+    };
     try {
-      const resp = await fetchImpl('https://economia.awesomeapi.com.br/last/EUR-BRL', {
+      const resp = await fetchImpl('https://economia.awesomeapi.com.br/last/USD-BRL,EUR-BRL', {
         headers: { Accept: 'application/json' },
       });
-      if (!resp.ok) return FALLBACK_EUR_BRL;
+      if (!resp.ok) return fallback;
       const text = await resp.text();
-      const rate = parseEurBrlRate(text ? JSON.parse(text) : null);
-      return rate ?? FALLBACK_EUR_BRL;
+      const payload = text ? JSON.parse(text) : null;
+      const out = { ...fallback };
+      for (const code of ['EUR', 'USD'] as const) {
+        const rate = parseFxRate(payload, code) ?? (code === 'EUR' ? parseEurBrlRate(payload) : null);
+        if (rate != null) out[code] = { rate, live: true, fetchedAt: Date.now() };
+      }
+      return out;
     } catch {
-      return FALLBACK_EUR_BRL;
+      return fallback;
     }
   }
 
@@ -2447,17 +2460,17 @@ export function createApp(deps: ServerDeps) {
 
     // Taxa das casas manuais p/ derivar a comissão das linhas com total_commission=0.
     // defaultCpa é gravado NA MOEDA DA CASA (`cpaCurrency`, ausente = EUR) → normaliza p/
-    // BRL pela cotação ao vivo (best-effort, cai no fallback), IGUAL ao /admin (houseRateOf).
+    // BRL pela cotação da casa (fixa, ou a do dia best-effort), IGUAL ao /admin (houseRateOf).
     // Só busca cotação/casas quando há linha manual — a OTG já traz total_commission em R$.
     let houseRateOf: ((slug: string | undefined) => { defaultCpa: number; defaultRev: number } | undefined) | undefined;
     if (manualRows.length) {
-      const eurBrl = await fetchEurBrlForRanking();
+      const quotes = await fetchFxQuotesForServer();
       const housesSnap = await adminDb.collection('houses').get();
       const rateBySlug = new Map<string, { defaultCpa: number; defaultRev: number }>();
       housesSnap.forEach((d) => {
         const v = d.data() as any;
         rateBySlug.set(d.id, {
-          defaultCpa: houseCpaToBrl(v?.defaultCpa, v?.cpaCurrency, eurBrl),
+          defaultCpa: houseCpaToBrl(v?.defaultCpa, v, quotes),
           defaultRev: Number(v?.defaultRev) || 0,
         });
       });
@@ -4405,6 +4418,10 @@ export function createApp(deps: ServerDeps) {
       // Moeda do CPA. Normalizada na leitura (ausente = EUR): a casa antiga não tem o
       // campo e o valor dela ESTÁ em euro — o client nunca precisa adivinhar.
       cpaCurrency: resolveCpaCurrency(data.cpaCurrency),
+      // Regime da cotação. Ausente = 'live': a casa em euro sempre converteu pela
+      // cotação do dia, e mudar esse default reinterpretaria o CPA de quem já existe.
+      fxMode: resolveFxMode(data.fxMode, 'live'),
+      fxRate: Number.isFinite(Number(data.fxRate)) && Number(data.fxRate) > 0 ? Number(data.fxRate) : null,
       // Alíquota de ISS retida no repasse ao afiliado. VARIA POR CASA (ver src/lib/tax.ts).
       issPercent: Number.isFinite(Number(data.issPercent)) ? Number(data.issPercent) : null,
       // Toggle "REV no lucro líquido" (call Infinity 12/08). Ausente = true (sempre foi assim).
@@ -4501,6 +4518,13 @@ export function createApp(deps: ServerDeps) {
       if (!cleanName) return res.status(400).json({ error: 'O nome da casa é obrigatório.' });
       const slug = slugifyHouse(req.body?.slug || cleanName);
       if (!slug) return res.status(400).json({ error: 'Slug inválido.' });
+      // Moeda + regime de cotação viajam juntos: cotação fixa sem valor é recusada
+      // AQUI, senão a casa nasceria com um CPA que não converte.
+      const houseCurrency = resolveCpaCurrency(req.body?.cpaCurrency);
+      const houseFxMode = resolveFxMode(req.body?.fxMode, 'live');
+      const houseFxInput = normalizeFxInput(houseCurrency, houseFxMode, req.body?.fxRate);
+      if ('error' in houseFxInput) return res.status(400).json({ error: houseFxInput.error });
+      const houseFx = { currency: houseCurrency, fxMode: houseFxMode, fxRate: houseFxInput.fxRate };
       const ref = adminDb.collection('houses').doc(slug);
       if ((await ref.get()).exists) {
         return res.status(409).json({ error: `Já existe uma casa com o slug "${slug}".` });
@@ -4519,8 +4543,11 @@ export function createApp(deps: ServerDeps) {
         dataSource: dataSource === 'otg' ? 'otg' : 'manual',
         defaultCpa: numOrNull(req.body?.defaultCpa),
         defaultRev: numOrNull(req.body?.defaultRev),
-        // Moeda em que a casa paga o CPA — gravada SEMPRE (casa nova nasce explícita).
-        cpaCurrency: resolveCpaCurrency(req.body?.cpaCurrency),
+        // Moeda em que a casa paga o CPA — gravada SEMPRE (casa nova nasce explícita),
+        // junto do REGIME de cotação (do dia × fixa) e da cotação fixa quando houver.
+        cpaCurrency: houseFx.currency,
+        fxMode: houseFx.fxMode,
+        fxRate: houseFx.fxRate,
         issPercent: numOrNull(req.body?.issPercent),
         createdByUid: (req as any).user?.uid ?? null,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -4598,6 +4625,21 @@ export function createApp(deps: ServerDeps) {
           patch.cpaCurrency = nextCurrency;
         }
       }
+      // Regime de cotação. Validado contra a moeda RESULTANTE (a do patch, ou a que
+      // já estava): mudar só o regime para "fixa" sem informar a cotação deixaria a
+      // casa com um CPA que não converte, e o sintoma seria comissão zerada.
+      if (body.fxMode !== undefined || body.fxRate !== undefined) {
+        const stored = (snap.data() as any) || {};
+        const currency = patch.cpaCurrency ?? resolveCpaCurrency(stored.cpaCurrency);
+        const nextMode = body.fxMode !== undefined
+          ? resolveFxMode(body.fxMode, 'live')
+          : resolveFxMode(stored.fxMode, 'live');
+        const rawRate = body.fxRate !== undefined ? body.fxRate : stored.fxRate;
+        const fx = normalizeFxInput(currency, nextMode, rawRate);
+        if ('error' in fx) return res.status(400).json({ error: fx.error });
+        patch.fxMode = nextMode;
+        patch.fxRate = fx.fxRate;
+      }
       if (body.issPercent !== undefined) patch.issPercent = numOrNull(body.issPercent);
       // Toggle "REV no lucro líquido" (call 12/08): grava booleano cru; ausente
       // no doc = true (a leitura normaliza). Mudar isto MUDA o lucro do /admin.
@@ -4631,7 +4673,7 @@ export function createApp(deps: ServerDeps) {
       // Auditoria: só os campos que de fato mudaram (antes→depois). 'logo' marcada à
       // parte (não logamos o base64/URL inteiro — só que houve troca).
       const changes = diffChanges(snap.data() as any, patch,
-        ['name', 'brandId', 'registerUrlTemplate', 'active', 'order', 'dataSource', 'defaultCpa', 'defaultRev', 'cpaCurrency', 'issPercent', 'revInProfit']);
+        ['name', 'brandId', 'registerUrlTemplate', 'active', 'order', 'dataSource', 'defaultCpa', 'defaultRev', 'cpaCurrency', 'fxMode', 'fxRate', 'issPercent', 'revInProfit']);
       if ('logo' in patch) changes.push({ field: 'logo', before: '(anterior)', after: patch.logo ? '(nova)' : null });
       // `integration` fica fora do diffChanges: no desvínculo o patch carrega um
       // FieldValue.delete(), que o diff leria como valor.
@@ -4705,6 +4747,12 @@ export function createApp(deps: ServerDeps) {
       // Meta mínima de CPAs por ciclo. Acordo antigo não tem o campo e lê 0 = "a casa
       // não estipulou meta"; o card não desenha a linha (visibleKpis). Sem migração.
       minCpaGoal: Number.isFinite(Number(x.minCpaGoal)) ? Number(x.minCpaGoal) : 0,
+      // Câmbio. Regime AUSENTE = 'none' = não converte, que é o que o acordo antigo
+      // fazia (a moeda era etiqueta e o número ia cru para o byBrand). É por aqui
+      // que a APROVAÇÃO recebe o regime — sem estes dois campos ela converteria
+      // sempre pelo default e o dado histórico mudaria de valor.
+      fxMode: resolveFxMode(x.fxMode, 'none'),
+      fxRate: Number.isFinite(Number(x.fxRate)) && Number(x.fxRate) > 0 ? Number(x.fxRate) : null,
     };
   };
   const partnershipFromDoc = (d: admin.firestore.DocumentSnapshot) => {
@@ -5239,7 +5287,26 @@ export function createApp(deps: ServerDeps) {
         const houseSnap = await adminDb.collection('houses').doc(String(deal.houseId)).get();
         const house = houseSnap.exists ? houseFromDoc(houseSnap) : { id: String(deal.houseId), slug: String(deal.houseId), brandId: null, registerUrlTemplate: null } as any;
         const brandKey = dealBrandKey(house);
-        const rates = dealToBrandRates(deal);
+        // CONVERSÃO NA APROVAÇÃO (decisão 17/08): o acordo pode estar em dólar ou
+        // euro, mas o `byBrand` — e todo o núcleo de comissão — é em R$. Converter
+        // aqui CONGELA o que o afiliado ganha: a partir daqui o câmbio mexe na
+        // receita da casa, não no repasse já concedido. Só busca cotação quando o
+        // acordo de fato depende dela.
+        const dealFx = dealFxSpec(deal);
+        const needsQuote = dealFx.currency !== 'BRL' && dealFx.fxMode === 'live';
+        // UMA cotação por aprovação: buscar de novo para a auditoria poderia
+        // registrar um número diferente do que foi gravado no byBrand.
+        const dealQuotes = needsQuote ? await fetchFxQuotesForServer() : undefined;
+        const usedFxRate = resolveFxRate(dealFx, dealQuotes);
+        const rates = dealToBrandRates(deal, dealQuotes);
+        // Sem cotação não se grava dinheiro. `null` só acontece em acordo de cotação
+        // FIXA sem valor (o validador de escrita já barra); falhar aqui é melhor que
+        // conceder uma taxa inventada e descobrir no extrato.
+        if (applyDealRates && !rates) {
+          return res.status(400).json({
+            error: 'O acordo está em moeda estrangeira sem cotação definida. Ajuste o acordo antes de aprovar.',
+          });
+        }
 
         // Aplica a taxa no affiliate_configs.byBrand[brandKey] preservando as outras
         // casas (merge do mapa) — MESMO caminho auditado do PATCH de config.
@@ -5250,7 +5317,7 @@ export function createApp(deps: ServerDeps) {
         // Mesma vigência das outras portas: conceder a taxa do deal não reprecifica
         // o que o afiliado já tenha gerado nesta casa (parceria reaberta depois de
         // encerrada, por exemplo).
-        const brandEntry = withRateHistory(currentRateEntry(cfgData, brandKey), rates);
+        const brandEntry = withRateHistory(currentRateEntry(cfgData, brandKey), rates ?? { cpaValue: 0, revPercentage: 0 });
         const nextByBrand = { ...curByBrand, [brandKey]: brandEntry };
         const cfgChanges = applyDealRates ? diffChanges(cfgData, { byBrand: nextByBrand }, ['byBrand']) : [];
 
@@ -5281,7 +5348,7 @@ export function createApp(deps: ServerDeps) {
         if (cfgChanges.length) {
           appendAuditLog(batch, req, { entityType: 'affiliate_config', entityId: affiliateId, entityLabel: await affiliateNameOf(affiliateId), action: 'config.update', changes: cfgChanges });
         }
-        appendAuditLog(batch, req, { entityType: 'partnership', entityId: id, entityLabel: buildDealLabel(deal), action: 'partnership.approve', metadata: { affiliateId, dealId: cur.dealId, brandKey, ratesFrom: applyDealRates ? 'deal' : 'gerente', ...(applyDealRates ? { cpaValue: rates.cpaValue, revPercentage: rates.revPercentage } : {}), linkIssued: !!registerUrl } });
+        appendAuditLog(batch, req, { entityType: 'partnership', entityId: id, entityLabel: buildDealLabel(deal), action: 'partnership.approve', metadata: { affiliateId, dealId: cur.dealId, brandKey, ratesFrom: applyDealRates ? 'deal' : 'gerente', ...(applyDealRates && rates ? { cpaValue: rates.cpaValue, revPercentage: rates.revPercentage, currency: dealFx.currency, ...(dealFx.currency !== 'BRL' ? { fxMode: dealFx.fxMode, fxRate: usedFxRate } : {}) } : {}), linkIssued: !!registerUrl } });
         await batch.commit();
         return res.json(partnershipFromDoc(await ref.get()));
       }

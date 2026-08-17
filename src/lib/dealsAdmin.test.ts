@@ -91,6 +91,24 @@ describe('rascunho do formulário', () => {
     expect(buildDealPayload({ ...emptyDealDraft(), minCpaGoal: '' }).minCpaGoal).toBe(0);
   });
 
+  it('o câmbio faz a ida e volta; acordo antigo abre em "não converte"', () => {
+    // Acordo gravado antes de 17/08 não tem regime: o modal tem que mostrar "sem
+    // conversão", que é o que o número dele de fato significa hoje.
+    expect(draftFromDeal(deal({ currency: 'USD' })).fxMode).toBe('none');
+    const comFx = draftFromDeal(deal({ currency: 'USD', fxMode: 'fixed', fxRate: 5.4 }));
+    expect(comFx.fxMode).toBe('fixed');
+    expect(comFx.fxRate).toBe('5.4');
+    expect(buildDealPayload(comFx)).toMatchObject({ fxMode: 'fixed', fxRate: 5.4 });
+  });
+
+  it('cotação vazia vai como null, nunca como zero real por dólar', () => {
+    expect(buildDealPayload({ ...emptyDealDraft(), currency: 'USD', fxMode: 'live', fxRate: '' }).fxRate).toBeNull();
+  });
+
+  it('aceita a cotação digitada em pt-BR (vírgula)', () => {
+    expect(buildDealPayload({ ...emptyDealDraft(), currency: 'USD', fxMode: 'fixed', fxRate: '5,42' }).fxRate).toBe(5.42);
+  });
+
   it('ida e volta preserva os KPIs preenchidos', () => {
     const original = deal({ type: 'gerenciado', baseline: 50, rollover: 2, ggrPercentage: 35, model: 'hybrid', revPercentage: 20 });
     const payload = buildDealPayload(draftFromDeal(original));

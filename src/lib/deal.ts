@@ -7,6 +7,10 @@
 
 import { num, BrandRates } from './commission';
 import { resolveDealType, dealPolicy, type DealTypeId } from './dealType';
+import {
+  resolveMoneyCurrency, resolveFxMode, normalizeFxInput, toBrl,
+  type FxMode, type FxSpec, type FxQuotes, type MoneyCurrency,
+} from './currency';
 
 // Modelo de remuneração do acordo. pt-BR no display; chave estável no dado.
 export type DealModel = 'cpa' | 'revshare' | 'hybrid';
@@ -46,6 +50,18 @@ export interface Deal {
   // 0/ausente = a casa não estipulou meta (ausência ≠ meta de zero na tela: o card
   // simplesmente não desenha a linha).
   minCpaGoal?: number;
+  // --- câmbio (pedido Infinity, 17/08/2026) ---------------------------------
+  // `currency` já existia, mas era ETIQUETA: a taxa ia crua para o `byBrand` e o
+  // núcleo de comissão a lia como reais, então um acordo em dólar pagava o mesmo
+  // número em real. Agora a conversão é real, e o regime diz por qual cotação:
+  // 'live' (do dia) ou 'fixed' (a que a agência digitou em `fxRate`).
+  //
+  // AUSENTE = 'none' = NÃO converte, que é exatamente o que o dado antigo fazia.
+  // Qualquer outro default reinterpretaria acordos já gravados e multiplicaria a
+  // comissão de alguém por 5 ou 6 sem ninguém ter pedido. O modal cuida de nascer
+  // com 'live' no acordo NOVO em moeda estrangeira.
+  fxMode?: FxMode;
+  fxRate?: number | null; // R$ por 1 unidade da moeda; só vale no modo 'fixed'
 }
 
 export const DEAL_MODELS: DealModel[] = ['cpa', 'revshare', 'hybrid'];
@@ -86,10 +102,40 @@ export function dealBrandKey(house: { brandId?: string | null; slug?: string | n
   return String(house?.slug ?? house?.id ?? '');
 }
 
-// Taxas que a APROVAÇÃO grava no byBrand do afiliado. O que o afiliado ganha = os
-// termos do deal (CPA em R$, REV em %). num() blinda contra valor malformado.
-export function dealToBrandRates(deal: Pick<Deal, 'cpaValue' | 'revPercentage'>): BrandRates {
-  return { cpaValue: num(deal?.cpaValue), revPercentage: num(deal?.revPercentage) };
+/**
+ * Câmbio de um acordo. Moeda fora do trio conversível (o 'crypto' legado) resolve
+ * como BRL e o regime ausente como 'none': os dois caminhos levam a "não converte",
+ * que é o comportamento que o dado antigo já tinha.
+ */
+export function dealFxSpec(deal?: Partial<Pick<Deal, 'currency' | 'fxMode' | 'fxRate'>> | null): FxSpec {
+  return {
+    currency: resolveMoneyCurrency(deal?.currency, 'BRL'),
+    fxMode: resolveFxMode(deal?.fxMode, 'none'),
+    fxRate: deal?.fxRate ?? null,
+  };
+}
+
+/** Moeda em que os valores do acordo estão escritos (p/ formatar na tela). */
+export function dealCurrency(deal?: Partial<Pick<Deal, 'currency'>> | null): MoneyCurrency {
+  return resolveMoneyCurrency(deal?.currency, 'BRL');
+}
+
+/**
+ * Taxas que a APROVAÇÃO grava no byBrand do afiliado, SEMPRE em R$ — é a moeda do
+ * núcleo de comissão, e é o que congela o que o afiliado ganha (decisão 17/08: a
+ * casa continua flutuando, o repasse já concedido não).
+ *
+ * `null` quando o acordo está em moeda estrangeira com cotação fixa e sem valor:
+ * quem chama tem que RECUSAR a aprovação em vez de gravar um número inventado.
+ * REV é percentual e nunca converte.
+ */
+export function dealToBrandRates(
+  deal: Partial<Pick<Deal, 'cpaValue' | 'revPercentage' | 'currency' | 'fxMode' | 'fxRate'>>,
+  quotes?: FxQuotes
+): BrandRates | null {
+  const cpaBrl = toBrl(num(deal?.cpaValue), dealFxSpec(deal), quotes);
+  if (cpaBrl == null) return null;
+  return { cpaValue: cpaBrl, revPercentage: num(deal?.revPercentage) };
 }
 
 // Normaliza/valida a entrada de criação/edição de deal (server e form). Devolve o
@@ -131,6 +177,13 @@ export function normalizeDealInput(raw: any): { deal?: Omit<Deal, 'id'>; error?:
   if (!Number.isInteger(minCpaGoal)) {
     return { error: 'A meta mínima de CPA é uma quantidade: use um número inteiro.' };
   }
+
+  // Câmbio. O regime só é normalizado a partir do que CHEGOU (default 'none'): um
+  // acordo antigo editado por outro motivo não pode ganhar conversão de brinde e
+  // multiplicar o repasse de alguém. Quem escolhe converter é a tela.
+  const fxMode = resolveFxMode(raw?.fxMode, 'none');
+  const fx = normalizeFxInput(resolveMoneyCurrency(currency, 'BRL'), fxMode, raw?.fxRate);
+  if ('error' in fx) return { error: fx.error };
   // A vitrine de um acordo que esconde as taxas é construída em torno da baseline:
   // publicar sem ela deixaria o afiliado com um card sem número nenhum. Só vale na
   // PUBLICAÇÃO — rascunho (inativo) pode estar incompleto de propósito.
@@ -154,6 +207,8 @@ export function normalizeDealInput(raw: any): { deal?: Omit<Deal, 'id'>; error?:
       rollover,
       ggrPercentage,
       minCpaGoal,
+      fxMode,
+      fxRate: fx.fxRate,
       ...(Number.isFinite(Number(raw?.order)) ? { order: Number(raw.order) } : {}),
     },
   };
@@ -189,5 +244,8 @@ export function buildDraftDealFromHouse(
     rollover: 0,
     ggrPercentage: null,
     minCpaGoal: 0,
+    // Rascunho nasce em real: sem câmbio a resolver, e o admin troca no modal.
+    fxMode: 'none',
+    fxRate: null,
   };
 }

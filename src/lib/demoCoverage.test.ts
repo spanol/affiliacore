@@ -204,6 +204,8 @@ describe('cobertura da demo · estados de domínio', () => {
     { label: 'status de parceria', file: 'src/lib/partnership.ts', symbol: 'PartnershipStatus' },
     { label: 'tipo de deal', file: 'src/lib/dealType.ts', symbol: 'DealTypeId' },
     { label: 'ciclo de pagamento do acordo', file: 'src/lib/deal.ts', symbol: 'PaymentCycle' },
+    { label: 'moeda', file: 'src/lib/currency.ts', symbol: 'MoneyCurrency' },
+    { label: 'regime de cotação', file: 'src/lib/currency.ts', symbol: 'FxMode' },
     { label: 'status de solicitação de conquista', file: 'src/lib/achievements.ts', symbol: 'REQUEST_STATUSES' },
     { label: 'categoria de aviso', file: 'src/services/noticeService.ts', symbol: 'NoticeCategory' },
     { label: 'público do aviso', file: 'src/services/noticeService.ts', symbol: 'NoticeAudience' },

@@ -2259,6 +2259,72 @@ describe('deals + parcerias (P2)', () => {
     expect(audits).toContain('partnership.approve');
   });
 
+  // MOEDA DO ACORDO (pedido Infinity 17/08). O byBrand é SEMPRE em R$ — é a moeda do
+  // núcleo de comissão. Converter na aprovação também CONGELA o repasse: o câmbio
+  // segue mexendo na receita da casa, não no que o afiliado já teve concedido.
+  it('APROVAÇÃO de acordo em DÓLAR com cotação FIXA grava o byBrand já em reais', async () => {
+    const seed: any = baseSeed();
+    seed.deals.d1 = { ...seed.deals.d1, cpaValue: 100, currency: 'USD', fxMode: 'fixed', fxRate: 5.4 };
+    seed.partnership_requests = { p1: { affiliateId: 'affX', dealId: 'd1', status: 'requested', code: null } };
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).patch('/api/partnerships/p1').set('Authorization', 'Bearer admin-uid').send({ status: 'approved' }).expect(200);
+
+    expect(db.__store.get('affiliate_configs')?.get('affX').byBrand.betano)
+      .toEqual({ cpaValue: 540, revPercentage: 0 });
+    // A auditoria registra a cotação usada: sem isso ninguém reconstrói de onde
+    // saíram os R$ 540 seis meses depois.
+    const log = [...(db.__store.get('audit_logs')?.values() ?? [])].find((l: any) => l.action === 'partnership.approve');
+    expect(log.metadata).toMatchObject({ cpaValue: 540, currency: 'USD', fxMode: 'fixed', fxRate: 5.4 });
+  });
+
+  it('APROVAÇÃO com cotação DO DIA usa o câmbio buscado na hora', async () => {
+    const seed: any = baseSeed();
+    seed.deals.d1 = { ...seed.deals.d1, cpaValue: 100, currency: 'USD', fxMode: 'live' };
+    seed.partnership_requests = { p1: { affiliateId: 'affX', dealId: 'd1', status: 'requested', code: null } };
+    const db = makeFirestore(seed);
+    const fetchImpl = async () => ({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ USDBRL: { bid: '5.00' }, EURBRL: { bid: '6.00' } }),
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db, fetchImpl: fetchImpl as any });
+    await request(app).patch('/api/partnerships/p1').set('Authorization', 'Bearer admin-uid').send({ status: 'approved' }).expect(200);
+    expect(db.__store.get('affiliate_configs')?.get('affX').byBrand.betano)
+      .toEqual({ cpaValue: 500, revPercentage: 0 });
+  });
+
+  // O dado que já existe: até 17/08 a moeda do acordo era etiqueta e o número ia cru
+  // para o byBrand. Aprovar um acordo antigo em dólar não pode multiplicar o repasse.
+  it('APROVAÇÃO de acordo ANTIGO em dólar (sem regime) NÃO converte', async () => {
+    const seed: any = baseSeed();
+    seed.deals.d1 = { ...seed.deals.d1, cpaValue: 100, currency: 'USD' };
+    seed.partnership_requests = { p1: { affiliateId: 'affX', dealId: 'd1', status: 'requested', code: null } };
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).patch('/api/partnerships/p1').set('Authorization', 'Bearer admin-uid').send({ status: 'approved' }).expect(200);
+    expect(db.__store.get('affiliate_configs')?.get('affX').byBrand.betano)
+      .toEqual({ cpaValue: 100, revPercentage: 0 });
+  });
+
+  it('APROVAÇÃO recusa acordo em moeda estrangeira sem cotação, em vez de inventar taxa', async () => {
+    const seed: any = baseSeed();
+    seed.deals.d1 = { ...seed.deals.d1, cpaValue: 100, currency: 'EUR', fxMode: 'fixed', fxRate: null };
+    seed.partnership_requests = { p1: { affiliateId: 'affX', dealId: 'd1', status: 'requested', code: null } };
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app).patch('/api/partnerships/p1').set('Authorization', 'Bearer admin-uid').send({ status: 'approved' }).expect(400);
+    expect(res.body.error).toMatch(/cotação/i);
+    expect(db.__store.get('affiliate_configs')?.get('affX')).toBeUndefined();
+  });
+
+  it('POST /api/deals: recusa cotação fixa sem valor', async () => {
+    const res = await request(buildApp({ seed: baseSeed() })).post('/api/deals').set('Authorization', 'Bearer admin-uid')
+      .send({ houseId: 'betano', operatorName: 'Betano', model: 'cpa', cpaValue: 100, currency: 'USD', fxMode: 'fixed' })
+      .expect(400);
+    expect(res.body.error).toMatch(/cotação fixa/i);
+  });
+
   it('APROVAÇÃO (casa OTG): byBrand keyed pelo brandId; link inativo quando não há registerUrlTemplate', async () => {
     const seed: any = baseSeed();
     seed.deals.d2.active = true; // ativa o deal OTG p/ aprovar
