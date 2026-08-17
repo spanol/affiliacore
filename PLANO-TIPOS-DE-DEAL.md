@@ -345,13 +345,31 @@ Dois detalhes de "ausência ≠ R$ 0" que apareceram aqui: a fila usa a config C
 quem não tem taxa nenhuma), e um topo gravado como `0` CONTA como configurado,
 porque zero é taxa real.
 
-**F6 · Verificação e rollout.** Roteiro na demo emulada (`npm run dev`, skill
-`/verify`, zero contato com projeto real): criar casa e ver o rascunho nascer,
-publicar um deal `gerenciado`, solicitar como afiliado, precificar como gerente
-(inclusive tentando estourar o teto e tentando precificar um neto), emitir o
-link como admin, e conferir que o `byBrand` do afiliado terminou com o valor do
-**gerente**. Depois, `VITE_DEAL_TYPE_DEFAULT: gerenciado` no
-`apphosting.infinity.yaml`.
+**F6 · Verificação e rollout. ⏳ CONFIG PRONTA, VERIFICAÇÃO NÃO RODADA.**
+
+`VITE_DEAL_TYPE_DEFAULT: gerenciado` já está no `apphosting.infinity.yaml`. Só
+vale no próximo rollout, e o deploy é ato do operador.
+
+**A verificação na tela NÃO foi feita.** Tudo o que sustenta as fases 1 a 5 é
+`tsc` + 1945 testes (unitários, de componente e de rota via supertest). Isso não
+substitui ver o fluxo funcionando: nenhuma das telas novas foi aberta num
+navegador. Roteiro para quando for rodado, na demo emulada (`npm run dev`, skill
+`/verify`, zero contato com projeto real):
+
+1. `/casas`: criar uma casa e conferir que o acordo nasceu em `/acordos` como
+   rascunho INATIVO, já com o tipo `gerenciado`.
+2. `/acordos`: preencher baseline e rollover, publicar, ver o badge do tipo.
+3. Como AFILIADO em `/parcerias`: o card mostra baseline e rollover e **não**
+   mostra CPA. Solicitar. Conferir no devtools que o JSON de `/api/deals` também
+   não traz `cpaValue` (é o ponto: a tela não é a barreira).
+4. Como GERENTE em `/network/afiliados`: a solicitação aparece na fila com o teto
+   ao lado. Tentar um valor acima do teto (tem que barrar), tentar precificar um
+   neto (não deve nem aparecer na fila), e então definir a comissão.
+5. Como ADMIN em `/acordos` → aba "Aguardando link": emitir o link.
+6. **A conferência que mais importa:** o `byBrand` do afiliado terminou com o
+   valor que o GERENTE definiu, não com o do deal.
+7. Trocar a comissão do afiliado e conferir a VIGÊNCIA: a carteira dele mantém o
+   que foi apurado antes da troca (`PLANO-COMISSAO-VIGENCIA.md`).
 
 ## 8. Compatibilidade
 

@@ -21,6 +21,19 @@ env:
       - BUILD
       - RUNTIME
 
+  # Tipo de acordo padrão (call de 15/08). `gerenciado` = o afiliado vê baseline e
+  # KPIs mas não o CPA, o GERENTE define a comissão do filho direto e só a agência
+  # emite o link. Decide o pré-marcado do radio em /acordos e o tipo do rascunho que
+  # nasce junto com a casa; o tipo REAL vive em cada deal, então acordo antigo (sem
+  # `type`) segue resolvendo como `direto` na leitura, sem migração.
+  # Ausente = 'direto', o comportamento de toda outra instância.
+  # Reverter = remover e re-rollout. Ver src/lib/dealType.ts.
+  - variable: VITE_DEAL_TYPE_DEFAULT
+    value: 'gerenciado'
+    availability:
+      - BUILD
+      - RUNTIME
+
   # Marca do cliente.
   - variable: VITE_BRAND_NAME
     value: 'Infinity'
