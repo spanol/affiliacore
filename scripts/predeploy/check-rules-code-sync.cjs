@@ -38,8 +38,12 @@ const { resolve } = require('node:path');
 // mais daqui.
 const INSTANCES = {
   'infinity-affiliacore': 'https://infinityaffiliates.agency',
-  // Landing + leads (Firebase Hosting estático). Sem backend App Hosting.
-  affiliacore: null,
+  // Landing + leads (Hosting estático) E a instância DEMO (backend App Hosting
+  // `affiliacore-demo`, no ar desde 17/08/2026) dividem o mesmo projeto e o mesmo
+  // banco. Era `null` ("não serve app, nada a verificar") enquanto só havia a
+  // landing; com a demo servindo o app, a ordem código→rules passou a valer aqui
+  // também, então a sonda aponta para o backend dela.
+  affiliacore: 'https://affiliacore-demo--affiliacore.us-east4.hosted.app',
   // A Boost saiu deste repo em 2026-07-30: a label foi entregue ao Carlos com a
   // codebase própria (`spanol/boost`) e o backend `boost-agency-server` builda de lá.
   // Deployar as rules DAQUI publicaria um ruleset que não corresponde ao código que
