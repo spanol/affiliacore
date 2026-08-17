@@ -316,8 +316,18 @@ export default function DashboardLayout() {
         <div className="pointer-events-none fixed top-[-15%] right-[-10%] w-[45%] h-[45%] rounded-full bg-white/5 blur-[120px] hidden dark:block z-0" />
 
         {/* Header */}
-        <header className="h-16 bg-glass-chrome dark:bg-glass-chrome-dark backdrop-blur-glass-medium border-b border-slate-200 dark:border-neutral-800/80 flex items-center justify-between px-8 sticky top-0 z-20 transition-colors duration-300">
-          <h2 className="text-xs font-bold text-slate-700 uppercase tracking-widest dark:text-neutral-300">
+        <header className="h-16 bg-glass-chrome dark:bg-glass-chrome-dark backdrop-blur-glass-medium border-b border-slate-200 dark:border-neutral-800/80 flex items-center justify-between px-6 lg:px-8 sticky top-0 z-20 transition-colors duration-300">
+          {/* No MOBILE a sidebar está fechada, então o cabeçalho é o único lugar
+              onde a marca aparece: a logo ocupa o canto e o rótulo da rota sai.
+              Ele era redundante ali (o título da página vem logo abaixo, dentro
+              do <Outlet/>) e roubava a única faixa horizontal que a tela tem.
+              No desktop a logo já mora na sidebar, então lá segue o rótulo. */}
+          {/* Sem aria-label: o nome acessível do link vem do `alt` da logo, que o
+              InstanceLogo já preenche com o nome da marca. */}
+          <Link to="/" className="lg:hidden flex items-center group">
+            <InstanceLogo className="h-7 max-w-[150px] w-auto object-contain transition-opacity group-hover:opacity-80" />
+          </Link>
+          <h2 className="hidden lg:block text-xs font-bold text-slate-700 uppercase tracking-widest dark:text-neutral-300">
             {location.pathname === '/admin'
               ? 'Painel Administrativo'
               : location.pathname === '/special-affiliates'
