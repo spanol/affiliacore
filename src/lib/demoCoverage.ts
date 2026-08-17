@@ -169,3 +169,86 @@ export function missingEnumValues(members: string[], seedSource: string): string
     return !quoted.test(seedSource);
   });
 }
+
+// ---------------------------------------------------------------------------
+// A demo DEPLOYADA (apphosting.demo.yaml) — dado semeado não basta: o módulo
+// que desenha a tela precisa estar ligado naquele ambiente.
+// ---------------------------------------------------------------------------
+
+/**
+ * Módulo opt-in por instância → coleções cujo dado só aparece com ele ligado.
+ * Semear `deals` sem `VITE_MARKETPLACE_ENABLED` na demo deployada é dado
+ * invisível: a rota nem é registrada e o item some da sidebar (foi o que se
+ * achou ao destravar o deploy em 17/08/2026).
+ */
+export const DEMO_MODULE_FLAGS: Array<{
+  flag: string;
+  expected: string;
+  gatedCollections: string[];
+}> = [
+  {
+    flag: 'VITE_MARKETPLACE_ENABLED',
+    expected: 'true',
+    gatedCollections: ['deals', 'partnership_requests'],
+  },
+];
+
+/** Valor de uma env declarada num apphosting*.yaml (`value:`), ou null. */
+export function readYamlEnvValue(yamlSource: string, variable: string): string | null {
+  const block = new RegExp(
+    `-\\s*variable:\\s*${variable}\\s*\\n(?:\\s+#[^\\n]*\\n)*\\s+value:\\s*['"]?([^'"\\n]+)['"]?`,
+  ).exec(yamlSource);
+  return block ? block[1].trim() : null;
+}
+
+/** Envs do yaml base servidas por Secret Manager (`secret:` em vez de `value:`). */
+export function parseSecretBackedVars(yamlSource: string): string[] {
+  const found = [...yamlSource.matchAll(/-\s*variable:\s*([A-Z0-9_]+)\s*\n(?:\s+#[^\n]*\n)*\s+secret:/g)]
+    .map((m) => m[1]);
+  return dedupeSorted(found);
+}
+
+/**
+ * Módulos que a demo semeia dado mas não liga no ambiente deployado. Cada item é
+ * uma tela que existe local (onde o dev-demo liga a flag) e desaparece em produção.
+ */
+export function unwiredDemoModules({
+  demoYaml,
+  seededCollections,
+  flags = DEMO_MODULE_FLAGS,
+}: {
+  demoYaml: string;
+  seededCollections: string[];
+  flags?: typeof DEMO_MODULE_FLAGS;
+}): string[] {
+  const seeded = new Set(seededCollections);
+  return flags
+    .filter(({ gatedCollections }) => gatedCollections.some((c) => seeded.has(c)))
+    .filter(({ flag, expected }) => readYamlEnvValue(demoYaml, flag) !== expected)
+    .map(({ flag }) => flag);
+}
+
+/**
+ * Envs do base que a instância NÃO neutraliza com um `value:` plain e que também
+ * não estão na lista de secrets que aquela instância cria de verdade.
+ *
+ * POR QUE: o yaml base referencia secrets que só existem no projeto da instância 0
+ * (affiliate-api-key, otg-links-*, otg-dash-*). Num projeto novo, o rollout FALHA na
+ * validação de secret inexistente — e falha DEPOIS de todo o resto do playbook, que
+ * é o pior momento para descobrir. Ver o histórico em PRODUTIZACAO.md (lição de
+ * 2026-07-07: `value: 'unused'`, nunca string vazia, que também reprova).
+ */
+export function unneutralizedSecrets({
+  baseYaml,
+  instanceYaml,
+  secretsCreatedByInstance,
+}: {
+  baseYaml: string;
+  instanceYaml: string;
+  secretsCreatedByInstance: string[];
+}): string[] {
+  const created = new Set(secretsCreatedByInstance);
+  return parseSecretBackedVars(baseYaml).filter(
+    (variable) => !created.has(variable) && readYamlEnvValue(instanceYaml, variable) === null,
+  );
+}

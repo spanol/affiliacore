@@ -16,6 +16,19 @@ env:
       - BUILD
       - RUNTIME
 
+  # Marketplace de acordos/parcerias LIGADO. É opt-in por instância (default OFF),
+  # mas a demo existe para mostrar o produto INTEIRO: sem esta flag as rotas
+  # /acordos, /parcerias e /meus-links não são registradas, os itens somem da
+  # sidebar e /api/deals responde 404 — ou seja, todo o marketplace semeado
+  # (acordos direto e gerenciado, fila do gerente, links dos afiliados) ficaria
+  # INVISÍVEL na demo, sem erro nenhum na tela. Travado por teste em
+  # src/lib/demoCoverage.test.ts: dado semeado exige o módulo ligado aqui.
+  - variable: VITE_MARKETPLACE_ENABLED
+    value: 'true'
+    availability:
+      - BUILD
+      - RUNTIME
+
   # Marca: produto + sufixo explícito de demo (honesto em print/screenshot).
   # SHORT/logo/favicon ficam nos defaults do produto.
   - variable: VITE_BRAND_NAME

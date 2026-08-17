@@ -228,7 +228,19 @@ e **seed**.
 7. **Backend** (`firebase apphosting:backends:create --project affiliacore`,
    repo `spanol/affiliacore`, branch `main`) + associar o ambiente **`demo`** no
    console (Settings → Environment). 1º rollout → conferir marca "AffiliaCore
-   Demo" + tema ember + `/casas` VAZIO (sem Superbet/SportingBet fantasma).
+   Demo" + tema ember + `/casas` VAZIO (sem Superbet/SportingBet fantasma) + o
+   item **Acordos** na sidebar (prova que o `VITE_MARKETPLACE_ENABLED` do
+   `apphosting.demo.yaml` entrou no build; sem ele o marketplace semeado fica
+   invisível — travado por teste em `src/lib/demoCoverage.test.ts`).
+
+   **Ensaio local antes do rollout** (pega erro de build e de env sem gastar um
+   rollout; é o caminho que o buildpack roda de verdade, que o `npm run dev` NÃO
+   exercita — dev usa o Vite como middleware, produção serve `dist/`): exporte as
+   envs do `apphosting.demo.yaml` (as `VITE_*` precisam existir no BUILD, é aí que
+   o Vite as embute), aponte Firestore/Auth para os emuladores e rode
+   `npm run build && NODE_ENV=production PORT=3130 npm start`. Validado em
+   17/08/2026: título "AffiliaCore Demo", login entra no `/admin` e a sidebar traz
+   os 18 itens, Acordos incluso.
 8. **Seed** — DOIS passos, nesta ordem (o 1º imprime as 3 senhas UMA vez):
    ```bash
    # 8a) núcleo: números batem EXATO com o mock da LP na janela de 30 dias
