@@ -209,7 +209,12 @@ export default function DashboardLayout() {
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-white dark:bg-neutral-950 border-r border-slate-200 dark:border-neutral-800/80">
-      <div className="p-6 pb-4">
+      {/* A logo só no DESKTOP. No drawer mobile ela repetiria a que agora vive no
+          cabeçalho e, junto do botão de fechar, empurrava o menu inteiro para
+          baixo: numa tela estreita isso custa dois ou três itens de lista. Como
+          o drawer só existe abaixo de `lg` e a sidebar só a partir de `lg`, a
+          própria classe decide, sem prop nem componente novo. */}
+      <div className="hidden lg:block p-6 pb-4">
         <Link to="/" className="flex items-center gap-2 group">
           <InstanceLogo className="h-[30px] w-auto transition-opacity group-hover:opacity-80" />
         </Link>
