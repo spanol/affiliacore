@@ -4694,7 +4694,13 @@ export function createApp(deps: ServerDeps) {
       type: resolveDealType(x.type),
       baseline: Number.isFinite(Number(x.baseline)) ? Number(x.baseline) : 0,
       rollover: Number.isFinite(Number(x.rollover)) ? Number(x.rollover) : 0,
-      ggrPercentage: Number.isFinite(Number(x.ggrPercentage)) ? Number(x.ggrPercentage) : null,
+      // AUSENTE ≠ 0 também aqui. `Number(null)` é 0 e passa no isFinite, então a
+      // checagem ingênua transformava "a casa não tem GGR" em "a casa tem GGR de
+      // 0%" na leitura, e o formulário do admin abria com um zero que ninguém
+      // digitou. Achado na verificação na demo (17/08).
+      ggrPercentage: x.ggrPercentage == null || x.ggrPercentage === ''
+        ? null
+        : (Number.isFinite(Number(x.ggrPercentage)) ? Number(x.ggrPercentage) : null),
     };
   };
   const partnershipFromDoc = (d: admin.firestore.DocumentSnapshot) => {

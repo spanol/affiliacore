@@ -345,31 +345,42 @@ Dois detalhes de "ausência ≠ R$ 0" que apareceram aqui: a fila usa a config C
 quem não tem taxa nenhuma), e um topo gravado como `0` CONTA como configurado,
 porque zero é taxa real.
 
-**F6 · Verificação e rollout. ⏳ CONFIG PRONTA, VERIFICAÇÃO NÃO RODADA.**
+**F6 · Verificação e rollout. ✅ VERIFICADO NA DEMO (17/08).**
 
-`VITE_DEAL_TYPE_DEFAULT: gerenciado` já está no `apphosting.infinity.yaml`. Só
-vale no próximo rollout, e o deploy é ato do operador.
+`VITE_DEAL_TYPE_DEFAULT: gerenciado` está no `apphosting.infinity.yaml`. Só vale
+no próximo rollout, e o deploy é ato do operador.
 
-**A verificação na tela NÃO foi feita.** Tudo o que sustenta as fases 1 a 5 é
-`tsc` + 1945 testes (unitários, de componente e de rota via supertest). Isso não
-substitui ver o fluxo funcionando: nenhuma das telas novas foi aberta num
-navegador. Roteiro para quando for rodado, na demo emulada (`npm run dev`, skill
-`/verify`, zero contato com projeto real):
+Rodado na demo emulada (`npm run dev` com `VITE_MARKETPLACE_ENABLED=true
+VITE_DEAL_TYPE_DEFAULT=gerenciado`, zero contato com projeto real). **A demo NÃO
+liga o marketplace por padrão**, então as duas envs são obrigatórias no comando
+para quem for repetir.
 
-1. `/casas`: criar uma casa e conferir que o acordo nasceu em `/acordos` como
-   rascunho INATIVO, já com o tipo `gerenciado`.
-2. `/acordos`: preencher baseline e rollover, publicar, ver o badge do tipo.
-3. Como AFILIADO em `/parcerias`: o card mostra baseline e rollover e **não**
-   mostra CPA. Solicitar. Conferir no devtools que o JSON de `/api/deals` também
-   não traz `cpaValue` (é o ponto: a tela não é a barreira).
-4. Como GERENTE em `/network/afiliados`: a solicitação aparece na fila com o teto
-   ao lado. Tentar um valor acima do teto (tem que barrar), tentar precificar um
-   neto (não deve nem aparecer na fila), e então definir a comissão.
-5. Como ADMIN em `/acordos` → aba "Aguardando link": emitir o link.
-6. **A conferência que mais importa:** o `byBrand` do afiliado terminou com o
-   valor que o GERENTE definiu, não com o do deal.
-7. Trocar a comissão do afiliado e conferir a VIGÊNCIA: a carteira dele mantém o
-   que foi apurado antes da troca (`PLANO-COMISSAO-VIGENCIA.md`).
+| # | Passo | Resultado |
+|---|---|---|
+| 1 | Criar casa em `/casas` | Acordo nasceu sozinho em `/acordos`, **Inativo**, badge "Acordo gerenciado pela rede" (o default de instância chegou ao servidor E à tela) |
+| 2 | Preencher baseline/rollover e publicar | CPA R$ 110, Baseline R$ 10, Rollover 2x no card do admin |
+| 3 | `/parcerias` como afiliado | Card com Baseline, Rollover e Ciclo, **sem CPA**. O JSON de `/api/deals` veio **sem as chaves** `cpaValue`/`revPercentage` (a barreira é o servidor, confirmado no payload cru) |
+| 4 | Fila em `/network/afiliados` | Só o filho DIRETO apareceu; o de outro ramo ficou de fora. Teto "R$ 70/CPA e 25% REV" exibido; 120 barrado com a mensagem de teto; 50 aceito |
+| 5 | Aba "Aguardando link" | "Pronta para o link" → Emitir link → parceria `approved` com código |
+| 6 | **`byBrand` final** | **R$ 50 (do gerente), não 110 (do deal)**. `updatedAt` nem mudou na aprovação, e a auditoria registrou `partnership.approve` com `ratesFrom: gerente` e **nenhum** `config.update` |
+| 7 | Afiliado SEM gerente | Rótulo "Em análise", não "Aguardando seu gerente" (o fallback do `pricedBy` funciona) |
+| 8 | Casa pausada | Vitrine do afiliado zerou, admin seguiu vendo, solicitação nova recusada, e a parceria já aprovada manteve status e link |
+
+**Um defeito encontrado e corrigido:** `dealFromDoc` devolvia `ggrPercentage: 0`
+para deal sem GGR, porque `Number(null)` é 0 e passa no `isFinite`. Transformava
+"a casa não tem GGR" em "GGR de 0%" e abria o formulário do admin com um zero que
+ninguém digitou. Mesma família de "ausência ≠ R$ 0", agora com teste dos dois
+lados (null continua null, 0 gravado continua 0).
+
+**Observação sobre a rede:** um especial do modelo ANTIGO (lista
+`subAffiliateIds` gravada) tem como diretos exatamente a lista, mesmo que a
+árvore `affiliate_uplines` diga outra coisa. A fila e o escopo do `GET` usam
+`resolveDirectSubIds`, então ficam consistentes entre si e mais restritos que o
+`isDirectDownline` da escrita. Conservador, sem risco, mas explica por que uma
+solicitação de alguém que a árvore põe como filho dele pode não aparecer na fila.
+
+Falta ainda verificar na tela o passo de VIGÊNCIA (trocar a comissão e conferir
+que a carteira preserva o apurado anterior). Ver `PLANO-COMISSAO-VIGENCIA.md`.
 
 ## 8. Compatibilidade
 

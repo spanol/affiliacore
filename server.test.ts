@@ -2369,6 +2369,23 @@ describe('deals · tipo gerenciado (o gerente precifica, a agência emite o link
     expect(aff.body.deals[0].cpaValue).toBe(110);
   });
 
+  // Achado na verificação na demo: `Number(null)` é 0 e passa no isFinite, então a
+  // leitura transformava "a casa não tem GGR" em "GGR de 0%" e o formulário do
+  // admin abria com um zero que ninguém digitou.
+  it('GGR ausente volta como null, não como 0', async () => {
+    const seed: any = seedRede();
+    seed.deals.dg.ggrPercentage = null;
+    const res = await request(appWith(seed)).get('/api/deals').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(res.body.deals[0].ggrPercentage).toBeNull();
+  });
+
+  it('GGR 0 gravado de propósito continua sendo 0 (zero é valor real)', async () => {
+    const seed: any = seedRede();
+    seed.deals.dg.ggrPercentage = 0;
+    const res = await request(appWith(seed)).get('/api/deals').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(res.body.deals[0].ggrPercentage).toBe(0);
+  });
+
   it('deal ANTIGO (sem campo type) resolve como direto e não esconde nada', async () => {
     const seed: any = seedRede();
     delete seed.deals.dg.type;
