@@ -313,7 +313,26 @@ nova funciona, mas fica vazia numa verificação pela tela.
 
 **F4 · Vitrine do afiliado.** Card e estados.
 
-**F5 · Fila do gerente.** Seção em `/network/afiliados`.
+**F5 · Fila do gerente. ✅ ENTREGUE.** Seção "Solicitações de parceria" em
+`/network/afiliados`, com o teto visível ao lado, prévia do que sobra para ele
+("fica com você: R$ 30/CPA") e os botões de definir comissão e recusar. Núcleo
+puro em `src/lib/uplineQueue.ts` (`buildUplineQueue`, `pricingError`,
+`spreadPreview`), que ESPELHA as recusas do servidor para a tela não oferecer o
+que a rota nega. O servidor passou a escopar `GET /api/partnerships` a
+own + filhos DIRETOS e a carimbar `pricedBy` em cada parceria.
+
+**Um vazamento pego por teste antigo:** a primeira versão escopava a fila só pela
+query (`where('affiliateId','in',ids)`). O mock de Firestore dos testes não
+implementa `in`, então devolveu tudo, e o teste de IDOR que já existia (`afiliado
+vê só as dele`) quebrou na hora. A correção não foi ensinar `in` ao mock: a
+BARREIRA passou a ser um filtro em memória sobre o conjunto permitido, com a
+query ficando como otimização. Segurança não pode depender de um operador de
+consulta funcionar.
+
+Dois detalhes de "ausência ≠ R$ 0" que apareceram aqui: a fila usa a config CRUA
+(o `ownConfig` da página preenche 0/0 e faria a tela dizer "seu teto é R$ 0" a
+quem não tem taxa nenhuma), e um topo gravado como `0` CONTA como configurado,
+porque zero é taxa real.
 
 **F6 · Verificação e rollout.** Roteiro na demo emulada (`npm run dev`, skill
 `/verify`, zero contato com projeto real): criar casa e ver o rascunho nascer,

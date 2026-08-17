@@ -16,13 +16,19 @@ import {
   fetchAffiliateLinks,
   fetchNetworkInvite,
   createNetworkInvite,
+  fetchPartnerships,
+  pricePartnership,
+  rejectPartnershipAsUpline,
   buildGoUrl,
+  type PartnershipRequest,
   SpecialAffiliate,
   AffiliateConfig,
   CaptureRequest,
   type AffiliateLink,
 } from '../services/affiliateService';
 import { fetchHouses, type House } from '../services/houseService';
+import { buildUplineQueue, pricingError, spreadPreview, type UplineQueueItem } from '../lib/uplineQueue';
+import { MARKETPLACE_ENABLED } from '../lib/instanceClient';
 import { buildNetworkInviteUrl } from '../lib/networkInvite';
 import { producingAffiliateIds } from '../lib/affiliateActivity';
 import { buildPerHousePayout, type HouseMetricRow } from '../lib/perHousePayout';
@@ -86,6 +92,12 @@ export default function SpecialSubAffiliates() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);
+  // Fila de parcerias (F5 dos tipos de deal): num acordo `gerenciado` o afiliado
+  // solicita e é o GERENTE quem define a comissão dele. O servidor já escopa o GET
+  // a own + filhos diretos; a tela recorta de novo por `buildUplineQueue`.
+  const [partnerships, setPartnerships] = useState<PartnershipRequest[]>([]);
+  const [queueEdits, setQueueEdits] = useState<Record<string, { cpaValue: string; revPercentage: string }>>({});
+  const [queueBusy, setQueueBusy] = useState<string | null>(null);
 
   const ownId = profile?.affiliateId ? String(profile.affiliateId) : '';
 
@@ -101,7 +113,7 @@ export default function SpecialSubAffiliates() {
       const specials = await fetchSpecialAffiliates();
       const mine = specials[ownId] || null;
       const networkIds = [ownId, ...((mine?.subAffiliateIds || []).map(String))];
-      const [split, cfgs, poolData, manual, myReferrals, netLinks, houseList, invite] = await Promise.all([
+      const [split, cfgs, poolData, manual, myReferrals, netLinks, houseList, invite, parts] = await Promise.all([
         fetchResultsForAffiliatesSplit(networkIds, range),
         fetchAffiliateConfigs(),
         fetchAffiliates().catch(() => []),
@@ -115,6 +127,9 @@ export default function SpecialSubAffiliates() {
         fetchHouses().catch(() => []),
         // Link de cadastro na rede: pode não existir ainda (o gerente gera na tela).
         fetchNetworkInvite().catch(() => ({ code: null, uses: 0 })),
+        // Fila de parcerias. Instância sem marketplace responde 404 de propósito,
+        // então nem chamamos: degradar para [] deixa a seção invisível.
+        MARKETPLACE_ENABLED ? fetchPartnerships().catch(() => []) : Promise.resolve([]),
       ]);
       setSpecial(mine);
       setResults(split.rows);
@@ -127,6 +142,7 @@ export default function SpecialSubAffiliates() {
       setHouses(Array.isArray(houseList) ? houseList : []);
       setInviteCode(invite?.code ?? null);
       setInviteUses(Number(invite?.uses ?? 0) || 0);
+      setPartnerships(Array.isArray(parts) ? parts : []);
       // semente dos inputs editáveis a partir dos configs salvos
       const seed: Record<string, { cpaValue: number | string; revPercentage: number | string }> = {};
       (mine?.subAffiliateIds || []).forEach((id) => {
@@ -236,6 +252,36 @@ export default function SpecialSubAffiliates() {
     () => configs[ownId] ?? { affiliateId: ownId, cpaValue: 0, revPercentage: 0 },
     [ownId, configs]
   );
+  const queueRates = (id: string) => queueEdits[id] ?? { cpaValue: '', revPercentage: '' };
+
+  const priceQueueItem = async (item: UplineQueueItem) => {
+    const rates = queueRates(item.request.id);
+    const erro = pricingError(item, rates);
+    if (erro) { push({ type: 'error', message: erro }); return; }
+    setQueueBusy(item.request.id);
+    try {
+      await pricePartnership(item.request.id, {
+        cpaValue: Number(rates.cpaValue) || 0,
+        revPercentage: Number(rates.revPercentage) || 0,
+      });
+      push({ type: 'success', message: 'Comissão definida. A agência vai emitir o link de divulgação.' });
+      await load();
+    } catch (e: any) {
+      push({ type: 'error', message: e?.message || 'Erro ao definir a comissão.' });
+    } finally { setQueueBusy(null); }
+  };
+
+  const rejectQueueItem = async (item: UplineQueueItem) => {
+    setQueueBusy(item.request.id);
+    try {
+      await rejectPartnershipAsUpline(item.request.id);
+      push({ type: 'success', message: 'Solicitação recusada. O afiliado foi avisado.' });
+      await load();
+    } catch (e: any) {
+      push({ type: 'error', message: e?.message || 'Erro ao recusar a solicitação.' });
+    } finally { setQueueBusy(null); }
+  };
+
   // brandIdOf só manda na parte OTG; a manual é precificada pela casa da linha.
   const brandIdOf = useMemo(() => buildBrandIdOf(pool), [pool]);
   const payoutOf = useMemo(
@@ -290,6 +336,14 @@ export default function SpecialSubAffiliates() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [special, results, producingIds, nameFromPool]);
+
+  // A fila usa a config CRUA, não o `ownConfig` acima: aquele preenche 0/0 quando
+  // não há config, e um zero preenchido faria a tela dizer "seu teto é R$ 0" para
+  // quem, na verdade, não tem taxa nenhuma naquela casa. Ausência ≠ R$ 0.
+  const queue = useMemo(
+    () => buildUplineQueue(partnerships, [...directIds], houses, configs[ownId] ?? null),
+    [partnerships, directIds, houses, configs, ownId],
+  );
 
   const availableBrands = useMemo(() => uniqueBrands(subs.map((s) => s.row)), [subs]);
 
@@ -454,6 +508,95 @@ export default function SpecialSubAffiliates() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* FILA DE PARCERIAS. Nos acordos gerenciados o afiliado escolhe a casa na
+          vitrine e quem define a comissão dele é o gerente. O link continua sendo
+          emitido pela agência, de propósito: assim ninguém entra numa casa cuja
+          operação foi pausada. Só aparece quando há fila. */}
+      {queue.length > 0 && (
+        <motion.section
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl shadow-sm overflow-hidden"
+        >
+          <div className="p-4 border-b border-slate-100 dark:border-neutral-800">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500 flex items-center gap-1.5">
+              <Clock size={12} /> Solicitações de parceria ({queue.length})
+            </p>
+            <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1">
+              Defina quanto cada afiliado recebe nesta casa. A diferença para a sua taxa fica com você. Depois a agência emite o link.
+            </p>
+          </div>
+          <div className="divide-y divide-slate-100 dark:divide-neutral-800">
+            {queue.map((item) => {
+              const rates = queueRates(item.request.id);
+              const erro = pricingError(item, rates);
+              const sobra = spreadPreview(item, rates);
+              const id = item.request.id;
+              const setRate = (patch: Partial<{ cpaValue: string; revPercentage: string }>) =>
+                setQueueEdits((prev) => ({ ...prev, [id]: { ...rates, ...patch } }));
+              return (
+                <div key={id} className="p-4 flex flex-col lg:flex-row lg:items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                      {humanizeName(nameFromPool[String(item.request.affiliateId)] || `#${item.request.affiliateId}`)}
+                    </p>
+                    <p className="text-[11px] text-slate-400 dark:text-neutral-500 truncate">
+                      {item.houseName}
+                      {item.capConfigured && (
+                        <> · sua taxa: R$ {item.cap.cpaValue}/CPA e {item.cap.revPercentage}% REV</>
+                      )}
+                    </p>
+                  </div>
+                  {item.capConfigured ? (
+                    <div className="flex items-end gap-2 flex-wrap">
+                      <label className="flex flex-col">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500">CPA (R$)</span>
+                        <input
+                          type="number" min="0" step="0.01" value={rates.cpaValue}
+                          onChange={(e) => setRate({ cpaValue: e.target.value })}
+                          placeholder="0,00"
+                          className="mt-1 w-24 px-2.5 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs dark:text-white outline-none focus:ring-2 focus:ring-accent-500/30"
+                        />
+                      </label>
+                      <label className="flex flex-col">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500">REV (%)</span>
+                        <input
+                          type="number" min="0" step="0.1" value={rates.revPercentage}
+                          onChange={(e) => setRate({ revPercentage: e.target.value })}
+                          placeholder="0"
+                          className="mt-1 w-20 px-2.5 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs dark:text-white outline-none focus:ring-2 focus:ring-accent-500/30"
+                        />
+                      </label>
+                      <span className="text-[10px] text-slate-400 dark:text-neutral-500 pb-2 whitespace-nowrap">
+                        fica com você: R$ {sobra.cpaValue.toFixed(2)}/CPA
+                      </span>
+                      <button
+                        type="button" onClick={() => priceQueueItem(item)} disabled={!!erro || queueBusy === id}
+                        className="px-3 py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:opacity-90 disabled:opacity-40 flex items-center gap-1.5"
+                      >
+                        {queueBusy === id ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Definir comissão
+                      </button>
+                      <button
+                        type="button" onClick={() => rejectQueueItem(item)} disabled={queueBusy === id}
+                        className="px-3 py-2 rounded-xl border border-slate-200 dark:border-neutral-700 text-slate-600 dark:text-neutral-300 text-xs font-bold hover:text-red-500 hover:border-red-300 disabled:opacity-40 flex items-center gap-1.5"
+                      >
+                        <X size={13} /> Recusar
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 max-w-sm">
+                      Você ainda não tem taxa nesta casa. Peça à agência antes de definir a comissão do seu afiliado.
+                    </p>
+                  )}
+                  {erro && item.capConfigured && (
+                    <p className="text-[11px] text-red-500 lg:basis-full">{erro}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </motion.section>
       )}
 
       {subIds.length === 0 ? (

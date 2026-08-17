@@ -4822,16 +4822,66 @@ export function createApp(deps: ServerDeps) {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
     try {
       const user = (req as any).user;
-      let q: admin.firestore.Query = adminDb.collection('partnership_requests');
-      if (user?.role !== 'admin') {
-        if (!user?.affiliateId) return res.json({ partnerships: [] });
-        q = q.where('affiliateId', '==', String(user.affiliateId));
+      const isAdmin = user?.role === 'admin';
+      let docs: admin.firestore.QueryDocumentSnapshot[] = [];
+
+      if (isAdmin) {
+        docs = (await adminDb.collection('partnership_requests').get()).docs;
+      } else {
+        const ownId = user?.affiliateId ? String(user.affiliateId) : '';
+        if (!ownId) return res.json({ partnerships: [] });
+        // O GERENTE precisa ver a fila dos filhos DIRETOS: é ele quem precifica.
+        // Só os DIRETOS, e não a subárvore inteira — VISÃO ≠ DINHEIRO, a mesma
+        // fronteira que `isDirectDownline` aplica na escrita. Trazer o neto aqui
+        // mostraria uma fila que a rota de precificação recusaria com 403.
+        const ids = [ownId];
+        const special = await resolveSpecialRecord(ownId, { withSubs: false });
+        if (resolveIsSpecial(special)) {
+          const [uplines, specials] = await Promise.all([readUplineMap(), readSpecialsMap()]);
+          for (const sub of resolveDirectSubIds(ownId, special!, { uplines, specials })) {
+            if (!ids.includes(sub)) ids.push(sub);
+          }
+        }
+        // `in` do Firestore aceita no máximo 30 valores por consulta.
+        for (let i = 0; i < ids.length; i += 30) {
+          const snap = await adminDb.collection('partnership_requests')
+            .where('affiliateId', 'in', ids.slice(i, i + 30)).get();
+          docs.push(...snap.docs);
+        }
+        // A BARREIRA é este filtro, não a query. A consulta acima é otimização (traz
+        // menos documento da rede); confiar nela para escopo faria a segurança
+        // depender de um operador funcionar. Sem esta linha o teste de IDOR que já
+        // existia passou a vazar a parceria de outro afiliado.
+        const allowed = new Set(ids);
+        docs = docs.filter((d) => allowed.has(String((d.data() as any)?.affiliateId)));
       }
-      const snap = await q.get();
+
       const wantStatus = typeof req.query.status === 'string' ? req.query.status : null;
-      const partnerships = snap.docs
-        .map(partnershipFromDoc)
-        .filter((p) => !wantStatus || p.status === wantStatus);
+      const list = docs.map(partnershipFromDoc).filter((p) => !wantStatus || p.status === wantStatus);
+
+      // Carimba QUEM precifica cada parceria. A tela precisa disso para falar a
+      // verdade ao afiliado ("aguardando seu gerente" × "em análise"): sem o
+      // carimbo ela teria que adivinhar pela política do deal e erraria justamente
+      // no afiliado sem gerente, que na prática espera a agência.
+      const dealIds = [...new Set(list.map((p) => String(p.dealId)).filter(Boolean))];
+      const deals = new Map<string, any>();
+      await Promise.all(dealIds.map(async (id) => {
+        const d = await adminDb!.collection('deals').doc(id).get();
+        if (d.exists) deals.set(id, dealFromDoc(d));
+      }));
+      // A árvore é lida UMA vez para a lista inteira, e só quando algum deal é do
+      // tipo gerenciado. Resolver parceria a parceria releria duas coleções por
+      // linha, o que numa fila de 50 seriam 100 leituras para a mesma resposta.
+      const needsTree = list.some((p) => dealPolicy(deals.get(String(p.dealId))).pricedBy === 'upline');
+      const tree = needsTree
+        ? await Promise.all([readUplineMap(), readSpecialsMap()]).then(([uplines, specials]) => ({ uplines, specials }))
+        : null;
+      const partnerships = list.map((p) => {
+        const policy = dealPolicy(deals.get(String(p.dealId)));
+        const upId = tree ? resolveDirectUpline(String(p.affiliateId), tree) : null;
+        const eligible = !!upId && resolveIsSpecial(tree!.specials[upId]);
+        return { ...p, pricedBy: effectivePricedBy(policy, eligible) };
+      });
       return res.json({ partnerships });
     } catch (e: any) {
       console.error('[partnerships] erro ao listar:', e);

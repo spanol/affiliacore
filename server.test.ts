@@ -2566,6 +2566,51 @@ describe('deals · tipo gerenciado (o gerente precifica, a agência emite o link
     expect(entry.since).toBe(addDays(entry.history[0].to, 1));
   });
 
+  // F5: o gerente precisa VER a fila para poder atendê-la.
+  it('GET /api/partnerships devolve ao gerente a solicitação do filho direto', async () => {
+    const res = await request(appWith(seedRede())).get('/api/partnerships')
+      .set('Authorization', 'Bearer ger-uid').expect(200);
+    expect(res.body.partnerships.map((p: any) => p.id)).toEqual(['pg']);
+  });
+
+  // VISÃO ≠ DINHEIRO também na leitura: mostrar o neto renderia uma fila que a
+  // rota de precificação recusa com 403.
+  it('a fila do gerente NÃO inclui o neto', async () => {
+    const seed: any = seedRede();
+    seed.partnership_requests.pn = { affiliateId: 'neto', dealId: 'dg', status: 'requested', code: null };
+    const res = await request(appWith(seed)).get('/api/partnerships')
+      .set('Authorization', 'Bearer ger-uid').expect(200);
+    expect(res.body.partnerships.map((p: any) => p.id)).toEqual(['pg']);
+  });
+
+  it('afiliado comum continua vendo só a própria parceria (não vaza a do irmão)', async () => {
+    const seed: any = seedRede();
+    seed.partnership_requests.po = { affiliateId: 'affSolo', dealId: 'dg', status: 'requested', code: null };
+    const res = await request(appWith(seed)).get('/api/partnerships')
+      .set('Authorization', 'Bearer aff-uid').expect(200);
+    expect(res.body.partnerships.map((p: any) => p.id)).toEqual(['pg']);
+  });
+
+  // Sem o carimbo a tela teria que adivinhar pela política do deal e erraria no
+  // afiliado sem gerente, que na prática espera a agência.
+  it('cada parceria vem carimbada com QUEM precifica', async () => {
+    const seed: any = seedRede();
+    seed.partnership_requests.ps = { affiliateId: 'affSolo', dealId: 'dg', status: 'requested', code: null };
+    const res = await request(appWith(seed)).get('/api/partnerships')
+      .set('Authorization', 'Bearer admin-uid').expect(200);
+    const byId = Object.fromEntries(res.body.partnerships.map((p: any) => [p.id, p.pricedBy]));
+    expect(byId.pg).toBe('upline');   // affX tem gerente ativo
+    expect(byId.ps).toBe('admin');    // affSolo não tem gerente
+  });
+
+  it('num acordo DIRETO o carimbo é sempre da agência', async () => {
+    const seed: any = seedRede();
+    seed.deals.dg.type = 'direto';
+    const res = await request(appWith(seed)).get('/api/partnerships')
+      .set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(res.body.partnerships[0].pricedBy).toBe('admin');
+  });
+
   it('parceria RECUSADA não aceita precificação', async () => {
     const seed: any = seedRede();
     seed.partnership_requests.pg.status = 'rejected';
