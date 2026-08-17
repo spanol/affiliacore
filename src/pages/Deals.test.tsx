@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, within } from '@testing-library/react';
 import Deals from './Deals';
 import { DEAL_TYPE_POLICY } from '../lib/dealType';
 
@@ -65,9 +65,12 @@ describe('/acordos · radio de tipo de acordo', () => {
   it('lista TODOS os tipos do catálogo, com rótulo e hint', async () => {
     await renderPage();
     fireEvent.click(screen.getByRole('button', { name: /Novo acordo/ }));
+    // Busca DENTRO do bloco do radio: o rótulo do tipo também aparece na linha
+    // "Tipo" do card do acordo, e um getByText solto pegaria os dois.
     Object.values(DEAL_TYPE_POLICY).forEach((p) => {
-      expect(screen.getByText(p.label)).toBeInTheDocument();
-      expect(screen.getByText(p.hint)).toBeInTheDocument();
+      const opcao = screen.getByTestId(`tipo-${p.id}`);
+      expect(within(opcao).getByText(p.label)).toBeInTheDocument();
+      expect(within(opcao).getByText(p.hint)).toBeInTheDocument();
     });
   });
 
@@ -143,16 +146,39 @@ describe('/acordos · payload salvo', () => {
   });
 });
 
-describe('/acordos · badge do tipo no card', () => {
-  it('não carimba o acordo direto', async () => {
+// O card do acordo segue o formato do card de CASA (/casas): um `<dl>` de fatos,
+// rótulo à esquerda e valor à direita, em vez da fileira de chips que havia antes.
+describe('/acordos · card no formato do card de casa', () => {
+  it('mostra o tipo como LINHA do dl, inclusive no acordo direto', async () => {
     await renderPage();
-    expect(screen.queryByTestId('badge-tipo')).not.toBeInTheDocument();
+    expect(screen.getByTestId('linha-tipo').textContent).toBe(DEAL_TYPE_POLICY.direto.label);
   });
 
-  it('carimba o rótulo do catálogo nos demais tipos', async () => {
+  it('usa o rótulo do catálogo nos demais tipos', async () => {
     h.deals = [deal({ type: 'gerenciado', baseline: 50 })];
     await renderPage();
-    expect(screen.getByTestId('badge-tipo').textContent).toBe(DEAL_TYPE_POLICY.gerenciado.label);
+    expect(screen.getByTestId('linha-tipo').textContent).toBe(DEAL_TYPE_POLICY.gerenciado.label);
+  });
+
+  it('as linhas de KPI seguem a política do tipo', async () => {
+    h.deals = [deal({ type: 'gerenciado', baseline: 50, rollover: 2 })];
+    await renderPage();
+    expect(screen.getByTestId('linha-baseline').textContent).toBe('R$ 50,00');
+    expect(screen.getByTestId('linha-rollover').textContent).toBe('2x');
+    expect(screen.queryByTestId('linha-geo')).not.toBeInTheDocument();
+  });
+
+  // Para o admin, campo vazio é informação (baseline em branco impede publicar),
+  // então a linha fica com o placeholder em vez de sumir. Igual ao card de casa.
+  it('KPI sem valor mostra o placeholder de vazio, e a linha NÃO some', async () => {
+    h.deals = [deal({ type: 'gerenciado', baseline: 0 })];
+    await renderPage();
+    expect(screen.getByTestId('linha-baseline').textContent).toBe('—');
+  });
+
+  it('o slug da casa aparece embaixo do nome, como no card de casa', async () => {
+    await renderPage();
+    expect(screen.getByText('esportiva')).toBeInTheDocument();
   });
 });
 

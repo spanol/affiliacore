@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { Tag, Loader2, Plus, Check, X, Ban, Power, Pencil, Inbox, Link2 } from 'lucide-react';
 import {
@@ -8,8 +8,9 @@ import {
   type Deal, type DealModel, type PaymentCycle, type DealCurrency, type DealTypeId, type PartnershipRequest,
 } from '../services/affiliateService';
 import { fetchHouses } from '../services/houseService';
+import { houseLogoOrPreset } from '../lib/housePresets';
 import {
-  emptyDealDraft, draftFromDeal, buildDealPayload, adminEditsKpi, dealTypeBadge,
+  emptyDealDraft, draftFromDeal, buildDealPayload, adminEditsKpi, adminDealCardRows,
   selectAdminPartnershipQueues, partnershipDecisionMessage, type DealDraft,
 } from '../lib/dealsAdmin';
 import { DEAL_TYPE_DEFAULT } from '../lib/instanceClient';
@@ -17,6 +18,33 @@ import { useToast } from '../contexts/ToastContext';
 import { cn, humanizeName } from '../lib/utils';
 
 type Tab = 'deals' | 'requests' | 'links';
+
+// Logo da operadora no card, idêntica à do card de casa (/casas): a mesma resolução
+// (logo gravada > ícone do preset > inicial) e a mesma moldura, para as duas telas
+// mostrarem a mesma casa do mesmo jeito. O acordo guarda o `houseId` (= slug), então
+// a casa é resolvida pela lista que a página já carrega.
+function DealHouseLogo({ deal, houses }: { deal: Deal; houses: any[] }) {
+  const [failed, setFailed] = useState(false);
+  const house = houses.find((h) => String(h?.slug ?? h?.id) === String(deal.houseId));
+  const logo = houseLogoOrPreset(house?.logo, house?.slug ?? deal.houseId, house?.id, house?.name ?? deal.operatorName);
+  const dim = { width: 44, height: 44 } as CSSProperties;
+  if (logo && !failed) {
+    return (
+      <img
+        src={logo}
+        alt={deal.operatorName}
+        style={dim}
+        onError={() => setFailed(true)}
+        className="rounded-xl object-contain bg-white border border-slate-100 dark:border-neutral-700 shrink-0"
+      />
+    );
+  }
+  return (
+    <span style={dim} className="rounded-xl bg-accent-500 text-accent-contrast flex items-center justify-center font-black text-sm shrink-0">
+      {(deal.operatorName || '?').charAt(0).toUpperCase()}
+    </span>
+  );
+}
 
 export default function Deals() {
   const { push } = useToast();
@@ -150,36 +178,79 @@ export default function Deals() {
             <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1">Crie o primeiro acordo para os afiliados começarem a solicitar parcerias.</p>
           </div>
         ) : (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {deals.map((deal) => (
-              <div key={deal.id} className={cn('bg-white dark:bg-neutral-900/60 border rounded-3xl p-5 shadow-sm flex flex-col gap-3', deal.active ? 'border-slate-200/70 dark:border-neutral-800' : 'border-slate-200/70 dark:border-neutral-800 opacity-60')}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-slate-900 dark:text-white truncate">{deal.operatorName}</h3>
-                    <p className="text-[11px] text-slate-400 dark:text-neutral-500 truncate">{buildDealLabel(deal)}</p>
+          // MESMO formato do card de CASA (/casas): logo + nome + slug em mono no
+          // topo, pill de status à direita, `<dl>` de fatos no meio e os botões
+          // embaixo. As duas telas falam do mesmo objeto de negócio, então ler uma
+          // depois da outra não deveria exigir reaprender o layout.
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {deals.map((deal, idx) => (
+              <motion.div
+                key={deal.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.04 }}
+                className={cn(
+                  'group relative overflow-hidden p-6 rounded-2xl border bg-white dark:bg-neutral-900/60 border-slate-200/70 dark:border-neutral-800 shadow-sm hover:border-accent-300 dark:hover:border-accent-800 transition-all',
+                  !deal.active && 'opacity-60',
+                )}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <DealHouseLogo deal={deal} houses={houses} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{deal.operatorName}</p>
+                      <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400 dark:text-neutral-500 mt-0.5 truncate">{deal.houseId}</p>
+                    </div>
                   </div>
-                  <span className={cn('shrink-0 px-2 py-1 rounded-lg text-[10px] font-bold', deal.active ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' : 'bg-slate-100 dark:bg-neutral-800 text-slate-500 dark:text-neutral-400')}>{deal.active ? 'Ativo' : 'Inativo'}</span>
+                  <span className={cn(
+                    'shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border',
+                    deal.active
+                      ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-slate-100 dark:bg-neutral-800 border-slate-200 dark:border-neutral-700 text-slate-400 dark:text-neutral-500',
+                  )}>
+                    <Power size={10} /> {deal.active ? 'Ativo' : 'Inativo'}
+                  </span>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-accent-500/15 text-accent-500">{DEAL_MODEL_LABEL[deal.model]}</span>
-                  {dealTypeBadge(deal) && (
-                    <span data-testid="badge-tipo" className="px-2 py-1 rounded-lg text-[10px] font-bold border border-slate-200 dark:border-neutral-700 text-slate-600 dark:text-neutral-300">{dealTypeBadge(deal)}</span>
-                  )}
-                  {(deal.cpaValue ?? 0) > 0 && <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300">CPA R$ {Number(deal.cpaValue).toFixed(2)}</span>}
-                  {(deal.revPercentage ?? 0) > 0 && <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300">RevShare {deal.revPercentage}%</span>}
-                  {(deal.baseline ?? 0) > 0 && <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300">{DEAL_KPI_LABEL.baseline} R$ {Number(deal.baseline).toFixed(2)}</span>}
-                  {(deal.rollover ?? 0) > 0 && <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300">{DEAL_KPI_LABEL.rollover} {deal.rollover}x</span>}
-                  {(deal.ggrPercentage ?? 0) > 0 && <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300">{DEAL_KPI_LABEL.ggr} {deal.ggrPercentage}%</span>}
-                </div>
-                <div className="mt-auto flex items-center gap-2 pt-2">
-                  <button onClick={() => openEdit(deal)} className="flex-1 py-2 rounded-xl border border-slate-200 dark:border-neutral-700 text-xs font-bold text-slate-600 dark:text-neutral-300 hover:border-accent-500/40 hover:text-accent-500 flex items-center justify-center gap-1.5"><Pencil size={13} /> Editar</button>
-                  <button onClick={() => toggleDeal(deal)} disabled={busy === deal.id} className={cn('flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-50', deal.active ? 'border border-slate-200 dark:border-neutral-700 text-slate-600 dark:text-neutral-300 hover:text-red-500 hover:border-red-300' : 'bg-emerald-500 text-white')}>
-                    {busy === deal.id ? <Loader2 size={13} className="animate-spin" /> : <Power size={13} />} {deal.active ? 'Desativar' : 'Ativar'}
+
+                <dl className="space-y-2 mb-5 text-xs">
+                  {adminDealCardRows(deal).map((row) => (
+                    <div key={row.id} className="flex items-center justify-between gap-2">
+                      <dt className="text-slate-400 dark:text-neutral-500 font-medium">{row.label}</dt>
+                      <dd
+                        data-testid={`linha-${row.id}`}
+                        className="truncate max-w-[60%] text-right font-semibold text-slate-600 dark:text-neutral-300"
+                      >
+                        {row.value ?? <span className="font-medium text-slate-300 dark:text-neutral-600">—</span>}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => openEdit(deal)}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700/60 text-xs font-bold text-slate-600 dark:text-neutral-200 hover:border-accent-500/40 hover:text-accent-600 dark:hover:text-accent-400 transition-all"
+                  >
+                    <Pencil size={13} /> Editar
+                  </button>
+                  <button
+                    onClick={() => toggleDeal(deal)}
+                    disabled={busy === deal.id}
+                    title={deal.active ? 'Desativar o acordo (some da vitrine)' : 'Ativar o acordo'}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50',
+                      deal.active
+                        ? 'bg-slate-50 dark:bg-neutral-800/60 border border-slate-100 dark:border-neutral-700/60 text-slate-600 dark:text-neutral-200 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 hover:border-red-200 dark:hover:border-red-900/40'
+                        : 'bg-accent-500/10 border border-accent-500/30 text-accent-600 dark:text-accent-400 hover:bg-accent-500/20',
+                    )}
+                  >
+                    {busy === deal.id ? <Loader2 size={13} className="animate-spin" /> : <Power size={13} />}
+                    {deal.active ? 'Desativar' : 'Ativar'}
                   </button>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </motion.div>
+          </div>
         )
       ) : tab === 'links' ? (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">

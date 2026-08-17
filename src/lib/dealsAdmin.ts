@@ -5,9 +5,10 @@
 // sai do JSX. Ver PLANO-TIPOS-DE-DEAL.md (F3) e dealType.ts.
 
 import {
-  DEAL_TYPE_POLICY, resolveDealType,
+  DEAL_TYPE_POLICY, DEAL_KPI_LABEL, resolveDealType,
   type DealTypeId, type DealKpiId,
 } from './dealType';
+import { formatDealKpiValue } from './dealShowcase';
 import type { Deal, DealModel, PaymentCycle, DealCurrency } from './deal';
 import type { PartnershipRequest, PartnershipStatus } from './partnership';
 
@@ -113,12 +114,34 @@ export function buildDealPayload(draft: DealDraft): Partial<Deal> {
   };
 }
 
-// Badge de tipo no card. `direto` é o default de todo deal antigo (o tipo se resolve
-// na leitura, sem migração), então carimbar a lista inteira com "Acordo direto" seria
-// ruído: só o que FOGE do default ganha selo.
-export function dealTypeBadge(deal?: Pick<Deal, 'type'> | null): string | null {
+export interface DealCardRow {
+  id: DealKpiId | 'tipo';
+  label: string;
+  value: string | null;   // null = a tela desenha o placeholder de vazio
+}
+
+// As linhas de fato do card do acordo, no mesmo formato `<dl>` do card de CASA
+// (/casas): rótulo à esquerda, valor à direita, uma linha por informação. Sai da
+// POLÍTICA do tipo, então um 3º tipo de deal traz as linhas dele sozinho.
+//
+// Diferente do card do AFILIADO, aqui o valor ausente NÃO some: para o admin
+// "Baseline —" é informação (é o que falta para publicar na vitrine), enquanto para
+// o afiliado seria só uma linha vazia. Mesma decisão do card de casa, que mostra
+// "URL de cadastro —".
+//
+// A única linha que some é a taxa que o MODELO não usa: num acordo CPA puro, uma
+// linha "RevShare —" é ruído, não informação.
+export function adminDealCardRows(deal?: Deal | null): DealCardRow[] {
   const type = resolveDealType(deal?.type);
-  return type === 'direto' ? null : (DEAL_TYPE_POLICY[type]?.label ?? null);
+  const rows: DealCardRow[] = [
+    { id: 'tipo', label: 'Tipo', value: DEAL_TYPE_POLICY[type].label },
+  ];
+  for (const kpi of adminDealKpis(type)) {
+    if (kpi === 'revshare' && deal?.model === 'cpa') continue;
+    if (kpi === 'cpa' && deal?.model === 'revshare') continue;
+    rows.push({ id: kpi, label: DEAL_KPI_LABEL[kpi], value: formatDealKpiValue(kpi, deal) });
+  }
+  return rows;
 }
 
 export interface AdminPartnershipQueues {

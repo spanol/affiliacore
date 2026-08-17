@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   adminDealKpis, adminEditsKpi, emptyDealDraft, draftFromDeal, buildDealPayload,
-  dealTypeBadge, selectAdminPartnershipQueues, partnershipDecisionMessage,
+  adminDealCardRows, selectAdminPartnershipQueues, partnershipDecisionMessage,
   ADMIN_ALWAYS_EDITABLE_KPIS,
 } from './dealsAdmin';
 import { DEAL_TYPES, DEAL_TYPE_POLICY } from './dealType';
@@ -132,15 +132,45 @@ describe('buildDealPayload · GGR vazio é null, não zero', () => {
   });
 });
 
-describe('dealTypeBadge', () => {
-  it('não carimba o tipo default', () => {
-    expect(dealTypeBadge(deal())).toBeNull();
-    expect(dealTypeBadge(deal({ type: 'direto' }))).toBeNull();
-    expect(dealTypeBadge(null)).toBeNull();
+describe('adminDealCardRows · as linhas do card, no formato do card de casa', () => {
+  it('abre pelo Tipo, com o rótulo do catálogo', () => {
+    expect(adminDealCardRows(deal({ type: 'gerenciado' }))[0])
+      .toEqual({ id: 'tipo', label: 'Tipo', value: DEAL_TYPE_POLICY.gerenciado.label });
+    expect(adminDealCardRows(deal())[0].value).toBe(DEAL_TYPE_POLICY.direto.label);
   });
 
-  it('usa o rótulo do catálogo para os demais tipos', () => {
-    expect(dealTypeBadge(deal({ type: 'gerenciado' }))).toBe(DEAL_TYPE_POLICY.gerenciado.label);
+  it('as linhas seguintes saem da POLÍTICA do tipo, não de lista fixa', () => {
+    const gerenciado = adminDealCardRows(deal({ type: 'gerenciado', model: 'hybrid' })).map((r) => r.id);
+    expect(gerenciado).toEqual(['tipo', 'cpa', 'revshare', 'baseline', 'rollover', 'cycle', 'ggr']);
+    const direto = adminDealCardRows(deal({ type: 'direto', model: 'hybrid' })).map((r) => r.id);
+    expect(direto).toEqual(['tipo', 'cpa', 'revshare', 'cycle', 'geo']);
+  });
+
+  // Para o ADMIN o vazio é informação (baseline em branco é o que impede publicar),
+  // ao contrário do card do afiliado, onde a linha some. Mesma escolha do card de
+  // casa, que mostra "URL de cadastro —".
+  it('valor ausente vira null para a tela desenhar o travessão, e a linha FICA', () => {
+    const rows = adminDealCardRows(deal({ type: 'gerenciado', baseline: 0, ggrPercentage: null }));
+    expect(rows.find((r) => r.id === 'baseline')).toMatchObject({ value: null });
+    expect(rows.find((r) => r.id === 'ggr')).toMatchObject({ value: null });
+  });
+
+  it('a taxa que o MODELO não usa some (linha "RevShare —" seria ruído)', () => {
+    expect(adminDealCardRows(deal({ model: 'cpa' })).map((r) => r.id)).not.toContain('revshare');
+    expect(adminDealCardRows(deal({ model: 'revshare' })).map((r) => r.id)).not.toContain('cpa');
+  });
+
+  it('formata os valores como a vitrine (fonte única de formatação)', () => {
+    const rows = adminDealCardRows(deal({ type: 'gerenciado', model: 'cpa', cpaValue: 110, baseline: 10, rollover: 2, cycle: 'semanal' }));
+    const val = (id: string) => rows.find((r) => r.id === id)?.value;
+    expect(val('cpa')).toBe('R$ 110,00');
+    expect(val('baseline')).toBe('R$ 10,00');
+    expect(val('rollover')).toBe('2x');
+    expect(val('cycle')).toBe('Semanal');
+  });
+
+  it('deal nulo não lança', () => {
+    expect(() => adminDealCardRows(null)).not.toThrow();
   });
 });
 
