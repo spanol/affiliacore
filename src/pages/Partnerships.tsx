@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { Handshake, Loader2, Search, CheckCircle, Clock, XCircle, Ban, Copy, Check, ExternalLink } from 'lucide-react';
+import { Handshake, Loader2, Search, CheckCircle, Clock, XCircle, Ban, Copy, Check, ExternalLink, Link2 } from 'lucide-react';
 import {
   fetchDeals, fetchPartnerships, requestPartnership, fetchAffiliateLinks,
-  buildDealLabel, selectAvailableDeals, PARTNERSHIP_STATUS_LABEL,
-  buildGoUrl, DEAL_MODEL_LABEL, PAYMENT_CYCLE_LABEL,
+  buildDealLabel, selectAvailableDeals, partnershipStatusLabel,
+  buildGoUrl, DEAL_MODEL_LABEL,
   type Deal, type PartnershipRequest, type AffiliateLink,
 } from '../services/affiliateService';
 import { fetchHouses } from '../services/houseService';
 import { useToast } from '../contexts/ToastContext';
 import { houseLogoOrPreset } from '../lib/housePresets';
+import {
+  dealKpiChips, dealRequestHint, resolvePartnershipPricedBy, partnershipNote,
+} from '../lib/dealShowcase';
 import { cn } from '../lib/utils';
 
 type Tab = 'available' | 'mine';
@@ -17,16 +20,13 @@ type Tab = 'available' | 'mine';
 const STATUS_STYLE: Record<string, { icon: any; cls: string }> = {
   approved: { icon: CheckCircle, cls: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200/70 dark:border-emerald-900/40' },
   requested: { icon: Clock, cls: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 border-amber-200/70 dark:border-amber-900/40' },
+  // `priced` é o estado do meio do acordo gerenciado: o gerente já definiu a
+  // comissão e a agência ainda vai emitir o link. Cor própria para não se confundir
+  // com "solicitada" (onde a vez ainda é do gerente).
+  priced: { icon: Link2, cls: 'text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 border-sky-200/70 dark:border-sky-900/40' },
   rejected: { icon: XCircle, cls: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border-red-200/70 dark:border-red-900/40' },
   discontinued: { icon: Ban, cls: 'text-slate-500 dark:text-neutral-400 bg-slate-100 dark:bg-neutral-800/60 border-slate-200 dark:border-neutral-700' },
 };
-
-function dealValueBadge(deal: Deal): string {
-  const parts: string[] = [];
-  if (deal.cpaValue > 0) parts.push(`CPA R$ ${deal.cpaValue.toFixed(2)}`);
-  if (deal.revPercentage > 0) parts.push(`RevShare ${deal.revPercentage}%`);
-  return parts.join(' · ') || '—';
-}
 
 export default function Partnerships() {
   const { push } = useToast();
@@ -68,6 +68,14 @@ export default function Partnerships() {
       .filter((d) => !q || d.operatorName.toLowerCase().includes(q) || (d.geo || '').toLowerCase().includes(q))
       .sort((a, b) => a.operatorName.localeCompare(b.operatorName, 'pt-BR'));
   }, [deals, requests, search]);
+
+  // O deal da solicitação resolve o tipo (e, por tabela, quem precifica) quando o
+  // servidor ainda não manda `pricedBy` na request.
+  const dealsById = useMemo(() => {
+    const map: Record<string, Deal> = {};
+    deals.forEach((d) => { map[String(d.id)] = d; });
+    return map;
+  }, [deals]);
 
   const handleRequest = async (deal: Deal) => {
     setBusy(deal.id);
@@ -147,31 +155,41 @@ export default function Partnerships() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {available.map((deal) => (
-                <div key={deal.id} className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl p-5 flex flex-col gap-4 shadow-sm">
-                  <div className="flex items-start gap-3">
-                    <OperatorAvatar houseId={deal.houseId} name={deal.operatorName} />
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-bold text-slate-900 dark:text-white truncate">{deal.operatorName}</h3>
-                      <p className="text-[11px] text-slate-400 dark:text-neutral-500 truncate">{buildDealLabel(deal)}</p>
+              {available.map((deal) => {
+                // Os KPIs saem da POLÍTICA do deal, nunca de uma lista fixa aqui: num
+                // acordo que esconde as taxas o servidor REMOVE cpaValue/revPercentage
+                // da resposta, então a tela só desenha o que de fato recebeu.
+                const chips = dealKpiChips(deal);
+                const hint = dealRequestHint(deal);
+                return (
+                  <div key={deal.id} data-testid={`oferta-${deal.id}`} className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl p-5 flex flex-col gap-4 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <OperatorAvatar houseId={deal.houseId} name={deal.operatorName} />
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-bold text-slate-900 dark:text-white truncate">{deal.operatorName}</h3>
+                        <p className="text-[11px] text-slate-400 dark:text-neutral-500 truncate">{buildDealLabel(deal)}</p>
+                      </div>
                     </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-accent-500/15 text-accent-500 uppercase tracking-wide">{DEAL_MODEL_LABEL[deal.model]}</span>
+                      {chips.map((chip) => (
+                        <span key={chip.id} data-testid={`kpi-${chip.id}`} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300">
+                          {chip.label} {chip.value}
+                        </span>
+                      ))}
+                    </div>
+                    {hint && <p className="text-[11px] text-slate-500 dark:text-neutral-400 -mt-1">{hint}</p>}
+                    <button
+                      onClick={() => handleRequest(deal)}
+                      disabled={busy === deal.id}
+                      className="mt-auto w-full py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-bold hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {busy === deal.id ? <Loader2 size={14} className="animate-spin" /> : <Handshake size={14} />}
+                      Solicitar parceria
+                    </button>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-accent-500/15 text-accent-500 uppercase tracking-wide">{DEAL_MODEL_LABEL[deal.model]}</span>
-                    <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300">{dealValueBadge(deal)}</span>
-                    <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300">{PAYMENT_CYCLE_LABEL[deal.cycle]}</span>
-                    {deal.geo && <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300">{deal.geo}</span>}
-                  </div>
-                  <button
-                    onClick={() => handleRequest(deal)}
-                    disabled={busy === deal.id}
-                    className="mt-auto w-full py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-bold hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {busy === deal.id ? <Loader2 size={14} className="animate-spin" /> : <Handshake size={14} />}
-                    Solicitar parceria
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </motion.div>
@@ -187,8 +205,16 @@ export default function Partnerships() {
             requests.map((r) => {
               const st = STATUS_STYLE[r.status] || STATUS_STYLE.requested;
               const Icon = st.icon;
+              // Quem precifica vem do servidor quando ele manda; senão, da política do
+              // deal. É o que separa "Aguardando seu gerente" de "Em análise".
+              const pricedBy = resolvePartnershipPricedBy(r, dealsById[String(r.dealId)]);
+              // Só oferece o link quando ele de fato resolve (a casa tem URL de
+              // cadastro); senão o /go cairia no fallback. Mesma regra do /meus-links,
+              // e é o que decide entre "copie o link" e "link em preparação".
+              const link = r.code ? links[r.code] : undefined;
+              const linkReady = !!(link && link.active !== false && link.registerUrl);
               return (
-                <div key={r.id} className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl p-5 shadow-sm">
+                <div key={r.id} data-testid={`solicitacao-${r.id}`} className="bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl p-5 shadow-sm">
                   <div className="flex items-center gap-3">
                     <OperatorAvatar houseId={r.houseId} name={r.operatorName || ''} />
                     <div className="min-w-0 flex-1">
@@ -196,33 +222,25 @@ export default function Partnerships() {
                       <p className="text-[11px] text-slate-400 dark:text-neutral-500 truncate">{r.dealLabel}</p>
                     </div>
                     <span className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border', st.cls)}>
-                      <Icon size={13} /> {PARTNERSHIP_STATUS_LABEL[r.status]}
+                      <Icon size={13} /> {partnershipStatusLabel(r.status, 'affiliate', pricedBy)}
                     </span>
                   </div>
+                  <p data-testid={`recado-${r.id}`} className="mt-3 text-[11px] text-slate-500 dark:text-neutral-400">{partnershipNote(r.status, pricedBy, linkReady)}</p>
                   {r.status === 'approved' && r.code && (
                     <div className="mt-4 pt-4 border-t border-slate-100 dark:border-neutral-800">
                       <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">Link de divulgação</label>
-                      {(() => {
-                        const link = links[r.code!];
-                        // Só oferece o link quando ele de fato resolve (a casa tem URL de
-                        // cadastro); senão o /go cairia no fallback. Mesma regra do /meus-links.
-                        const ready = link && link.active !== false && !!link.registerUrl;
-                        return ready ? (
-                          <div className="flex items-center gap-2 mt-1.5">
-                            <code className="flex-1 px-3 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs text-slate-700 dark:text-neutral-200 truncate">{buildGoUrl(r.code!)}</code>
-                            <button onClick={() => copyLink(r.code!)} className="px-3 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-bold hover:opacity-90 flex items-center gap-1.5">
-                              {copied === r.code ? <Check size={14} /> : <Copy size={14} />} {copied === r.code ? 'Copiado' : 'Copiar'}
-                            </button>
-                            <a href={buildGoUrl(r.code!)} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-xl border border-slate-200 dark:border-neutral-700 text-slate-500 hover:text-accent-500"><ExternalLink size={14} /></a>
-                          </div>
-                        ) : (
-                          <p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">Link em preparação: a casa ainda não tem URL de cadastro configurada. Fale com o administrador.</p>
-                        );
-                      })()}
+                      {linkReady ? (
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <code className="flex-1 px-3 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-xs text-slate-700 dark:text-neutral-200 truncate">{buildGoUrl(r.code!)}</code>
+                          <button onClick={() => copyLink(r.code!)} className="px-3 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-bold hover:opacity-90 flex items-center gap-1.5">
+                            {copied === r.code ? <Check size={14} /> : <Copy size={14} />} {copied === r.code ? 'Copiado' : 'Copiar'}
+                          </button>
+                          <a href={buildGoUrl(r.code!)} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-xl border border-slate-200 dark:border-neutral-700 text-slate-500 hover:text-accent-500"><ExternalLink size={14} /></a>
+                        </div>
+                      ) : (
+                        <p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">Link em preparação: a casa ainda não tem URL de cadastro configurada. Fale com o administrador.</p>
+                      )}
                     </div>
-                  )}
-                  {r.status === 'discontinued' && (
-                    <p className="mt-3 text-[11px] text-slate-400 dark:text-neutral-500">Este acordo foi encerrado pela operadora.</p>
                   )}
                 </div>
               );

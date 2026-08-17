@@ -53,6 +53,11 @@ export interface PartnershipRequest {
   dealId: string;
   status: PartnershipStatus;
   code?: string | null;        // code do affiliate_links, setado na aprovação
+  // QUEM precifica esta solicitação, resolvido pelo SERVIDOR no GET (não é gravado
+  // no doc). O client não tem a árvore da rede em mãos, então não conseguiria
+  // distinguir "acordo gerenciado" de "acordo gerenciado sem gerente elegível", que
+  // é justamente a diferença entre "aguardando seu gerente" e "em análise".
+  pricedBy?: 'admin' | 'upline';
   // denormalizado p/ exibir sem re-join no client:
   operatorName?: string;
   dealLabel?: string;

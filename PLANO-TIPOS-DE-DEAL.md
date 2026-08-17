@@ -311,7 +311,18 @@ Três decisões que valem registrar:
 `priced` pela interface** — só a rota `POST /api/partnerships/:id/price`. A aba
 nova funciona, mas fica vazia numa verificação pela tela.
 
-**F4 · Vitrine do afiliado.** Card e estados.
+**F4 · Vitrine do afiliado. ✅ ENTREGUE.** O card monta os chips a partir de
+`visibleKpis(deal)` + a formatação pura de `src/lib/dealShowcase.ts`, na ordem da
+política. A função local `dealValueBadge`, que fazia `deal.cpaValue.toFixed(2)`,
+foi REMOVIDA: num deal sanitizado o campo chega ausente e aquilo era um crash
+garantido na tela do afiliado. Toda formatação devolve `null` para valor ausente,
+e o chip simplesmente não é desenhado (nunca "R$ 0,00").
+
+Cada solicitação ganhou rótulo por audiência e um recado curto do que acontece
+agora. O `pricedBy` vem carimbado pelo servidor (F5) e o client só o valida;
+`partnershipNote` recebe `linkReady` porque uma parceria aprovada tem dois
+desfechos, e dizer "copie o link abaixo" quando a casa não tem URL de cadastro
+seria mentira na tela.
 
 **F5 · Fila do gerente. ✅ ENTREGUE.** Seção "Solicitações de parceria" em
 `/network/afiliados`, com o teto visível ao lado, prévia do que sobra para ele
