@@ -12,6 +12,13 @@ import {
   houseForBrandKey,
   type TriageLink,
 } from './linkTriage';
+import type { Deal } from './deal';
+
+const deal = (over: Partial<Deal> = {}): Deal => ({
+  id: 'd1', houseId: 'esportiva-bet', operatorName: 'Esportiva Bet', model: 'cpa',
+  cpaValue: 110, revPercentage: 0, cycle: 'mensal', currency: 'BRL', geo: 'Brasil',
+  active: true, ...over,
+});
 
 const link = (over: Partial<TriageLink> = {}): TriageLink => ({
   code: 'abc123',
@@ -280,6 +287,63 @@ describe('buildMyLinkCards (ponta do afiliado)', () => {
 
   it('entradas nulas não quebram', () => {
     expect(buildMyLinkCards(null, null, null)).toEqual([]);
+  });
+
+  it('cartão de parceria carrega o ACORDO pelo dealId, sem adivinhar', () => {
+    const cards = buildMyLinkCards(
+      [{ id: 'p1', code: 'AAA', dealId: 'd9', operatorName: 'Super Bet V2', dealLabel: 'CPA', houseId: 'superbet' }],
+      [{ code: 'AAA', affiliateId: 'aff1', brandId: '77', registerUrl: 'https://sb.bet/r', active: true }],
+      houses,
+      [deal({ id: 'd9', houseId: 'superbet', minCpaGoal: 5 }), deal({ id: 'd8', houseId: 'esportiva-bet' })],
+    );
+    expect(cards[0].deal?.id).toBe('d9');
+    expect(cards[0].deal?.minCpaGoal).toBe(5);
+  });
+
+  it('parceria cujo acordo saiu da vitrine fica sem acordo, não com o de outra casa', () => {
+    const cards = buildMyLinkCards(
+      [{ id: 'p1', code: 'AAA', dealId: 'apagado', operatorName: 'Super Bet V2', houseId: 'superbet' }],
+      [{ code: 'AAA', affiliateId: 'aff1', brandId: '77', registerUrl: 'https://sb.bet/r', active: true }],
+      houses,
+      [deal({ id: 'd8', houseId: 'esportiva-bet' })],
+    );
+    expect(cards[0].deal).toBeNull();
+  });
+
+  it('link SEM parceria pega o acordo da casa quando a casa tem UM só', () => {
+    const cards = buildMyLinkCards(
+      [],
+      [{ code: 'BBB', affiliateId: 'aff1', brandId: 'esportiva-bet', registerUrl: 'https://e.bet/r', active: true }],
+      houses,
+      [deal({ id: 'd8', houseId: 'esportiva-bet', operatorName: 'Esportiva Bet', cycle: 'd30mais' })],
+    );
+    expect(cards[0].deal?.id).toBe('d8');
+    // o rótulo do acordo vira o subtítulo: melhor que o genérico "Link de divulgação"
+    expect(cards[0].subtitle).toBe('Esportiva Bet - CPA - D30+ - BRL - Brasil');
+  });
+
+  // Duas ofertas na mesma operadora (modelos diferentes) e o link não guarda qual
+  // delas foi combinada. Publicar uma das duas seria mostrar ao afiliado termos que
+  // talvez não sejam os dele.
+  it('casa com MAIS DE UM acordo não resolve acordo nenhum', () => {
+    const cards = buildMyLinkCards(
+      [],
+      [{ code: 'BBB', affiliateId: 'aff1', brandId: 'esportiva-bet', registerUrl: 'https://e.bet/r', active: true }],
+      houses,
+      [deal({ id: 'd8', houseId: 'esportiva-bet' }), deal({ id: 'd7', houseId: 'esportiva-bet', model: 'revshare' })],
+    );
+    expect(cards[0].deal).toBeNull();
+    expect(cards[0].subtitle).toBe('Link de divulgação');
+  });
+
+  it('sem acordos (instância sem marketplace) o cartão sai como antes', () => {
+    const cards = buildMyLinkCards(
+      [{ id: 'p1', code: 'AAA', dealId: 'd9', operatorName: 'Super Bet V2', dealLabel: 'CPA', houseId: 'superbet' }],
+      [{ code: 'AAA', affiliateId: 'aff1', brandId: '77', registerUrl: 'https://sb.bet/r', active: true }],
+      houses,
+    );
+    expect(cards[0].deal).toBeNull();
+    expect(cards[0].subtitle).toBe('CPA');
   });
 
   it('houseForBrandKey resolve por brandId, slug e id — e devolve null sem chave', () => {

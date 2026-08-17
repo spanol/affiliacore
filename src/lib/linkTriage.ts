@@ -12,6 +12,7 @@
 // um link do pool nunca redireciona nem conta clique antes de ser atribuído.
 
 import { num } from './commission';
+import { buildDealLabel, type Deal } from './deal';
 
 export type LinkTriageView =
   | 'com_link'
@@ -276,6 +277,7 @@ export function parseStandbyLinks(text: string): StandbyParseResult {
 export interface MyLinkPartnership {
   id?: string;
   code?: string | null;
+  dealId?: string | null;
   operatorName?: string | null;
   dealLabel?: string | null;
   houseId?: string | null;
@@ -298,6 +300,22 @@ export interface MyLinkCard {
   clicks: number;
   deliverable: boolean;
   source: 'partnership' | 'assigned';
+  // ACORDO que rege este link, quando dá para saber qual é. A tela desenha os KPIs
+  // dele com a MESMA regra da vitrine (dealKpiChips), então o acordo que esconde as
+  // taxas continua escondendo: os campos já chegam cortados pelo servidor.
+  // `null` = link sem acordo resolvível; o cartão fica como era antes.
+  deal: Deal | null;
+}
+
+// Acordo de um link SEM parceria (atribuído pela triagem ou migrado do legado). A
+// mesma casa pode ter VÁRIOS acordos (modelos diferentes na mesma operadora) e o
+// link não guarda qual deles foi combinado — escolher um seria publicar ao afiliado
+// termos que talvez não sejam os dele. Por isso só resolve quando a casa tem UM.
+function soleDealForHouse(deals: Deal[] | null | undefined, keys: Array<unknown>): Deal | null {
+  const wanted = new Set(keys.map(brandKeyOf).filter((k) => k !== ''));
+  if (wanted.size === 0) return null;
+  const found = (Array.isArray(deals) ? deals : []).filter((d) => wanted.has(brandKeyOf(d?.houseId)));
+  return found.length === 1 ? found[0] : null;
 }
 
 // Casa de um link pela chave de marca (brandId da OTG ou slug da casa manual —
@@ -321,16 +339,25 @@ export function houseForBrandKey(
  * Cartões da tela do afiliado: parcerias aprovadas + links atribuídos/migrados
  * que não pertencem a nenhuma parceria. O `code` é a chave de deduplicação — um
  * link de parceria NUNCA aparece duas vezes, mesmo estando nas duas listas.
+ *
+ * `deals` é OPCIONAL: instância sem marketplace (o módulo é opt-in por env) não tem
+ * a rota, a página passa lista vazia e os cartões saem como sempre saíram.
  */
 export function buildMyLinkCards(
   partnerships: MyLinkPartnership[] | null | undefined,
   links: TriageLink[] | null | undefined,
   houses: MyLinkHouse[] | null | undefined,
+  deals?: Deal[] | null,
 ): MyLinkCard[] {
   const byCode = new Map<string, TriageLink>();
   for (const l of Array.isArray(links) ? links : []) {
     const code = String(l?.code ?? '').trim();
     if (code) byCode.set(code, l);
+  }
+  const dealById = new Map<string, Deal>();
+  for (const d of Array.isArray(deals) ? deals : []) {
+    const id = String(d?.id ?? '').trim();
+    if (id) dealById.set(id, d);
   }
 
   const cards: MyLinkCard[] = [];
@@ -341,6 +368,9 @@ export function buildMyLinkCards(
     if (!code) continue; // parceria sem link emitido não vira cartão
     used.add(code);
     const link = byCode.get(code) ?? null;
+    // Na parceria o acordo é EXPLÍCITO (`dealId`), então não há adivinhação: acordo
+    // apagado da vitrine simplesmente não resolve e o cartão fica sem os KPIs.
+    const deal = dealById.get(String(p?.dealId ?? '').trim()) ?? null;
     cards.push({
       key: String(p?.id ?? code),
       code,
@@ -351,6 +381,7 @@ export function buildMyLinkCards(
       clicks: num(link?.clicks),
       deliverable: isDeliverableLink(link),
       source: 'partnership',
+      deal,
     });
   }
 
@@ -358,16 +389,18 @@ export function buildMyLinkCards(
     if (used.has(code)) continue;
     if (isStandbyLink(link)) continue; // pool sem dono não é do afiliado
     const house = houseForBrandKey(houses, link?.brandId);
+    const deal = soleDealForHouse(deals, [house?.slug, house?.id, link?.brandId]);
     cards.push({
       key: code,
       code,
       houseId: house ? String(house.id) : null,
       title: String(house?.name ?? '').trim() || brandKeyOf(link?.brandId) || 'Operadora',
-      subtitle: 'Link de divulgação',
+      subtitle: deal ? buildDealLabel(deal) : 'Link de divulgação',
       registerUrl: String(link?.registerUrl ?? '').trim(),
       clicks: num(link?.clicks),
       deliverable: isDeliverableLink(link),
       source: 'assigned',
+      deal,
     });
   }
 

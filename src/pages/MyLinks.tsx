@@ -3,11 +3,12 @@ import { pluralize } from '../lib/plural';
 import { motion } from 'motion/react';
 import { Link2, Loader2, Copy, Check, MousePointerClick, ExternalLink } from 'lucide-react';
 import {
-  fetchPartnerships, fetchAffiliateLinks, buildGoUrl,
+  fetchPartnerships, fetchAffiliateLinks, fetchDeals, buildGoUrl, DEAL_MODEL_LABEL,
 } from '../services/affiliateService';
 import { fetchHouses } from '../services/houseService';
 import { useToast } from '../contexts/ToastContext';
 import { houseLogoOrPreset } from '../lib/housePresets';
+import { dealKpiChips } from '../lib/dealShowcase';
 import { buildMyLinkCards, type MyLinkCard } from '../lib/linkTriage';
 
 export default function MyLinks() {
@@ -24,10 +25,14 @@ export default function MyLinks() {
     (async () => {
       setLoading(true);
       try {
-        const [parts, allLinks, houses] = await Promise.all([
+        // Os acordos entram para o cartão mostrar os TERMOS do link, e não só a URL.
+        // `catch` porque o marketplace é opt-in por instância: sem o módulo a rota não
+        // existe, e a tela tem que continuar listando os links do mesmo jeito.
+        const [parts, allLinks, houses, deals] = await Promise.all([
           fetchPartnerships('approved'), fetchAffiliateLinks(), fetchHouses().catch(() => []),
+          fetchDeals().catch(() => []),
         ]);
-        setCards(buildMyLinkCards(parts, allLinks as any, houses as any));
+        setCards(buildMyLinkCards(parts, allLinks as any, houses as any, deals as any));
         const hmap: Record<string, string | null> = {};
         (houses as any[]).forEach((h) => {
           hmap[String(h.id)] = houseLogoOrPreset(h.logo, h.slug, h.id, h.name);
@@ -95,6 +100,23 @@ export default function MyLinks() {
                     <span className="text-[10px] uppercase tracking-widest text-slate-400 dark:text-neutral-500 font-bold">cliques</span>
                   </div>
                 </div>
+                {/* Termos do acordo que rege este link. Os KPIs saem da POLÍTICA do
+                    tipo de acordo (a mesma da vitrine): num acordo gerenciado o CPA
+                    nem chega aqui, o servidor já o removeu da resposta. */}
+                {card.deal && (
+                  <div data-testid={`acordo-${card.code}`} className="mt-4 flex flex-wrap gap-1.5">
+                    {card.deal.model && (
+                      <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-accent-500/15 text-accent-500 uppercase tracking-wide">
+                        {DEAL_MODEL_LABEL[card.deal.model]}
+                      </span>
+                    )}
+                    {dealKpiChips(card.deal).map((chip) => (
+                      <span key={chip.id} data-testid={`kpi-${chip.id}`} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300">
+                        {chip.label} {chip.value}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className="mt-4 pt-4 border-t border-slate-100 dark:border-neutral-800">
                   {!card.deliverable ? (
                     <p className="text-[11px] text-amber-600 dark:text-amber-400">Link indisponível: ainda sem URL de cadastro, ou desativado. Fale com o administrador.</p>
