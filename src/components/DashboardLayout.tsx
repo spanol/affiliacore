@@ -6,9 +6,9 @@ import { fetchSpecialAffiliates, type SpecialAffiliate } from '../services/affil
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import { 
-  LayoutDashboard, 
-  User, 
-  Settings, 
+  LayoutDashboard,
+  ChevronRight,
+  Settings,
   LogOut, 
   Menu, 
   X,
@@ -195,7 +195,10 @@ export default function DashboardLayout() {
     {
       label: 'Conta',
       items: [
-        { label: 'Meu Perfil', path: '/profile', icon: User },
+        // "Meu Perfil" NÃO entra aqui: quem leva a /profile é o card do usuário no
+        // rodapé da sidebar, que já mostra avatar, nome e papel. Dois caminhos para
+        // a mesma tela, um deles com a cara do dono da conta, é um item de menu
+        // gasto à toa.
         // Suporte: deep link pro WhatsApp cadastrado pelo operador da label. Só
         // aparece quando há contato ativo (senão levaria a lugar nenhum).
         ...(supportUrl
@@ -272,7 +275,21 @@ export default function DashboardLayout() {
       </nav>
 
       <div className="mt-auto border-t border-slate-100 dark:border-neutral-800/80 p-4">
-        <div className="flex items-center gap-3 p-2.5 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-neutral-800 mb-4">
+        {/* O card do usuário É o acesso a /profile (o item "Meu Perfil" saiu do
+            menu): ele já carrega avatar, nome e papel, então é o alvo mais
+            reconhecível da sidebar. Fica ATIVO quando a rota é /profile, com o
+            mesmo vocabulário visual dos itens de menu. */}
+        <Link
+          to="/profile"
+          onClick={() => setIsMobileMenuOpen(false)}
+          title="Meu perfil"
+          className={cn(
+            'group flex items-center gap-3 p-2.5 rounded-xl border mb-4 transition-all',
+            isActive('/profile')
+              ? 'bg-accent-500/10 border-accent-500/30 shadow-sm'
+              : 'bg-slate-50 dark:bg-white/5 border-slate-100 dark:border-neutral-800 hover:bg-white dark:hover:bg-white/10 hover:border-accent-500/40 hover:shadow-sm',
+          )}
+        >
           <div className="relative">
             {profile?.avatarUrl ? (
               <img
@@ -292,7 +309,16 @@ export default function DashboardLayout() {
               {profile?.role === 'admin' ? 'Administrador' : 'Cliente'}
             </p>
           </div>
-        </div>
+          <ChevronRight
+            size={15}
+            className={cn(
+              'shrink-0 transition-colors',
+              isActive('/profile')
+                ? 'text-accent-500'
+                : 'text-slate-300 dark:text-neutral-600 group-hover:text-accent-500',
+            )}
+          />
+        </Link>
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 dark:text-neutral-400 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 hover:shadow-sm transition-all text-xs font-bold border border-transparent hover:border-red-100 dark:hover:border-red-900/30"
