@@ -415,9 +415,34 @@ no `apphosting.<cliente>.yaml`, sem rebuild.
    - **HeroDashboardMock do app** também ganhou o card por instância
      (OTG on = Total CPA; OTG-free = Total depositado) — app, LP e futura
      demo contam a MESMA história numérica.
-9. **PRÓXIMO:** typo-defense afiliacore.com.br + INPI/Instagram (link na
-   bio ainda pendente — operador); playbook no cliente 0; P5.2 jurídico;
-   formalizar degraus do P5.5; demo P5.3 quando houver lead quente.
+9. ✅ **P5.3c · DEMO COM COBERTURA TOTAL + TRAVA DE REGRESSÃO (2026-08-17,
+   pedido "grande cobertura de cenários para gravar mídia nova").** A demo
+   deixou de mostrar só o núcleo: `DEMO_FULL=1 npm run dev` sobe emuladores +
+   seed base + `seed-demo-extras.cjs` num comando, e a demo ganhou 133
+   afiliados, 7 casas, carteira em todos os status COM casa, marketplace
+   (acordo direto E gerenciado, fila do gerente e "Aguardando link"),
+   conquistas (5 placas + fila), links com pool de standby, jurídico,
+   integração `esportiva-tap` ligada, `/solicitacoes` nas 3 naturezas,
+   settings (Suporte na sidebar + vitrine), taxa com vigência/byBrand,
+   2º especial `fromNetwork` e auditoria rica. Smoke Playwright nas 32
+   telas dos 3 papéis: nenhuma vazia. **A demo também virou parte da
+   harness**: `src/lib/demoCoverage.ts` + teste travam coleção nova sem
+   dado e enum novo sem registro (achou sozinha `affiliate_tag_aliases` e
+   o status `priced`) — ver o invariante no CLAUDE.md. O `seed-demo-extras`
+   agora roda também contra o Firestore REAL da demo (`--live --yes`, com
+   guard de projeto + proteção dos `leads` verificada por query), que é o
+   que faltava para a instância deployada não nascer pobre.
+10. **PRÓXIMO — a demo deployada depende SÓ de gates de operador** (nada de
+   código pendente; playbook em `scripts/provision/README.md` § "Instância
+   DEMO", passos 1 a 9): (a) Blaze no projeto `affiliacore`; (b) Auth
+   e-mail/senha; (c) app Web registrado; (d) rules MESCLADAS
+   (`build-affiliacore-rules.cjs` + deploy com `--config
+   firebase.affiliacore.json --project www` — NUNCA o `firestore.rules`
+   raiz, apagaria o bloco `leads`); (e) service account + os 2 secrets;
+   (f) backend App Hosting com o ambiente `demo`; (g) seed 8a + 8b; (h)
+   smoke. Fora disso: typo-defense afiliacore.com.br + INPI/Instagram
+   (link na bio ainda pendente — operador); playbook no cliente 0; P5.2
+   jurídico; formalizar degraus do P5.5.
 
 ## 🎨 Fundo preto = padrão de label (2026-07-28)
 

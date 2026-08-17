@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * SEED EXTRAS · demo "gigante" para gravação (reels) — SÓ EMULADOR.
+ * SEED EXTRAS · demo "gigante" — gravação de mídia (emulador) E a instância DEMO
+ * deployada que se mostra a cliente (projeto Firebase `affiliacore`).
  *
  * Roda DEPOIS do seed base (`seed-demo.cjs --wipe --yes`), que popula o núcleo
  * (dashboard/afiliados/auditoria/ranking/portal/avisos/prêmios/rede). Este script é
@@ -8,37 +9,87 @@
  *   1) INFLA a operação p/ parecer uma agência grande: +95 afiliados, +3 casas,
  *      +milhares de linhas de resultado (headline sobe p/ centenas de milhares/mês);
  *   2) POPULA os módulos que o seed base não cobre (branch feat/integracao-affility):
- *      carteira (payment_profiles + withdrawal_requests em TODOS os status),
+ *      carteira (payment_profiles + withdrawal_requests em TODOS os status, com casa),
  *      jurídico (legal_documents versionados + legal_acceptances), marketplace
- *      (deals + partnership_requests), links de divulgação (affiliate_links +
- *      link_click_stats + link_clicks), contatos, mensagens diretas e histórico de
- *      daily_rankings.
+ *      (deals direto E gerenciado + partnership_requests, inclusive a fila do
+ *      gerente), links de divulgação (affiliate_links + link_click_stats +
+ *      link_clicks + pool de standby), conquistas (achievement_tiers + requests),
+ *      /solicitacoes nas 3 naturezas (lead + signup + indicação), settings
+ *      (suporte + vitrine), integração configurada (esportiva-tap), avisos e
+ *      notificações de todos os tipos, taxa com vigência/byBrand no afiliado demo,
+ *      2º especial fromNetwork, link de rede do especial, contatos, mensagens
+ *      diretas, trilha de auditoria rica e histórico de daily_rankings.
  *
- * Uso (com os emuladores no ar):
+ * Uso A — EMULADOR (gravação local, o caminho do dia a dia; `DEMO_FULL=1 npm run
+ * dev` já faz isto por baixo):
  *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=affiliacore \
  *   GOOGLE_CLOUD_PROJECT=affiliacore node scripts/provision/seed-demo-extras.cjs
  *
- * SEGURANÇA: aborta se FIRESTORE_EMULATOR_HOST NÃO estiver setado (nunca toca um
- * Firestore real) e se o projeto não for `affiliacore`.
+ * Uso B — INSTÂNCIA DEMO DEPLOYADA (Firestore REAL do projeto `affiliacore`, depois
+ * do seed base; exige --live porque apaga coleções):
+ *   GOOGLE_APPLICATION_CREDENTIALS=./service-account.affiliacore.json \
+ *     node scripts/provision/seed-demo-extras.cjs --live --yes
+ *
+ * SEGURANÇA (o script APAGA coleções inteiras — ver OWN_COLLECTIONS):
+ *   • Sem emulador e sem `--live --yes`, aborta. Escrever em Firestore real é
+ *     sempre um gesto explícito, nunca o default de um comando digitado rápido.
+ *   • GUARD DE PROJETO: o projeto tem que ser `affiliacore` (a demo). Um projeto de
+ *     instância REAL de cliente (agencia-boost-app, infinity-affiliacore...) aborta:
+ *     este script destrói dado de gestão de verdade.
+ *   • `leads` (a landing divide o banco com a demo no projeto affiliacore) é
+ *     PROTEGIDO: a contagem é conferida no fim e divergência é erro.
  */
 const admin = require('firebase-admin');
 const crypto = require('crypto');
+const fs = require('fs');
 
 // ---------------------------------------------------------------------------
 // Guards + init
 // ---------------------------------------------------------------------------
-if (!process.env.FIRESTORE_EMULATOR_HOST) {
-  console.error('ABORTADO: FIRESTORE_EMULATOR_HOST não está setado. Este script só roda contra o emulador.');
+const has = (name) => process.argv.includes(`--${name}`);
+const EMULATOR = !!process.env.FIRESTORE_EMULATOR_HOST;
+const LIVE = has('live');
+
+if (!EMULATOR && !(LIVE && has('yes'))) {
+  console.error('ABORTADO: sem FIRESTORE_EMULATOR_HOST no ambiente.');
+  console.error('Para semear a demo LOCAL, suba os emuladores (DEMO_FULL=1 npm run dev).');
+  console.error('Para semear a instância DEMO deployada (Firestore real do projeto affiliacore),');
+  console.error('confirme com: --live --yes');
   process.exit(1);
 }
-const PROJECT = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'affiliacore';
+
+// Projeto: no emulador vem das envs; no modo --live sai do service account (é a
+// credencial que decide onde escreve, então é dela que o guard tem que ler).
+function resolveLiveProject() {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    try { return JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY).project_id; } catch { /* segue */ }
+  }
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    try { return JSON.parse(fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8')).project_id; } catch { /* segue */ }
+  }
+  return process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || null;
+}
+const PROJECT = EMULATOR
+  ? (process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'affiliacore')
+  : resolveLiveProject();
 if (PROJECT !== 'affiliacore') {
-  console.error(`ABORTADO: projeto "${PROJECT}" != "affiliacore".`);
+  console.error(`ABORTADO: projeto "${PROJECT}" != "affiliacore" (a instância DEMO).`);
+  console.error('Este script APAGA coleções inteiras: jamais aponte para o projeto de um cliente.');
   process.exit(1);
 }
-admin.initializeApp({ projectId: PROJECT });
+
+if (EMULATOR) {
+  admin.initializeApp({ projectId: PROJECT });
+} else if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+  admin.initializeApp({ credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)) });
+} else {
+  admin.initializeApp(); // GOOGLE_APPLICATION_CREDENTIALS
+}
 const db = admin.firestore();
 const { Timestamp, FieldValue } = admin.firestore;
+console.log(EMULATOR
+  ? `Modo: EMULADOR (${process.env.FIRESTORE_EMULATOR_HOST})`
+  : 'Modo: --live · Firestore REAL do projeto affiliacore (instância DEMO)');
 
 // ---------------------------------------------------------------------------
 // Utilitários determinísticos (mesma pegada do seed base)
@@ -109,11 +160,16 @@ const CIDADES = ['São Paulo/SP', 'Rio de Janeiro/RJ', 'Belo Horizonte/MG', 'Cur
 const RUAS = ['Rua das Palmeiras', 'Av. Brasil', 'Rua XV de Novembro', 'Av. Paulista', 'Rua do Comércio', 'Av. Getúlio Vargas', 'Rua Sete de Setembro', 'Av. Rio Branco'];
 
 // Casas extras (manuais). defaultCpa em EUR (convenção /casas), defaultRev em %.
+// A Esportiva entra COM conector (integrations/esportiva-tap) p/ mostrar o pull
+// automático — espelha o setup real da Infinity.
 const EXTRA_HOUSES = [
   { slug: 'kto', name: 'KTO', defaultCpa: 20, defaultRev: 30 },
   { slug: 'novibet', name: 'Novibet', defaultCpa: 19, defaultRev: 28 },
   { slug: 'vaidebet', name: 'Vai de Bet', defaultCpa: 17, defaultRev: 25 },
+  { slug: 'esportiva', name: 'Esportiva Bet', defaultCpa: 18, defaultRev: 26 },
 ];
+// Tag `afp` de propósito: está em TAG_PARAMS (src/lib/linkTriage.ts) — a triagem
+// de /links reconhece a tag em uso; `wm` não seria reconhecida.
 const REGISTER_URL = {
   superbet: 'https://superbet.bet.br/cadastro',
   betano: 'https://www.betano.bet.br/register',
@@ -121,8 +177,9 @@ const REGISTER_URL = {
   kto: 'https://www.kto.bet.br/cadastro',
   novibet: 'https://www.novibet.bet.br/registo',
   vaidebet: 'https://vaidebet.bet.br/cadastro',
+  esportiva: 'https://esportiva.bet.br/cadastro',
 };
-const HOUSE_NAME = { superbet: 'Superbet', betano: 'Betano', betmgm: 'BetMGM', kto: 'KTO', novibet: 'Novibet', vaidebet: 'Vai de Bet' };
+const HOUSE_NAME = { superbet: 'Superbet', betano: 'Betano', betmgm: 'BetMGM', kto: 'KTO', novibet: 'Novibet', vaidebet: 'Vai de Bet', esportiva: 'Esportiva Bet' };
 
 const fakeCpf = () => `${between(100, 999)}.${between(100, 999)}.${between(100, 999)}-${between(10, 99)}`;
 const fakeCnpj = () => `${between(10, 99)}.${between(100, 999)}.${between(100, 999)}/0001-${between(10, 99)}`;
@@ -130,12 +187,23 @@ const fakeAddress = () => `${pick(RUAS)}, ${between(10, 1999)} - ${pick(CIDADES)
 
 // ---------------------------------------------------------------------------
 async function main() {
-  console.log('== SEED EXTRAS (demo gigante · emulador) ==');
-  console.log(`Projeto: ${PROJECT} · emulador: ${process.env.FIRESTORE_EMULATOR_HOST}`);
+  console.log('== SEED EXTRAS (demo gigante) ==');
+
+  // `leads` (formulário da landing) divide o banco com a demo no projeto
+  // affiliacore. O script não o toca, e a contagem antes/depois PROVA isso —
+  // declarar sem verificar é o erro que a casa não repete (ver CLAUDE.md).
+  const leadsBefore = (await db.collection('leads').count().get()).data().count;
+  if (!EMULATOR) console.log(`  leads da landing protegidos: ${leadsBefore} docs`);
 
   // 0) Limpeza defensiva das coleções que o seed base NÃO conhece (p/ re-run) +
   //    afiliados extras de uma rodada anterior (marcados demoExtra).
-  const OWN_COLLECTIONS = ['deals', 'partnership_requests', 'legal_documents', 'legal_acceptances', 'withdrawal_requests'];
+  // Coleções 100% dos extras (o seed base não grava nelas): deletar inteiro é
+  // seguro e é o que torna o re-run idempotente (os links têm code aleatório).
+  const OWN_COLLECTIONS = [
+    'deals', 'partnership_requests', 'legal_documents', 'legal_acceptances', 'withdrawal_requests',
+    'achievement_tiers', 'achievement_requests', 'affiliate_referrals', 'integrations',
+    'affiliate_links', 'link_click_stats', 'link_clicks', 'affiliate_tag_aliases',
+  ];
   for (const col of OWN_COLLECTIONS) {
     const n = await deleteCollection(col);
     if (n) console.log(`  limpo ${col}: ${n}`);
@@ -174,6 +242,9 @@ async function main() {
     .filter((u) => u.role === 'client' && u.affiliateId);
   const adminUid = (usersSnap.docs.find((d) => d.data()?.role === 'admin')?.id) || 'demo-admin';
   const demoAfiliado = clientUsers.find((u) => !u.isSpecial) || null;
+  const especialUser = clientUsers.find((u) => u.isSpecial) || null;
+  const especialUserUid = especialUser ? especialUser.uid : null;
+  const especialAffiliateId = especialUser ? especialUser.affiliateId : null;
   console.log(`  base: ${Object.keys(baseNames).length} afiliados, ${baseProducerIds.length} com config, ${clientUsers.length} logins cliente`);
 
   const HOUSE_SLUGS = ['superbet', 'betano', 'betmgm', ...EXTRA_HOUSES.map((h) => h.slug)];
@@ -182,14 +253,17 @@ async function main() {
   // 2) Casas: adiciona as extras + carimba registerUrlTemplate em TODAS (p/ links ativos)
   EXTRA_HOUSES.forEach((h, i) => writes.push((b) => b.set(db.collection('houses').doc(h.slug), {
     slug: h.slug, name: h.name, brandId: null, logo: null,
-    registerUrlTemplate: `${REGISTER_URL[h.slug]}?wm={affiliateId}`,
+    registerUrlTemplate: `${REGISTER_URL[h.slug]}?afp={affiliateId}`,
     active: true, order: 10 + i, dataSource: 'manual',
+    // vínculo casa↔integração é 1:1 e vive nos DOIS docs (applyIntegrationLink):
+    // aqui a flag da casa; o alvo (houseId) vai no doc integrations/esportiva-tap.
+    ...(h.slug === 'esportiva' ? { integration: 'esportiva-tap' } : {}),
     defaultCpa: h.defaultCpa, defaultRev: h.defaultRev,
     createdByUid: adminUid, createdAt: daysAgoTs(65), updatedAt: daysAgoTs(65),
   })));
   ['superbet', 'betano', 'betmgm'].forEach((slug) => writes.push((b) => b.set(
     db.collection('houses').doc(slug),
-    { registerUrlTemplate: `${REGISTER_URL[slug]}?wm={affiliateId}`, updatedAt: daysAgoTs(40) },
+    { registerUrlTemplate: `${REGISTER_URL[slug]}?afp={affiliateId}`, updatedAt: daysAgoTs(40) },
     { merge: true },
   )));
 
@@ -304,12 +378,16 @@ async function main() {
   // frágil; então geramos o snapshot na hora a partir de um lookup simples.
   const pixSnapshotFor = (id, name) => ({ pixKeyType: 'cpf', pixKey: fakeCpf(), documentType: 'cpf', document: fakeCpf(), legalName: name });
   const STATUS_POOL = ['requested', 'requested', 'approved', 'paid', 'paid', 'paid', 'rejected'];
-  const mkWithdrawal = (id, name, amount, status, ageDays, note) => {
+  // `house`: slug (vira houseKey/houseLabel — sem ele a linha sai "Casa não
+  // informada" e o filtro por casa do /saques fica vazio). null = dado legado,
+  // que vale manter em 1-2 saques p/ exercitar o placeholder.
+  const mkWithdrawal = (id, name, amount, status, ageDays, note, house) => {
     const ref = db.collection('withdrawal_requests').doc();
     const decided = status !== 'requested';
     writes.push((b) => b.set(ref, {
       affiliateId: id, amount: money(amount), status,
       note: note || null,
+      ...(house ? { houseKey: house, houseLabel: HOUSE_NAME[house] } : {}),
       pixSnapshot: withProfile.has(id) ? pixSnapshotFor(id, name) : null,
       requestedByUid: adminUid,
       requestedAt: daysAgoTs(ageDays),
@@ -322,7 +400,9 @@ async function main() {
     if (!withProfile.has(p.id)) return;
     const n = between(0, 3);
     for (let k = 0; k < n; k++) {
-      mkWithdrawal(p.id, p.name, between(400, 12000) + rnd(), pick(STATUS_POOL), between(1, 55), rnd() < 0.4 ? `Referente a ${pick(['junho', 'julho', 'quinzena', 'fechamento mensal'])}` : null);
+      mkWithdrawal(p.id, p.name, between(400, 12000) + rnd(), pick(STATUS_POOL), between(1, 55),
+        rnd() < 0.4 ? `Referente a ${pick(['junho', 'julho', 'quinzena', 'fechamento mensal'])}` : null,
+        pick(HOUSE_SLUGS));
       wCount++;
     }
   });
@@ -331,26 +411,31 @@ async function main() {
     const id = demoAfiliado.affiliateId;
     const nm = baseNames[id] || 'Afiliado';
     ensureProfile(id, nm);
-    mkWithdrawal(id, nm, 2450.00, 'paid', 40, 'Referente a maio');
-    mkWithdrawal(id, nm, 3120.50, 'paid', 22, 'Referente a junho');
-    mkWithdrawal(id, nm, 1890.00, 'approved', 6, 'Fechamento quinzenal');
-    mkWithdrawal(id, nm, 2760.00, 'requested', 1, 'Referente a julho');
-    mkWithdrawal(id, nm, 500.00, 'rejected', 33, 'Valor abaixo do mínimo combinado');
+    mkWithdrawal(id, nm, 2450.00, 'paid', 40, 'Referente a maio', null); // legado sem casa
+    mkWithdrawal(id, nm, 3120.50, 'paid', 22, 'Referente a junho', 'superbet');
+    mkWithdrawal(id, nm, 1890.00, 'approved', 6, 'Fechamento quinzenal', 'betano');
+    mkWithdrawal(id, nm, 2760.00, 'requested', 1, 'Referente a julho', 'superbet');
+    mkWithdrawal(id, nm, 500.00, 'rejected', 33, 'Valor abaixo do mínimo combinado', 'kto');
     wCount += 5;
   }
 
-  // 7) deals (marketplace) — variados, quase todos ativos
+  // 7) deals (marketplace) — variados, quase todos ativos. `type` explícito
+  // (dealType.ts): 'direto' é o default de leitura; os 'gerenciado' exercitam a
+  // política da Infinity (CPA oculto do afiliado, baseline/rollover/GGR no card,
+  // "quem precifica é o gerente"). Gerenciado ATIVO exige baseline > 0.
   const DEALS = [
-    { slug: 'superbet', model: 'cpa', cpaValue: 250, revPercentage: 0, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true },
-    { slug: 'superbet', model: 'hybrid', cpaValue: 150, revPercentage: 20, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true },
-    { slug: 'betano', model: 'revshare', cpaValue: 0, revPercentage: 35, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true },
-    { slug: 'betmgm', model: 'cpa', cpaValue: 220, revPercentage: 0, cycle: 'quinzenal', currency: 'BRL', geo: 'Brasil', active: true },
-    { slug: 'kto', model: 'hybrid', cpaValue: 180, revPercentage: 25, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true },
-    { slug: 'kto', model: 'revshare', cpaValue: 0, revPercentage: 40, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true },
-    { slug: 'novibet', model: 'cpa', cpaValue: 200, revPercentage: 0, cycle: 'semanal', currency: 'BRL', geo: 'Brasil', active: true },
-    { slug: 'vaidebet', model: 'cpa', cpaValue: 190, revPercentage: 0, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true },
-    { slug: 'betano', model: 'cpa', cpaValue: 210, revPercentage: 0, cycle: 'mensal', currency: 'EUR', geo: 'Brasil', active: false },
-    { slug: 'novibet', model: 'hybrid', cpaValue: 160, revPercentage: 22, cycle: 'quinzenal', currency: 'BRL', geo: 'Brasil', active: true },
+    { slug: 'superbet', model: 'cpa', cpaValue: 250, revPercentage: 0, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'direto' },
+    { slug: 'superbet', model: 'hybrid', cpaValue: 150, revPercentage: 20, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'direto' },
+    { slug: 'betano', model: 'revshare', cpaValue: 0, revPercentage: 35, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'direto' },
+    { slug: 'betmgm', model: 'cpa', cpaValue: 220, revPercentage: 0, cycle: 'quinzenal', currency: 'BRL', geo: 'Brasil', active: true, type: 'direto' },
+    { slug: 'kto', model: 'hybrid', cpaValue: 180, revPercentage: 25, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'direto' },
+    { slug: 'kto', model: 'revshare', cpaValue: 0, revPercentage: 40, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'direto' },
+    { slug: 'novibet', model: 'cpa', cpaValue: 200, revPercentage: 0, cycle: 'semanal', currency: 'BRL', geo: 'Brasil', active: true, type: 'direto' },
+    { slug: 'vaidebet', model: 'cpa', cpaValue: 190, revPercentage: 0, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: false, type: 'direto' },
+    { slug: 'betano', model: 'cpa', cpaValue: 210, revPercentage: 0, cycle: 'mensal', currency: 'EUR', geo: 'Brasil', active: false, type: 'direto' },
+    { slug: 'novibet', model: 'hybrid', cpaValue: 160, revPercentage: 22, cycle: 'quinzenal', currency: 'BRL', geo: 'Brasil', active: true, type: 'direto' },
+    { slug: 'esportiva', model: 'cpa', cpaValue: 300, revPercentage: 0, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'gerenciado', baseline: 2500, rollover: 2, ggrPercentage: null },
+    { slug: 'vaidebet', model: 'hybrid', cpaValue: 250, revPercentage: 20, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'gerenciado', baseline: 1500, rollover: 3, ggrPercentage: 30 },
   ];
   const MODEL_LABEL = { cpa: 'CPA', revshare: 'RevShare', hybrid: 'Híbrido' };
   const CYCLE_LABEL = { semanal: 'Semanal', quinzenal: 'Quinzenal', mensal: 'Mensal' };
@@ -362,12 +447,15 @@ async function main() {
       houseId: d.slug, operatorName: HOUSE_NAME[d.slug], model: d.model,
       cpaValue: d.cpaValue, revPercentage: d.revPercentage, cycle: d.cycle,
       currency: d.currency, geo: d.geo, active: d.active, order: i,
+      type: d.type,
+      ...(d.type === 'gerenciado' ? { baseline: d.baseline, rollover: d.rollover, ggrPercentage: d.ggrPercentage ?? null } : {}),
       label: dealLabel(d), createdByUid: adminUid,
       createdAt: daysAgoTs(60 - i), updatedAt: daysAgoTs(between(1, 30)),
     }));
     return { id, ...d, operatorName: HOUSE_NAME[d.slug], label: dealLabel(d) };
   });
-  const activeDeals = dealDocs.filter((d) => d.active);
+  const activeDeals = dealDocs.filter((d) => d.active && d.type !== 'gerenciado');
+  const managedDeals = dealDocs.filter((d) => d.active && d.type === 'gerenciado');
 
   // 8) parcerias + affiliate_links (aprovadas emitem link com cliques)
   const linkStatsWrites = []; // adiados p/ depois (dependem dos codes)
@@ -456,6 +544,30 @@ async function main() {
     }));
     partCount++;
   }
+  // Parcerias em deal GERENCIADO, vindas de filhos DIRETOS da especial (Igor e
+  // Carla estão na lista da Ana): o par de estados do fluxo do gerente. A
+  // `requested` é a fila dele ("quem precifica é o gerente"); a `priced` é a que
+  // ele já precificou e espera o master emitir o link — sem ela a aba
+  // "Aguardando link" do /acordos abre vazia.
+  if (managedDeals.length) {
+    const md = managedDeals[0];
+    writes.push((b) => b.set(db.collection('partnership_requests').doc('demo-part-gerenciado'), {
+      affiliateId: affId('Igor Santana'), dealId: md.id, status: 'requested', code: null,
+      operatorName: md.operatorName, dealLabel: md.label, houseId: md.slug,
+      requestedByUid: adminUid, requestedAt: daysAgoTs(2),
+    }));
+    partCount++;
+    const priced = managedDeals[1] || md;
+    writes.push((b) => b.set(db.collection('partnership_requests').doc('demo-part-precificado'), {
+      affiliateId: affId('Carla Menezes'), dealId: priced.id, status: 'priced', code: null,
+      operatorName: priced.operatorName, dealLabel: priced.label, houseId: priced.slug,
+      requestedByUid: adminUid, requestedAt: daysAgoTs(4),
+      // taxa definida pelo GERENTE (não pelo deal): aprovar daqui NÃO reescreve a
+      // taxa, senão o spread dele seria apagado sem erro na tela.
+      pricedByUid: especialUserUid, pricedByAffiliateId: especialAffiliateId, pricedAt: daysAgoTs(3),
+    }));
+    partCount++;
+  }
 
   // 9) Jurídico versionado + aceites
   const LEGAL = [
@@ -518,6 +630,233 @@ async function main() {
     }));
   }
 
+  // 12) settings — support_contact liga o item "Suporte" da sidebar; showcase
+  // ligado apaga o banner âmbar "auto-cadastro desligado" do /solicitacoes.
+  writes.push((b) => b.set(db.collection('settings').doc('support_contact'), {
+    phone: '5511988887777',
+    message: 'Olá! Preciso de ajuda com o painel AffiliaCore.',
+    label: 'Suporte',
+    active: true,
+  }));
+  writes.push((b) => b.set(db.collection('settings').doc('showcase'), {
+    enabled: true,
+    description: 'Painel de afiliados com fechamento de comissão automático, ranking diário e carteira integrada.',
+    siteUrl: 'https://affiliacore.com.br',
+    updatedAt: daysAgoTs(8),
+  }));
+
+  // 13) integração configurada (server-only; o seed usa Admin SDK) — badge
+  // "Ativa" em /integracoes e modo "Pull automático" no modal da Esportiva.
+  // O outro lado do vínculo 1:1 (houses/esportiva.integration) já foi gravado na §2.
+  writes.push((b) => b.set(db.collection('integrations').doc('esportiva-tap'), {
+    id: 'esportiva-tap',
+    enabled: true,
+    apiKey: 'demo-esportiva-key-000000001234', // nunca volta ao browser; a tela mostra só ••••1234
+    houseId: 'esportiva',
+    config: { cpaBase: '120', apiBase: 'https://boapi3.smartico.ai' },
+    updatedAt: daysAgoTs(9),
+    updatedBy: adminUid,
+  }));
+
+  // 14) conquistas — catálogo de placas + fila de solicitações. Metas calibradas
+  // pra demo: o afiliado demo (top produtor) já bate as primeiras.
+  const TIERS = [
+    { id: 'demo-tier-bronze', title: 'Placa Bronze', subtitle: 'BRONZE', metaCommission: 5000, metaCpas: 0, order: 0 },
+    { id: 'demo-tier-prata', title: 'Placa Prata', subtitle: 'SILVER', metaCommission: 15000, metaCpas: 0, order: 1 },
+    { id: 'demo-tier-ouro', title: 'Placa Ouro', subtitle: 'GOLD', metaCommission: 50000, metaCpas: 50, order: 2 },
+    { id: 'demo-tier-platina', title: 'Placa Platina', subtitle: 'PLATINUM', metaCommission: 150000, metaCpas: 150, order: 3 },
+    { id: 'demo-tier-diamante', title: 'Placa Diamante', subtitle: 'DIAMOND', metaCommission: 500000, metaCpas: 500, order: 4 },
+  ];
+  TIERS.forEach((t) => writes.push((b) => b.set(db.collection('achievement_tiers').doc(t.id), {
+    title: t.title, subtitle: t.subtitle,
+    description: `Atinja R$ ${t.metaCommission.toLocaleString('pt-BR')} em comissão acumulada${t.metaCpas ? ` e ${t.metaCpas} CPAs qualificados` : ''} para receber a ${t.title}.`,
+    metaCpas: t.metaCpas, metaCommission: t.metaCommission,
+    order: t.order, active: true, imageUrl: '',
+    createdAt: daysAgoTs(45), updatedAt: daysAgoTs(45),
+  })));
+  if (demoAfiliado) {
+    const id = demoAfiliado.affiliateId;
+    const nm = baseNames[id] || 'Afiliado';
+    writes.push((b) => b.set(db.collection('achievement_requests').doc('demo-achv-1'), {
+      tierId: 'demo-tier-prata', tierTitle: 'Placa Prata',
+      affiliateId: id, affiliateName: nm,
+      status: 'approved', snapshot: { cpas: 82, commission: 18450.6 },
+      note: null, requestedByUid: demoAfiliado.uid,
+      createdAt: daysAgoTs(20), updatedAt: daysAgoTs(18), decidedAt: daysAgoTs(18),
+    }));
+    writes.push((b) => b.set(db.collection('achievement_requests').doc('demo-achv-2'), {
+      tierId: 'demo-tier-ouro', tierTitle: 'Placa Ouro',
+      affiliateId: id, affiliateName: nm,
+      status: 'pending', snapshot: { cpas: 130, commission: 52320.4 },
+      note: 'Bati a meta este mês! 🏆', requestedByUid: demoAfiliado.uid,
+      createdAt: daysAgoTs(1), updatedAt: daysAgoTs(1),
+    }));
+  }
+
+  // 15) /solicitacoes com as TRÊS naturezas: lead (contacts, já na §10),
+  // signup pendente (users sem affiliateId) e indicação (affiliate_referrals).
+  const SIGNUPS = [
+    { uid: 'demo-signup-1', name: 'Renato Guimarães', email: 'renato.guimaraes@gmail.com', phone: '+5511987650001', socialMedia: '@renatogui', status: null },
+    { uid: 'demo-signup-2', name: 'Vitória Sampaio', email: 'vitoria.sampaio@gmail.com', phone: '+5521987650002', socialMedia: '@vitoriasampaio', status: null },
+    { uid: 'demo-signup-3', name: 'Édson Prado', email: 'edson.prado@gmail.com', phone: null, socialMedia: null, status: 'archived' },
+  ];
+  SIGNUPS.forEach((s, i) => writes.push((b) => b.set(db.collection('users').doc(s.uid), {
+    uid: s.uid, name: s.name, email: s.email, role: 'client',
+    phone: s.phone, socialMedia: s.socialMedia,
+    source: 'vitrine-affiliacore',
+    ...(s.status ? { requestStatus: s.status } : {}),
+    createdAt: daysAgoTs(2 + i * 3),
+  })));
+  if (especialUser) {
+    const espName = baseNames[especialUser.affiliateId] || 'Especial';
+    [
+      { id: 'demo-referral-1', name: 'Kaique Moura', email: 'kaique.moura@gmail.com', phone: '+5531987650003', note: 'Trabalha comigo no tráfego, produz bem no Telegram.' },
+      { id: 'demo-referral-2', name: 'Lívia Castilho', email: 'livia.castilho@gmail.com', phone: null, note: null },
+    ].forEach((r, i) => writes.push((b) => b.set(db.collection('affiliate_referrals').doc(r.id), {
+      name: r.name, email: r.email, phone: r.phone, note: r.note,
+      referrerAffiliateId: especialUser.affiliateId, referrerName: espName, referrerUid: especialUser.uid,
+      requestStatus: 'pending', createdAt: daysAgoTs(1 + i * 2),
+    })));
+    // link de cadastro na rede do especial (reutilizável, sem validade)
+    writes.push((b) => b.set(db.collection('invites').doc('demo-rede-' + especialUser.affiliateId.slice(-8)), {
+      token: 'demo-rede-' + especialUser.affiliateId.slice(-8),
+      kind: 'network',
+      ownerAffiliateId: especialUser.affiliateId, ownerName: espName,
+      status: 'active', uses: 3,
+      createdAt: daysAgoTs(12),
+    }));
+  }
+
+  // 16) links de STANDBY (pool sem dono) — a 5ª visão da triagem /links
+  for (let s = 0; s < 10; s++) {
+    const slug = HOUSE_SLUGS[s % HOUSE_SLUGS.length];
+    const code = `sb${String(s + 1).padStart(3, '0')}`;
+    const tag = `pool${s + 1}`;
+    writes.push((b) => b.set(db.collection('affiliate_links').doc(code), {
+      code, affiliateId: null, brandId: slug,
+      registerUrl: `${REGISTER_URL[slug]}?afp=${tag}`, tag,
+      active: false, clicks: 0, botClicks: 0,
+      createdByUid: adminUid, createdAt: daysAgoTs(between(5, 30)), updatedAt: daysAgoTs(between(0, 5)),
+    }));
+  }
+
+  // 17) avisos/notificações — completa os enums que o seed base não usa:
+  // category 'importante', audience 'specials', aviso com link, e os tipos de
+  // user_notification além de results_updated.
+  writes.push((b) => b.set(db.collection('notices').doc('demo-aviso-especiais'), {
+    title: 'Gestores: fechamento da rede na segunda',
+    body: 'O repasse das equipes fecha segunda-feira às 18h. Confira as taxas dos seus afiliados diretos antes do corte.',
+    category: 'importante', audience: 'specials',
+    link: 'https://affiliacore.com.br',
+    active: true, createdAt: daysAgoTs(2), updatedAt: daysAgoTs(2),
+  }));
+  if (demoAfiliado) {
+    writes.push((b) => b.set(db.collection('user_notifications').doc('demo-notif-2'), {
+      recipientUid: demoAfiliado.uid, affiliateId: demoAfiliado.affiliateId,
+      type: 'achievement_approved',
+      title: 'Conquista aprovada: Placa Prata',
+      body: 'Parabéns! Sua Placa Prata foi aprovada e já está a caminho.',
+      readAt: null, createdAt: daysAgoTs(18),
+    }));
+    writes.push((b) => b.set(db.collection('user_notifications').doc('demo-notif-3'), {
+      recipientUid: demoAfiliado.uid, affiliateId: demoAfiliado.affiliateId,
+      type: 'partnership_rejected',
+      title: 'Parceria não aprovada',
+      body: 'Sua solicitação no acordo Betano - CPA - Mensal - EUR - Brasil não foi aprovada. Fale com a gerência para entender o motivo.',
+      readAt: daysAgoTs(3), createdAt: daysAgoTs(4),
+    }));
+  }
+
+  // 18) taxa com VIGÊNCIA + override por casa no afiliado demo (rateHistory F1):
+  // o /financeiro fatia a apuração por janela e a Superbet paga pela taxa da casa.
+  // merge:true — o doc base (taxa de topo) já existe, só enriquecemos.
+  if (demoAfiliado) {
+    const sinceTop = toISO(addDays(today, -14));
+    const sinceBrand = toISO(addDays(today, -10));
+    writes.push((b) => b.set(db.collection('affiliate_configs').doc(demoAfiliado.affiliateId), {
+      since: sinceTop,
+      history: [{ from: '1970-01-01', to: toISO(addDays(today, -15)), cpaValue: 55, revPercentage: 20 }],
+      byBrand: {
+        superbet: {
+          cpaValue: 80, since: sinceBrand,
+          history: [{ from: '1970-01-01', to: toISO(addDays(today, -11)), cpaValue: 65 }],
+        },
+      },
+      updatedAt: daysAgoTs(10),
+    }, { merge: true }));
+  }
+
+  // 18.1) Taxa POR CASA da Carla — é a que o GERENTE definiu na parceria `priced`
+  // acima. Sem ela a parceria precificada apontaria para uma taxa que não existe.
+  const carlaId = affId('Carla Menezes');
+  if (baseNames[carlaId] && managedDeals.length) {
+    const brandKey = (managedDeals[1] || managedDeals[0]).slug;
+    writes.push((b) => b.set(db.collection('affiliate_configs').doc(carlaId), {
+      byBrand: { [brandKey]: { cpaValue: 38, revPercentage: 12, since: toISO(addDays(today, -2)) } },
+      updatedAt: daysAgoTs(3),
+    }, { merge: true }));
+  }
+
+  // 18.2) Apelidos de tag (afiliado ↔ ?afp= da planilha da casa): é o que faz o
+  // import de resultados casar uma linha cuja tag não é o id do afiliado. Sem um
+  // doc aqui, a tela de vínculo de tag do /casas nasce vazia.
+  const TAG_ALIASES = [
+    { tag: 'yagovip', affiliate: 'Yago Martins', houseSlug: 'superbet' },
+    { tag: 'ana-oficial', affiliate: 'Ana Souza', houseSlug: 'betano' },
+    { tag: 'lucas2026', affiliate: 'Lucas Ferreira', houseSlug: 'kto' },
+    { tag: 'bia-promo', affiliate: 'Bia Cardoso', houseSlug: 'esportiva' },
+  ];
+  TAG_ALIASES.forEach((a) => {
+    const id = affId(a.affiliate);
+    if (!baseNames[id]) return;
+    writes.push((b) => b.set(db.collection('affiliate_tag_aliases').doc(a.tag), {
+      tag: a.tag, affiliateId: id, houseSlug: a.houseSlug,
+      createdByUid: adminUid, createdAt: daysAgoTs(between(6, 30)),
+    }));
+  });
+
+  // 19) 2º especial no modo REDE (fromNetwork): a sub-rede é DERIVADA da árvore
+  // de affiliate_uplines a cada leitura (N níveis) — o seed base só mostra o
+  // modelo antigo de lista manual. Lucas tem Duda e Carla diretas e o Bruno no
+  // 3º nível via Duda.
+  const lucasId = affId('Lucas Ferreira');
+  if (baseNames[lucasId]) {
+    writes.push((b) => b.set(db.collection('special_affiliates').doc(lucasId), {
+      active: true, fromNetwork: true, subAffiliateIds: [],
+      updatedAt: daysAgoTs(14),
+    }));
+  }
+
+  // 20) trilha de auditoria das features dos extras — sem isso os filtros de
+  // entidade/ação da /auditoria listam só 4 opções. Ids determinísticos p/ re-run.
+  const extraAudit = [
+    { n: 60, entityType: 'deal', entityId: 'demo-deal-1', entityLabel: 'Superbet - CPA - Mensal - BRL - Brasil', action: 'deal.create', metadata: { model: 'cpa', cpaValue: 250 } },
+    { n: 49, entityType: 'deal', entityId: 'demo-deal-11', entityLabel: 'Esportiva Bet - CPA - Mensal - BRL - Brasil', action: 'deal.create', metadata: { type: 'gerenciado', baseline: 2500 } },
+    { n: 25, entityType: 'deal', entityId: 'demo-deal-9', entityLabel: 'Betano - CPA - Mensal - EUR - Brasil', action: 'deal.update', changes: [{ field: 'active', before: true, after: false }] },
+    { n: 21, entityType: 'partnership', entityId: 'demo-part-audit', entityLabel: `${baseNames[demoAfiliado?.affiliateId] || 'Afiliado'} · Superbet`, action: 'partnership.approve', metadata: { dealId: 'demo-deal-1' } },
+    { n: 20, entityType: 'partnership', entityId: 'demo-part-audit-2', entityLabel: `${baseNames[demoAfiliado?.affiliateId] || 'Afiliado'} · Betano`, action: 'partnership.reject', reason: 'Acordo em moeda estrangeira suspenso.' },
+    { n: 6, entityType: 'withdrawal', entityId: 'demo-wd-audit', entityLabel: baseNames[demoAfiliado?.affiliateId] || 'Afiliado', action: 'withdrawal.request', metadata: { amount: 2760 } },
+    { n: 5, entityType: 'withdrawal', entityId: 'demo-wd-audit-2', entityLabel: baseNames[demoAfiliado?.affiliateId] || 'Afiliado', action: 'withdrawal.approved', metadata: { amount: 1890 } },
+    { n: 4, entityType: 'withdrawal', entityId: 'demo-wd-audit-3', entityLabel: baseNames[demoAfiliado?.affiliateId] || 'Afiliado', action: 'withdrawal.paid', metadata: { amount: 3120.5 } },
+    { n: 16, entityType: 'link', entityId: 'sb001', entityLabel: 'Superbet', action: 'link.generate', metadata: { tag: 'pool1' } },
+    { n: 15, entityType: 'link', entityId: 'sb002', entityLabel: 'Betano', action: 'link.standby_import', metadata: { imported: 10 } },
+    { n: 50, entityType: 'legal_document', entityId: 'demo-legal-acordo-de-afiliacao', entityLabel: 'Acordo de Afiliação', action: 'legal_document.create', metadata: { version: 1 } },
+    { n: 12, entityType: 'legal_document', entityId: 'demo-legal-acordo-de-afiliacao', entityLabel: 'Acordo de Afiliação', action: 'legal_document.update', changes: [{ field: 'version', before: 1, after: 2 }] },
+    { n: 24, entityType: 'network', entityId: affId('Duda Rocha'), entityLabel: 'Duda Rocha', action: 'network.set_upline', changes: [{ field: 'uplineId', before: null, after: affId('Lucas Ferreira') }] },
+    { n: 9, entityType: 'integration', entityId: 'esportiva-tap', entityLabel: 'Esportiva TAP', action: 'integration.update', changes: [{ field: 'active', before: false, after: true }] },
+    { n: 8, entityType: 'settings', entityId: 'showcase', entityLabel: 'Vitrine AffiliaCore', action: 'showcase.update', changes: [{ field: 'active', before: false, after: true }] },
+    { n: 18, entityType: 'achievement_tier', entityId: 'demo-tier-ouro', entityLabel: 'Placa Ouro', action: 'achievement_tier.create', metadata: null },
+    { n: 17, entityType: 'achievement_request', entityId: 'demo-achv-1', entityLabel: 'Placa Prata', action: 'achievement_request.approve', metadata: { affiliate: baseNames[demoAfiliado?.affiliateId] || 'Afiliado' } },
+    { n: 11, entityType: 'invite', entityId: 'demo-invite-audit', entityLabel: 'Marina Lopes', action: 'invite.create', metadata: { expiresAt: toISO(addDays(today, -4)) } },
+  ];
+  extraAudit.forEach((a, i) => writes.push((b) => b.set(db.collection('audit_logs').doc(`demo-x-audit-${String(i + 1).padStart(2, '0')}`), {
+    entityType: a.entityType, entityId: a.entityId ?? null, entityLabel: a.entityLabel ?? null,
+    action: a.action, actorId: adminUid, actorName: 'Equipe AffiliaCore', actorEmail: 'demo@affiliacore.com.br',
+    changes: a.changes ?? null, metadata: a.metadata ?? null, reason: a.reason ?? null,
+    affiliateId: a.entityType === 'affiliate' ? (a.entityId ?? null) : null,
+    createdAt: daysAgoTs(a.n),
+  })));
+
   console.log(`  preparados ${writes.length} writes principais + ${linkStatsWrites.length} stats + ${rawClickWrites.length} cliques crus`);
   await commitChunked(writes);
   await commitChunked(linkStatsWrites);
@@ -561,7 +900,7 @@ async function main() {
   let totalComm = 0, totalFtd = 0;
   hrSnap.forEach((d) => { const v = d.data(); totalComm += Number(v.total_commission) || 0; totalFtd += Number(v.first_deposits) || 0; });
   const counts = {};
-  for (const col of ['affiliates', 'affiliate_configs', 'houses', 'house_results', 'payment_profiles', 'withdrawal_requests', 'deals', 'partnership_requests', 'affiliate_links', 'link_click_stats', 'link_clicks', 'legal_documents', 'legal_acceptances', 'contacts', 'direct_messages', 'daily_rankings']) {
+  for (const col of ['affiliates', 'affiliate_configs', 'houses', 'house_results', 'payment_profiles', 'withdrawal_requests', 'deals', 'partnership_requests', 'affiliate_links', 'link_click_stats', 'link_clicks', 'legal_documents', 'legal_acceptances', 'contacts', 'direct_messages', 'daily_rankings', 'achievement_tiers', 'achievement_requests', 'affiliate_referrals', 'integrations', 'settings', 'invites', 'special_affiliates']) {
     counts[col] = (await db.collection(col).count().get()).data().count;
   }
   console.log(`  headline janela 30d: R$ ${totalComm.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} · FTD ${totalFtd}`);
@@ -572,6 +911,13 @@ async function main() {
     const yl = await db.collection('affiliate_links').where('affiliateId', '==', yId).get();
     console.log(`  afiliado demo (${allNames[yId]}): ${yw.size} saques · ${yl.size} links`);
   }
+  // Proteção dos leads verificada por QUERY (não por declaração).
+  const leadsAfter = (await db.collection('leads').count().get()).data().count;
+  if (leadsAfter !== leadsBefore) {
+    throw new Error(`PROTEÇÃO VIOLADA: leads mudou de ${leadsBefore} para ${leadsAfter}!`);
+  }
+  console.log(`  ✔ leads da landing intactos (${leadsAfter}).`);
+
   console.log('\n✔ Extras semeados.');
 }
 

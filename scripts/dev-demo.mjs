@@ -13,6 +13,12 @@
 // Comportamento com emuladores JÁ ativos (restart rápido do server): reusa os
 // dados como estão — não re-seeda, para não apagar o que você criou testando.
 // Force um reseed do zero com DEMO_RESEED=1.
+//
+// DEMO GIGANTE (gravação de reels/screenshots): DEMO_FULL=1 roda também o
+// seed-demo-extras.cjs depois do seed base — +95 afiliados, +3 casas, carteira,
+// marketplace, links, jurídico, contatos, mensagens e histórico de ranking.
+// ATENÇÃO: o extras INFLA o headline (sai dos números exatos do mock da LP);
+// p/ voltar à demo "fiel ao mock", DEMO_RESEED=1 sem DEMO_FULL.
 // ============================================================================
 import fs from 'node:fs';
 import net from 'node:net';
@@ -53,6 +59,10 @@ const appEnv = {
   }),
   VITE_USE_EMULATORS: 'true',
   VITE_OTG_ENABLED: 'false',
+  // O marketplace é opt-in por instância (default OFF em prod), mas a demo mostra
+  // o produto INTEIRO — sem isso as telas de Acordos/Parcerias/Meus Links somem
+  // e /api/deals responde 404 mesmo com dados semeados.
+  VITE_MARKETPLACE_ENABLED: 'true',
   VITE_BRAND_NAME: 'AffiliaCore Demo',
   VITE_BRAND_ACCENT: '#E11D48',
   VITE_BRAND_CANVAS: '#26181C',
@@ -167,6 +177,21 @@ function parseCredentials(output) {
   return creds;
 }
 
+function runSeedExtras() {
+  console.log('[dev-demo] DEMO_FULL=1: semeando os EXTRAS (demo gigante p/ gravação)…');
+  const res = spawnSync('node', ['scripts/provision/seed-demo-extras.cjs'], {
+    cwd: root,
+    env: { ...process.env, ...demoEnv },
+    encoding: 'utf8',
+    maxBuffer: 1024 * 1024 * 10,
+  });
+  if (res.status !== 0) {
+    throw new Error(`seed-demo-extras falhou:\n${res.stdout || ''}\n${res.stderr || ''}`);
+  }
+  const line = (res.stdout || '').split(/\r?\n/).find((l) => l.includes('headline janela 30d'));
+  if (line) console.log(`[dev-demo] extras ok —${line.split(':').slice(1).join(':')}`);
+}
+
 function runSeed({ wipe }) {
   const args = ['scripts/provision/seed-demo.cjs'];
   if (wipe) args.push('--wipe', '--yes');
@@ -227,14 +252,18 @@ async function main() {
   }
 
   const { fresh } = await ensureEmulators();
+  const full = process.env.DEMO_FULL === '1';
   let creds = null;
   if (fresh) {
     console.log('[dev-demo] emuladores no ar. Seedando a demo…');
     creds = runSeed({ wipe: false });
+    if (full) runSeedExtras();
   } else if (process.env.DEMO_RESEED === '1') {
     console.log('[dev-demo] emuladores já ativos — DEMO_RESEED=1: reseedando do zero…');
     creds = runSeed({ wipe: true });
+    if (full) runSeedExtras();
   } else {
+    if (full) runSeedExtras(); // idempotente: limpa e refaz só o que é dos extras
     console.log('[dev-demo] emuladores já ativos — mantendo os dados (DEMO_RESEED=1 reseeda do zero).');
     creds = savedCredentials();
   }

@@ -228,25 +228,58 @@ e **seed**.
 7. **Backend** (`firebase apphosting:backends:create --project affiliacore`,
    repo `spanol/affiliacore`, branch `main`) + associar o ambiente **`demo`** no
    console (Settings → Environment). 1º rollout → conferir marca "AffiliaCore
-   Demo" + tema ember + `/casas` VAZIO (sem Superbet/SportingBet fantasma).
-8. **Seed** (imprime as 3 senhas UMA vez — admin/afiliado/especial):
+   Demo" + tema ember + `/casas` VAZIO (sem Superbet/SportingBet fantasma) + o
+   item **Acordos** na sidebar (prova que o `VITE_MARKETPLACE_ENABLED` do
+   `apphosting.demo.yaml` entrou no build; sem ele o marketplace semeado fica
+   invisível — travado por teste em `src/lib/demoCoverage.test.ts`).
+
+   **Ensaio local antes do rollout** (pega erro de build e de env sem gastar um
+   rollout; é o caminho que o buildpack roda de verdade, que o `npm run dev` NÃO
+   exercita — dev usa o Vite como middleware, produção serve `dist/`): exporte as
+   envs do `apphosting.demo.yaml` (as `VITE_*` precisam existir no BUILD, é aí que
+   o Vite as embute), aponte Firestore/Auth para os emuladores e rode
+   `npm run build && NODE_ENV=production PORT=3130 npm start`. Validado em
+   17/08/2026: título "AffiliaCore Demo", login entra no `/admin` e a sidebar traz
+   os 18 itens, Acordos incluso.
+8. **Seed** — DOIS passos, nesta ordem (o 1º imprime as 3 senhas UMA vez):
    ```bash
+   # 8a) núcleo: números batem EXATO com o mock da LP na janela de 30 dias
    GOOGLE_APPLICATION_CREDENTIALS=./service-account.affiliacore.json \
      node scripts/provision/seed-demo.cjs
+
+   # 8b) cobertura TOTAL de features (o que se mostra a cliente): +95 afiliados,
+   #     +4 casas, carteira, marketplace, conquistas, links, jurídico, integração,
+   #     solicitações, auditoria rica. --live --yes é obrigatório fora do emulador.
+   GOOGLE_APPLICATION_CREDENTIALS=./service-account.affiliacore.json \
+     node scripts/provision/seed-demo-extras.cjs --live --yes
    ```
-   O script tem GUARD de projeto (só roda no `affiliacore`) e protege `leads`.
+   Os dois têm GUARD de projeto (só rodam no `affiliacore`) e protegem `leads` com
+   contagem antes/depois verificada por query.
    Validar a matemática sem Firebase: `node scripts/provision/seed-demo.cjs --plan`.
+
+   **Decisão de qual seed levar ao ar.** O 8b INFLA o headline (centenas de
+   milhares/mês) e sai dos números do mock da LP. Para lead que chega pela landing
+   e vai comparar com o mock, rode só o 8a. Para demonstração de PRODUTO (mostrar
+   que a plataforma faz tudo), rode 8a + 8b: é a diferença entre uma demo com 3
+   telas cheias e uma com todas. O 8b é idempotente (limpa e refaz o que é dele),
+   então dá para ir e voltar sem reset total.
 9. **Smoke da demo** (como demo@affiliacore.com.br):
-   - [ ] `/admin` com preset **"Últimos 30 dias"** = números do mock da LP
-         (comissão R$ 24.831,90 · 38 afiliados · funil 1.204/312/187 · card
-         "Total depositado" no lugar de "Total CPA").
+   - [ ] `/admin` com preset **"Últimos 30 dias"**. Só com o 8a: números do mock da
+         LP (comissão R$ 24.831,90 · 38 afiliados · funil 1.204/312/187 · card
+         "Total depositado" no lugar de "Total CPA"). Com o 8b: 133 afiliados e
+         headline na casa das centenas de milhares.
    - [ ] `/ranking` → gerar o dia → pódio com ≥10 afiliados.
    - [ ] Portal do afiliado (afiliado@...) mostra SÓ os números do Yago; sino
          com aviso + notificação.
    - [ ] `/network` do especial (especial@...) com a sub-rede de 3.
-   - [ ] `/auditoria` populada; `/casas` com as 3 casas manuais.
+   - [ ] `/auditoria` populada; `/casas` com as casas manuais.
    - [ ] Form da landing (affiliacore.com.br) SEGUE gravando lead (rules
          mescladas) — testar e LIMPAR o lead de teste (confirmando via console).
+   - [ ] Com o 8b, conferir também as telas que só ele enche: `/saques` (4 abas com
+         casa e PIX), `/acordos` (acordo direto E gerenciado; abas Solicitações e
+         Aguardando link), `/conquistas` (5 placas + fila), `/links` (5 visões,
+         incluindo Standby), `/integracoes` (Esportiva "Ativa"), `/solicitacoes`
+         (lead + cadastro + indicação) e o item **Suporte** na sidebar.
 10. **Operação com leads**: entregar as credenciais por canal seguro; depois de
     cada lead, `--rotate` (troca senhas + revoga sessões); periodicamente
     `--wipe --yes` (reseta dados fictícios E o rastro do lead: convites,
@@ -266,10 +299,22 @@ http://localhost:3123 — tudo num comando, morre junto no Ctrl+C.
 ```bash
 npm run dev                 # emuladores + seed + app demo (porta 3123; PORT=xxxx muda)
 DEMO_RESEED=1 npm run dev   # emulador já ativo? reseeda do zero (--wipe)
+DEMO_FULL=1 npm run dev     # demo GIGANTE p/ gravação: roda também o seed-demo-extras.cjs
 ```
 
 Com os emuladores JÁ ativos, um restart do `npm run dev` NÃO re-seeda (preserva
 o que você criou testando) — o reseed é opt-in via `DEMO_RESEED=1`.
+
+**`DEMO_FULL=1` (demo gigante, p/ reels/screenshots):** além do seed base, roda
+`scripts/provision/seed-demo-extras.cjs` — +95 afiliados, +3 casas (KTO, Novibet,
+Vai de Bet), carteira (perfis PIX + saques em todos os status), marketplace
+(acordos + parcerias + links com cliques), jurídico versionado, contatos,
+mensagens diretas e 10 dias de histórico de ranking. O headline sobe p/ centenas
+de milhares (SAI dos números exatos do mock da LP — p/ voltar à demo fiel,
+`DEMO_RESEED=1` sem `DEMO_FULL`). O extras é idempotente (limpa e refaz o que é
+dele) e SÓ roda contra emulador (aborta sem `FIRESTORE_EMULATOR_HOST`). O
+`npm run dev` também liga `VITE_MARKETPLACE_ENABLED=true` na demo, senão as
+telas de Acordos/Parcerias/Meus Links nem aparecem.
 
 A receita manual equivalente (o que o script faz por baixo — útil p/ depurar um
 passo isolado) é: `firebase emulators:start --only firestore,auth --project
