@@ -461,7 +461,13 @@ export default function AdminDashboard() {
             )}
             {loading ? (
               <div className="flex items-center justify-center h-20">
-                <Loader2 className="animate-spin text-brand dark:text-white" />
+                {/* O 1º card é INVERTIDO (escuro no tema claro), então o loader
+                    segue a cor do card, igual ao ícone e ao valor logo abaixo.
+                    Com `text-brand` fixo ele sumia no claro: navy sobre navy. */}
+                <Loader2 className={cn(
+                  "animate-spin",
+                  idx === 0 ? "text-white" : "text-brand dark:text-white"
+                )} />
               </div>
             ) : (
               <>
