@@ -266,10 +266,22 @@ http://localhost:3123 — tudo num comando, morre junto no Ctrl+C.
 ```bash
 npm run dev                 # emuladores + seed + app demo (porta 3123; PORT=xxxx muda)
 DEMO_RESEED=1 npm run dev   # emulador já ativo? reseeda do zero (--wipe)
+DEMO_FULL=1 npm run dev     # demo GIGANTE p/ gravação: roda também o seed-demo-extras.cjs
 ```
 
 Com os emuladores JÁ ativos, um restart do `npm run dev` NÃO re-seeda (preserva
 o que você criou testando) — o reseed é opt-in via `DEMO_RESEED=1`.
+
+**`DEMO_FULL=1` (demo gigante, p/ reels/screenshots):** além do seed base, roda
+`scripts/provision/seed-demo-extras.cjs` — +95 afiliados, +3 casas (KTO, Novibet,
+Vai de Bet), carteira (perfis PIX + saques em todos os status), marketplace
+(acordos + parcerias + links com cliques), jurídico versionado, contatos,
+mensagens diretas e 10 dias de histórico de ranking. O headline sobe p/ centenas
+de milhares (SAI dos números exatos do mock da LP — p/ voltar à demo fiel,
+`DEMO_RESEED=1` sem `DEMO_FULL`). O extras é idempotente (limpa e refaz o que é
+dele) e SÓ roda contra emulador (aborta sem `FIRESTORE_EMULATOR_HOST`). O
+`npm run dev` também liga `VITE_MARKETPLACE_ENABLED=true` na demo, senão as
+telas de Acordos/Parcerias/Meus Links nem aparecem.
 
 A receita manual equivalente (o que o script faz por baixo — útil p/ depurar um
 passo isolado) é: `firebase emulators:start --only firestore,auth --project

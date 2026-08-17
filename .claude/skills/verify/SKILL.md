@@ -19,6 +19,11 @@ Emuladores já ativos? O comando reusa os dados como estão (restart rápido do
 server não apaga o que você criou); `DEMO_RESEED=1 npm run dev` reseeda do zero.
 Porta ocupada/alternativa: `PORT=3125 npm run dev`.
 
+Demo GIGANTE (gravação de reels/screenshots — carteira, marketplace, links,
+jurídico, contatos, +95 afiliados): `DEMO_FULL=1 npm run dev` (detalhes no
+README de provision). Sai dos números exatos do mock da LP; a demo "fiel"
+volta com `DEMO_RESEED=1` sem `DEMO_FULL`.
+
 Dirija com o Chrome MCP. Fluxos que valem o smoke: `/` (Home pública deslogada),
 login admin → `/admin`, `/ranking` (gerar ranking do dia — o seed garante
 produção ONTEM), `/auditoria`; login afiliado → portal próprio.

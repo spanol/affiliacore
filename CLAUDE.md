@@ -32,6 +32,8 @@ npm install          # install deps
 npm run dev          # DEV PADRÃO: demo nos EMULADORES (scripts/dev-demo.mjs) — sobe Firestore+Auth
                      # emulados, seeda a demo (senhas no console + .demo-runtime/) e inicia o app
                      # em http://localhost:3123. ZERO contato com projeto real. DEMO_RESEED=1 reseeda.
+                     # DEMO_FULL=1 = demo GIGANTE p/ gravação (roda seed-demo-extras.cjs: carteira,
+                     # marketplace, conquistas, +95 afiliados...) — sai dos números exatos do mock da LP.
 npm run dev:server   # servidor CRU (o antigo dev): tsx server.ts com o .env como estiver —
                      # aponta pro projeto Firebase REAL configurado; use consciente.
 npm start            # same as dev:server (tsx server.ts) — used in production with NODE_ENV=production
