@@ -254,6 +254,40 @@ Para o admin não descobrir isso por acaso, o rascunho pendente entra no card
 "Saúde da configuração" do `/admin` (entregue em `09f2561`), como mais uma linha
 de pendência.
 
+### 5.1 ...e a tela de acordos sugere o rascunho das casas antigas ✅ ENTREGUE (17/08)
+
+O gatilho acima é o `POST /api/houses`, então ele só alcança casa NOVA. A agência
+que já tinha as casas configuradas (toda instância existente, inclusive a
+Infinity) abre `/acordos` e não vê nada: as operadoras estão lá, mas descobrir
+quais ficaram de fora da vitrine dependia de abrir o select do "Novo acordo" e
+comparar na memória.
+
+`/acordos` passa a listar, embaixo dos acordos, uma seção "Casas sem acordo" com
+um card por casa configurada que ainda não tem oferta. O card é o MESMO do acordo
+(logo, `<dl>` de linhas, ordem da política) porque é literalmente o acordo que
+seria criado; a pill diz "Rascunho" e o botão abre o modal já preenchido.
+
+Três decisões:
+
+- **A sugestão é VIRTUAL.** Nada é gravado até o admin salvar. Materializar um
+  doc por casa na leitura criaria acordo em nome de quem não pediu, e desfazer
+  seria apagar dado em produção. Assim, pausar/reativar a casa faz a sugestão
+  sumir e voltar sem tocar em nada, no mesmo espírito do filtro de casa pausada
+  do `GET /api/deals`.
+- **O rascunho vem com a taxa PADRÃO da casa** (`defaultCpa`/`defaultRev`), que é
+  a mesma coisa que `cpaValue`/`revPercentage` do acordo significam (comissão
+  casa→agência). A MOEDA acompanha o número copiado: a casa declara em que moeda
+  paga o CPA (ausente = EUR no núcleo de dinheiro), e mandar o valor sem a moeda
+  dele trocaria a unidade em silêncio. Casa sem taxa padrão abre com os campos
+  VAZIOS, nunca com zero (ausência ≠ R$ 0).
+- **Casa PAUSADA fica de fora** da sugestão: o acordo dela não apareceria na
+  vitrine de ninguém.
+
+Núcleo puro em `dealsAdmin.ts` (`buildHouseDraftCards`, `draftFromHouse`) + o
+check `checkCasasSemAcordo` no `setupChecks.ts`, que leva a mesma pendência ao
+card do `/admin` e fica em silêncio na instância com o marketplace desligado.
+22 testes novos (11 no núcleo, 6 na página, 5 no check).
+
 ## 6. Telas
 
 | Tela | Mudança |

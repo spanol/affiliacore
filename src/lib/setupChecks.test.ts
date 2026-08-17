@@ -8,6 +8,7 @@ import {
   checkPullSemChave,
   checkVinculoIntegracao,
   checkCasasOtgSemFonte,
+  checkCasasSemAcordo,
   runSetupChecks,
 } from './setupChecks';
 
@@ -243,5 +244,40 @@ describe('checkCasasOtgSemFonte', () => {
   it('com a OTG ligada (ou flag ausente) não há achado', () => {
     expect(checkCasasOtgSemFonte(houses, true)).toBeNull();
     expect(checkCasasOtgSemFonte(houses, undefined)).toBeNull();
+  });
+});
+
+describe('checkCasasSemAcordo', () => {
+  const casas = [
+    { id: 'esportiva', slug: 'esportiva', name: 'Esportiva Bet' },
+    { id: 'leon', slug: 'leon', name: 'LEON Bet' },
+  ];
+
+  it('lista as casas ativas que não têm acordo publicado', () => {
+    const finding = checkCasasSemAcordo(casas, [{ houseId: 'esportiva' }], true);
+    expect(finding?.id).toBe('casas-sem-acordo');
+    expect(finding?.severity).toBe('info');
+    expect(finding?.subjects).toEqual(['LEON Bet']);
+    expect(finding?.fixRoute).toBe('/acordos');
+  });
+
+  it('cala a boca quando todas as casas já têm acordo', () => {
+    expect(checkCasasSemAcordo(casas, [{ houseId: 'esportiva' }, { houseId: 'leon' }], true)).toBeNull();
+  });
+
+  // Sem vitrine, casa sem acordo não é pendência: o check nunca dispara e nem
+  // depende da lista de acordos (que a instância desligada sequer consegue ler).
+  it('não dispara com o marketplace desligado', () => {
+    expect(checkCasasSemAcordo(casas, [], false)).toBeNull();
+    expect(checkCasasSemAcordo(casas, [], undefined)).toBeNull();
+  });
+
+  it('casa pausada fica de fora', () => {
+    const finding = checkCasasSemAcordo([{ id: 'x', slug: 'x', name: 'Pausada', active: false }], [], true);
+    expect(finding).toBeNull();
+  });
+
+  it('o acordo casa pelo slug ou pelo id da casa', () => {
+    expect(checkCasasSemAcordo([{ id: 'doc-1', slug: 'esportiva', name: 'Esportiva' }], [{ houseId: 'doc-1' }], true)).toBeNull();
   });
 });

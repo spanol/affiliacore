@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { AlertTriangle, AlertCircle, Info, ChevronRight, Wrench } from 'lucide-react';
 import { runSetupChecks, type SetupFinding, type SetupSeverity } from '../lib/setupChecks';
-import { fetchRegisteredUsers, type SpecialAffiliate } from '../services/affiliateService';
+import { fetchRegisteredUsers, fetchDeals, type SpecialAffiliate, type Deal } from '../services/affiliateService';
 import { fetchHouses, type House } from '../services/houseService';
 import { fetchIntegrations, type PublicIntegration } from '../services/integrationService';
-import { OTG_ENABLED } from '../lib/instanceClient';
+import { OTG_ENABLED, MARKETPLACE_ENABLED } from '../lib/instanceClient';
 import { cn } from '../lib/utils';
 
 // Saúde da configuração (F1 de ONBOARDING-AVISOS.md): card do /admin que lista
@@ -53,22 +53,26 @@ export default function SetupHealthCard({ affiliates, configs, specials, loading
   const [users, setUsers] = useState<Awaited<ReturnType<typeof fetchRegisteredUsers>>>([]);
   const [houses, setHouses] = useState<House[]>([]);
   const [integrations, setIntegrations] = useState<PublicIntegration[]>([]);
+  const [deals, setDeals] = useState<Deal[]>([]);
   const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
     let cancelado = false;
     // Falha de qualquer fonte cai em lista vazia: o check correspondente degrada
-    // para o silêncio (nunca para um falso positivo barulhento).
+    // para o silêncio (nunca para um falso positivo barulhento). Os acordos só são
+    // buscados com o marketplace ligado (a rota responde 404 sem ele).
     Promise.all([
       fetchRegisteredUsers().catch(() => []),
       fetchHouses().catch(() => []),
       fetchIntegrations().catch(() => []),
+      MARKETPLACE_ENABLED ? fetchDeals().catch(() => []) : Promise.resolve([]),
     ])
-      .then(([u, h, i]) => {
+      .then(([u, h, i, d]) => {
         if (cancelado) return;
         setUsers(u);
         setHouses(h);
         setIntegrations(i);
+        setDeals(d);
       })
       .finally(() => { if (!cancelado) setFetching(false); });
     return () => { cancelado = true; };
@@ -84,8 +88,10 @@ export default function SetupHealthCard({ affiliates, configs, specials, loading
       houses,
       integrations,
       otgEnabled: OTG_ENABLED,
+      deals,
+      marketplaceEnabled: MARKETPLACE_ENABLED,
     });
-  }, [loading, fetching, affiliates, configs, users, specials, houses, integrations]);
+  }, [loading, fetching, affiliates, configs, users, specials, houses, integrations, deals]);
 
   if (!findings.length) return null;
 

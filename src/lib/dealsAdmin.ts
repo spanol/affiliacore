@@ -9,6 +9,8 @@ import {
   type DealTypeId, type DealKpiId,
 } from './dealType';
 import { formatDealKpiValue } from './dealShowcase';
+import { num } from './commission';
+import { resolveCpaCurrency } from './currency';
 import type { Deal, DealModel, PaymentCycle, DealCurrency } from './deal';
 import type { PartnershipRequest, PartnershipStatus } from './partnership';
 
@@ -142,6 +144,103 @@ export function adminDealCardRows(deal?: Deal | null): DealCardRow[] {
     rows.push({ id: kpi, label: DEAL_KPI_LABEL[kpi], value: formatDealKpiValue(kpi, deal) });
   }
   return rows;
+}
+
+// --- Rascunhos das casas que ainda não têm acordo ---------------------------
+// `POST /api/houses` já cria o acordo junto com a casa NOVA (rascunho inativo).
+// Isso não alcança as casas que a agência configurou ANTES disso, nem a casa cujo
+// rascunho o admin apagou: elas ficam invisíveis em /acordos e só reaparecem se
+// alguém lembrar de clicar em "Novo acordo".
+//
+// A sugestão é VIRTUAL de propósito: nada é gravado até o admin abrir o modal e
+// salvar. Materializar um doc por casa na leitura criaria acordo em nome de quem
+// não pediu, e desfazer isso seria apagar dado em produção. Aqui, ativar/pausar
+// uma casa faz a sugestão aparecer e sumir sem tocar em nada.
+
+export interface DraftHouse {
+  id?: string | null;
+  slug?: string | null;
+  name?: string | null;
+  active?: boolean;
+  order?: number | null;
+  defaultCpa?: number | null;
+  defaultRev?: number | null;
+  cpaCurrency?: string | null;
+}
+
+// Chave da casa no acordo. O `houseId` do deal é o SLUG (= doc id das casas), e é
+// também o `value` do select do modal, então os dois lados casam.
+const houseKey = (h: DraftHouse): string => String(h?.id ?? h?.slug ?? '').trim();
+
+// A casa pode aparecer no deal pelo slug OU pelo id (iguais na prática, doc id =
+// slug); comparar os dois evita sugerir um acordo que já existe.
+function houseHasDeal(house: DraftHouse, dealHouseIds: Set<string>): boolean {
+  return [house?.id, house?.slug]
+    .map((v) => String(v ?? '').trim())
+    .some((v) => v !== '' && dealHouseIds.has(v));
+}
+
+// Rascunho do formulário pré-preenchido com o que a agência JÁ configurou na casa.
+// O CPA/REV padrão da casa é a comissão casa→agência (houseService.defaultCpa), que
+// é exatamente o que `cpaValue`/`revPercentage` do acordo significam, então copiar
+// é o ponto da sugestão. A MOEDA acompanha o número copiado (a casa guarda em qual
+// moeda paga o CPA, e ausente = EUR no núcleo de dinheiro): mandar o valor sem a
+// moeda dele seria trocar a unidade em silêncio.
+// Nasce `active: true`, ao contrário do rascunho que o servidor cria sozinho: aqui
+// há um humano no modal revisando antes de salvar, e o validador de publicação
+// ainda barra o que estiver incompleto (ex.: baseline no tipo gerenciado).
+export function draftFromHouse(house: DraftHouse, type: DealTypeId = 'direto'): DealDraft {
+  const cpa = num(house?.defaultCpa);
+  const rev = num(house?.defaultRev);
+  const model: DealModel = cpa > 0 && rev > 0 ? 'hybrid' : cpa <= 0 && rev > 0 ? 'revshare' : 'cpa';
+  return {
+    ...emptyDealDraft(type),
+    houseId: houseKey(house),
+    operatorName: String(house?.name ?? '').trim(),
+    model,
+    cpaValue: cpa > 0 ? String(cpa) : '',
+    revPercentage: rev > 0 ? String(rev) : '',
+    currency: cpa > 0 ? (resolveCpaCurrency(house?.cpaCurrency) as DealCurrency) : 'BRL',
+    active: true,
+  };
+}
+
+export interface HouseDraftCard {
+  key: string;            // slug da casa; chave de lista e do modal
+  house: DraftHouse;
+  draft: DealDraft;       // o que o modal abre ao clicar em "Criar acordo"
+  rows: DealCardRow[];    // as MESMAS linhas do card de acordo, já com a sugestão
+}
+
+// Casas configuradas que ainda não têm acordo, na ordem do card de casa (/casas).
+//
+// Casa PAUSADA fica de fora: o acordo dela não apareceria na vitrine de ninguém
+// (o GET /api/deals filtra casa inativa), então sugerir a oferta agora é ruído.
+// Reativar a casa traz a sugestão de volta, sem migração nem dado tocado.
+// Casa sem nome também fica de fora, pela mesma razão que
+// `buildDraftDealFromHouse` devolve null: acordo sem operadora não é acordo.
+export function buildHouseDraftCards(
+  houses: DraftHouse[] | null | undefined,
+  deals: Array<Pick<Deal, 'houseId'>> | null | undefined,
+  type: DealTypeId = 'direto',
+): HouseDraftCard[] {
+  const dealHouseIds = new Set(
+    (Array.isArray(deals) ? deals : [])
+      .map((d) => String(d?.houseId ?? '').trim())
+      .filter(Boolean),
+  );
+  return (Array.isArray(houses) ? houses : [])
+    .filter((h) => houseKey(h) && String(h?.name ?? '').trim() && h?.active !== false)
+    .filter((h) => !houseHasDeal(h, dealHouseIds))
+    .sort((a, b) => num(a?.order) - num(b?.order)
+      || String(a?.name ?? '').localeCompare(String(b?.name ?? ''), 'pt-BR'))
+    .map((house) => {
+      const draft = draftFromHouse(house, type);
+      // O card mostra as linhas do acordo que SERIA criado, com os mesmos rótulos
+      // e a mesma ordem do card de acordo. `id` vazio: este deal não existe.
+      const virtual = { id: '', ...buildDealPayload(draft) } as Deal;
+      return { key: houseKey(house), house, draft, rows: adminDealCardRows(virtual) };
+    });
 }
 
 export interface AdminPartnershipQueues {

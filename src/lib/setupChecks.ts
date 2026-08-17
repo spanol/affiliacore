@@ -73,6 +73,9 @@ export interface SetupIntegration {
 
 export interface SetupInputs {
   affiliates?: SetupRosterItem[] | null;
+  /** Acordos do marketplace. Só olhado quando `marketplaceEnabled` é true. */
+  deals?: Array<{ houseId?: string | null }> | null;
+  marketplaceEnabled?: boolean;
   /** Mapa affiliateId → config. PRESENÇA da chave = doc persistido. */
   configs?: Record<string, unknown> | null;
   users?: SetupUser[] | null;
@@ -387,11 +390,48 @@ export function checkCasasOtgSemFonte(
   };
 }
 
+/**
+ * Casa ativa sem NENHUM acordo no marketplace: ela não existe na vitrine do
+ * afiliado, que não tem como solicitar o link. A casa nova já nasce com o
+ * rascunho (POST /api/houses), então isto pega o que foi configurado antes disso
+ * ou teve o rascunho apagado. Instância com o marketplace desligado fica em
+ * silêncio: sem vitrine, casa sem acordo não é pendência nenhuma.
+ */
+export function checkCasasSemAcordo(
+  houses: SetupHouse[] | null | undefined,
+  deals: SetupInputs['deals'],
+  marketplaceEnabled: boolean | undefined,
+): SetupFinding | null {
+  if (marketplaceEnabled !== true) return null;
+  const comAcordo = new Set(
+    (Array.isArray(deals) ? deals : [])
+      .map((d) => String(d?.houseId ?? '').trim())
+      .filter(Boolean),
+  );
+  const missing = (Array.isArray(houses) ? houses : []).filter(
+    (h) =>
+      h?.active !== false &&
+      String(h?.name ?? '').trim() &&
+      ![h?.slug, h?.id].some((v) => String(v ?? '').trim() && comAcordo.has(String(v).trim())),
+  );
+  if (!missing.length) return null;
+  return {
+    id: 'casas-sem-acordo',
+    severity: 'info',
+    title: `${missing.length} casa(s) sem acordo na vitrine`,
+    detail:
+      'O afiliado só solicita o link das casas que têm acordo publicado. O rascunho de cada uma já está pronto na tela de acordos, com a taxa padrão da casa.',
+    fixRoute: '/acordos',
+    fixLabel: 'Abrir acordos',
+    subjects: missing.map((h) => h.name || String(h.slug ?? h.id ?? '')),
+  };
+}
+
 const SEVERITY_RANK: Record<SetupSeverity, number> = { critical: 0, warning: 1, info: 2 };
 
 /** Roda todos os checks e devolve os achados ordenados por severidade. */
 export function runSetupChecks(inputs: SetupInputs): SetupFinding[] {
-  const { affiliates, configs, users, specials, houses, integrations, otgEnabled } = inputs ?? {};
+  const { affiliates, configs, users, specials, houses, integrations, otgEnabled, deals, marketplaceEnabled } = inputs ?? {};
   const findings = [
     checkEspeciaisSemFlag(specials, users, affiliates),
     checkAffiliatesSemTaxa(affiliates, configs, specials, users),
@@ -400,6 +440,7 @@ export function runSetupChecks(inputs: SetupInputs): SetupFinding[] {
     checkVinculoIntegracao(houses, integrations),
     checkCasasOtgSemFonte(houses, otgEnabled),
     checkCasasManuaisSemRegua(houses),
+    checkCasasSemAcordo(houses, deals, marketplaceEnabled),
     checkAffiliatesSemAcesso(affiliates, users),
   ].filter((f): f is SetupFinding => f !== null);
   return findings.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);

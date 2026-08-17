@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { Tag, Loader2, Plus, Check, X, Ban, Power, Pencil, Inbox, Link2 } from 'lucide-react';
+import { Tag, Loader2, Plus, Check, X, Ban, Power, Pencil, Inbox, Link2, Sparkles } from 'lucide-react';
 import {
   fetchDeals, createDeal, updateDeal, fetchPartnerships, decidePartnership, fetchAffiliates,
   buildDealLabel, DEAL_MODELS, PAYMENT_CYCLES, DEAL_CURRENCIES, DEAL_MODEL_LABEL, PAYMENT_CYCLE_LABEL,
@@ -11,7 +11,8 @@ import { fetchHouses } from '../services/houseService';
 import { houseLogoOrPreset } from '../lib/housePresets';
 import {
   emptyDealDraft, draftFromDeal, buildDealPayload, adminEditsKpi, adminDealCardRows,
-  selectAdminPartnershipQueues, partnershipDecisionMessage, type DealDraft,
+  selectAdminPartnershipQueues, partnershipDecisionMessage, buildHouseDraftCards,
+  type DealDraft, type HouseDraftCard,
 } from '../lib/dealsAdmin';
 import { DEAL_TYPE_DEFAULT } from '../lib/instanceClient';
 import { useToast } from '../contexts/ToastContext';
@@ -23,7 +24,7 @@ type Tab = 'deals' | 'requests' | 'links';
 // (logo gravada > ícone do preset > inicial) e a mesma moldura, para as duas telas
 // mostrarem a mesma casa do mesmo jeito. O acordo guarda o `houseId` (= slug), então
 // a casa é resolvida pela lista que a página já carrega.
-function DealHouseLogo({ deal, houses }: { deal: Deal; houses: any[] }) {
+function DealHouseLogo({ deal, houses }: { deal: Pick<Deal, 'houseId' | 'operatorName'>; houses: any[] }) {
   const [failed, setFailed] = useState(false);
   const house = houses.find((h) => String(h?.slug ?? h?.id) === String(deal.houseId));
   const logo = houseLogoOrPreset(house?.logo, house?.slug ?? deal.houseId, house?.id, house?.name ?? deal.operatorName);
@@ -81,6 +82,14 @@ export default function Deals() {
   // `priced` (o gerente já precificou) NÃO é uma parceria decidida: ela espera o
   // link da agência e por isso tem fila própria. Recorte puro em lib/dealsAdmin.
   const { pending, awaitingLink, decided } = useMemo(() => selectAdminPartnershipQueues(requests), [requests]);
+
+  // Casas configuradas que ainda não viraram acordo. A tela sugere o rascunho de
+  // cada uma (sem gravar nada) para o admin não precisar descobrir sozinho, pelo
+  // select do "Novo acordo", quais operadoras ficaram de fora da vitrine.
+  const houseDrafts = useMemo(
+    () => buildHouseDraftCards(houses, deals, DEAL_TYPE_DEFAULT),
+    [houses, deals],
+  );
 
   // Política do tipo escolhido no modal: dirige quais campos de KPI aparecem e o
   // aviso de que as taxas ficam ocultas para o afiliado.
@@ -171,13 +180,16 @@ export default function Deals() {
       {loading ? (
         <div className="p-24 flex justify-center"><Loader2 className="animate-spin text-accent-500" size={40} /></div>
       ) : tab === 'deals' ? (
-        deals.length === 0 ? (
-          <div className="p-16 text-center bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl">
-            <Tag className="mx-auto text-slate-300 dark:text-neutral-600 mb-3" size={40} />
-            <h3 className="text-sm font-bold text-slate-800 dark:text-neutral-100">Nenhum acordo cadastrado</h3>
-            <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1">Crie o primeiro acordo para os afiliados começarem a solicitar parcerias.</p>
-          </div>
-        ) : (
+        <div className="space-y-10">
+          {deals.length === 0 && houseDrafts.length === 0 && (
+            <div className="p-16 text-center bg-white dark:bg-neutral-900/60 border border-slate-200/70 dark:border-neutral-800 rounded-3xl">
+              <Tag className="mx-auto text-slate-300 dark:text-neutral-600 mb-3" size={40} />
+              <h3 className="text-sm font-bold text-slate-800 dark:text-neutral-100">Nenhum acordo cadastrado</h3>
+              <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1">Cadastre as casas da agência para os rascunhos aparecerem aqui, ou crie o acordo manualmente.</p>
+            </div>
+          )}
+
+          {deals.length > 0 && (
           // MESMO formato do card de CASA (/casas): logo + nome + slug em mono no
           // topo, pill de status à direita, `<dl>` de fatos no meio e os botões
           // embaixo. As duas telas falam do mesmo objeto de negócio, então ler uma
@@ -251,7 +263,68 @@ export default function Deals() {
               </motion.div>
             ))}
           </div>
-        )
+          )}
+
+          {/* Casas que a agência já configurou e que ainda não têm acordo. O card é
+              o MESMO do acordo (logo, linhas, ordem), mas o acordo não existe: a
+              pill diz isso e nada foi gravado até o admin salvar no modal. */}
+          {houseDrafts.length > 0 && (
+            <section data-testid="rascunhos-de-casa">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500 mb-1">
+                Casas sem acordo ({houseDrafts.length})
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-neutral-400 mb-4 max-w-2xl">
+                Estas casas estão cadastradas mas não têm oferta na vitrine. O rascunho já vem com a taxa padrão da casa; revise e salve para publicar.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {houseDrafts.map((card, idx) => (
+                  <motion.div
+                    key={card.key}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.04 }}
+                  >
+                    <div
+                      data-testid={`rascunho-${card.key}`}
+                      className="group relative h-full overflow-hidden p-6 rounded-2xl border border-dashed bg-white dark:bg-neutral-900/40 border-slate-300 dark:border-neutral-700 hover:border-accent-400 dark:hover:border-accent-700 transition-all"
+                    >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <DealHouseLogo deal={{ houseId: card.draft.houseId, operatorName: card.draft.operatorName }} houses={houses} />
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{card.draft.operatorName}</p>
+                          <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400 dark:text-neutral-500 mt-0.5 truncate">{card.draft.houseId}</p>
+                        </div>
+                      </div>
+                      <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400">
+                        <Sparkles size={10} /> Rascunho
+                      </span>
+                    </div>
+
+                    <dl className="space-y-2 mb-5 text-xs">
+                      {card.rows.map((row) => (
+                        <div key={row.id} className="flex items-center justify-between gap-2">
+                          <dt className="text-slate-400 dark:text-neutral-500 font-medium">{row.label}</dt>
+                          <dd className="truncate max-w-[60%] text-right font-semibold text-slate-600 dark:text-neutral-300">
+                            {row.value ?? <span className="font-medium text-slate-300 dark:text-neutral-600">—</span>}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+
+                    <button
+                      onClick={() => setModal(card.draft)}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-accent-500/10 border border-accent-500/30 text-xs font-bold text-accent-600 dark:text-accent-400 hover:bg-accent-500/20 transition-all"
+                    >
+                      <Plus size={13} /> Criar acordo
+                    </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
       ) : tab === 'links' ? (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
           <p className="text-xs text-slate-500 dark:text-neutral-400 max-w-2xl">

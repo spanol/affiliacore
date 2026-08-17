@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   adminDealKpis, adminEditsKpi, emptyDealDraft, draftFromDeal, buildDealPayload,
   adminDealCardRows, selectAdminPartnershipQueues, partnershipDecisionMessage,
-  ADMIN_ALWAYS_EDITABLE_KPIS,
+  ADMIN_ALWAYS_EDITABLE_KPIS, buildHouseDraftCards, draftFromHouse, type DraftHouse,
 } from './dealsAdmin';
 import { DEAL_TYPES, DEAL_TYPE_POLICY } from './dealType';
 import type { Deal } from './deal';
@@ -221,5 +221,97 @@ describe('partnershipDecisionMessage', () => {
       partnershipDecisionMessage('approved', 'discontinued'),
     ];
     msgs.forEach((m) => expect(m).not.toMatch(/—/));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rascunhos das casas que ainda não têm acordo (/acordos abre com a sugestão)
+// ---------------------------------------------------------------------------
+
+const casa = (over: Partial<DraftHouse> = {}): DraftHouse => ({
+  id: 'esportiva', slug: 'esportiva', name: 'Esportiva Bet', active: true, ...over,
+});
+
+describe('draftFromHouse · o rascunho já vem com o que a casa tem configurado', () => {
+  it('copia a taxa padrão da casa para os campos do acordo', () => {
+    const d = draftFromHouse(casa({ defaultCpa: 110, defaultRev: 25, cpaCurrency: 'BRL' }));
+    expect(d.houseId).toBe('esportiva');
+    expect(d.operatorName).toBe('Esportiva Bet');
+    expect(d.cpaValue).toBe('110');
+    expect(d.revPercentage).toBe('25');
+    // CPA e REV juntos = híbrido; só REV = revshare; o resto cai em CPA.
+    expect(d.model).toBe('hybrid');
+    expect(draftFromHouse(casa({ defaultRev: 30 })).model).toBe('revshare');
+    expect(draftFromHouse(casa({ defaultCpa: 110 })).model).toBe('cpa');
+    expect(draftFromHouse(casa()).model).toBe('cpa');
+  });
+
+  it('casa sem taxa padrão abre com os campos VAZIOS, nunca com zero', () => {
+    // Ausência ≠ R$ 0: um "0" pré-digitado seria lido como taxa configurada e
+    // ainda obrigaria o admin a apagar antes de escrever o valor real.
+    const d = draftFromHouse(casa());
+    expect(d.cpaValue).toBe('');
+    expect(d.revPercentage).toBe('');
+    expect(d.baseline).toBe('');
+    expect(d.ggrPercentage).toBe('');
+  });
+
+  it('a moeda acompanha o CPA copiado (casa sem moeda declarada paga em EUR)', () => {
+    expect(draftFromHouse(casa({ defaultCpa: 30 })).currency).toBe('EUR');
+    expect(draftFromHouse(casa({ defaultCpa: 110, cpaCurrency: 'BRL' })).currency).toBe('BRL');
+    // Sem número copiado não há moeda a herdar: fica no default do formulário.
+    expect(draftFromHouse(casa({ cpaCurrency: 'EUR' })).currency).toBe('BRL');
+  });
+
+  it('nasce ATIVO e com o tipo da instância (há um humano revisando no modal)', () => {
+    const d = draftFromHouse(casa(), 'gerenciado');
+    expect(d.active).toBe(true);
+    expect(d.type).toBe('gerenciado');
+    expect(draftFromHouse(casa()).type).toBe('direto');
+  });
+});
+
+describe('buildHouseDraftCards · quais casas viram sugestão em /acordos', () => {
+  const houses: DraftHouse[] = [
+    casa({ id: 'leon', slug: 'leon', name: 'LEON Bet', order: 2 }),
+    casa({ id: 'esportiva', slug: 'esportiva', name: 'Esportiva Bet', order: 1, defaultCpa: 110, cpaCurrency: 'BRL' }),
+    casa({ id: 'superbet', slug: 'superbet', name: 'Superbet', order: 3 }),
+  ];
+
+  it('sugere só as casas sem acordo, na ordem do backoffice de casas', () => {
+    const cards = buildHouseDraftCards(houses, [{ houseId: 'superbet' }]);
+    expect(cards.map((c) => c.key)).toEqual(['esportiva', 'leon']);
+  });
+
+  it('casa PAUSADA fica de fora (o acordo dela não apareceria na vitrine)', () => {
+    const cards = buildHouseDraftCards([...houses, casa({ id: 'pausada', slug: 'pausada', name: 'Pausada', active: false })], []);
+    expect(cards.map((c) => c.key)).not.toContain('pausada');
+  });
+
+  it('casa sem nome ou sem slug não vira acordo', () => {
+    const cards = buildHouseDraftCards(
+      [casa({ id: 'x', slug: 'x', name: '  ' }), casa({ id: '', slug: '', name: 'Sem chave' })],
+      [],
+    );
+    expect(cards).toEqual([]);
+  });
+
+  it('acordo já existente pelo SLUG ou pelo ID tira a casa da lista', () => {
+    expect(buildHouseDraftCards([casa()], [{ houseId: 'esportiva' }])).toEqual([]);
+    expect(buildHouseDraftCards([casa({ id: 'doc-1', slug: 'esportiva' })], [{ houseId: 'doc-1' }])).toEqual([]);
+  });
+
+  it('as linhas do card são as MESMAS do card de acordo, já com a sugestão', () => {
+    const [card] = buildHouseDraftCards(houses, []);
+    const rows = Object.fromEntries(card.rows.map((r) => [r.id, r.value]));
+    expect(rows.cpa).toBe('R$ 110,00');
+    // O que a casa não tem aparece vazio (a tela desenha o placeholder), nunca R$ 0.
+    expect(rows.geo).toBeNull();
+    expect(card.rows.map((r) => r.id)).toEqual(adminDealCardRows({ ...card.draft, id: '', cpaValue: 110, revPercentage: 0 } as any).map((r) => r.id));
+  });
+
+  it('entrada nula ou vazia não quebra', () => {
+    expect(buildHouseDraftCards(null, null)).toEqual([]);
+    expect(buildHouseDraftCards(undefined, [{ houseId: 'x' }])).toEqual([]);
   });
 });

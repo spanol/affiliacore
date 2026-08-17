@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
   push: vi.fn(),
   deals: [] as any[],
   partnerships: [] as any[],
+  houses: [] as any[],
   createDeal: vi.fn(),
   updateDeal: vi.fn(),
   decidePartnership: vi.fn(),
@@ -22,7 +23,7 @@ vi.mock('motion/react', () => ({
   motion: new Proxy({}, { get: () => (props: any) => props.children ?? null }),
 }));
 vi.mock('../services/houseService', () => ({
-  fetchHouses: async () => [{ id: 'esportiva', name: 'Esportiva Bet' }],
+  fetchHouses: async () => h.houses,
 }));
 // Os PUROS re-exportados pelo service (catálogo de tipos, rótulos) entram de verdade:
 // o teste tem que enxergar o mesmo catálogo que a tela consome.
@@ -56,6 +57,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   h.deals = [deal()];
   h.partnerships = [];
+  h.houses = [{ id: 'esportiva', slug: 'esportiva', name: 'Esportiva Bet', active: true }];
   h.createDeal.mockResolvedValue({});
   h.updateDeal.mockResolvedValue({});
   h.decidePartnership.mockResolvedValue({});
@@ -229,5 +231,65 @@ describe('/acordos · aba Aguardando link', () => {
     await renderPage();
     clickTab('Aguardando link');
     expect(screen.getByText('Nenhuma parceria esperando link.')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rascunhos das casas configuradas: a tela abre com a sugestão, sem gravar nada
+// ---------------------------------------------------------------------------
+
+const leon = { id: 'leon', slug: 'leon', name: 'LEON Bet', active: true, defaultCpa: 110, cpaCurrency: 'BRL' };
+
+describe('/acordos · casas sem acordo viram rascunho na tela', () => {
+  it('lista a casa configurada que ainda não tem acordo, com a taxa padrão dela', async () => {
+    h.houses = [...h.houses, leon];
+    await renderPage();
+    const card = screen.getByTestId('rascunho-leon');
+    expect(within(card).getByText('LEON Bet')).toBeInTheDocument();
+    expect(within(card).getByText('R$ 110,00')).toBeInTheDocument();
+  });
+
+  it('casa que JÁ tem acordo não aparece como rascunho (não duplica o card)', async () => {
+    await renderPage();
+    expect(screen.queryByTestId('rascunho-esportiva')).toBeNull();
+    expect(screen.queryByTestId('rascunhos-de-casa')).toBeNull();
+  });
+
+  it('casa pausada fica de fora: o acordo dela não apareceria na vitrine', async () => {
+    h.houses = [...h.houses, { ...leon, active: false }];
+    await renderPage();
+    expect(screen.queryByTestId('rascunho-leon')).toBeNull();
+  });
+
+  // O rascunho é uma SUGESTÃO: nada é gravado até o admin salvar no modal.
+  it('só grava o acordo depois de revisar e salvar', async () => {
+    h.houses = [...h.houses, leon];
+    await renderPage();
+    expect(h.createDeal).not.toHaveBeenCalled();
+
+    fireEvent.click(within(screen.getByTestId('rascunho-leon')).getByRole('button', { name: /Criar acordo/ }));
+    // O modal abre pré-preenchido com a casa e a taxa que a agência configurou.
+    expect((screen.getByTestId('campo-casa') as HTMLSelectElement).value).toBe('leon');
+    expect((screen.getByTestId('campo-cpa') as HTMLInputElement).value).toBe('110');
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })); });
+    expect(h.createDeal).toHaveBeenCalledWith(
+      expect.objectContaining({ houseId: 'leon', operatorName: 'LEON Bet', cpaValue: 110, currency: 'BRL' }),
+    );
+  });
+
+  it('sem acordo nenhum, o rascunho da casa ocupa o lugar do estado vazio', async () => {
+    h.deals = [];
+    h.houses = [leon];
+    await renderPage();
+    expect(screen.getByTestId('rascunho-leon')).toBeInTheDocument();
+    expect(screen.queryByText(/Nenhum acordo cadastrado/)).toBeNull();
+  });
+
+  it('sem acordo e sem casa, o estado vazio continua lá', async () => {
+    h.deals = [];
+    h.houses = [];
+    await renderPage();
+    expect(screen.getByText(/Nenhum acordo cadastrado/)).toBeInTheDocument();
   });
 });
