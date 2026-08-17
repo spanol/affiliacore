@@ -205,6 +205,11 @@ mora toda lá). Sem link público: o acesso é entregue a lead quente, com senha
 rotativa. Difere do playbook padrão em 3 pontos: **Blaze**, **rules mescladas**
 e **seed**.
 
+> ✅ **PROVISIONADA em 2026-08-17.** Backend `affiliacore-demo` (us-east4), ambiente
+> `demo`, seeds 8a+8b no ar, domínio próprio **https://demo.affiliacore.com.br**
+> (TLS validado). Os passos abaixo seguem valendo como receita; o que o
+> provisionamento real ensinou está em "Gotchas medidos" no fim desta seção.
+
 1. **Plano Blaze** no projeto `affiliacore` (App Hosting exige; custo ~zero com
    `minInstances: 0`). Console → Configurações → Uso e faturamento.
 2. **Authentication** → ativar **E-mail/senha** (os logins demo usam Auth).
@@ -285,6 +290,48 @@ e **seed**.
     `--wipe --yes` (reseta dados fictícios E o rastro do lead: convites,
     auditoria, casas criadas...). Cron do ranking é opcional (o admin gera pelo
     botão); se quiser, seguir o §5 do playbook padrão.
+11. **Domínio próprio** (§6 do playbook padrão): App Hosting → backend →
+    Configurações → Domínios → "Adicionar um domínio personalizado". Ele devolve
+    TRÊS registros para criar no DNS: `A` do subdomínio, `TXT` de posse
+    (`fah-claim=…`) e um `CNAME` de desafio ACME (`_acme-challenge_<hash>.<sub>`).
+    Depois, "Verificar registros" e esperar o certificado.
+
+### Gotchas medidos no provisionamento real (2026-08-17)
+
+Coisas que só aparecem fazendo, e que vão repetir na próxima instância:
+
+- **`backends:create` logo depois de ligar o Blaze FALHA uma vez.** Erro: *the
+  service account "firebase-app-hosting-compute@…" was not found*. O próprio CLI
+  avisa que a SA "está sendo provisionada em background". Não saia corrigindo IAM:
+  espere ~1 min e rode de novo. (Diferente do gotcha de IAM do §4, que exige
+  recriar o backend — lá a SA existe e está sem papéis.)
+- **`--non-interactive` cria o backend SEM repositório.** Não existe comando de
+  CLI para conectar o GitHub (é Developer Connect, só console). O fluxo do console
+  abre um **popup** — automação que não enxerga popup precisa interceptar a URL do
+  `window.open` e navegar na própria aba.
+- **O console ACEITA upload de `.zip`/`.tgz` do código-fonte** ("Criar lançamento"
+  → "Fazer upload de um arquivo .zip"). O CLI só tem `--git-branch`/`--git-commit`;
+  concluir dali que "App Hosting não faz deploy por zip" é errado. É a saída quando
+  o GitHub estiver fora.
+- **Salve o repositório com "Apenas salvar", não com "Salvar e implantar",
+  enquanto o ambiente não estiver associado.** Sem o `demo`, o rollout usa só o
+  `apphosting.yaml` base e MORRE na validação dos secrets OTG que não existem no
+  projeto novo.
+- **Secrets sem prompt:** `firebase apphosting:secrets:set <nome> --project <p>
+  --data-file <arquivo> --non-interactive`. Sem `--force` (que mexeria no yaml).
+  Depois do backend existir, `grantaccess` nos dois.
+- **⚠️ `.demo-runtime/affiliacore/latest-demo-credentials.txt` é do EMULADOR.** Quem
+  escreve esse arquivo é o `scripts/dev-demo.mjs`; o seed contra o projeto REAL
+  imprime as senhas só no stdout, uma vez. Pegar as senhas do arquivo depois de um
+  seed de produção entrega credencial que não loga na instância no ar.
+- **DNS:** o `affiliacore.com.br` está numa conta GoDaddy **diferente** da que tem
+  o `agencyboost.com.br` (o Registro.br mostra registrar GoDaddy, handle `p86`).
+  Procurar na conta errada dá "Domínio não encontrado" e parece problema de DNS.
+- **"Mudanças de DNS ainda não detectadas" é cache, não erro.** O verificador do
+  Google usa resolvers públicos, e uma consulta feita ANTES de criar o registro
+  deixa `NXDOMAIN` em cache negativo. Confira no autoritativo
+  (`nslookup -type=A <sub> ns01.domaincontrol.com`) e espere. Na prática o HTTPS
+  respondeu em poucos minutos, não nas 24h que o console anuncia.
 
 ### Preview LOCAL da demo (sem provisionar nada — validado 2026-07-08)
 

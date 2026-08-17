@@ -633,3 +633,42 @@ especial da Boost ficou sem ver equipe. Agora:
   (aliases: `infinity`, `www`);
 - o predeploy hook tem `agencia-boost-app` como **`blocked`**, com a mensagem dizendo
   que as rules dela se deployam do repo dela.
+
+## 🚀 Instância DEMO no ar (2026-08-17) — P5.3 destravado
+
+**https://demo.affiliacore.com.br** · backend App Hosting `affiliacore-demo`
+(us-east4, projeto `affiliacore`, ambiente `demo`), build do commit `05a2c30`.
+
+A demo existia como receita no `scripts/provision/README.md` desde julho, mas nunca
+tinha sido provisionada. Agora está: Blaze + Auth ligados, app Web registrado, rules
+MESCLADAS deployadas (`firebase.affiliacore.json` → `firestore.affiliacore.rules`,
+414 linhas, bloco `leads` intacto), secrets `firebase-service-account-key` e
+`ranking-cron-secret` criados com `grantaccess`, repo `spanol/affiliacore` vinculado
+na `main` (rollout automático a cada push) e os DOIS seeds rodados.
+
+**Números que a demo mostra hoje** (preset "Últimos 30 dias"): R$ 943.557,97 e 133
+afiliados — é o 8a + 8b. Só com o 8a ela bate EXATO com o mock da LP (R$ 24.831,90 ·
+38 afiliados), e o 8b é idempotente, então dá para ir e voltar conforme o lead.
+
+**Smoke de aceite (17/08):** título "AffiliaCore Demo" + tema ember · sidebar com 18
+itens incluindo **Acordos** (prova de que o `VITE_MARKETPLACE_ENABLED` do
+`apphosting.demo.yaml` entrou no BUILD) e **Suporte** · `/acordos` com os dois tipos
+de deal, 12 acordos, "Solicitações (20)" e "Aguardando link (1)" · `/casas` sem
+"Roster OTG"/"Sincronizar afiliados" (OTG-free) · LP na raiz intacta.
+
+**O que a demo muda no processo, e não só no comercial:** o projeto `affiliacore`
+deixou de ser "só Hosting estático" e passou a servir o app sobre o MESMO banco da
+landing. Por isso ele entrou no mapa `INSTANCES` do
+`scripts/predeploy/check-rules-code-sync.cjs` apontando para o backend da demo
+(commit `6b17d7e`) — a regra "código primeiro, rules depois" vale ali agora.
+
+**Pendências de operador:**
+- `node scripts/provision/seed-demo.cjs --rotate` depois de cada lead (as senhas do
+  provisionamento circularam em chat).
+- Decidir sobre a `service-account.affiliacore.json` no disco: o playbook manda
+  apagar após o bootstrap, mas é ela que permite `--rotate`/`--wipe` depois.
+- A conexão Developer Connect guarda um **token OAuth do GitHub pessoal** (`spanol`)
+  no Secret Manager do projeto. O próprio Google recomenda conta de bot. Tudo bem
+  enquanto o projeto é só nosso; se algum dia um cliente ganhar IAM ali, migrar.
+- Cobrança do GitHub segue com problema (banner "update your payment method"), o que
+  mantém o CI parado desde 13/08. Não afeta o App Hosting.
