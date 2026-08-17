@@ -229,24 +229,45 @@ e **seed**.
    repo `spanol/affiliacore`, branch `main`) + associar o ambiente **`demo`** no
    console (Settings → Environment). 1º rollout → conferir marca "AffiliaCore
    Demo" + tema ember + `/casas` VAZIO (sem Superbet/SportingBet fantasma).
-8. **Seed** (imprime as 3 senhas UMA vez — admin/afiliado/especial):
+8. **Seed** — DOIS passos, nesta ordem (o 1º imprime as 3 senhas UMA vez):
    ```bash
+   # 8a) núcleo: números batem EXATO com o mock da LP na janela de 30 dias
    GOOGLE_APPLICATION_CREDENTIALS=./service-account.affiliacore.json \
      node scripts/provision/seed-demo.cjs
+
+   # 8b) cobertura TOTAL de features (o que se mostra a cliente): +95 afiliados,
+   #     +4 casas, carteira, marketplace, conquistas, links, jurídico, integração,
+   #     solicitações, auditoria rica. --live --yes é obrigatório fora do emulador.
+   GOOGLE_APPLICATION_CREDENTIALS=./service-account.affiliacore.json \
+     node scripts/provision/seed-demo-extras.cjs --live --yes
    ```
-   O script tem GUARD de projeto (só roda no `affiliacore`) e protege `leads`.
+   Os dois têm GUARD de projeto (só rodam no `affiliacore`) e protegem `leads` com
+   contagem antes/depois verificada por query.
    Validar a matemática sem Firebase: `node scripts/provision/seed-demo.cjs --plan`.
+
+   **Decisão de qual seed levar ao ar.** O 8b INFLA o headline (centenas de
+   milhares/mês) e sai dos números do mock da LP. Para lead que chega pela landing
+   e vai comparar com o mock, rode só o 8a. Para demonstração de PRODUTO (mostrar
+   que a plataforma faz tudo), rode 8a + 8b: é a diferença entre uma demo com 3
+   telas cheias e uma com todas. O 8b é idempotente (limpa e refaz o que é dele),
+   então dá para ir e voltar sem reset total.
 9. **Smoke da demo** (como demo@affiliacore.com.br):
-   - [ ] `/admin` com preset **"Últimos 30 dias"** = números do mock da LP
-         (comissão R$ 24.831,90 · 38 afiliados · funil 1.204/312/187 · card
-         "Total depositado" no lugar de "Total CPA").
+   - [ ] `/admin` com preset **"Últimos 30 dias"**. Só com o 8a: números do mock da
+         LP (comissão R$ 24.831,90 · 38 afiliados · funil 1.204/312/187 · card
+         "Total depositado" no lugar de "Total CPA"). Com o 8b: 133 afiliados e
+         headline na casa das centenas de milhares.
    - [ ] `/ranking` → gerar o dia → pódio com ≥10 afiliados.
    - [ ] Portal do afiliado (afiliado@...) mostra SÓ os números do Yago; sino
          com aviso + notificação.
    - [ ] `/network` do especial (especial@...) com a sub-rede de 3.
-   - [ ] `/auditoria` populada; `/casas` com as 3 casas manuais.
+   - [ ] `/auditoria` populada; `/casas` com as casas manuais.
    - [ ] Form da landing (affiliacore.com.br) SEGUE gravando lead (rules
          mescladas) — testar e LIMPAR o lead de teste (confirmando via console).
+   - [ ] Com o 8b, conferir também as telas que só ele enche: `/saques` (4 abas com
+         casa e PIX), `/acordos` (acordo direto E gerenciado; abas Solicitações e
+         Aguardando link), `/conquistas` (5 placas + fila), `/links` (5 visões,
+         incluindo Standby), `/integracoes` (Esportiva "Ativa"), `/solicitacoes`
+         (lead + cadastro + indicação) e o item **Suporte** na sidebar.
 10. **Operação com leads**: entregar as credenciais por canal seguro; depois de
     cada lead, `--rotate` (troca senhas + revoga sessões); periodicamente
     `--wipe --yes` (reseta dados fictícios E o rastro do lead: convites,

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * SEED EXTRAS · demo "gigante" para gravação (reels) — SÓ EMULADOR.
+ * SEED EXTRAS · demo "gigante" — gravação de mídia (emulador) E a instância DEMO
+ * deployada que se mostra a cliente (projeto Firebase `affiliacore`).
  *
  * Roda DEPOIS do seed base (`seed-demo.cjs --wipe --yes`), que popula o núcleo
  * (dashboard/afiliados/auditoria/ranking/portal/avisos/prêmios/rede). Este script é
@@ -19,31 +20,76 @@
  *      2º especial fromNetwork, link de rede do especial, contatos, mensagens
  *      diretas, trilha de auditoria rica e histórico de daily_rankings.
  *
- * Uso (com os emuladores no ar):
+ * Uso A — EMULADOR (gravação local, o caminho do dia a dia; `DEMO_FULL=1 npm run
+ * dev` já faz isto por baixo):
  *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=affiliacore \
  *   GOOGLE_CLOUD_PROJECT=affiliacore node scripts/provision/seed-demo-extras.cjs
  *
- * SEGURANÇA: aborta se FIRESTORE_EMULATOR_HOST NÃO estiver setado (nunca toca um
- * Firestore real) e se o projeto não for `affiliacore`.
+ * Uso B — INSTÂNCIA DEMO DEPLOYADA (Firestore REAL do projeto `affiliacore`, depois
+ * do seed base; exige --live porque apaga coleções):
+ *   GOOGLE_APPLICATION_CREDENTIALS=./service-account.affiliacore.json \
+ *     node scripts/provision/seed-demo-extras.cjs --live --yes
+ *
+ * SEGURANÇA (o script APAGA coleções inteiras — ver OWN_COLLECTIONS):
+ *   • Sem emulador e sem `--live --yes`, aborta. Escrever em Firestore real é
+ *     sempre um gesto explícito, nunca o default de um comando digitado rápido.
+ *   • GUARD DE PROJETO: o projeto tem que ser `affiliacore` (a demo). Um projeto de
+ *     instância REAL de cliente (agencia-boost-app, infinity-affiliacore...) aborta:
+ *     este script destrói dado de gestão de verdade.
+ *   • `leads` (a landing divide o banco com a demo no projeto affiliacore) é
+ *     PROTEGIDO: a contagem é conferida no fim e divergência é erro.
  */
 const admin = require('firebase-admin');
 const crypto = require('crypto');
+const fs = require('fs');
 
 // ---------------------------------------------------------------------------
 // Guards + init
 // ---------------------------------------------------------------------------
-if (!process.env.FIRESTORE_EMULATOR_HOST) {
-  console.error('ABORTADO: FIRESTORE_EMULATOR_HOST não está setado. Este script só roda contra o emulador.');
+const has = (name) => process.argv.includes(`--${name}`);
+const EMULATOR = !!process.env.FIRESTORE_EMULATOR_HOST;
+const LIVE = has('live');
+
+if (!EMULATOR && !(LIVE && has('yes'))) {
+  console.error('ABORTADO: sem FIRESTORE_EMULATOR_HOST no ambiente.');
+  console.error('Para semear a demo LOCAL, suba os emuladores (DEMO_FULL=1 npm run dev).');
+  console.error('Para semear a instância DEMO deployada (Firestore real do projeto affiliacore),');
+  console.error('confirme com: --live --yes');
   process.exit(1);
 }
-const PROJECT = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'affiliacore';
+
+// Projeto: no emulador vem das envs; no modo --live sai do service account (é a
+// credencial que decide onde escreve, então é dela que o guard tem que ler).
+function resolveLiveProject() {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    try { return JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY).project_id; } catch { /* segue */ }
+  }
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    try { return JSON.parse(fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8')).project_id; } catch { /* segue */ }
+  }
+  return process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || null;
+}
+const PROJECT = EMULATOR
+  ? (process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'affiliacore')
+  : resolveLiveProject();
 if (PROJECT !== 'affiliacore') {
-  console.error(`ABORTADO: projeto "${PROJECT}" != "affiliacore".`);
+  console.error(`ABORTADO: projeto "${PROJECT}" != "affiliacore" (a instância DEMO).`);
+  console.error('Este script APAGA coleções inteiras: jamais aponte para o projeto de um cliente.');
   process.exit(1);
 }
-admin.initializeApp({ projectId: PROJECT });
+
+if (EMULATOR) {
+  admin.initializeApp({ projectId: PROJECT });
+} else if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+  admin.initializeApp({ credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)) });
+} else {
+  admin.initializeApp(); // GOOGLE_APPLICATION_CREDENTIALS
+}
 const db = admin.firestore();
 const { Timestamp, FieldValue } = admin.firestore;
+console.log(EMULATOR
+  ? `Modo: EMULADOR (${process.env.FIRESTORE_EMULATOR_HOST})`
+  : 'Modo: --live · Firestore REAL do projeto affiliacore (instância DEMO)');
 
 // ---------------------------------------------------------------------------
 // Utilitários determinísticos (mesma pegada do seed base)
@@ -141,8 +187,13 @@ const fakeAddress = () => `${pick(RUAS)}, ${between(10, 1999)} - ${pick(CIDADES)
 
 // ---------------------------------------------------------------------------
 async function main() {
-  console.log('== SEED EXTRAS (demo gigante · emulador) ==');
-  console.log(`Projeto: ${PROJECT} · emulador: ${process.env.FIRESTORE_EMULATOR_HOST}`);
+  console.log('== SEED EXTRAS (demo gigante) ==');
+
+  // `leads` (formulário da landing) divide o banco com a demo no projeto
+  // affiliacore. O script não o toca, e a contagem antes/depois PROVA isso —
+  // declarar sem verificar é o erro que a casa não repete (ver CLAUDE.md).
+  const leadsBefore = (await db.collection('leads').count().get()).data().count;
+  if (!EMULATOR) console.log(`  leads da landing protegidos: ${leadsBefore} docs`);
 
   // 0) Limpeza defensiva das coleções que o seed base NÃO conhece (p/ re-run) +
   //    afiliados extras de uma rodada anterior (marcados demoExtra).
@@ -151,7 +202,7 @@ async function main() {
   const OWN_COLLECTIONS = [
     'deals', 'partnership_requests', 'legal_documents', 'legal_acceptances', 'withdrawal_requests',
     'achievement_tiers', 'achievement_requests', 'affiliate_referrals', 'integrations',
-    'affiliate_links', 'link_click_stats', 'link_clicks',
+    'affiliate_links', 'link_click_stats', 'link_clicks', 'affiliate_tag_aliases',
   ];
   for (const col of OWN_COLLECTIONS) {
     const n = await deleteCollection(col);
@@ -191,6 +242,9 @@ async function main() {
     .filter((u) => u.role === 'client' && u.affiliateId);
   const adminUid = (usersSnap.docs.find((d) => d.data()?.role === 'admin')?.id) || 'demo-admin';
   const demoAfiliado = clientUsers.find((u) => !u.isSpecial) || null;
+  const especialUser = clientUsers.find((u) => u.isSpecial) || null;
+  const especialUserUid = especialUser ? especialUser.uid : null;
+  const especialAffiliateId = especialUser ? especialUser.affiliateId : null;
   console.log(`  base: ${Object.keys(baseNames).length} afiliados, ${baseProducerIds.length} com config, ${clientUsers.length} logins cliente`);
 
   const HOUSE_SLUGS = ['superbet', 'betano', 'betmgm', ...EXTRA_HOUSES.map((h) => h.slug)];
@@ -490,14 +544,27 @@ async function main() {
     }));
     partCount++;
   }
-  // Parceria pendente num deal GERENCIADO, vinda de um filho DIRETO da especial
-  // (Igor está na lista da Ana): é o cenário "quem precifica é o gerente".
+  // Parcerias em deal GERENCIADO, vindas de filhos DIRETOS da especial (Igor e
+  // Carla estão na lista da Ana): o par de estados do fluxo do gerente. A
+  // `requested` é a fila dele ("quem precifica é o gerente"); a `priced` é a que
+  // ele já precificou e espera o master emitir o link — sem ela a aba
+  // "Aguardando link" do /acordos abre vazia.
   if (managedDeals.length) {
     const md = managedDeals[0];
     writes.push((b) => b.set(db.collection('partnership_requests').doc('demo-part-gerenciado'), {
       affiliateId: affId('Igor Santana'), dealId: md.id, status: 'requested', code: null,
       operatorName: md.operatorName, dealLabel: md.label, houseId: md.slug,
       requestedByUid: adminUid, requestedAt: daysAgoTs(2),
+    }));
+    partCount++;
+    const priced = managedDeals[1] || md;
+    writes.push((b) => b.set(db.collection('partnership_requests').doc('demo-part-precificado'), {
+      affiliateId: affId('Carla Menezes'), dealId: priced.id, status: 'priced', code: null,
+      operatorName: priced.operatorName, dealLabel: priced.label, houseId: priced.slug,
+      requestedByUid: adminUid, requestedAt: daysAgoTs(4),
+      // taxa definida pelo GERENTE (não pelo deal): aprovar daqui NÃO reescreve a
+      // taxa, senão o spread dele seria apagado sem erro na tela.
+      pricedByUid: especialUserUid, pricedByAffiliateId: especialAffiliateId, pricedAt: daysAgoTs(3),
     }));
     partCount++;
   }
@@ -640,7 +707,6 @@ async function main() {
     ...(s.status ? { requestStatus: s.status } : {}),
     createdAt: daysAgoTs(2 + i * 3),
   })));
-  const especialUser = clientUsers.find((u) => u.isSpecial) || null;
   if (especialUser) {
     const espName = baseNames[especialUser.affiliateId] || 'Especial';
     [
@@ -719,6 +785,35 @@ async function main() {
       updatedAt: daysAgoTs(10),
     }, { merge: true }));
   }
+
+  // 18.1) Taxa POR CASA da Carla — é a que o GERENTE definiu na parceria `priced`
+  // acima. Sem ela a parceria precificada apontaria para uma taxa que não existe.
+  const carlaId = affId('Carla Menezes');
+  if (baseNames[carlaId] && managedDeals.length) {
+    const brandKey = (managedDeals[1] || managedDeals[0]).slug;
+    writes.push((b) => b.set(db.collection('affiliate_configs').doc(carlaId), {
+      byBrand: { [brandKey]: { cpaValue: 38, revPercentage: 12, since: toISO(addDays(today, -2)) } },
+      updatedAt: daysAgoTs(3),
+    }, { merge: true }));
+  }
+
+  // 18.2) Apelidos de tag (afiliado ↔ ?afp= da planilha da casa): é o que faz o
+  // import de resultados casar uma linha cuja tag não é o id do afiliado. Sem um
+  // doc aqui, a tela de vínculo de tag do /casas nasce vazia.
+  const TAG_ALIASES = [
+    { tag: 'yagovip', affiliate: 'Yago Martins', houseSlug: 'superbet' },
+    { tag: 'ana-oficial', affiliate: 'Ana Souza', houseSlug: 'betano' },
+    { tag: 'lucas2026', affiliate: 'Lucas Ferreira', houseSlug: 'kto' },
+    { tag: 'bia-promo', affiliate: 'Bia Cardoso', houseSlug: 'esportiva' },
+  ];
+  TAG_ALIASES.forEach((a) => {
+    const id = affId(a.affiliate);
+    if (!baseNames[id]) return;
+    writes.push((b) => b.set(db.collection('affiliate_tag_aliases').doc(a.tag), {
+      tag: a.tag, affiliateId: id, houseSlug: a.houseSlug,
+      createdByUid: adminUid, createdAt: daysAgoTs(between(6, 30)),
+    }));
+  });
 
   // 19) 2º especial no modo REDE (fromNetwork): a sub-rede é DERIVADA da árvore
   // de affiliate_uplines a cada leitura (N níveis) — o seed base só mostra o
@@ -816,6 +911,13 @@ async function main() {
     const yl = await db.collection('affiliate_links').where('affiliateId', '==', yId).get();
     console.log(`  afiliado demo (${allNames[yId]}): ${yw.size} saques · ${yl.size} links`);
   }
+  // Proteção dos leads verificada por QUERY (não por declaração).
+  const leadsAfter = (await db.collection('leads').count().get()).data().count;
+  if (leadsAfter !== leadsBefore) {
+    throw new Error(`PROTEÇÃO VIOLADA: leads mudou de ${leadsBefore} para ${leadsAfter}!`);
+  }
+  console.log(`  ✔ leads da landing intactos (${leadsAfter}).`);
+
   console.log('\n✔ Extras semeados.');
 }
 
