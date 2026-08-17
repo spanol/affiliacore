@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildDealLabel, dealBrandKey, dealToBrandRates, normalizeDealInput, buildDraftDealFromHouse,
+  PAYMENT_CYCLES, PAYMENT_CYCLE_LABEL,
 } from './deal';
 
 describe('buildDealLabel · padrão Operadora-Modelo-Ciclo-Moeda-Geo', () => {
@@ -15,6 +16,53 @@ describe('buildDealLabel · padrão Operadora-Modelo-Ciclo-Moeda-Geo', () => {
   });
   it('objeto vazio → string vazia (nunca lança)', () => {
     expect(buildDealLabel({})).toBe('');
+  });
+});
+
+describe('ciclo D30+ (pedido Infinity, 17/08/2026)', () => {
+  it('entra no enum e tem rótulo próprio, distinto do mensal', () => {
+    expect(PAYMENT_CYCLES).toContain('d30mais');
+    expect(PAYMENT_CYCLE_LABEL.d30mais).toBe('D30+');
+    expect(PAYMENT_CYCLE_LABEL.d30mais).not.toBe(PAYMENT_CYCLE_LABEL.mensal);
+  });
+  it('todo ciclo do enum tem rótulo (nada cai no vazio na tela)', () => {
+    PAYMENT_CYCLES.forEach((c) => expect(PAYMENT_CYCLE_LABEL[c]?.length ?? 0).toBeGreaterThan(0));
+  });
+  it('aparece no rótulo do acordo', () => {
+    expect(buildDealLabel({ operatorName: 'LEON Bet', model: 'cpa', cycle: 'd30mais', currency: 'BRL' }))
+      .toBe('LEON Bet - CPA - D30+ - BRL');
+  });
+  it('normaliza como ciclo válido, sem cair no default', () => {
+    const { deal } = normalizeDealInput({ houseId: 'leon-bet', operatorName: 'LEON Bet', model: 'cpa', cpaValue: 150, cycle: 'd30mais' });
+    expect(deal?.cycle).toBe('d30mais');
+  });
+});
+
+describe('meta mínima de CPA', () => {
+  const base = { houseId: 'leon-bet', operatorName: 'LEON Bet', model: 'cpa', cpaValue: 150 };
+
+  it('grava a quantidade informada', () => {
+    expect(normalizeDealInput({ ...base, minCpaGoal: 5 }).deal?.minCpaGoal).toBe(5);
+  });
+  // Acordo antigo não tem o campo, e "sem meta" é o estado normal de quem nunca a
+  // usou. 0 é o valor que o card lê como "não estipulou" e não desenha a linha.
+  it('ausente vira 0 (a casa não estipulou meta), sem exigir migração', () => {
+    expect(normalizeDealInput(base).deal?.minCpaGoal).toBe(0);
+    expect(normalizeDealInput({ ...base, minCpaGoal: '' }).deal?.minCpaGoal).toBe(0);
+  });
+  it('recusa negativo', () => {
+    expect(normalizeDealInput({ ...base, minCpaGoal: -1 }).error).toMatch(/negativa/i);
+  });
+  it('recusa quebrado: meta é contagem de CPA, não dinheiro', () => {
+    expect(normalizeDealInput({ ...base, minCpaGoal: 2.5 }).error).toMatch(/inteiro/i);
+  });
+  it('valor malformado não propaga NaN', () => {
+    const { deal, error } = normalizeDealInput({ ...base, minCpaGoal: 'abc' });
+    expect(error).toBeUndefined();
+    expect(deal?.minCpaGoal).toBe(0);
+  });
+  it('rascunho criado junto com a casa nasce sem meta', () => {
+    expect(buildDraftDealFromHouse({ slug: 'leon-bet', name: 'LEON Bet' })?.minCpaGoal).toBe(0);
   });
 });
 

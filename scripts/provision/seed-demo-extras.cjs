@@ -424,7 +424,7 @@ async function main() {
   // política da Infinity (CPA oculto do afiliado, baseline/rollover/GGR no card,
   // "quem precifica é o gerente"). Gerenciado ATIVO exige baseline > 0.
   const DEALS = [
-    { slug: 'superbet', model: 'cpa', cpaValue: 250, revPercentage: 0, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'direto' },
+    { slug: 'superbet', model: 'cpa', cpaValue: 250, revPercentage: 0, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'direto', minCpaGoal: 5 },
     { slug: 'superbet', model: 'hybrid', cpaValue: 150, revPercentage: 20, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'direto' },
     { slug: 'betano', model: 'revshare', cpaValue: 0, revPercentage: 35, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'direto' },
     { slug: 'betmgm', model: 'cpa', cpaValue: 220, revPercentage: 0, cycle: 'quinzenal', currency: 'BRL', geo: 'Brasil', active: true, type: 'direto' },
@@ -434,11 +434,14 @@ async function main() {
     { slug: 'vaidebet', model: 'cpa', cpaValue: 190, revPercentage: 0, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: false, type: 'direto' },
     { slug: 'betano', model: 'cpa', cpaValue: 210, revPercentage: 0, cycle: 'mensal', currency: 'EUR', geo: 'Brasil', active: false, type: 'direto' },
     { slug: 'novibet', model: 'hybrid', cpaValue: 160, revPercentage: 22, cycle: 'quinzenal', currency: 'BRL', geo: 'Brasil', active: true, type: 'direto' },
-    { slug: 'esportiva', model: 'cpa', cpaValue: 300, revPercentage: 0, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'gerenciado', baseline: 2500, rollover: 2, ggrPercentage: null },
+    // Ciclo D30+ e meta mínima de CPA (pedido da Infinity, 17/08/2026): a demo tem
+    // que mostrar os dois, senão o card e o modal seguem parecendo os de antes.
+    { slug: 'kto', model: 'cpa', cpaValue: 240, revPercentage: 0, cycle: 'd30mais', currency: 'BRL', geo: 'Brasil', active: true, type: 'direto', minCpaGoal: 3 },
+    { slug: 'esportiva', model: 'cpa', cpaValue: 300, revPercentage: 0, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'gerenciado', baseline: 2500, rollover: 2, ggrPercentage: null, minCpaGoal: 10 },
     { slug: 'vaidebet', model: 'hybrid', cpaValue: 250, revPercentage: 20, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'gerenciado', baseline: 1500, rollover: 3, ggrPercentage: 30 },
   ];
   const MODEL_LABEL = { cpa: 'CPA', revshare: 'RevShare', hybrid: 'Híbrido' };
-  const CYCLE_LABEL = { semanal: 'Semanal', quinzenal: 'Quinzenal', mensal: 'Mensal' };
+  const CYCLE_LABEL = { semanal: 'Semanal', quinzenal: 'Quinzenal', mensal: 'Mensal', d30mais: 'D30+' };
   const dealLabel = (d) => [HOUSE_NAME[d.slug], MODEL_LABEL[d.model], CYCLE_LABEL[d.cycle], d.currency, d.geo]
     .filter((p) => p && String(p).length).join(' - ');
   const dealDocs = DEALS.map((d, i) => {
@@ -447,7 +450,7 @@ async function main() {
       houseId: d.slug, operatorName: HOUSE_NAME[d.slug], model: d.model,
       cpaValue: d.cpaValue, revPercentage: d.revPercentage, cycle: d.cycle,
       currency: d.currency, geo: d.geo, active: d.active, order: i,
-      type: d.type,
+      type: d.type, minCpaGoal: d.minCpaGoal ?? 0,
       ...(d.type === 'gerenciado' ? { baseline: d.baseline, rollover: d.rollover, ggrPercentage: d.ggrPercentage ?? null } : {}),
       label: dealLabel(d), createdByUid: adminUid,
       createdAt: daysAgoTs(60 - i), updatedAt: daysAgoTs(between(1, 30)),

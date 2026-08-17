@@ -32,8 +32,8 @@ describe('adminDealKpis · o que o ADMIN edita em cada tipo', () => {
   });
 
   it('acrescenta os KPIs da política do tipo', () => {
-    expect(adminDealKpis('direto')).toEqual(['cpa', 'revshare', 'cycle', 'geo']);
-    expect(adminDealKpis('gerenciado')).toEqual(['cpa', 'revshare', 'baseline', 'rollover', 'cycle', 'ggr']);
+    expect(adminDealKpis('direto')).toEqual(['cpa', 'revshare', 'cpaGoal', 'cycle', 'geo']);
+    expect(adminDealKpis('gerenciado')).toEqual(['cpa', 'revshare', 'baseline', 'rollover', 'cpaGoal', 'cycle', 'ggr']);
   });
 
   it('baseline/rollover/GGR só no tipo cuja política os pede', () => {
@@ -82,6 +82,13 @@ describe('rascunho do formulário', () => {
     expect(d.baseline).toBe('');
     expect(d.ggrPercentage).toBe('');
     expect(d.cpaValue).toBe('110');
+  });
+
+  it('a meta mínima faz a ida e volta como quantidade, e zero vira campo vazio', () => {
+    expect(draftFromDeal(deal({ minCpaGoal: 5 })).minCpaGoal).toBe('5');
+    expect(draftFromDeal(deal({ minCpaGoal: 0 })).minCpaGoal).toBe('');
+    expect(buildDealPayload({ ...emptyDealDraft(), minCpaGoal: '5' }).minCpaGoal).toBe(5);
+    expect(buildDealPayload({ ...emptyDealDraft(), minCpaGoal: '' }).minCpaGoal).toBe(0);
   });
 
   it('ida e volta preserva os KPIs preenchidos', () => {
@@ -141,9 +148,9 @@ describe('adminDealCardRows · as linhas do card, no formato do card de casa', (
 
   it('as linhas seguintes saem da POLÍTICA do tipo, não de lista fixa', () => {
     const gerenciado = adminDealCardRows(deal({ type: 'gerenciado', model: 'hybrid' })).map((r) => r.id);
-    expect(gerenciado).toEqual(['tipo', 'cpa', 'revshare', 'baseline', 'rollover', 'cycle', 'ggr']);
+    expect(gerenciado).toEqual(['tipo', 'cpa', 'revshare', 'baseline', 'rollover', 'cpaGoal', 'cycle', 'ggr']);
     const direto = adminDealCardRows(deal({ type: 'direto', model: 'hybrid' })).map((r) => r.id);
-    expect(direto).toEqual(['tipo', 'cpa', 'revshare', 'cycle', 'geo']);
+    expect(direto).toEqual(['tipo', 'cpa', 'revshare', 'cpaGoal', 'cycle', 'geo']);
   });
 
   // Para o ADMIN o vazio é informação (baseline em branco é o que impede publicar),

@@ -479,6 +479,13 @@ export default function Deals() {
                     <p className="text-[10px] text-slate-400 dark:text-neutral-500 mt-1">Deixe vazio se a casa não tem GGR.</p>
                   </div>
                 )}
+                {shows('cpaGoal') && (
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">{DEAL_KPI_LABEL.cpaGoal} de CPA</label>
+                    <input data-testid="campo-meta-cpa" type="number" min="0" step="1" value={modal.minCpaGoal} onChange={(e) => setModal({ ...modal, minCpaGoal: e.target.value })} placeholder="0" className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white outline-none" />
+                    <p className="text-[10px] text-slate-400 dark:text-neutral-500 mt-1">Quantidade de CPAs qualificados que a casa espera por ciclo. Vazio: a casa não estipulou meta.</p>
+                  </div>
+                )}
                 <div>
                   <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">Moeda</label>
                   <select data-testid="campo-moeda" value={modal.currency} onChange={(e) => setModal({ ...modal, currency: e.target.value as DealCurrency })} className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white outline-none">

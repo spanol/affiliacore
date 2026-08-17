@@ -157,3 +157,22 @@ describe('visibleKpis · card não mostra KPI sem valor', () => {
     expect(() => visibleKpis(null)).not.toThrow();
   });
 });
+
+describe('meta mínima de CPA · KPI dos dois tipos', () => {
+  it('aparece no card quando o acordo tem meta, em direto e em gerenciado', () => {
+    expect(visibleKpis(deal({ minCpaGoal: 5 }))).toContain('cpaGoal');
+    expect(visibleKpis(deal({ type: 'gerenciado', baseline: 10, minCpaGoal: 5 }))).toContain('cpaGoal');
+  });
+  it('acordo sem meta não ganha a linha (0/ausente ≠ meta de zero)', () => {
+    expect(visibleKpis(deal())).not.toContain('cpaGoal');
+    expect(visibleKpis(deal({ minCpaGoal: 0 }))).not.toContain('cpaGoal');
+  });
+  // A meta é termo da OFERTA, não taxa. O que o tipo gerenciado esconde é quanto a
+  // casa paga; esconder também a meta deixaria o afiliado sem saber o que a casa
+  // espera dele, que é justamente o motivo do campo existir.
+  it('sobrevive à sanitização do acordo que esconde as taxas', () => {
+    const visto = sanitizeDealForViewer(deal({ type: 'gerenciado', baseline: 10, minCpaGoal: 5 }), 'affiliate');
+    expect(visto.cpaValue).toBeUndefined();
+    expect(visto.minCpaGoal).toBe(5);
+  });
+});

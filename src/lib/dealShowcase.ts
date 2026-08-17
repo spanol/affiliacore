@@ -12,6 +12,7 @@
 // desenha a linha.
 
 import { num } from './commission';
+import { pluralize } from './plural';
 import { PAYMENT_CYCLE_LABEL, type Deal } from './deal';
 import { DEAL_KPI_LABEL, dealPolicy, visibleKpis, type DealKpiId } from './dealType';
 import type { PartnershipRequest, PartnershipStatus } from './partnership';
@@ -47,6 +48,12 @@ export function formatDealKpiValue(kpi: DealKpiId, deal?: Deal | null): string |
     case 'ggr': {
       const v = positive(deal?.ggrPercentage);
       return v == null ? null : pct(v);
+    }
+    // Meta é CONTAGEM, não dinheiro: "5 CPAs", nunca "R$ 5,00". O período fica na
+    // linha do Ciclo, ao lado, então repetir "por mês" aqui seria redundância.
+    case 'cpaGoal': {
+      const v = positive(deal?.minCpaGoal);
+      return v == null ? null : pluralize(v, 'CPA');
     }
     case 'cycle': {
       const cycle = deal?.cycle;

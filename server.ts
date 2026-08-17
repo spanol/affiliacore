@@ -4702,6 +4702,9 @@ export function createApp(deps: ServerDeps) {
       ggrPercentage: x.ggrPercentage == null || x.ggrPercentage === ''
         ? null
         : (Number.isFinite(Number(x.ggrPercentage)) ? Number(x.ggrPercentage) : null),
+      // Meta mínima de CPAs por ciclo. Acordo antigo não tem o campo e lê 0 = "a casa
+      // não estipulou meta"; o card não desenha a linha (visibleKpis). Sem migração.
+      minCpaGoal: Number.isFinite(Number(x.minCpaGoal)) ? Number(x.minCpaGoal) : 0,
     };
   };
   const partnershipFromDoc = (d: admin.firestore.DocumentSnapshot) => {
@@ -4793,7 +4796,7 @@ export function createApp(deps: ServerDeps) {
 
       const patch = { ...deal, label: buildDealLabel(deal), updatedAt: admin.firestore.FieldValue.serverTimestamp() };
       const changes = diffChanges(before.data() as any, patch,
-        ['operatorName', 'model', 'cpaValue', 'revPercentage', 'cycle', 'currency', 'geo', 'active', 'houseId']);
+        ['operatorName', 'model', 'cpaValue', 'revPercentage', 'cycle', 'currency', 'geo', 'active', 'houseId', 'minCpaGoal']);
       await ref.set(patch, { merge: true });
       if (changes.length) {
         await writeAuditLog(req, { entityType: 'deal', entityId: id, entityLabel: patch.label, action: 'deal.update', changes });

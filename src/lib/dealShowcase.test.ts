@@ -40,7 +40,17 @@ describe('formatDealKpiValue', () => {
 
   it('usa o rótulo do ciclo e o texto cru do geo', () => {
     expect(formatDealKpiValue('cycle', deal({ cycle: 'semanal' }))).toBe('Semanal');
+    expect(formatDealKpiValue('cycle', deal({ cycle: 'd30mais' }))).toBe('D30+');
     expect(formatDealKpiValue('geo', deal({ geo: 'México' }))).toBe('México');
+  });
+
+  // A meta é CONTAGEM: "5 CPAs", não "R$ 5,00". E concorda no singular — a régua de
+  // copy do repo proíbe "1 CPA(s)".
+  it('formata a meta como quantidade de CPAs, com concordância', () => {
+    expect(formatDealKpiValue('cpaGoal', deal({ minCpaGoal: 5 }))).toBe('5 CPAs');
+    expect(formatDealKpiValue('cpaGoal', deal({ minCpaGoal: 1 }))).toBe('1 CPA');
+    expect(formatDealKpiValue('cpaGoal', deal({ minCpaGoal: 0 }))).toBeNull();
+    expect(formatDealKpiValue('cpaGoal', deal())).toBeNull();
   });
 
   it('devolve null (não "R$ 0,00") quando o valor não veio', () => {

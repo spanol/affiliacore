@@ -10,8 +10,11 @@ import { resolveDealType, dealPolicy, type DealTypeId } from './dealType';
 
 // Modelo de remuneração do acordo. pt-BR no display; chave estável no dado.
 export type DealModel = 'cpa' | 'revshare' | 'hybrid';
-// Ciclo de fechamento/pagamento (janela).
-export type PaymentCycle = 'semanal' | 'quinzenal' | 'mensal';
+// Ciclo de fechamento/pagamento (janela). `d30mais` (pedido da Infinity, 17/08/2026)
+// é o fechamento em D+30 ou mais: a casa fecha o período e só libera o pagamento a
+// partir de 30 dias. NÃO é o `mensal`, que é o mês de calendário, e a diferença
+// importa para o afiliado saber quando o dinheiro cai.
+export type PaymentCycle = 'semanal' | 'quinzenal' | 'mensal' | 'd30mais';
 // Moeda do acordo (rótulo; o cálculo de comissão segue em R$ no núcleo).
 export type DealCurrency = 'BRL' | 'EUR' | 'USD' | 'crypto';
 
@@ -36,17 +39,24 @@ export interface Deal {
   baseline?: number;          // R$; informativo, NÃO entra no núcleo de comissão
   rollover?: number;          // multiplicador (2 = "rollover 2x"); informativo
   ggrPercentage?: number | null; // % de GGR quando a casa tem; informativo
+  // Meta MÍNIMA de CPAs qualificados por ciclo (pedido da Infinity, 17/08/2026).
+  // É uma QUANTIDADE, não dinheiro, e é informativa: dizer ao afiliado quantas
+  // qualificações a casa espera no período. NÃO entra no núcleo de comissão — quem
+  // paga segue sendo `calcAffiliatePayout` sobre o que foi produzido de fato.
+  // 0/ausente = a casa não estipulou meta (ausência ≠ meta de zero na tela: o card
+  // simplesmente não desenha a linha).
+  minCpaGoal?: number;
 }
 
 export const DEAL_MODELS: DealModel[] = ['cpa', 'revshare', 'hybrid'];
-export const PAYMENT_CYCLES: PaymentCycle[] = ['semanal', 'quinzenal', 'mensal'];
+export const PAYMENT_CYCLES: PaymentCycle[] = ['semanal', 'quinzenal', 'mensal', 'd30mais'];
 export const DEAL_CURRENCIES: DealCurrency[] = ['BRL', 'EUR', 'USD', 'crypto'];
 
 export const DEAL_MODEL_LABEL: Record<DealModel, string> = {
   cpa: 'CPA', revshare: 'RevShare', hybrid: 'Híbrido',
 };
 export const PAYMENT_CYCLE_LABEL: Record<PaymentCycle, string> = {
-  semanal: 'Semanal', quinzenal: 'Quinzenal', mensal: 'Mensal',
+  semanal: 'Semanal', quinzenal: 'Quinzenal', mensal: 'Mensal', d30mais: 'D30+',
 };
 
 // Rótulo legível do acordo, no padrão Affility: "Operadora - Modelo - Ciclo - Moeda -
@@ -113,6 +123,14 @@ export function normalizeDealInput(raw: any): { deal?: Omit<Deal, 'id'>; error?:
   if (baseline < 0 || rollover < 0 || (ggrPercentage != null && ggrPercentage < 0)) {
     return { error: 'Baseline, rollover e GGR não podem ser negativos.' };
   }
+  // A meta é uma CONTAGEM de CPAs. "2,5 CPAs" não existe do lado da casa, e aceitar
+  // o valor quebrado só empurraria o arredondamento para a tela, onde cada leitor
+  // arredondaria de um jeito.
+  const minCpaGoal = num(raw?.minCpaGoal);
+  if (minCpaGoal < 0) return { error: 'A meta mínima de CPA não pode ser negativa.' };
+  if (!Number.isInteger(minCpaGoal)) {
+    return { error: 'A meta mínima de CPA é uma quantidade: use um número inteiro.' };
+  }
   // A vitrine de um acordo que esconde as taxas é construída em torno da baseline:
   // publicar sem ela deixaria o afiliado com um card sem número nenhum. Só vale na
   // PUBLICAÇÃO — rascunho (inativo) pode estar incompleto de propósito.
@@ -135,6 +153,7 @@ export function normalizeDealInput(raw: any): { deal?: Omit<Deal, 'id'>; error?:
       baseline,
       rollover,
       ggrPercentage,
+      minCpaGoal,
       ...(Number.isFinite(Number(raw?.order)) ? { order: Number(raw.order) } : {}),
     },
   };
@@ -169,5 +188,6 @@ export function buildDraftDealFromHouse(
     baseline: 0,
     rollover: 0,
     ggrPercentage: null,
+    minCpaGoal: 0,
   };
 }

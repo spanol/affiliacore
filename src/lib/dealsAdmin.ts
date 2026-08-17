@@ -28,6 +28,7 @@ export interface DealDraft {
   baseline: string;
   rollover: string;
   ggrPercentage: string;
+  minCpaGoal: string;
   cycle: PaymentCycle;
   currency: DealCurrency;
   geo: string;
@@ -58,7 +59,7 @@ export function emptyDealDraft(type: DealTypeId = 'direto'): DealDraft {
   return {
     houseId: '', operatorName: '', type: resolveDealType(type), model: 'cpa',
     cpaValue: '', revPercentage: '', baseline: '', rollover: '', ggrPercentage: '',
-    cycle: 'mensal', currency: 'BRL', geo: '', active: true,
+    minCpaGoal: '', cycle: 'mensal', currency: 'BRL', geo: '', active: true,
   };
 }
 
@@ -84,6 +85,7 @@ export function draftFromDeal(deal: Deal): DealDraft {
     baseline: numToField(deal.baseline),
     rollover: numToField(deal.rollover),
     ggrPercentage: ggrToField(deal.ggrPercentage),
+    minCpaGoal: numToField(deal.minCpaGoal),
     cycle: deal.cycle,
     currency: deal.currency,
     geo: deal.geo,
@@ -109,6 +111,7 @@ export function buildDealPayload(draft: DealDraft): Partial<Deal> {
     baseline: fieldToNum(draft.baseline),
     rollover: fieldToNum(draft.rollover),
     ggrPercentage: isBlank(draft.ggrPercentage) ? null : fieldToNum(draft.ggrPercentage),
+    minCpaGoal: fieldToNum(draft.minCpaGoal),
     cycle: draft.cycle,
     currency: draft.currency,
     geo: draft.geo,

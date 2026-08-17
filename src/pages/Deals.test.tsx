@@ -128,6 +128,22 @@ describe('/acordos · campos de KPI conforme a política', () => {
     await openNew();
     expect(screen.queryByTestId('aviso-taxas-ocultas')).not.toBeInTheDocument();
   });
+
+  // Pedidos da Infinity (17/08/2026): o ciclo D30+ e a meta mínima de CPA.
+  it('o ciclo oferece D30+ junto dos ciclos de sempre', async () => {
+    await openNew();
+    const opcoes = [...(screen.getByTestId('campo-cycle') as HTMLSelectElement).options].map((o) => o.value);
+    expect(opcoes).toContain('d30mais');
+    fireEvent.change(screen.getByTestId('campo-cycle'), { target: { value: 'd30mais' } });
+    expect((screen.getByTestId('campo-cycle') as HTMLSelectElement).value).toBe('d30mais');
+  });
+
+  it('a meta mínima de CPA existe nos dois tipos de acordo', async () => {
+    await openNew();
+    expect(screen.getByTestId('campo-meta-cpa')).toBeTruthy();
+    fireEvent.click(radio('gerenciado'));
+    expect(screen.getByTestId('campo-meta-cpa')).toBeTruthy();
+  });
 });
 
 describe('/acordos · payload salvo', () => {
@@ -145,6 +161,19 @@ describe('/acordos · payload salvo', () => {
     expect(payload.type).toBe('gerenciado');
     expect(payload.baseline).toBe(50);
     expect(payload.cpaValue).toBe(110);
+  });
+
+  it('o ciclo D30+ e a meta mínima chegam no payload', async () => {
+    await renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /Novo acordo/ }));
+    fireEvent.change(screen.getByTestId('campo-casa'), { target: { value: 'esportiva' } });
+    fireEvent.change(field('cpa')!, { target: { value: '150' } });
+    fireEvent.change(screen.getByTestId('campo-cycle'), { target: { value: 'd30mais' } });
+    fireEvent.change(screen.getByTestId('campo-meta-cpa'), { target: { value: '5' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })); });
+    const payload = h.createDeal.mock.calls[0][0];
+    expect(payload.cycle).toBe('d30mais');
+    expect(payload.minCpaGoal).toBe(5);
   });
 });
 
