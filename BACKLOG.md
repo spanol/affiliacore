@@ -367,6 +367,9 @@ influenciador e de afiliado migrado.
 Não existe. O legado tinha meta por competência com "Feito / Faltam / %" e **zerando na virada do
 mês**. As Conquistas (entregues) são **acumuladas**, não mensais — são complementares, não substitutas.
 
+**Parcialmente coberto desde 17/08/2026:** o acordo já GUARDA a meta (`Deal.minCpaGoal`, pedido da
+Infinity), mas ela é só **informativa** — ver §8 abaixo, que é a outra metade deste item.
+
 ### 6. CPA Abuser
 
 Detectava CPA abusado e **descontava do saque**, com detalhamento por tag no extrato. Quando isso foi
@@ -382,6 +385,29 @@ onde morar. Pesa na Esportiva, onde o RevShare pode ser negativo e a margem já 
 - **Aprovação com CPA no ato** — `pending_affiliates` aprova e convida, mas não define a taxa no momento.
 - **Log de visualização com IP** — a nossa auditoria é server-authoritative e append-only (melhor),
   mas não registra "Fulano visualizou", que a deles fazia.
+
+### 8. Meta mínima de CPA: hoje informa, não cobra (aberto em 17/08/2026)
+
+O acordo já tem `minCpaGoal` (commit `a7841ae`): o admin digita a quantidade de CPAs qualificados que
+a casa espera por ciclo, e ela aparece como KPI no card do acordo, na vitrine `/parcerias` e no
+cartão de `/meus-links`. **É exibição e nada mais** — não bloqueia, não desconta, não muda a taxa.
+
+Falta confirmar com o Maurício qual era a intenção. Se a meta tiver que ter CONSEQUÊNCIA, o trabalho
+é bem maior que o campo:
+
+1. **Progresso no ciclo** — "3 de 5 CPAs" com barra, no painel do afiliado e na lista do admin.
+   Exige recortar a produção pela janela do ciclo do acordo, e o ciclo agora inclui `d30mais`, que
+   NÃO é o mês de calendário: a janela tem que sair do ciclo do deal, não de `mês corrente`.
+2. **Regra de consequência** — as três que aparecem no mercado, e são bem diferentes entre si:
+   perder o acordo (encerra a parceria e desativa o link), não receber no ciclo (segura o saque) ou
+   cair para uma taxa menor. A terceira esbarra na taxa com VIGÊNCIA (`PLANO-COMISSAO-VIGENCIA.md`):
+   mudar a taxa sem vigência reprecifica o histórico inteiro.
+3. **Aviso antes do fim do ciclo**, senão a consequência chega como surpresa (o `noticeService` e as
+   notificações pessoais já existem para isso).
+
+Enquanto isso não for decidido, o campo continua informativo — que é o comportamento seguro: nada
+que o afiliado já produziu muda de valor por causa dele. Ver §5 (meta mensal do legado), que é a
+mesma feature vista pelo lado do afiliado.
 
 ### Bloqueios que NÃO são nossos
 
