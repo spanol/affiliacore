@@ -383,11 +383,19 @@ export async function saveSpecialAffiliate(data: SpecialAffiliate): Promise<void
 
 // O afiliado especial define a comissão de um sub da própria sub-rede (via servidor,
 // que valida posse + teto — affiliate_configs é admin-only nas rules).
-export async function saveSubAffiliateConfig(subAffiliateId: string, cpaValue: number, revPercentage: number): Promise<void> {
+// `brandKey` = casa alvo (brandId da OTG ou slug da casa manual). Com casa, o
+// servidor grava em `byBrand[brandKey]` e não encosta na taxa de topo; sem casa,
+// grava o topo (comportamento histórico, hoje sem chamador na tela do gerente).
+export async function saveSubAffiliateConfig(
+  subAffiliateId: string,
+  cpaValue: number,
+  revPercentage: number,
+  brandKey?: string | null,
+): Promise<void> {
   const response = await authFetch('/api/special/sub-config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-    body: JSON.stringify({ subAffiliateId, cpaValue, revPercentage }),
+    body: JSON.stringify({ subAffiliateId, cpaValue, revPercentage, ...(brandKey ? { brandKey } : {}) }),
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));

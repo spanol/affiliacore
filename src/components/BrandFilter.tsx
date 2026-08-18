@@ -8,6 +8,10 @@ interface BrandFilterProps {
   brands: string[];
   value: string; // ALL_BRANDS ou o nome de uma marca
   onChange: (value: string) => void;
+  // Mostrar o seletor mesmo com UMA casa só. Default false: numa lista filtrável
+  // "todas × a única" não é escolha. Vira true onde a seleção MUDA o que a tela
+  // deixa fazer (a comissão por casa do gerente), não só o que ela lista.
+  showSingle?: boolean;
 }
 
 const ALL_LABEL = 'Todas as casas';
@@ -15,7 +19,7 @@ const ALL_LABEL = 'Todas as casas';
 // Seletor de casa (multi-marca) — dropdown com a logo inline, espelhando o portal
 // da OTG: "Todas as casas" + uma opção por casa (logo + nome). Some quando há 0/1
 // casa (não há o que filtrar). A marca selecionada aparece no gatilho com a logo.
-export default function BrandFilter({ brands, value, onChange }: BrandFilterProps) {
+export default function BrandFilter({ brands, value, onChange, showSingle = false }: BrandFilterProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -34,7 +38,7 @@ export default function BrandFilter({ brands, value, onChange }: BrandFilterProp
     };
   }, [open]);
 
-  if (!Array.isArray(brands) || brands.length < 2) return null;
+  if (!Array.isArray(brands) || brands.length < (showSingle ? 1 : 2)) return null;
 
   const isAll = value === ALL_BRANDS;
   const options = [ALL_BRANDS, ...brands];

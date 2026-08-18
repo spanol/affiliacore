@@ -30,6 +30,23 @@ const SECRET = generateTotpSecret();
 // Doubles em memória — Firestore + Admin Auth. Cobrem só o que as rotas testadas
 // usam: collection/doc/get/set + where/get; auth().verifyIdToken/createUser.
 // =============================================================================
+// Merge de MAPA ANINHADO, como o Firestore real faz com `{ merge: true }`: um
+// campo de mapa é fundido chave a chave, não substituído. Sem isto o double dizia
+// que gravar `byBrand: { casaA: ... }` apagava `byBrand.casaB` — e um teste
+// escrito contra essa mentira empurraria a rota a reescrever o mapa inteiro (o
+// read-modify-write que perde a escrita concorrente de outra casa).
+// Array e sentinela (FieldValue) são FOLHA: substituem, nunca fundem.
+const isPlainObject = (v: any) =>
+  !!v && typeof v === 'object' && !Array.isArray(v) && Object.getPrototypeOf(v) === Object.prototype;
+
+function mergeDoc(prev: any, next: any): any {
+  const out: any = { ...(prev || {}) };
+  for (const [k, v] of Object.entries(next || {})) {
+    out[k] = isPlainObject(v) && isPlainObject(out[k]) ? mergeDoc(out[k], v) : v;
+  }
+  return out;
+}
+
 function makeFirestore(seed: Record<string, Record<string, any>> = {}): any {
   const store = new Map<string, Map<string, any>>();
   for (const [col, docs] of Object.entries(seed)) {
@@ -53,7 +70,7 @@ function makeFirestore(seed: Record<string, Record<string, any>> = {}): any {
     },
     async set(data: any, opts?: any) {
       const m = getCol(col);
-      if (opts?.merge) m.set(id, { ...(m.get(id) || {}), ...data });
+      if (opts?.merge) m.set(id, mergeDoc(m.get(id), data));
       else m.set(id, data);
     },
     async delete() {
@@ -121,7 +138,7 @@ function makeFirestore(seed: Record<string, Record<string, any>> = {}): any {
         set(ref: any, data: any, opts?: any) {
           writes.push(() => {
             const m = getCol(ref.__col);
-            if (opts?.merge) m.set(ref.id, { ...(m.get(ref.id) || {}), ...data });
+            if (opts?.merge) m.set(ref.id, mergeDoc(m.get(ref.id), data));
             else m.set(ref.id, data);
           });
         },
@@ -560,6 +577,136 @@ describe('POST /api/special/sub-config — taxa do sub também vira config.updat
     expect(resp.body.error).toContain('teto');
     // Nada gravado: a taxa do sub segue a original.
     expect(db.__store.get('affiliate_configs')?.get('SUB-1')?.cpaValue).toBe(100);
+  });
+
+  // --- Gesto POR CASA (pedido Infinity, 17/08) --------------------------------
+  // A tela do gerente deixou de editar a taxa de TOPO do sub: com `brandKey` a
+  // gravação vai para `byBrand[casa]` e o topo (o "valor de contrato" que a
+  // agência define) fica intacto. Ver src/lib/subHouseRates.ts.
+  describe('com brandKey (casa alvo)', () => {
+    const perHouseSeed = {
+      ...seed,
+      affiliate_configs: {
+        'ESP-1': {
+          cpaValue: 400,
+          revPercentage: 30,
+          byBrand: { 'esportiva-bet': { cpaValue: 110, revPercentage: 5 } },
+        },
+        'SUB-1': { affiliateId: 'SUB-1', cpaValue: 100, revPercentage: 10 },
+      },
+    };
+
+    it('grava em byBrand[casa] e NAO encosta na taxa de topo do sub', async () => {
+      const db = makeFirestore(perHouseSeed);
+      const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+      await request(app)
+        .post('/api/special/sub-config')
+        .set('Authorization', 'Bearer esp-uid')
+        .send({ subAffiliateId: 'SUB-1', brandKey: 'esportiva-bet', cpaValue: 90, revPercentage: 3 })
+        .expect(200);
+      const cfg = db.__store.get('affiliate_configs')?.get('SUB-1');
+      expect(cfg.byBrand['esportiva-bet']).toMatchObject({ cpaValue: 90, revPercentage: 3 });
+      expect(cfg.cpaValue).toBe(100);      // topo preservado
+      expect(cfg.revPercentage).toBe(10);
+      const logs = [...(db.__store.get('audit_logs')?.values() ?? [])];
+      expect(logs[0].changes[0].field).toBe('byBrand');
+      expect(logs[0].metadata).toMatchObject({ via: 'special/sub-config', brandKey: 'esportiva-bet' });
+    });
+
+    it('o teto passa a ser a taxa do gerente NAQUELA casa, nao a de topo', async () => {
+      const db = makeFirestore(perHouseSeed);
+      const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+      // 200 cabe no teto de TOPO (400) mas estoura o da Esportiva (110).
+      const resp = await request(app)
+        .post('/api/special/sub-config')
+        .set('Authorization', 'Bearer esp-uid')
+        .send({ subAffiliateId: 'SUB-1', brandKey: 'esportiva-bet', cpaValue: 200, revPercentage: 3 })
+        .expect(400);
+      expect(resp.body.error).toContain('nesta casa');
+      expect(db.__store.get('affiliate_configs')?.get('SUB-1')?.byBrand).toBeUndefined();
+    });
+
+    it('sem override na casa, o teto CAI NO TOPO (o padrao do contrato vale ali)', async () => {
+      const db = makeFirestore(perHouseSeed);
+      const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+      // Mesma precedencia de `resolveBrandRates`: byBrand vence, na falta vale o
+      // topo. 390 passa (teto de topo 400) e vai para o byBrand da LEON.
+      await request(app)
+        .post('/api/special/sub-config')
+        .set('Authorization', 'Bearer esp-uid')
+        .send({ subAffiliateId: 'SUB-1', brandKey: 'leon-bet', cpaValue: 390, revPercentage: 1 })
+        .expect(200);
+      expect(db.__store.get('affiliate_configs')?.get('SUB-1').byBrand['leon-bet'])
+        .toMatchObject({ cpaValue: 390, revPercentage: 1 });
+    });
+
+    it('gerente SEM taxa nenhuma → 400 (ausencia ≠ R$ 0), nada gravado', async () => {
+      const db = makeFirestore({
+        ...perHouseSeed,
+        affiliate_configs: {
+          ...perHouseSeed.affiliate_configs,
+          'ESP-1': { byBrand: { 'esportiva-bet': { cpaValue: 110, revPercentage: 5 } } },
+        },
+      });
+      const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+      const resp = await request(app)
+        .post('/api/special/sub-config')
+        .set('Authorization', 'Bearer esp-uid')
+        .send({ subAffiliateId: 'SUB-1', brandKey: 'leon-bet', cpaValue: 10, revPercentage: 1 })
+        .expect(400);
+      expect(resp.body.error).toContain('ainda não tem taxa nesta casa');
+      expect(db.__store.get('affiliate_configs')?.get('SUB-1')?.byBrand).toBeUndefined();
+    });
+
+    it('as OUTRAS casas do byBrand do sub sobrevivem ao merge', async () => {
+      const db = makeFirestore({
+        ...perHouseSeed,
+        affiliate_configs: {
+          ...perHouseSeed.affiliate_configs,
+          'SUB-1': {
+            affiliateId: 'SUB-1',
+            cpaValue: 100,
+            revPercentage: 10,
+            byBrand: { 'leon-bet': { cpaValue: 55, revPercentage: 2 } },
+          },
+        },
+      });
+      const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+      await request(app)
+        .post('/api/special/sub-config')
+        .set('Authorization', 'Bearer esp-uid')
+        .send({ subAffiliateId: 'SUB-1', brandKey: 'esportiva-bet', cpaValue: 90, revPercentage: 3 })
+        .expect(200);
+      const cfg = db.__store.get('affiliate_configs')?.get('SUB-1');
+      expect(cfg.byBrand['leon-bet']).toEqual({ cpaValue: 55, revPercentage: 2 });
+      expect(cfg.byBrand['esportiva-bet']).toMatchObject({ cpaValue: 90, revPercentage: 3 });
+    });
+
+    it('trocar a taxa da casa CONGELA o trecho anterior (vigencia)', async () => {
+      const db = makeFirestore({
+        ...perHouseSeed,
+        affiliate_configs: {
+          ...perHouseSeed.affiliate_configs,
+          'SUB-1': {
+            affiliateId: 'SUB-1',
+            cpaValue: 100,
+            revPercentage: 10,
+            byBrand: { 'esportiva-bet': { cpaValue: 80, revPercentage: 2 } },
+          },
+        },
+      });
+      const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+      await request(app)
+        .post('/api/special/sub-config')
+        .set('Authorization', 'Bearer esp-uid')
+        .send({ subAffiliateId: 'SUB-1', brandKey: 'esportiva-bet', cpaValue: 90, revPercentage: 3 })
+        .expect(200);
+      const entry = db.__store.get('affiliate_configs')?.get('SUB-1').byBrand['esportiva-bet'];
+      expect(entry).toMatchObject({ cpaValue: 90, revPercentage: 3, since: expect.any(String) });
+      expect(entry.history).toEqual([
+        { from: '1970-01-01', to: expect.any(String), cpaValue: 80, revPercentage: 2 },
+      ]);
+    });
   });
 });
 

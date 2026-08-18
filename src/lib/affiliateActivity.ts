@@ -54,7 +54,7 @@ function otgIdOf(row: any): string {
  */
 export function producingAffiliateIds(
   otgRows: any[] | null | undefined,
-  manualRows: Array<{ affiliateId?: string | null } & ActivityRow> | null | undefined
+  manualRows: Array<{ affiliateId?: string | number | null } & ActivityRow> | null | undefined
 ): Set<string> {
   const ids = new Set<string>();
   for (const row of Array.isArray(otgRows) ? otgRows : []) {

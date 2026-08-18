@@ -9,7 +9,6 @@ import {
   fetchSpecialAffiliates,
   fetchAffiliates,
   fetchResultsForAffiliatesSplit,
-  fetchManualResults,
   fetchAffiliateConfigs,
   saveSubAffiliateConfig,
   createAffiliateReferral,
@@ -29,14 +28,24 @@ import {
 } from '../services/affiliateService';
 import { fetchHouses, type House } from '../services/houseService';
 import { buildUplineQueue, pricingError, spreadPreview, type UplineQueueItem } from '../lib/uplineQueue';
+import {
+  buildHouseOptions,
+  houseKeyByName,
+  scopePartsToHouse,
+  funnelByAffiliate,
+  houseRateDraft,
+  isIncompleteRateDraft,
+  EMPTY_RATE_DRAFT,
+  type RateDraft,
+} from '../lib/subHouseRates';
+import { resolveRepasseCap, hasConfiguredRate } from '../lib/network';
 import { MARKETPLACE_ENABLED } from '../lib/instanceClient';
 import { buildNetworkInviteUrl } from '../lib/networkInvite';
 import { producingAffiliateIds } from '../lib/affiliateActivity';
 import { buildPerHousePayout, type HouseMetricRow } from '../lib/perHousePayout';
-import { StoredManualRow } from '../lib/houseResults';
 import DateRangePicker from '../components/DateRangePicker';
 import BrandFilter from '../components/BrandFilter';
-import { getBrandName, uniqueBrands, ALL_BRANDS, buildBrandIdOf } from '../lib/brand';
+import { getBrandName, ALL_BRANDS, buildBrandIdOf } from '../lib/brand';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
 import { cn, humanizeName } from '../lib/utils';
 
@@ -45,6 +54,12 @@ const brl = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigi
 // Sub que ele VÊ mas não repassa (neto na rede N níveis): quem define a comissão é
 // o gerente logo acima dele. Ver "visão ≠ dinheiro" em src/lib/specialNetwork.ts.
 const INDIRECT_HINT = 'Indicado indireto: a comissão dele é definida por quem está acima dele na rede.';
+
+// Sem casa selecionada não há gesto de dinheiro nesta tela (pedido Infinity, 17/08).
+// Editar aqui gravava a taxa de TOPO do afiliado, que vale em toda casa sem
+// override: um ajuste pensado para uma casa reprecificava as outras. A comissão
+// agora é POR CASA, como na precificação de parceria. Ver lib/subHouseRates.
+const PICK_HOUSE_HINT = 'Selecione uma casa para definir a comissão do seu afiliado nela.';
 
 // Passo 3 · Lista de sub-afiliados do afiliado especial — espelha o "Afiliados" do
 // master, capado à própria rede. Cada sub abre a AffiliateDetails escopada
@@ -62,11 +77,12 @@ export default function SpecialSubAffiliates() {
   // Partes SEPARADAS (OTG × manual) — o "Seu ganho" (spread) precifica a linha
   // manual pela casa da LINHA via perHousePayout (bug do R$ 280, 2026-08-12).
   const [payoutParts, setPayoutParts] = useState<{ otg: any[]; manual: HouseMetricRow[] }>({ otg: [], manual: [] });
-  const [manualRows, setManualRows] = useState<StoredManualRow[]>([]);
   const [configs, setConfigs] = useState<Record<string, AffiliateConfig>>({});
   const [pool, setPool] = useState<any[]>([]); // mirror p/ afiliado→brandId (byBrand)
-  // Edição da comissão de cada sub (CPA/REV), com teto = taxa própria do especial.
-  const [subEdits, setSubEdits] = useState<Record<string, { cpaValue: number | string; revPercentage: number | string }>>({});
+  // Edição da comissão de cada sub (CPA/REV) NA CASA SELECIONADA, com teto = taxa
+  // própria do especial naquela casa. Strings: campo vazio é ausência de taxa, que
+  // não é R$ 0 (o 0 explícito continua sendo um valor válido e gravável).
+  const [subEdits, setSubEdits] = useState<Record<string, RateDraft>>({});
   const [savingSub, setSavingSub] = useState<string | null>(null);
   // Filtros — espelham a /affiliates do master, capados à rede do especial.
   const [searchTerm, setSearchTerm] = useState('');
@@ -114,13 +130,10 @@ export default function SpecialSubAffiliates() {
       const specials = await fetchSpecialAffiliates();
       const mine = specials[ownId] || null;
       const networkIds = [ownId, ...((mine?.subAffiliateIds || []).map(String))];
-      const [split, cfgs, poolData, manual, myReferrals, netLinks, houseList, invite, parts] = await Promise.all([
+      const [split, cfgs, poolData, myReferrals, netLinks, houseList, invite, parts] = await Promise.all([
         fetchResultsForAffiliatesSplit(networkIds, range),
         fetchAffiliateConfigs(),
         fetchAffiliates().catch(() => []),
-        // Casas MANUAIS entram na atividade: sem isto, numa instância OTG-free
-        // todo sub aparecia como parado. `fetchManualResults` já degrada p/ [].
-        fetchManualResults(range).catch(() => []),
         // Indicações do próprio gerente (o servidor escopa) — acompanhamento.
         fetchAffiliateReferrals().catch(() => []),
         // Links da rede (item 1): o servidor devolve own + subs para o especial.
@@ -135,7 +148,6 @@ export default function SpecialSubAffiliates() {
       setSpecial(mine);
       setResults(split.rows);
       setPayoutParts({ otg: split.otg, manual: split.manual });
-      setManualRows(Array.isArray(manual) ? manual : []);
       setConfigs(cfgs);
       setPool(Array.isArray(poolData) ? poolData : []);
       setReferrals(Array.isArray(myReferrals) ? myReferrals : []);
@@ -144,13 +156,6 @@ export default function SpecialSubAffiliates() {
       setInviteCode(invite?.code ?? null);
       setInviteUses(Number(invite?.uses ?? 0) || 0);
       setPartnerships(Array.isArray(parts) ? parts : []);
-      // semente dos inputs editáveis a partir dos configs salvos
-      const seed: Record<string, { cpaValue: number | string; revPercentage: number | string }> = {};
-      (mine?.subAffiliateIds || []).forEach((id) => {
-        const c = cfgs[String(id)];
-        seed[String(id)] = { cpaValue: c?.cpaValue ?? 0, revPercentage: c?.revPercentage ?? 0 };
-      });
-      setSubEdits(seed);
     } catch (e) {
       console.error('Erro ao carregar sub-afiliados:', e);
       setResults([]);
@@ -285,9 +290,45 @@ export default function SpecialSubAffiliates() {
 
   // brandIdOf só manda na parte OTG; a manual é precificada pela casa da linha.
   const brandIdOf = useMemo(() => buildBrandIdOf(pool), [pool]);
+
+  // --- Casa selecionada (pedido Infinity, 17/08) -----------------------------
+  // O seletor sai do BACKOFFICE de casas, não da marca das linhas: numa instância
+  // OTG-free a linha agregada do afiliado não tem marca, e o seletor ficaria vazio
+  // justamente onde ele passou a ser obrigatório para editar a comissão.
+  const houseOptions = useMemo(() => buildHouseOptions(houses), [houses]);
+  const houseNames = useMemo(() => houseOptions.map((o) => o.name), [houseOptions]);
+  const selectedHouseKey = useMemo(
+    () => (brandFilter === ALL_BRANDS ? null : houseKeyByName(houseOptions, brandFilter)),
+    [brandFilter, houseOptions]
+  );
+  const selectedHouseName = selectedHouseKey ? brandFilter : '';
+
+  // Recorte das partes (OTG × manual) à casa selecionada — SEPARADAS, porque
+  // `buildPerHousePayout` conta o manual 2× se receber a linha mesclada.
+  const scopedParts = useMemo(
+    () => scopePartsToHouse(payoutParts, brandIdOf, selectedHouseKey),
+    [payoutParts, brandIdOf, selectedHouseKey]
+  );
   const payoutOf = useMemo(
-    () => buildPerHousePayout(payoutParts.otg, payoutParts.manual, brandIdOf),
-    [payoutParts, brandIdOf]
+    () => buildPerHousePayout(scopedParts.otg, scopedParts.manual, brandIdOf),
+    [scopedParts, brandIdOf]
+  );
+  // Funil recortado: com casa selecionada as colunas mostram o que veio DELA. Sem
+  // casa, a linha agregada do afiliado (results) segue sendo a fonte.
+  const houseFunnel = useMemo(
+    () => (selectedHouseKey ? funnelByAffiliate(scopedParts) : null),
+    [scopedParts, selectedHouseKey]
+  );
+
+  // Teto do gerente NA CASA. Config CRUA (não o `ownConfig`, que preenche 0/0):
+  // um teto zerado diria "seu teto é R$ 0" para quem não tem taxa nenhuma ali.
+  const houseCap = useMemo(
+    () => resolveRepasseCap(configs[ownId] ?? null, selectedHouseKey || undefined),
+    [configs, ownId, selectedHouseKey]
+  );
+  const houseCapConfigured = useMemo(
+    () => (selectedHouseKey ? hasConfiguredRate(configs[ownId] ?? null, selectedHouseKey) : false),
+    [configs, ownId, selectedHouseKey]
   );
 
   const rowById = (id: string) => results.find((r) => String(r.affiliate_id ?? r.id ?? '') === String(id));
@@ -296,9 +337,11 @@ export default function SpecialSubAffiliates() {
   // Produção no período unindo OTG + MANUAL — definição ÚNICA em lib/affiliateActivity
   // (antes a regra vivia inline aqui, só com a OTG e só com funil: um sub que produziu
   // em casa manual, ou cuja única evidência era a comissão, aparecia como parado).
+  // Sai das partes RECORTADAS: com uma casa selecionada, "com produção" é produção
+  // NAQUELA casa, senão o selo contradiria os números da própria linha.
   const producingIds = useMemo(
-    () => producingAffiliateIds(results, manualRows),
-    [results, manualRows]
+    () => producingAffiliateIds(scopedParts.otg, scopedParts.manual),
+    [scopedParts]
   );
 
   // Quem ele REPASSA (indicados diretos) ⊆ quem ele VÊ. Numa rede de N níveis a
@@ -328,15 +371,24 @@ export default function SpecialSubAffiliates() {
   const subs = useMemo(() => subIds.map((id) => {
     const r = rowById(id) || {};
     const producing = producingIds.has(String(id));
+    // Métricas da CASA quando há casa selecionada; senão o agregado do afiliado.
+    const metrics = houseFunnel
+      ? (houseFunnel[String(id)] ?? { registrations: 0, first_deposits: 0, qualified_cpa: 0 })
+      : {
+          registrations: Number(r.registrations) || 0,
+          first_deposits: Number(r.first_deposits) || 0,
+          qualified_cpa: Number(r.qualified_cpa) || 0,
+        };
     return {
       id,
       row: r,
+      metrics,
       name: humanizeName(r.affiliate_name || r.name || r.label || nameFromPool[id] || `#${id}`),
       brand: getBrandName(r),
       producing,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [special, results, producingIds, nameFromPool]);
+  }), [special, results, producingIds, nameFromPool, houseFunnel]);
 
   // A fila usa a config CRUA, não o `ownConfig` acima: aquele preenche 0/0 quando
   // não há config, e um zero preenchido faria a tela dizer "seu teto é R$ 0" para
@@ -346,32 +398,54 @@ export default function SpecialSubAffiliates() {
     [partnerships, directIds, houses, configs, ownId],
   );
 
-  const availableBrands = useMemo(() => uniqueBrands(subs.map((s) => s.row)), [subs]);
-
+  // A casa selecionada recorta os NÚMEROS, não a lista: a hora de definir a
+  // comissão de um afiliado numa casa é justamente antes de ele produzir nela, e
+  // esconder quem ainda não produziu deixaria essa taxa impossível de configurar.
+  // Para estreitar a lista, o filtro de atividade continua ali (já recortado).
   const filteredSubs = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return subs.filter((s) => {
       const matchesSearch = !term || s.name.toLowerCase().includes(term) || s.id.toLowerCase().includes(term);
-      const matchesBrand = brandFilter === ALL_BRANDS || getBrandName(s.row) === brandFilter;
       const matchesActivity =
         activityFilter === 'all' || (activityFilter === 'producing' ? s.producing : !s.producing);
-      return matchesSearch && matchesBrand && matchesActivity;
+      return matchesSearch && matchesActivity;
     });
-  }, [subs, searchTerm, brandFilter, activityFilter]);
+  }, [subs, searchTerm, activityFilter]);
 
-  // Teto = taxa própria do especial: a comissão do sub não passa dela (spread ≥ 0).
+  // Semente dos campos: o override que o sub JÁ tem naquela casa, ou vazio. Trocar
+  // de casa reescreve a semente inteira; sem casa não há campo, então não há
+  // rascunho a guardar (e um rascunho velho não pode vazar para a casa seguinte).
+  useEffect(() => {
+    if (!selectedHouseKey) { setSubEdits({}); return; }
+    const seed: Record<string, RateDraft> = {};
+    (special?.subAffiliateIds ?? []).forEach((sid) => {
+      const id = String(sid);
+      seed[id] = houseRateDraft(configs[id], selectedHouseKey);
+    });
+    setSubEdits(seed);
+  }, [selectedHouseKey, configs, special]);
+
+  // O campo guarda o texto CRU (dá para apagar e redigitar). O teto é validado no
+  // save por `pricingError`, a MESMA pura que a fila do gerente usa: clampar em
+  // silêncio grava um número que o gerente não digitou.
   const handleSubChange = (id: string, field: 'cpaValue' | 'revPercentage', value: string) => {
-    const teto = field === 'cpaValue' ? (ownConfig.cpaValue || 0) : (ownConfig.revPercentage || 0);
-    const next = value === '' ? '' : Math.min(teto, Math.max(0, parseFloat(value) || 0));
-    setSubEdits((prev) => ({ ...prev, [id]: { ...(prev[id] || { cpaValue: 0, revPercentage: 0 }), [field]: next } }));
+    setSubEdits((prev) => ({ ...prev, [id]: { ...(prev[id] ?? EMPTY_RATE_DRAFT), [field]: value } }));
   };
 
   const handleSaveSub = async (id: string) => {
-    const edit = subEdits[id] || { cpaValue: 0, revPercentage: 0 };
+    if (!selectedHouseKey) return;
+    const draft = subEdits[id] ?? EMPTY_RATE_DRAFT;
+    if (isIncompleteRateDraft(draft)) {
+      push({ type: 'error', message: `Preencha o CPA e o REV do afiliado em ${selectedHouseName}. Use 0 onde ele não recebe.` });
+      return;
+    }
+    const rates = { cpaValue: Number(draft.cpaValue) || 0, revPercentage: Number(draft.revPercentage) || 0 };
+    const erro = pricingError({ cap: houseCap, capConfigured: houseCapConfigured }, rates);
+    if (erro) { push({ type: 'error', message: erro }); return; }
     setSavingSub(id);
     try {
-      await saveSubAffiliateConfig(id, Number(edit.cpaValue) || 0, Number(edit.revPercentage) || 0);
-      push({ type: 'success', message: 'Comissão do sub-afiliado atualizada.' });
+      await saveSubAffiliateConfig(id, rates.cpaValue, rates.revPercentage, selectedHouseKey);
+      push({ type: 'success', message: `Comissão em ${selectedHouseName} atualizada. Vale a partir de amanhã.` });
       await load();
     } catch (err) {
       push({ type: 'error', message: err instanceof Error ? err.message : 'Falha ao salvar comissão.' });
@@ -624,10 +698,12 @@ export default function SpecialSubAffiliates() {
               />
             </div>
             <div className="flex items-center gap-3 flex-wrap">
-              <span className="hidden xl:inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500">
-                Teto: R$ {ownConfig.cpaValue}/CPA · {ownConfig.revPercentage}% REV
-              </span>
-              <BrandFilter brands={availableBrands} value={brandFilter} onChange={setBrandFilter} />
+              {selectedHouseKey && houseCapConfigured && (
+                <span className="hidden xl:inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-neutral-500">
+                  Teto em {selectedHouseName}: R$ {houseCap.cpaValue}/CPA · {houseCap.revPercentage}% REV
+                </span>
+              )}
+              <BrandFilter brands={houseNames} value={brandFilter} onChange={setBrandFilter} showSingle />
               <div className="flex items-center gap-1.5">
                 {([
                   { k: 'all', l: 'Todos' },
@@ -655,6 +731,22 @@ export default function SpecialSubAffiliates() {
             </div>
           </div>
 
+          {/* Estado do gesto de comissão: sem casa não há edição; com casa, mas sem
+              taxa própria nela, também não (ausência ≠ R$ 0, quem resolve é a agência). */}
+          {!selectedHouseKey ? (
+            <div className="px-4 py-3 border-b border-slate-100 dark:border-neutral-800 bg-slate-50/60 dark:bg-neutral-800/20">
+              <p className="text-[11px] text-slate-500 dark:text-neutral-400">
+                <b className="text-slate-700 dark:text-neutral-200">Comissão por casa:</b> {PICK_HOUSE_HINT}
+              </p>
+            </div>
+          ) : !houseCapConfigured ? (
+            <div className="px-4 py-3 border-b border-slate-100 dark:border-neutral-800 bg-amber-50/70 dark:bg-amber-900/10">
+              <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                Você ainda não tem taxa em {selectedHouseName}. Peça à agência antes de definir a comissão dos seus afiliados nesta casa.
+              </p>
+            </div>
+          ) : null}
+
           {filteredSubs.length === 0 ? (
             <div className="p-24 text-center">
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl border border-slate-100 dark:border-neutral-700/60 bg-slate-50 dark:bg-neutral-800/60 text-slate-500 dark:text-neutral-300 mb-4">
@@ -676,17 +768,22 @@ export default function SpecialSubAffiliates() {
                       <th className="px-6 py-4 text-right">CPA Qualif.</th>
                       <th className="px-6 py-4 text-right">Seu ganho</th>
                       <th className="px-6 py-4">Link de divulgação</th>
-                      <th className="px-6 py-4">Comissão CPA (R$)</th>
-                      <th className="px-6 py-4">Comissão REV (%)</th>
+                      {selectedHouseKey && (
+                        <>
+                          <th className="px-6 py-4">Comissão CPA (R$)</th>
+                          <th className="px-6 py-4">Comissão REV (%)</th>
+                        </>
+                      )}
                       <th className="px-6 py-4 text-right">Ação</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-neutral-800 text-xs">
-                    {filteredSubs.map(({ id, name, producing, row: r }) => {
+                    {filteredSubs.map(({ id, name, producing, row: r, metrics }) => {
                       // Seu ganho = spread (taxa própria − taxa do sub) sobre a produção
                       // dele, precificada POR CASA (perHousePayout) dos dois lados.
                       const spread = payoutOf.breakdownFor(id, ownConfig).total - payoutOf.breakdownFor(id, configs[id]).total;
-                      const canEdit = directIds.has(id);
+                      const canEdit = !!selectedHouseKey && houseCapConfigured && directIds.has(id);
+                      const draft = subEdits[id] ?? EMPTY_RATE_DRAFT;
                       return (
                         <tr
                           key={id}
@@ -700,49 +797,57 @@ export default function SpecialSubAffiliates() {
                               {renderBadges(r, producing)}
                             </div>
                           </td>
-                          <td className="px-6 py-4 text-right tabular-nums font-bold text-slate-700 dark:text-neutral-200">{(r.registrations || 0).toLocaleString('pt-BR')}</td>
-                          <td className="px-6 py-4 text-right tabular-nums font-bold text-slate-700 dark:text-neutral-200">{(r.first_deposits || 0).toLocaleString('pt-BR')}</td>
-                          <td className="px-6 py-4 text-right tabular-nums font-bold text-slate-700 dark:text-neutral-200">{(r.qualified_cpa || 0).toLocaleString('pt-BR')}</td>
+                          <td className="px-6 py-4 text-right tabular-nums font-bold text-slate-700 dark:text-neutral-200">{metrics.registrations.toLocaleString('pt-BR')}</td>
+                          <td className="px-6 py-4 text-right tabular-nums font-bold text-slate-700 dark:text-neutral-200">{metrics.first_deposits.toLocaleString('pt-BR')}</td>
+                          <td className="px-6 py-4 text-right tabular-nums font-bold text-slate-700 dark:text-neutral-200">{metrics.qualified_cpa.toLocaleString('pt-BR')}</td>
                           <td className="px-6 py-4 text-right tabular-nums font-black text-emerald-600 dark:text-emerald-400">{brl(spread)}</td>
                           <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                             {renderLinkCell(id)}
                           </td>
-                          <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                            <div className="relative w-24">
-                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 dark:text-neutral-500">R$</span>
-                              <input
-                                type="number" min="0" max={ownConfig.cpaValue || 0} step="0.01"
-                                value={subEdits[id]?.cpaValue ?? 0}
-                                onChange={(e) => handleSubChange(id, 'cpaValue', e.target.value)}
-                                disabled={!canEdit}
-                                title={canEdit ? undefined : INDIRECT_HINT}
-                                className="w-24 pl-7 pr-2 py-1.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                              />
-                            </div>
-                          </td>
-                          <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                            <div className="relative w-24">
-                              <Percent size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300 dark:text-neutral-500" />
-                              <input
-                                type="number" min="0" max={ownConfig.revPercentage || 0} step="0.1"
-                                value={subEdits[id]?.revPercentage ?? 0}
-                                onChange={(e) => handleSubChange(id, 'revPercentage', e.target.value)}
-                                disabled={!canEdit}
-                                title={canEdit ? undefined : INDIRECT_HINT}
-                                className="w-24 pl-6 pr-2 py-1.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                              />
-                            </div>
-                          </td>
+                          {selectedHouseKey && (
+                            <>
+                              <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                <div className="relative w-28">
+                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 dark:text-neutral-500">R$</span>
+                                  <input
+                                    type="number" min="0" max={houseCap.cpaValue} step="0.01"
+                                    value={draft.cpaValue}
+                                    placeholder="Sem taxa"
+                                    onChange={(e) => handleSubChange(id, 'cpaValue', e.target.value)}
+                                    disabled={!canEdit}
+                                    title={directIds.has(id) ? undefined : INDIRECT_HINT}
+                                    className="w-28 pl-7 pr-2 py-1.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                                  />
+                                </div>
+                              </td>
+                              <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                <div className="relative w-28">
+                                  <Percent size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300 dark:text-neutral-500" />
+                                  <input
+                                    type="number" min="0" max={houseCap.revPercentage} step="0.1"
+                                    value={draft.revPercentage}
+                                    placeholder="Sem taxa"
+                                    onChange={(e) => handleSubChange(id, 'revPercentage', e.target.value)}
+                                    disabled={!canEdit}
+                                    title={directIds.has(id) ? undefined : INDIRECT_HINT}
+                                    className="w-28 pl-6 pr-2 py-1.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                                  />
+                                </div>
+                              </td>
+                            </>
+                          )}
                           <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => handleSaveSub(id)}
-                                disabled={savingSub === id || !canEdit}
-                                title={canEdit ? 'Salvar comissão' : INDIRECT_HINT}
-                                className="p-2 rounded-lg bg-accent-50 text-accent-600 hover:bg-accent-500 hover:text-accent-contrast dark:bg-accent-900/10 dark:text-accent-400 dark:hover:bg-accent-500 dark:hover:text-accent-contrast transition-all disabled:opacity-50"
-                              >
-                                {savingSub === id ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                              </button>
+                              {selectedHouseKey && (
+                                <button
+                                  onClick={() => handleSaveSub(id)}
+                                  disabled={savingSub === id || !canEdit}
+                                  title={canEdit ? `Salvar comissão em ${selectedHouseName}` : INDIRECT_HINT}
+                                  className="p-2 rounded-lg bg-accent-50 text-accent-600 hover:bg-accent-500 hover:text-accent-contrast dark:bg-accent-900/10 dark:text-accent-400 dark:hover:bg-accent-500 dark:hover:text-accent-contrast transition-all disabled:opacity-50"
+                                >
+                                  {savingSub === id ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                                </button>
+                              )}
                               <button
                                 onClick={() => navigate(`/affiliates/${id}`)}
                                 title="Ver dados do afiliado"
@@ -761,15 +866,16 @@ export default function SpecialSubAffiliates() {
 
               {/* Mobile · cards */}
               <div className="md:hidden divide-y divide-slate-100 dark:divide-neutral-800">
-                {filteredSubs.map(({ id, name, producing, row: r }) => {
+                {filteredSubs.map(({ id, name, producing, row: r, metrics }) => {
                   // Mesmo spread por casa do desktop — antes o mobile usava só a
                   // taxa de topo e os dois divergiam com byBrand.
                   const spread = payoutOf.breakdownFor(id, ownConfig).total - payoutOf.breakdownFor(id, configs[id]).total;
-                  const canEdit = directIds.has(id);
+                  const canEdit = !!selectedHouseKey && houseCapConfigured && directIds.has(id);
+                  const draft = subEdits[id] ?? EMPTY_RATE_DRAFT;
                   const stats = [
-                    { label: 'Cadastros', value: (r.registrations || 0).toLocaleString('pt-BR') },
-                    { label: 'Depósitos', value: (r.first_deposits || 0).toLocaleString('pt-BR') },
-                    { label: 'CPA Qualif.', value: (r.qualified_cpa || 0).toLocaleString('pt-BR') },
+                    { label: 'Cadastros', value: metrics.registrations.toLocaleString('pt-BR') },
+                    { label: 'Depósitos', value: metrics.first_deposits.toLocaleString('pt-BR') },
+                    { label: 'CPA Qualif.', value: metrics.qualified_cpa.toLocaleString('pt-BR') },
                   ];
                   return (
                     <div key={id} className="p-4 space-y-4">
@@ -805,46 +911,52 @@ export default function SpecialSubAffiliates() {
                         <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-2">Link de divulgação</p>
                         {renderLinkCell(id)}
                       </div>
-                      <div className="pt-3 border-t border-slate-100 dark:border-neutral-800">
-                        <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-2">
-                          Comissão do sub{' '}
-                          <span className="normal-case font-medium">
-                            {canEdit ? `(teto: R$ ${ownConfig.cpaValue}/CPA · ${ownConfig.revPercentage}% REV)` : '(indicado indireto)'}
-                          </span>
-                        </p>
-                        {!canEdit && (
-                          <p className="mb-2 text-[10px] text-slate-500 dark:text-neutral-400">{INDIRECT_HINT}</p>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <div className="relative flex-1">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 dark:text-neutral-500">R$</span>
-                            <input
-                              type="number" min="0" max={ownConfig.cpaValue || 0} step="0.01"
-                              value={subEdits[id]?.cpaValue ?? 0}
-                              onChange={(e) => handleSubChange(id, 'cpaValue', e.target.value)}
-                              disabled={!canEdit}
-                              className="disabled:opacity-40 disabled:cursor-not-allowed w-full pl-7 pr-2 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
-                            />
+                      {selectedHouseKey && (
+                        <div className="pt-3 border-t border-slate-100 dark:border-neutral-800">
+                          <p className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-2">
+                            Comissão em {selectedHouseName}{' '}
+                            <span className="normal-case font-medium">
+                              {canEdit
+                                ? `(teto: R$ ${houseCap.cpaValue}/CPA · ${houseCap.revPercentage}% REV)`
+                                : directIds.has(id) ? '(sem taxa sua nesta casa)' : '(indicado indireto)'}
+                            </span>
+                          </p>
+                          {!directIds.has(id) && (
+                            <p className="mb-2 text-[10px] text-slate-500 dark:text-neutral-400">{INDIRECT_HINT}</p>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <div className="relative flex-1">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 dark:text-neutral-500">R$</span>
+                              <input
+                                type="number" min="0" max={houseCap.cpaValue} step="0.01"
+                                value={draft.cpaValue}
+                                placeholder="Sem taxa"
+                                onChange={(e) => handleSubChange(id, 'cpaValue', e.target.value)}
+                                disabled={!canEdit}
+                                className="disabled:opacity-40 disabled:cursor-not-allowed w-full pl-7 pr-2 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
+                              />
+                            </div>
+                            <div className="relative flex-1">
+                              <Percent size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300 dark:text-neutral-500" />
+                              <input
+                                type="number" min="0" max={houseCap.revPercentage} step="0.1"
+                                value={draft.revPercentage}
+                                placeholder="Sem taxa"
+                                onChange={(e) => handleSubChange(id, 'revPercentage', e.target.value)}
+                                disabled={!canEdit}
+                                className="disabled:opacity-40 disabled:cursor-not-allowed w-full pl-6 pr-2 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
+                              />
+                            </div>
+                            <button
+                              onClick={() => handleSaveSub(id)}
+                              disabled={savingSub === id || !canEdit}
+                              className="p-2 rounded-lg bg-accent-50 text-accent-600 hover:bg-accent-500 hover:text-accent-contrast dark:bg-accent-900/10 dark:text-accent-400 dark:hover:bg-accent-500 dark:hover:text-accent-contrast transition-all disabled:opacity-50"
+                            >
+                              {savingSub === id ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                            </button>
                           </div>
-                          <div className="relative flex-1">
-                            <Percent size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300 dark:text-neutral-500" />
-                            <input
-                              type="number" min="0" max={ownConfig.revPercentage || 0} step="0.1"
-                              value={subEdits[id]?.revPercentage ?? 0}
-                              onChange={(e) => handleSubChange(id, 'revPercentage', e.target.value)}
-                              disabled={!canEdit}
-                              className="disabled:opacity-40 disabled:cursor-not-allowed w-full pl-6 pr-2 py-2 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white"
-                            />
-                          </div>
-                          <button
-                            onClick={() => handleSaveSub(id)}
-                            disabled={savingSub === id || !canEdit}
-                            className="p-2 rounded-lg bg-accent-50 text-accent-600 hover:bg-accent-500 hover:text-accent-contrast dark:bg-accent-900/10 dark:text-accent-400 dark:hover:bg-accent-500 dark:hover:text-accent-contrast transition-all disabled:opacity-50"
-                          >
-                            {savingSub === id ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                          </button>
                         </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })}

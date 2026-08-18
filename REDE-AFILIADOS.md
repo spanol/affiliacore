@@ -354,3 +354,47 @@ o NOME quando o convite é de rede.
   taxa dele é o gerente, depois, em "Meus afiliados" (ele é filho DIRETO).
 - Sem mudança em `firestore.rules` (a coleção `invites` já era server-only), então **não há ordem de
   deploy** a respeitar nesta entrega.
+
+---
+
+## 11. Comissão do sub POR CASA em "Meus afiliados" (2026-08-17, pedido Infinity)
+
+**O problema.** A lista de sub-afiliados do gerente (`/network/afiliados`) editava a taxa de TOPO do
+afiliado (`affiliate_configs.{cpaValue,revPercentage}`). Numa instância multi-casa esse número é o
+"valor de contrato": ele vale em toda casa que NÃO tem override, porque `resolveBrandRates` cai nele
+quando `byBrand[casa]` não existe. Resultado: um ajuste que o gerente fazia pensando numa casa
+reprecificava o afiliado em todas as outras, sem nada na tela dizendo isso.
+
+**A regra nova.** O gesto de dinheiro nessa tela passou a ser POR CASA, igual ao da precificação de
+parceria (`POST /api/partnerships/:id/price`):
+
+- **Sem casa selecionada não existem as colunas** "Comissão CPA" e "Comissão REV", nem o botão de
+  salvar. A tela segue servindo para VER a rede (produção, ganho, links).
+- **Com uma casa selecionada as colunas voltam** e gravam em `byBrand[chave-da-casa]`, sem encostar
+  no topo. O teto exibido e validado é a taxa do gerente NAQUELA casa
+  (`resolveRepasseCap(cfg, brandKey)`), com a mesma precedência de sempre: `byBrand` vence, na falta
+  vale o topo do próprio gerente.
+- **As métricas da linha recortam junto** (funil, "Seu ganho" e o selo "com produção"): mostrar o
+  total da rede ao lado de uma taxa que vale só numa casa faz a linha mentir sobre a origem do número.
+- **A lista NÃO é recortada pela casa.** A hora de definir a comissão de um afiliado numa casa é
+  justamente antes de ele produzir nela; esconder quem ainda não produziu tornaria essa taxa
+  impossível de configurar. Quem estreita a lista é a busca e o filtro de atividade.
+
+**Rota.** `POST /api/special/sub-config` ganhou `brandKey` OPCIONAL. Com casa: exige
+`hasConfiguredRate` do gerente ali, valida o teto por casa e grava `byBrand[brandKey]` com vigência
+(`withRateHistory`) preservando as demais casas pelo merge. Sem casa: o comportamento histórico de
+topo, mantido por compatibilidade (hoje sem chamador na tela).
+
+**Invariantes.**
+
+- **Os DOIS campos são obrigatórios** ao salvar. O branco viraria 0 no `byBrand`, e `rateStatus` lê
+  esse 0 como "taxa configurada" (ausência ≠ R$ 0). Exigindo o par, todo zero gravado é um zero
+  DIGITADO, e o teto do gerente vale sobre as duas pontas: um REV deixado em branco herdaria o
+  contrato do afiliado e poderia passar da taxa do gerente sem aparecer para ninguém.
+- **O seletor de casa sai do backoffice** (`houses` ativas), NÃO da marca das linhas de resultado:
+  numa instância OTG-free a linha agregada do afiliado não tem `brand`, e o seletor ficaria vazio
+  justamente onde ele virou obrigatório para editar.
+- Núcleo puro em `src/lib/subHouseRates.ts` (com teste colocado); a validação da taxa digitada reusa
+  `pricingError` de `src/lib/uplineQueue.ts`, a mesma pura da fila do gerente.
+- Sem mudança em `firestore.rules` (`affiliate_configs` já é mediada pelo servidor): **não há ordem
+  de deploy** a respeitar nesta entrega.

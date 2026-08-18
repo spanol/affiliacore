@@ -1026,9 +1026,14 @@ export function createApp(deps: ServerDeps) {
       const callerAffiliateId = user?.affiliateId ? String(user.affiliateId) : null;
       if (!callerAffiliateId) return res.status(403).json({ error: 'Sua conta não está vinculada a um afiliado.' });
 
-      const { subAffiliateId, cpaValue, revPercentage } = req.body ?? {};
+      const { subAffiliateId, cpaValue, revPercentage, brandKey: rawBrandKey } = req.body ?? {};
       const subId = subAffiliateId != null ? String(subAffiliateId) : '';
       if (!subId) return res.status(400).json({ error: 'subAffiliateId é obrigatório.' });
+      // Casa ALVO do gesto (chave do byBrand: brandId da OTG ou slug da casa
+      // manual). Ausente = gesto de TOPO, o comportamento histórico desta rota.
+      // A tela do gerente hoje SEMPRE manda a casa (pedido Infinity 17/08): mexer
+      // no topo daqui reprecificava toda casa sem override. Ver lib/subHouseRates.
+      const brandKey = rawBrandKey != null ? String(rawBrandKey).trim() : '';
 
       const cpa = Number(cpaValue) || 0;
       const rev = Number(revPercentage) || 0;
@@ -1057,9 +1062,21 @@ export function createApp(deps: ServerDeps) {
       // cascata de rede usa, para não divergir de uma reimplementação inline.
       const ownCfgSnap = await adminDb.collection('affiliate_configs').doc(callerAffiliateId).get();
       const ownCfg = ownCfgSnap.exists ? (ownCfgSnap.data() as any) : {};
-      const cap = resolveRepasseCap(ownCfg);
+      // Ausência ≠ R$ 0: sem taxa PRÓPRIA na casa ele não tem o que repassar, e um
+      // teto zerado daria a mensagem errada ("o teto é R$ 0") para um problema que
+      // é da agência resolver. Mesma ordem de recusa da precificação de parceria.
+      if (brandKey && !hasConfiguredRate(ownCfg, brandKey)) {
+        return res.status(400).json({
+          error: 'Você ainda não tem taxa nesta casa. Peça à agência antes de definir a comissão do seu afiliado.',
+        });
+      }
+      const cap = resolveRepasseCap(ownCfg, brandKey || undefined);
       if (exceedsRepasseCap({ cpaValue: cpa, revPercentage: rev }, cap)) {
-        return res.status(400).json({ error: `A comissão do sub não pode passar da sua taxa (teto: R$ ${cap.cpaValue}/CPA · ${cap.revPercentage}% REV).` });
+        return res.status(400).json({
+          error: brandKey
+            ? `A comissão do sub não pode passar da sua taxa nesta casa (teto: R$ ${cap.cpaValue}/CPA · ${cap.revPercentage}% REV).`
+            : `A comissão do sub não pode passar da sua taxa (teto: R$ ${cap.cpaValue}/CPA · ${cap.revPercentage}% REV).`,
+        });
       }
 
       // Fase 3 (auditoria de dinheiro): a mudança de taxa do sub também é
@@ -1069,19 +1086,24 @@ export function createApp(deps: ServerDeps) {
       const beforeSnap = await subRef.get();
       const beforeCfg = beforeSnap.exists ? (beforeSnap.data() as any) : undefined;
       // VIGÊNCIA: a taxa nova vale de amanhã; o que o sub já gerou fica com a antiga.
-      // Aqui o gesto é de TOPO (esta rota não tem casa no contexto), então o segmento
-      // é fechado na raiz da config. [[PLANO-COMISSAO-VIGENCIA]]
-      const configPatch = withRateHistory(currentRateEntry(beforeCfg, null), { cpaValue: cpa, revPercentage: rev });
+      // O segmento é fechado NA CASA quando o gesto tem casa, e na raiz quando não
+      // tem (compat). [[PLANO-COMISSAO-VIGENCIA]]
+      const rateEntry = withRateHistory(currentRateEntry(beforeCfg, brandKey || null), { cpaValue: cpa, revPercentage: rev });
+      // Gravação POR CASA: merge preservando as OUTRAS casas do byBrand — e sem
+      // encostar no topo, que é o "valor de contrato" que a agência define.
+      const configPatch: Record<string, unknown> = brandKey
+        ? { byBrand: { ...(beforeCfg?.byBrand ?? {}), [brandKey]: rateEntry } }
+        : (rateEntry as unknown as Record<string, unknown>);
       const changes = diffChanges(
         beforeCfg,
-        configPatch as unknown as Record<string, unknown>,
-        ['cpaValue', 'revPercentage'],
+        configPatch,
+        brandKey ? ['byBrand'] : ['cpaValue', 'revPercentage'],
       );
 
       const batch = adminDb.batch();
       batch.set(subRef, {
         affiliateId: subId,
-        ...configPatch,
+        ...(brandKey ? { byBrand: { [brandKey]: rateEntry } } : configPatch),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
       if (changes.length) {
@@ -1091,12 +1113,12 @@ export function createApp(deps: ServerDeps) {
           entityLabel: await affiliateNameOf(subId),
           action: 'config.update',
           changes,
-          metadata: { via: 'special/sub-config', specialAffiliateId: callerAffiliateId },
+          metadata: { via: 'special/sub-config', specialAffiliateId: callerAffiliateId, brandKey: brandKey || null },
         });
       }
       await batch.commit();
 
-      return res.json({ affiliateId: subId, cpaValue: cpa, revPercentage: rev });
+      return res.json({ affiliateId: subId, brandKey: brandKey || null, cpaValue: cpa, revPercentage: rev });
     } catch (error: any) {
       console.error('Error setting sub-affiliate config:', error);
       return res.status(500).json({ error: error.message || 'Erro interno.' });
