@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatDealKpiValue, dealKpiChips, dealRequestHint,
-  resolvePartnershipPricedBy, partnershipNote,
+  resolvePartnershipPricedBy, partnershipNote, myCommissionChips,
 } from './dealShowcase';
 import { DEAL_KPI_LABEL, DEAL_TYPE_POLICY } from './dealType';
 import type { Deal } from './deal';
@@ -160,5 +160,49 @@ describe('partnershipNote', () => {
       ]);
     todos.forEach((t) => expect(t).not.toContain('—'));
     expect(dealRequestHint(deal({ type: 'gerenciado' }))).not.toContain('—');
+  });
+});
+
+describe('myCommissionChips · a comissão do PRÓPRIO afiliado no card (/meus-links)', () => {
+  const config = (over: any = {}) => ({ affiliateId: 'a1', cpaValue: undefined, revPercentage: undefined, ...over });
+
+  it('acordo gerenciado + taxa do gerente no byBrand → "Seu CPA" e "Seu RevShare" em reais', () => {
+    const cfg = config({ byBrand: { esportiva: { cpaValue: 110, revPercentage: 12.5 } } });
+    const chips = myCommissionChips(sanitizado(), cfg as any, 'esportiva');
+    expect(chips).toEqual([
+      { id: 'myCpa', label: 'Seu CPA', value: 'R$ 110,00' },
+      { id: 'myRev', label: 'Seu RevShare', value: '12,5%' },
+    ]);
+  });
+
+  it('acordo DIRETO nunca ganha o chip: o CPA do card já é a comissão do afiliado', () => {
+    const cfg = config({ byBrand: { esportiva: { cpaValue: 110, revPercentage: 0 } } });
+    expect(myCommissionChips(deal(), cfg as any, 'esportiva')).toEqual([]);
+  });
+
+  it('ausência ≠ R$ 0: sem taxa configurada (ou configurada em zero) não sai chip', () => {
+    expect(myCommissionChips(sanitizado(), config() as any, 'esportiva')).toEqual([]);
+    expect(myCommissionChips(sanitizado(), null, 'esportiva')).toEqual([]);
+    const zerada = config({ byBrand: { esportiva: { cpaValue: 0, revPercentage: 0 } } });
+    expect(myCommissionChips(sanitizado(), zerada as any, 'esportiva')).toEqual([]);
+  });
+
+  it('sem override da casa, cai na taxa de TOPO (é a taxa efetiva do afiliado ali)', () => {
+    const cfg = config({ cpaValue: 80, revPercentage: 0 });
+    expect(myCommissionChips(sanitizado(), cfg as any, 'esportiva')).toEqual([
+      { id: 'myCpa', label: 'Seu CPA', value: 'R$ 80,00' },
+    ]);
+  });
+
+  it('deal ausente ou brandKey vazio não lançam', () => {
+    const cfg = config({ byBrand: { esportiva: { cpaValue: 110, revPercentage: 0 } } });
+    expect(myCommissionChips(null, cfg as any, 'esportiva')).toEqual([]);
+    expect(myCommissionChips(sanitizado(), cfg as any, '')).toEqual([]);
+  });
+
+  it('copy sem travessão no meio de frase', () => {
+    const cfg = config({ byBrand: { esportiva: { cpaValue: 110, revPercentage: 12.5 } } });
+    myCommissionChips(sanitizado(), cfg as any, 'esportiva')
+      .forEach((c) => expect(`${c.label} ${c.value}`).not.toContain('—'));
   });
 });

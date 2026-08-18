@@ -11,7 +11,7 @@
 // formatação devolve `null` quando o valor não veio, e o card simplesmente não
 // desenha a linha.
 
-import { num } from './commission';
+import { num, rateStatus, resolveBrandRates, type AffiliateConfig } from './commission';
 import { pluralize } from './plural';
 import { formatMoney } from './currency';
 import { PAYMENT_CYCLE_LABEL, dealCurrency, type Deal } from './deal';
@@ -96,6 +96,38 @@ export function dealRequestHint(deal?: Deal | null): string | null {
   return dealPolicy(deal ?? null).pricedBy === 'upline'
     ? 'Sua comissão nesta casa é definida pelo seu gerente.'
     : null;
+}
+
+// A comissão do PRÓPRIO afiliado no card de um link/parceria (pedido do Maurício,
+// 18/08/2026): num acordo gerenciado o CPA do DEAL nem chega ao client (o servidor
+// corta — é o que a casa paga à agência), mas a taxa que o GERENTE atribuiu ao
+// afiliado é dele por direito e vive na PRÓPRIA config (byBrand da casa, gravado
+// pela precificação/aprovação). Só existe quando a política esconde as taxas do
+// deal: num acordo direto o chip de CPA do card JÁ É a comissão do afiliado, e
+// "Seu CPA" ao lado repetiria o mesmo número.
+// Ausência ≠ R$ 0 (rateStatus): sem taxa configurada na casa não sai chip nenhum.
+// O byBrand é gravado em REAIS (a conversão de moeda acontece na aprovação), então
+// o formato aqui é sempre R$, nunca a moeda do deal.
+export interface MyCommissionChip {
+  id: 'myCpa' | 'myRev';
+  label: string;
+  value: string;
+}
+
+export function myCommissionChips(
+  deal: Deal | null | undefined,
+  config: AffiliateConfig | null | undefined,
+  brandKey: string | null | undefined,
+): MyCommissionChip[] {
+  if (!deal || dealPolicy(deal).showRatesToAffiliate) return [];
+  if (!config) return [];
+  const key = String(brandKey ?? '').trim() || undefined;
+  const status = rateStatus(config, key);
+  const rates = resolveBrandRates(config, key);
+  const out: MyCommissionChip[] = [];
+  if (status.cpaConfigured && rates.cpaValue > 0) out.push({ id: 'myCpa', label: 'Seu CPA', value: brl(rates.cpaValue) });
+  if (status.revConfigured && rates.revPercentage > 0) out.push({ id: 'myRev', label: 'Seu RevShare', value: pct(rates.revPercentage) });
+  return out;
 }
 
 export type PricedBy = 'admin' | 'upline';

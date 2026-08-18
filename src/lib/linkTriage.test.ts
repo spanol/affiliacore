@@ -289,6 +289,30 @@ describe('buildMyLinkCards (ponta do afiliado)', () => {
     expect(buildMyLinkCards(null, null, null)).toEqual([]);
   });
 
+  // A chave é a MESMA que a precificação/aprovação grava no byBrand (dealBrandKey):
+  // errar aqui faria a tela buscar a comissão do afiliado na casa errada.
+  it('brandKey segue a convenção do byBrand: brandId da OTG, slug da manual, houseId quando a casa sumiu', () => {
+    const cards = buildMyLinkCards(
+      [
+        { id: 'p1', code: 'AAA', operatorName: 'Super Bet V2', houseId: 'superbet' },
+        { id: 'p2', code: 'CCC', operatorName: 'Esportiva Bet', houseId: 'esportiva-bet' },
+        { id: 'p3', code: 'DDD', operatorName: 'Sumida', houseId: 'casa-removida' },
+      ],
+      [
+        { code: 'AAA', affiliateId: 'aff1', brandId: '77', registerUrl: 'https://sb.bet/r', active: true },
+        { code: 'CCC', affiliateId: 'aff1', brandId: 'esportiva-bet', registerUrl: 'https://e.bet/r', active: true },
+        { code: 'DDD', affiliateId: 'aff1', brandId: null, registerUrl: 'https://s.bet/r', active: true },
+        { code: 'BBB', affiliateId: 'aff1', brandId: 'esportiva-bet', registerUrl: 'https://e.bet/r2', active: true },
+      ],
+      houses,
+    );
+    const byCode = Object.fromEntries(cards.map((c) => [c.code, c.brandKey]));
+    expect(byCode.AAA).toBe('77');            // casa OTG → brandId
+    expect(byCode.CCC).toBe('esportiva-bet'); // casa manual → slug
+    expect(byCode.DDD).toBe('casa-removida'); // casa sumida → o próprio houseId (nas manuais é o slug)
+    expect(byCode.BBB).toBe('esportiva-bet'); // link atribuído → pela casa resolvida do brandId
+  });
+
   it('cartão de parceria carrega o ACORDO pelo dealId, sem adivinhar', () => {
     const cards = buildMyLinkCards(
       [{ id: 'p1', code: 'AAA', dealId: 'd9', operatorName: 'Super Bet V2', dealLabel: 'CPA', houseId: 'superbet' }],

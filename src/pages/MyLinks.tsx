@@ -3,20 +3,26 @@ import { pluralize } from '../lib/plural';
 import { motion } from 'motion/react';
 import { Link2, Loader2, Copy, Check, MousePointerClick, ExternalLink } from 'lucide-react';
 import {
-  fetchPartnerships, fetchAffiliateLinks, fetchDeals, buildGoUrl, DEAL_MODEL_LABEL,
+  fetchPartnerships, fetchAffiliateLinks, fetchDeals, fetchAffiliateConfigs, buildGoUrl, DEAL_MODEL_LABEL,
+  type AffiliateConfig,
 } from '../services/affiliateService';
 import { fetchHouses } from '../services/houseService';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { houseLogoOrPreset } from '../lib/housePresets';
-import { dealKpiChips } from '../lib/dealShowcase';
+import { dealKpiChips, myCommissionChips } from '../lib/dealShowcase';
 import { buildMyLinkCards, type MyLinkCard } from '../lib/linkTriage';
 
 export default function MyLinks() {
   const { push } = useToast();
+  const { profile } = useAuth();
   // Cartões = parcerias aprovadas UNIDAS aos links atribuídos pela triagem ou
   // migrados de plataforma legada (esses não têm parceria e antes ficavam
   // invisíveis pro dono). Ver buildMyLinkCards em src/lib/linkTriage.ts.
   const [cards, setCards] = useState<MyLinkCard[]>([]);
+  // A PRÓPRIA config do afiliado: é dela que sai a comissão que o gerente atribuiu
+  // (byBrand da casa), mostrada no card de um acordo gerenciado. `null` = sem chip.
+  const [myConfig, setMyConfig] = useState<AffiliateConfig | null>(null);
   const [logos, setLogos] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
@@ -28,11 +34,15 @@ export default function MyLinks() {
         // Os acordos entram para o cartão mostrar os TERMOS do link, e não só a URL.
         // `catch` porque o marketplace é opt-in por instância: sem o módulo a rota não
         // existe, e a tela tem que continuar listando os links do mesmo jeito.
-        const [parts, allLinks, houses, deals] = await Promise.all([
+        const [parts, allLinks, houses, deals, configs] = await Promise.all([
           fetchPartnerships('approved'), fetchAffiliateLinks(), fetchHouses().catch(() => []),
           fetchDeals().catch(() => []),
+          // O servidor escopa por papel (afiliado recebe a própria config); falha
+          // aqui só faz o chip de comissão não aparecer, a tela segue inteira.
+          fetchAffiliateConfigs().catch(() => ({} as Record<string, AffiliateConfig>)),
         ]);
         setCards(buildMyLinkCards(parts, allLinks as any, houses as any, deals as any));
+        setMyConfig(profile?.affiliateId ? configs[String(profile.affiliateId)] ?? null : null);
         const hmap: Record<string, string | null> = {};
         (houses as any[]).forEach((h) => {
           hmap[String(h.id)] = houseLogoOrPreset(h.logo, h.slug, h.id, h.name);
@@ -45,7 +55,7 @@ export default function MyLinks() {
       }
     })();
     /* eslint-disable-next-line */
-  }, []);
+  }, [profile?.affiliateId]);
 
   const totalClicks = useMemo(() => cards.reduce((s, c) => s + c.clicks, 0), [cards]);
 
@@ -110,6 +120,15 @@ export default function MyLinks() {
                         {DEAL_MODEL_LABEL[card.deal.model]}
                       </span>
                     )}
+                    {/* A comissão do PRÓPRIO afiliado vem antes dos termos da
+                        oferta: num acordo gerenciado o CPA do deal nem chega ao
+                        client, e o que interessa a quem divulga é o que ELE ganha
+                        (pedido do Maurício, 18/08/2026). Ver myCommissionChips. */}
+                    {myCommissionChips(card.deal, myConfig, card.brandKey).map((chip) => (
+                      <span key={chip.id} data-testid={`kpi-${chip.id}`} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                        {chip.label} {chip.value}
+                      </span>
+                    ))}
                     {dealKpiChips(card.deal).map((chip) => (
                       <span key={chip.id} data-testid={`kpi-${chip.id}`} className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300">
                         {chip.label} {chip.value}

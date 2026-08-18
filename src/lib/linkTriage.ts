@@ -12,7 +12,7 @@
 // um link do pool nunca redireciona nem conta clique antes de ser atribuído.
 
 import { num } from './commission';
-import { buildDealLabel, type Deal } from './deal';
+import { buildDealLabel, dealBrandKey, type Deal } from './deal';
 
 export type LinkTriageView =
   | 'com_link'
@@ -305,6 +305,10 @@ export interface MyLinkCard {
   // taxas continua escondendo: os campos já chegam cortados pelo servidor.
   // `null` = link sem acordo resolvível; o cartão fica como era antes.
   deal: Deal | null;
+  // Chave da casa no `byBrand` (a MESMA convenção de `dealBrandKey`: brandId da
+  // OTG, senão slug da manual), p/ a tela resolver a comissão PRÓPRIA do afiliado
+  // nesta casa. `null` = sem casa resolvível.
+  brandKey: string | null;
 }
 
 // Acordo de um link SEM parceria (atribuído pela triagem ou migrado do legado). A
@@ -371,6 +375,11 @@ export function buildMyLinkCards(
     // Na parceria o acordo é EXPLÍCITO (`dealId`), então não há adivinhação: acordo
     // apagado da vitrine simplesmente não resolve e o cartão fica sem os KPIs.
     const deal = dealById.get(String(p?.dealId ?? '').trim()) ?? null;
+    // brandKey pela MESMA convenção do servidor (dealBrandKey). Casa sumida cai no
+    // próprio houseId — que nas manuais É o slug, o mesmo fallback da precificação.
+    const pHouse = p?.houseId != null
+      ? (Array.isArray(houses) ? houses : []).find((h) => String(h?.id) === String(p.houseId)) ?? null
+      : null;
     cards.push({
       key: String(p?.id ?? code),
       code,
@@ -382,6 +391,7 @@ export function buildMyLinkCards(
       deliverable: isDeliverableLink(link),
       source: 'partnership',
       deal,
+      brandKey: pHouse ? dealBrandKey(pHouse) : (p?.houseId != null ? String(p.houseId) : null),
     });
   }
 
@@ -401,6 +411,7 @@ export function buildMyLinkCards(
       deliverable: isDeliverableLink(link),
       source: 'assigned',
       deal,
+      brandKey: house ? dealBrandKey(house) : (brandKeyOf(link?.brandId) || null),
     });
   }
 
