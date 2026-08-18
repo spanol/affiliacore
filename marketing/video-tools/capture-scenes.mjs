@@ -1,20 +1,25 @@
-// Captura das 3 cenas do vídeo de apresentação do painel Infinity (demo emulada,
-// pedido da Letícia 2026-08-18). Pré-requisitos: `DEMO_FULL=1 npm run dev` (demo
-// gigante na 3123 + emuladores) E `scripts/provision/start-infinity-preview.cmd`
-// (preview com marca Infinity na 3124, mesmos emuladores). A senha do afiliado
-// semeado muda a cada seed — passe via env DEMO_AFILIADO_PASS (sai no console do
-// `npm run dev` e em .demo-runtime/affiliacore/latest-demo-credentials.txt).
-// Saída: ../video/raw/scene{1,2,3}.webm em 1280×720 (janela 1024×576 da moldura).
+// Captura das cenas dos vídeos de apresentação do painel (demo emulada) — o
+// workflow é POR MARCA: aponte VIDEO_BASE para a instância local com a marca
+// desejada e VIDEO_OUT para a pasta raw/ do kit daquela marca.
+//   AffiliaCore (a própria demo):  VIDEO_BASE=http://127.0.0.1:3123 VIDEO_OUT=marketing/affiliacore/video/raw
+//   Infinity (preview local):      VIDEO_BASE=http://127.0.0.1:3124 VIDEO_OUT=marketing/infinity/video/raw
+//                                  (sobe com scripts/provision/start-infinity-preview.cmd)
+// Pré-requisito comum: `DEMO_FULL=1 npm run dev` (demo gigante + emuladores).
+// Senhas do seed via env DEMO_AFILIADO_PASS / DEMO_ESPECIAL_PASS (saem no
+// console do `npm run dev` e em .demo-runtime/affiliacore/latest-demo-credentials.txt).
+// Saída: VIDEO_OUT/scene{1..8}.webm em 1280×720 (janela 1024×576 da moldura).
+// Vídeo 1 = cenas 1-3 (cadastro, painel, carteira) · vídeo 2 = cenas 4-8
+// (avisos+ranking, conquistas, meus links, rede do especial, gestão da equipe).
 import puppeteer from 'puppeteer-core';
 import { mkdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const RAW = join(HERE, '..', 'video', 'raw');
+const RAW = resolve(process.env.VIDEO_OUT || join(HERE, '..', 'infinity', 'video', 'raw'));
 mkdirSync(RAW, { recursive: true });
 
-const BASE = 'http://127.0.0.1:3124';
+const BASE = process.env.VIDEO_BASE || 'http://127.0.0.1:3124';
 const INVITE = `${BASE}/cadastro/demo-rede-na-souza`;
 const AFILIADO = { email: 'afiliado@affiliacore.com.br', pass: process.env.DEMO_AFILIADO_PASS };
 // Cenas 7/8 (visão do especial) usam DEMO_ESPECIAL_PASS (mesma origem da senha).

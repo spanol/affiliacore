@@ -70,8 +70,10 @@ gravar a voz por cima (CapCut, app do IG) ou `ffmpeg -i video.mp4 -i voz.m4a
 1. `DEMO_FULL=1 npm run dev` (demo gigante nos emuladores, app na 3123).
 2. `scripts/provision/start-infinity-preview.cmd` (marca Infinity na 3124, mesmos emuladores).
 3. Molduras: `node marketing/infinity/generator/gen-video-frames.mjs` (resvg; `npm i --no-save @resvg/resvg-js`).
-4. Cenas: `DEMO_AFILIADO_PASS=<senha do console do dev> node marketing/infinity/generator/capture-scenes.mjs`
-   (puppeteer-core `--no-save`; `SCENES=1` grava só uma cena; sai em `video/raw/scene{1,2,3}.webm`).
+4. Cenas: `VIDEO_BASE=http://127.0.0.1:3124 VIDEO_OUT=marketing/infinity/video/raw
+   DEMO_AFILIADO_PASS=<senha do console do dev> node marketing/video-tools/capture-scenes.mjs`
+   (puppeteer-core `--no-save`; `SCENES=1` grava só uma cena; o script virou
+   COMPARTILHADO entre marcas, ver `marketing/affiliacore/VIDEO-APRESENTACAO.md`).
 5. Composição (receita do kit brand-reels, SPEED=1.25 · BG=0x0e0a16 · WIN=28,640,1024×576):
    a cena 1 leva `crop=864:486:208:117` antes do scale (zoom no card de cadastro,
    que é estreito); cenas 2 e 3 escalam 1280×720→1024×576 direto. Depois
