@@ -2372,6 +2372,31 @@ describe('deals + parcerias (P2)', () => {
     expect(again.body.id).toBe(res.body.id);
   });
 
+  it('POST /api/partnerships: parceria PRECIFICADA também é viva (não nasce duplicata "Em análise")', async () => {
+    // O bug do print do Maurício (18/08): com a parceria em `priced`, o pedido
+    // repetido criava um doc novo e o afiliado via a mesma casa duas vezes.
+    const seed: any = baseSeed();
+    seed.partnership_requests = { p1: { affiliateId: 'affX', dealId: 'd1', status: 'priced', code: null } };
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app).post('/api/partnerships').set('Authorization', 'Bearer aff-uid').send({ dealId: 'd1' }).expect(200);
+    expect(res.body.id).toBe('p1');
+    expect(db.__store.get('partnership_requests')?.size).toBe(1);
+  });
+
+  it('GET /api/partnerships: duplicata da mesma casa vira UMA linha (o estado atual), mesmo filtrando por status', async () => {
+    const seed: any = baseSeed();
+    seed.partnership_requests = {
+      dup: { affiliateId: 'affX', dealId: 'd1', status: 'requested' },
+      p1: { affiliateId: 'affX', dealId: 'd1', status: 'priced' },
+    };
+    const res = await request(buildApp({ seed })).get('/api/partnerships').set('Authorization', 'Bearer aff-uid').expect(200);
+    expect(res.body.partnerships.map((p: any) => p.id)).toEqual(['p1']);
+    // A duplicata superada não ressuscita pelo filtro de status.
+    const filtered = await request(buildApp({ seed })).get('/api/partnerships?status=requested').set('Authorization', 'Bearer aff-uid').expect(200);
+    expect(filtered.body.partnerships).toEqual([]);
+  });
+
   it('GET /api/partnerships: afiliado vê só as dele (não vaza a do outro)', async () => {
     const seed: any = baseSeed();
     seed.partnership_requests = {

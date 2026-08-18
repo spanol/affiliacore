@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   canTransition, isActivePartnership, selectAvailableDeals, joinPartnerships,
+  selectCurrentPartnerships,
   partnershipStatusLabel, PARTNERSHIP_STATUSES, PARTNERSHIP_STATUS_LABEL,
   PartnershipRequest,
 } from './partnership';
@@ -124,5 +125,72 @@ describe('joinPartnerships · enriquece request com dados do deal', () => {
     const r: PartnershipRequest = { ...req('dX', 'discontinued'), operatorName: 'Antiga', dealLabel: 'Antiga - CPA' };
     const [out] = joinPartnerships([r], {});
     expect(out).toMatchObject({ operatorName: 'Antiga', dealLabel: 'Antiga - CPA' });
+  });
+});
+
+describe('selectCurrentPartnerships · uma entrada por afiliado×acordo (o estado atual)', () => {
+  const at = (id: string, dealId: string, status: PartnershipRequest['status'], over: Partial<PartnershipRequest> = {}): PartnershipRequest =>
+    ({ id, affiliateId: 'a1', dealId, status, ...over });
+
+  it('duplicata do print do Maurício: "Em análise" + "Aguardando o link" da mesma casa viram SÓ a precificada', () => {
+    const out = selectCurrentPartnerships([
+      at('p2', 'esportiva', 'requested'),
+      at('p1', 'esportiva', 'priced'),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ id: 'p1', status: 'priced' });
+  });
+
+  it('a viva mais avançada vence: aprovada > precificada > solicitada', () => {
+    const out = selectCurrentPartnerships([
+      at('p1', 'd1', 'requested'),
+      at('p2', 'd1', 'approved'),
+      at('p3', 'd1', 'priced'),
+    ]);
+    expect(out.map((p) => p.id)).toEqual(['p2']);
+  });
+
+  it('recusa antiga some quando um pedido novo está de pé (o estado atual é o pedido)', () => {
+    const out = selectCurrentPartnerships([
+      at('velha', 'd1', 'rejected', { decidedAt: '2026-08-01T10:00:00Z' }),
+      at('nova', 'd1', 'requested', { requestedAt: '2026-08-15T10:00:00Z' }),
+    ]);
+    expect(out.map((p) => p.id)).toEqual(['nova']);
+  });
+
+  it('sem nenhuma viva, vale a decisão mais recente (rejeitada fica apenas como rejeitada)', () => {
+    const out = selectCurrentPartnerships([
+      at('r1', 'd1', 'rejected', { decidedAt: '2026-08-01T10:00:00Z' }),
+      at('r2', 'd1', 'rejected', { decidedAt: '2026-08-10T10:00:00Z' }),
+    ]);
+    expect(out.map((p) => p.id)).toEqual(['r2']);
+    expect(out[0].status).toBe('rejected');
+  });
+
+  it('acordos diferentes e afiliados diferentes NÃO se engolem', () => {
+    const list = [
+      at('p1', 'd1', 'approved'),
+      at('p2', 'd2', 'requested'),
+      { ...at('p3', 'd1', 'requested'), affiliateId: 'a2' },
+    ];
+    expect(selectCurrentPartnerships(list)).toHaveLength(3);
+  });
+
+  it('timestamp tolerante: shape serializado {seconds} desempata entre iguais', () => {
+    const out = selectCurrentPartnerships([
+      at('antiga', 'd1', 'requested', { requestedAt: { seconds: 1_000 } }),
+      at('recente', 'd1', 'requested', { requestedAt: { seconds: 2_000 } }),
+    ]);
+    expect(out.map((p) => p.id)).toEqual(['recente']);
+  });
+
+  it('entradas inválidas não lançam nem agrupam sem dealId', () => {
+    expect(selectCurrentPartnerships(null as any)).toEqual([]);
+    const out = selectCurrentPartnerships([
+      null as any,
+      at('semDeal1', '', 'requested'),
+      at('semDeal2', '', 'requested'),
+    ]);
+    expect(out.map((p) => p.id)).toEqual(['semDeal1', 'semDeal2']);
   });
 });

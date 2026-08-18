@@ -49,7 +49,7 @@ import { parseStandbyLinks, extractTagFromUrl } from './src/lib/linkTriage';
 import { buildTaggedUrl, suggestTag } from './src/lib/linkGeneration';
 import { buildResultsNotification, type ResultsNotificationVariant } from './src/lib/resultsNotification';
 import { normalizeDealInput, buildDealLabel, dealBrandKey, dealToBrandRates, dealFxSpec, buildDraftDealFromHouse } from './src/lib/deal';
-import { canTransition, nextStatusAfterPricing, PARTNERSHIP_STATUS_LABEL, type PartnershipStatus } from './src/lib/partnership';
+import { canTransition, nextStatusAfterPricing, isActivePartnership, selectCurrentPartnerships, PARTNERSHIP_STATUS_LABEL, type PartnershipStatus } from './src/lib/partnership';
 import {
   resolveDealType, dealPolicy, effectivePricedBy, sanitizeDealsForViewer, type DealTypeId,
 } from './src/lib/dealType';
@@ -4937,7 +4937,13 @@ export function createApp(deps: ServerDeps) {
       }
 
       const wantStatus = typeof req.query.status === 'string' ? req.query.status : null;
-      const list = docs.map(partnershipFromDoc).filter((p) => !wantStatus || p.status === wantStatus);
+      // UMA linha por afiliado×acordo (o estado atual): a duplicata que o POST
+      // antigo deixou criar (não conhecia `priced`) virava duas entradas na tela
+      // do afiliado e duas filas p/ o gerente. O dedupe roda ANTES do filtro de
+      // status — depois dele, um `?status=requested` ressuscitaria justamente a
+      // duplicata superada que a lista completa esconde.
+      const list = selectCurrentPartnerships(docs.map(partnershipFromDoc))
+        .filter((p) => !wantStatus || p.status === wantStatus);
 
       // Carimba QUEM precifica cada parceria. A tela precisa disso para falar a
       // verdade ao afiliado ("aguardando seu gerente" × "em análise"): sem o
@@ -4971,7 +4977,9 @@ export function createApp(deps: ServerDeps) {
 
   // Solicita uma parceria. O afiliado só pede p/ si (affiliateId do token); admin pode
   // pedir por outro (body.affiliateId). Idempotente por (afiliado × deal) enquanto a
-  // parceria estiver VIVA (solicitada/aprovada) — recusada/encerrada libera novo pedido.
+  // parceria estiver VIVA (isActivePartnership: solicitada/precificada/aprovada) —
+  // recusada/encerrada libera novo pedido. `priced` TEM que contar como viva: sem ela
+  // o pedido repetido criava um doc novo e o afiliado via a mesma casa duas vezes.
   app.post('/api/partnerships', requireAuth, requireMarketplace, async (req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
     try {
@@ -4998,7 +5006,7 @@ export function createApp(deps: ServerDeps) {
       const existing = await adminDb.collection('partnership_requests').where('affiliateId', '==', affiliateId).get();
       const alive = existing.docs.find((d) => {
         const x = d.data() as any;
-        return String(x.dealId) === dealId && (x.status === 'requested' || x.status === 'approved');
+        return String(x.dealId) === dealId && isActivePartnership((x.status ?? 'requested') as PartnershipStatus);
       });
       if (alive) return res.status(200).json(partnershipFromDoc(alive));
 

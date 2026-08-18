@@ -109,6 +109,58 @@ export function isActivePartnership(status: PartnershipStatus): boolean {
   return status === 'requested' || status === 'priced' || status === 'approved';
 }
 
+// Peso de "quão avançada" está a parceria na esteira. As VIVAS ficam sempre à
+// frente das decididas, e entre vivas vence a mais adiante no fluxo.
+const CURRENT_RANK: Record<PartnershipStatus, number> = {
+  approved: 5,
+  priced: 4,
+  requested: 3,
+  rejected: 2,
+  discontinued: 2,
+};
+
+// Timestamp tolerante: Timestamp do Admin SDK (tem toMillis), o shape serializado
+// em JSON ({seconds}/{_seconds}) ou string de data. Fora disso, 0.
+function partnershipTimeOf(v: any): number {
+  if (!v) return 0;
+  if (typeof v.toMillis === 'function') {
+    try { return Number(v.toMillis()) || 0; } catch { return 0; }
+  }
+  const secs = Number(v.seconds ?? v._seconds);
+  if (Number.isFinite(secs) && secs > 0) return secs * 1000;
+  const parsed = Date.parse(String(v));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+// UMA entrada por afiliado×acordo: o ESTADO ATUAL da parceria. O fluxo gerenciado
+// muda a MESMA solicitação de estado (requested → priced → approved), mas
+// duplicatas reais existiram (o POST idempotente não conhecia `priced` e deixava
+// pedir de novo um acordo já precificado) e viravam DUAS linhas na tela do
+// afiliado — "Em análise" e "Aguardando o link" da mesma casa, print do Maurício
+// em 18/08/2026 — e duas filas para o gerente/admin. A regra: a parceria VIVA
+// mais avançada vence; sem nenhuma viva, vale a decisão mais recente (a recusa
+// antiga some quando um pedido novo está de pé, porque o estado atual é o pedido).
+// O histórico completo continua nos docs e na trilha de auditoria.
+export function selectCurrentPartnerships(requests: PartnershipRequest[]): PartnershipRequest[] {
+  const rank = (r: PartnershipRequest) => CURRENT_RANK[r?.status as PartnershipStatus] ?? 0;
+  const when = (r: PartnershipRequest) =>
+    Math.max(partnershipTimeOf(r?.decidedAt), partnershipTimeOf(r?.requestedAt));
+  const byKey = new Map<string, PartnershipRequest>();
+  const list = Array.isArray(requests) ? requests : [];
+  for (let i = 0; i < list.length; i++) {
+    const r = list[i];
+    if (!r) continue;
+    const dealId = String(r.dealId ?? '').trim();
+    // Sem dealId não dá para saber de qual acordo é: fica como veio, sem agrupar.
+    const key = dealId ? `${String(r.affiliateId ?? '')}|${dealId}` : `#${i}`;
+    const cur = byKey.get(key);
+    if (!cur || rank(r) > rank(cur) || (rank(r) === rank(cur) && when(r) >= when(cur))) {
+      byKey.set(key, r);
+    }
+  }
+  return [...byKey.values()];
+}
+
 // OFERTAS DISPONÍVEIS = deals ATIVOS que o afiliado ainda não tem parceria VIVA.
 // (uma parceria recusada/encerrada não esconde a oferta — pode pedir de novo).
 export function selectAvailableDeals(deals: Deal[], myRequests: PartnershipRequest[]): Deal[] {
