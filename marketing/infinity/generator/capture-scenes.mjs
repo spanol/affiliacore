@@ -17,10 +17,8 @@ mkdirSync(RAW, { recursive: true });
 const BASE = 'http://127.0.0.1:3124';
 const INVITE = `${BASE}/cadastro/demo-rede-na-souza`;
 const AFILIADO = { email: 'afiliado@affiliacore.com.br', pass: process.env.DEMO_AFILIADO_PASS };
-if (!AFILIADO.pass) {
-  console.error('Falta DEMO_AFILIADO_PASS (senha do afiliado da demo, ver .demo-runtime/affiliacore/latest-demo-credentials.txt).');
-  process.exit(1);
-}
+// Cenas 7/8 (visão do especial) usam DEMO_ESPECIAL_PASS (mesma origem da senha).
+const ESPECIAL = { email: 'especial@affiliacore.com.br', pass: process.env.DEMO_ESPECIAL_PASS };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -48,9 +46,41 @@ async function typeInto(page, selector, text, delay = 26) {
   await page.type(selector, text, { delay });
 }
 
-// SCENES=1 (ou "2,3") grava só as cenas listadas; default = todas.
+// SCENES=1 (ou "2,3") grava só as cenas listadas; default = as 3 do vídeo 1.
+// Vídeo 2 = cenas 4..8 (SCENES=4,5,6,7,8).
 const SCENES = (process.env.SCENES || '1,2,3').split(',').map((s) => s.trim());
 const wants = (n) => SCENES.includes(String(n));
+
+// Login pela tela (fora de gravação); tolera sessão já aberta no perfil.
+async function loginAs(page, who) {
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle2' });
+  if (await page.$('input[type="email"]')) {
+    await page.type('input[type="email"]', who.email, { delay: 5 });
+    await page.type('input[type="password"]', who.pass, { delay: 5 });
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 }).catch(() => {}),
+      page.click('button[type="submit"]'),
+    ]);
+  }
+  await sleep(4000);
+  await dismissPopups(page);
+}
+
+// Cena "navega e rola": grava a rota com pausas de leitura e rolagem suave.
+async function recordRoute(page, path, out, { holds = [2800, 2000, 2200], scrolls = [600, 600] } = {}) {
+  await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle2' });
+  await sleep(2500);
+  await dismissPopups(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await sleep(300);
+  const rec = await page.screencast({ path: out });
+  await sleep(holds[0]);
+  for (let i = 0; i < scrolls.length; i++) {
+    await smoothScroll(page, scrolls[i]);
+    await sleep(holds[i + 1] ?? 2000);
+  }
+  await rec.stop();
+}
 
 // A demo semeia mensagens da gerência que abrem como popup sobre o painel —
 // fora da gravação elas são dispensadas (senão a cena inteira fica atrás do modal).
@@ -177,6 +207,69 @@ if (wants(3)) {
   await rec.stop();
   console.log('scene3 ok');
 }
+}
+
+// ---------- VÍDEO 2 · cenas 4-6: módulos do afiliado que ficaram de fora ----------
+if (wants(4) || wants(5) || wants(6)) {
+  if (!AFILIADO.pass) { console.error('Falta DEMO_AFILIADO_PASS.'); process.exit(1); }
+  const page = await newPage();
+  await loginAs(page, AFILIADO);
+
+  if (wants(4)) {
+    // avisos + ranking numa cena só (a navegação entra na gravação)
+    await page.goto(`${BASE}/avisos`, { waitUntil: 'networkidle2' });
+    await sleep(2500);
+    await dismissPopups(page);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await sleep(300);
+    const rec = await page.screencast({ path: join(RAW, 'scene4.webm') });
+    await sleep(2800);
+    await smoothScroll(page, 450);
+    await sleep(1800);
+    // navegação SPA (clique na sidebar): page.goto recarrega a página inteira e
+    // pisca BRANCO no meio da gravação
+    await page.click('a[href="/ranking"]');
+    await sleep(2600);
+    await smoothScroll(page, 500);
+    await sleep(2200);
+    await rec.stop();
+    console.log('scene4 ok');
+  }
+  if (wants(5)) {
+    await recordRoute(page, '/conquistas', join(RAW, 'scene5.webm'));
+    console.log('scene5 ok');
+  }
+  if (wants(6)) {
+    await recordRoute(page, '/meus-links', join(RAW, 'scene6.webm'));
+    console.log('scene6 ok');
+  }
+  await page.close();
+}
+
+// ---------- VÍDEO 2 · cenas 7-8: a visão do afiliado ESPECIAL ----------
+if (wants(7) || wants(8)) {
+  if (!ESPECIAL.pass) { console.error('Falta DEMO_ESPECIAL_PASS.'); process.exit(1); }
+  // contexto anônimo: não herda a sessão do afiliado
+  const ctx = await browser.createBrowserContext();
+  const page = await ctx.newPage();
+  await page.setViewport({ width: 1280, height: 720 });
+  await page.evaluateOnNewDocument(() => {
+    localStorage.setItem('theme', 'dark');
+    const kill = () => document.querySelectorAll('.firebase-emulator-warning').forEach((n) => n.remove());
+    new MutationObserver(kill).observe(document.documentElement, { childList: true, subtree: true });
+    setInterval(kill, 300);
+  });
+  await loginAs(page, ESPECIAL);
+
+  if (wants(7)) {
+    await recordRoute(page, '/network', join(RAW, 'scene7.webm'), { holds: [3000, 2000, 2200], scrolls: [700, 700] });
+    console.log('scene7 ok');
+  }
+  if (wants(8)) {
+    await recordRoute(page, '/network/afiliados', join(RAW, 'scene8.webm'), { holds: [3000, 2000, 2200], scrolls: [600, 600] });
+    console.log('scene8 ok');
+  }
+  await ctx.close();
 }
 
 await browser.close();

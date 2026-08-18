@@ -111,4 +111,70 @@ frame({
     'Acompanhe o status de cada pedido',
   ],
 });
+// ---------- Vídeo 2 · os módulos que ficaram de fora (afiliado + especial) ----------
+frame({
+  file: 'v2-frame-1-avisos.png',
+  index: 1,
+  total: 5,
+  title: 'Fique por dentro',
+  titleSize: 88,
+  sub: 'Avisos da agência e ranking do período',
+  bullets: [
+    'Mural com os comunicados da agência',
+    'Notificações pessoais no sino',
+    'Ranking com os destaques do período',
+  ],
+});
+frame({
+  file: 'v2-frame-2-conquistas.png',
+  index: 2,
+  total: 5,
+  title: 'Evolua e conquiste',
+  titleSize: 84,
+  sub: 'Marcos de produção viram placas',
+  bullets: [
+    'Conquistas por marco de faturamento',
+    'Progresso até o próximo nível',
+    'Solicite a placa ao bater a meta',
+  ],
+});
+frame({
+  file: 'v2-frame-3-links.png',
+  index: 3,
+  total: 5,
+  title: 'Seus links e acordos',
+  titleSize: 80,
+  sub: 'Divulgação com cliques contados',
+  bullets: [
+    'Links prontos para divulgar',
+    'Os termos do seu acordo, casa a casa',
+    'Cliques contados em tempo real',
+  ],
+});
+frame({
+  file: 'v2-frame-4-equipe.png',
+  index: 4,
+  total: 5,
+  title: 'A visão do líder',
+  titleSize: 88,
+  sub: 'Quem tem equipe enxerga a rede inteira',
+  bullets: [
+    'Comissão consolidada da equipe',
+    'Produção da rede, casa a casa',
+    'Top afiliados do período',
+  ],
+});
+frame({
+  file: 'v2-frame-5-gestao.png',
+  index: 5,
+  total: 5,
+  title: 'Gerencie sua equipe',
+  titleSize: 82,
+  sub: 'Afiliados, produção e link de convite',
+  bullets: [
+    'A produção de cada afiliado seu',
+    'Link de cadastro da sua rede',
+    'Quem entra pelo link já nasce na equipe',
+  ],
+});
 console.log('OUT →', OUT);
