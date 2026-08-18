@@ -15,6 +15,8 @@ set GOOGLE_CLOUD_PROJECT=affiliacore
 set FIREBASE_WEBAPP_CONFIG={"apiKey":"demo-local","authDomain":"127.0.0.1","projectId":"affiliacore","storageBucket":"affiliacore.firebasestorage.app","appId":"1:demo:web:demo"}
 set VITE_USE_EMULATORS=true
 set VITE_OTG_ENABLED=false
+rem A Infinity real liga o marketplace (apphosting.infinity.yaml) — o preview acompanha.
+set VITE_MARKETPLACE_ENABLED=true
 set VITE_BRAND_NAME=Infinity
 set VITE_BRAND_SHORT=Infinity
 set VITE_BRAND_LOGO_URL=/infinity/logo.svg
