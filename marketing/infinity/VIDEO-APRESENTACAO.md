@@ -40,6 +40,31 @@ Vídeo 2:
 > meta, seus links com os termos do acordo e, para quem lidera equipe, a visão
 > completa da rede com o link de convite. Qualquer dúvida, chama o suporte.
 
+## Narração (copy para locução ou TTS)
+
+Os vídeos saem sem áudio de propósito. A narração abaixo foi calibrada à duração
+real de cada cena (~2,5 palavras por segundo, com folga de respiro). Para juntar:
+gravar a voz por cima (CapCut, app do IG) ou `ffmpeg -i video.mp4 -i voz.m4a
+-c:v copy -map 0:v -map 1:a -shortest out.mp4`.
+
+### Vídeo 1 · `apresentacao-painel.mp4` (31s)
+
+| Cena | Janela | Texto |
+|------|--------|-------|
+| 1 · Cadastro | 0:00 a 0:12 | Bem-vindo à Infinity! Criar o seu acesso é rápido: abra o link de cadastro que você recebeu, preencha seus dados, crie uma senha e pronto. Seu login fica ativo na hora. |
+| 2 · Painel | 0:12 a 0:23 | Ao entrar, o painel mostra seus números do período: comissão total, cadastros, depósitos e o detalhamento casa a casa, com a evolução dia a dia. |
+| 3 · Carteira | 0:23 a 0:31 | E no Financeiro fica a sua carteira: saldo por casa, saque via PIX e o status de cada pedido. Dúvidas? Chama o suporte. |
+
+### Vídeo 2 · `apresentacao-painel-2.mp4` (40s)
+
+| Cena | Janela | Texto |
+|------|--------|-------|
+| 1 · Avisos e ranking | 0:00 a 0:09 | Nos avisos ficam os comunicados da agência e as suas notificações. E o ranking diário mostra os destaques e os prêmios do dia. |
+| 2 · Conquistas | 0:09 a 0:17 | Nas conquistas, cada meta de produção vira uma placa: acompanhe seu progresso e solicite o prêmio quando bater a meta. |
+| 3 · Meus Links | 0:17 a 0:24 | Em Meus Links você encontra o seu link de cada casa, com os termos do acordo e os cliques contados. |
+| 4 · Visão do líder | 0:24 a 0:32 | Quem lidera uma equipe vê a rede inteira: comissão consolidada, produção casa a casa e o desempenho de cada afiliado. |
+| 5 · Gestão da equipe | 0:32 a 0:40 | Em Meus Afiliados, gerencie sua equipe e compartilhe o seu link de cadastro: quem entra por ele já nasce na sua rede. |
+
 ## Como regravar / regenerar
 
 1. `DEMO_FULL=1 npm run dev` (demo gigante nos emuladores, app na 3123).
