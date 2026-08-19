@@ -449,6 +449,9 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
   // "Upload manual" numa casa que puxa sozinha, como a Esportiva.
   const [mode, setMode] = useState<HouseResultsMode>(() => houseResultsMode(house));
   const [integrationId, setIntegrationId] = useState(house?.integration ?? '');
+  // Rede 1:N (ex.: Fomento/Offer18): id da casa DENTRO da rede (offer_id). É por
+  // ele que o postback acha a casa; o servidor recusa duplicado na mesma rede.
+  const [integrationExternalId, setIntegrationExternalId] = useState(house?.integrationExternalId ?? '');
   const [integrations, setIntegrations] = useState<PublicIntegration[]>([]);
   const [loadingIntegrations, setLoadingIntegrations] = useState(true);
   // Taxa padrão da casa (comissão casa→agência) — string no input, parseada no save.
@@ -500,6 +503,10 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
   }, []);
 
   const selectedIntegration = integrations.find((i) => i.id === integrationId) ?? null;
+  // Rede 1:N por postback: pede o id externo e MANTÉM a taxa padrão da casa (o
+  // postback só traz contagens; a comissão deriva do defaultCpa, como toda casa
+  // EUR sem comissão importada).
+  const multiHouseIntegration = mode === 'integration' && selectedIntegration?.multiHouse === true;
 
   const autoSlug = useMemo(
     () => name.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
@@ -569,6 +576,8 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
         registerUrlTemplate: registerUrlTemplate.trim() || null,
         active,
         ...houseModePayload(mode, integrationId),
+        // Rede 1:N: fora dela o campo vai null (limpa um vínculo antigo de oferta).
+        integrationExternalId: multiHouseIntegration ? (integrationExternalId.trim() || null) : null,
         // Valor na moeda escolhida (EUR inteiro / BRL e USD com centavos) + a moeda
         // e o regime, que viajam SEMPRE juntos: são eles que decidem se o número
         // será convertido e por qual taxa.
@@ -770,6 +779,23 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
               </Field>
             )}
 
+            {/* Rede 1:N (postback): a mesma credencial atende várias casas, e é o id
+                externo que roteia cada disparo para a casa certa. Sem ele o evento
+                fica no ledger como "sem casa" até o admin preencher e reprocessar. */}
+            {multiHouseIntegration && (
+              <Field
+                label="ID da oferta na rede"
+                hint="O número da oferta desta casa no painel da rede (ex.: 22007840 na Fomento). É por ele que o postback credita esta casa; duplicado entre casas da mesma rede é recusado."
+              >
+                <input
+                  value={integrationExternalId}
+                  onChange={(e) => setIntegrationExternalId(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="ex.: 22007840"
+                  className={`${inputCls} font-mono`}
+                />
+              </Field>
+            )}
+
             {/* A taxa padrão da casa é uma DECLARAÇÃO: a agência informa o que a casa
                 paga porque ninguém lhe conta. Numa casa com pull isso se inverte — a
                 própria casa conta (comissão, RVS e a parcela CPA vêm na resposta), e o
@@ -777,7 +803,7 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
                 `total_commission` ausente, e o pull sempre a traz) e o CPA virou um
                 segundo lugar para a MESMA régua que o conector lê de /integracoes. Em
                 vez de pedir de novo um número que já existe, apontamos para a fonte. */}
-            {mode === 'integration' && (
+            {mode === 'integration' && !multiHouseIntegration && (
               <div className="p-4 rounded-xl bg-slate-50 dark:bg-neutral-800/40 border border-slate-100 dark:border-neutral-800 space-y-2">
                 <p className="text-xs font-bold text-slate-700 dark:text-neutral-200 flex items-center gap-2">
                   <Plug size={14} className="text-emerald-500" /> Taxas: quem informa é a casa
@@ -797,7 +823,10 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
               </div>
             )}
 
-            {mode === 'manual' && (
+            {/* Também nas redes 1:N por postback: os disparos só trazem CONTAGEM
+                (lead/ftd) e a comissão da casa DERIVA desta taxa, então escondê-la
+                aqui zeraria a receita da casa sem nenhum erro na tela. */}
+            {(mode === 'manual' || multiHouseIntegration) && (
               <Field label="Taxa padrão da casa" hint="RECEITA: o que a casa paga à AGÊNCIA. NÃO é o repasse ao afiliado (esse fica em Afiliados). Usada p/ derivar a comissão quando a planilha não traz a coluna 'comissao'. Informe na MOEDA em que a casa paga: em moeda estrangeira você escolhe se a conversão segue a cotação do dia ou uma cotação fixa; em real gravamos o valor exato. Sem isto, o lucro por casa fica negativo.">
                 <div className="grid grid-cols-2 gap-2">
                   <div>

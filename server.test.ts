@@ -22,6 +22,7 @@ import request from 'supertest';
 import { createApp } from './server';
 import { generateTotpSecret, hashBackupCode, totpCode } from './src/lib/totp';
 import { addDays } from './src/lib/rateHistory';
+import { resolveServerToday } from './src/lib/scope';
 
 // Segredo fixo p/ os testes de 2FA — os códigos são gerados de verdade (RFC 6238).
 const SECRET = generateTotpSecret();
@@ -4963,5 +4964,160 @@ describe('validação de telefone por SMS (/api/phone)', () => {
     const { provider } = captureSms();
     const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(), smsProvider: provider });
     await request(app).post('/api/phone/attach').send({ phone: PHONE, verificationToken: 'x' }).expect(401);
+  });
+});
+
+// =============================================================================
+// Postback da Fomento (rede Offer18) — /api/postback/fomento + reprocesso
+// =============================================================================
+describe('postback da Fomento — /api/postback/fomento', () => {
+  const HOJE = resolveServerToday();
+  const seed = () => ({
+    users: { 'admin-uid': { role: 'admin' } },
+    integrations: { 'fomento-offer18': { enabled: true, apiKey: 'seg' } },
+    houses: {
+      spininio: {
+        slug: 'spininio', name: 'Spininio BR Sports', dataSource: 'manual',
+        integration: 'fomento-offer18', integrationExternalId: '22007840',
+        defaultCpa: 35, cpaCurrency: 'EUR', active: true,
+      },
+    },
+    affiliate_links: { l1: { affiliateId: 'AFF-1', tag: 'mauricio' } },
+  });
+  const fire = (app: any, qs: string) => request(app).get(`/api/postback/fomento?${qs}`);
+
+  it('sem segredo certo → 403; integração desligada → 503', async () => {
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(seed()) });
+    await fire(app, 's=errado&offer=22007840&event=ftd').expect(403);
+
+    const dbOff = makeFirestore({ ...seed(), integrations: { 'fomento-offer18': { enabled: false, apiKey: 'seg' } } });
+    const appOff = createApp({ adminApp: makeAdminApp(), adminDb: dbOff });
+    await fire(appOff, 's=seg&offer=22007840&event=ftd').expect(503);
+  });
+
+  it('template mal colado (offer/event ausentes) → 400, visível no log de postback da rede', async () => {
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(seed()) });
+    await fire(app, 's=seg&event=ftd').expect(400);
+    await fire(app, 's=seg&offer=22007840').expect(400);
+  });
+
+  it('ftd com tag vinculada: ledger idempotente + agregado e linha atribuída, SEM dinheiro', async () => {
+    const db = makeFirestore(seed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await fire(app, 's=seg&offer=22007840&event=ftd&click=c1&tag=mauricio&payout=35&currency=EUR&player=jog9').expect(200);
+    expect(res.body).toMatchObject({ ok: true, house: 'spininio', day: HOJE });
+
+    // Ledger: doc determinístico, com o payout CRU (auditoria) fora das métricas.
+    const ev = db.__store.get('postback_events')!.get('fpb__22007840__ftd__c1');
+    expect(ev).toMatchObject({ offerId: '22007840', event: 'ftd', tag: 'mauricio', payout: 35, currency: 'EUR', day: HOJE });
+
+    const rows = [...db.__store.get('house_results')!.values()];
+    const agg = rows.find((r: any) => r.affiliateId === null);
+    const attr = rows.find((r: any) => r.affiliateId === 'AFF-1');
+    expect(agg).toMatchObject({ houseSlug: 'spininio', date: HOJE, first_deposits: 1, qualified_cpa: 1, registrations: 0, total_commission: 0, source: 'postback' });
+    expect(attr).toMatchObject({ date: HOJE, first_deposits: 1, qualified_cpa: 1 });
+
+    const casa = db.__store.get('houses')!.get('spininio');
+    expect(casa.lastResultsSyncSource).toBe('postback');
+    expect(casa.lastResultsDate).toBe(HOJE);
+  });
+
+  it('retry do mesmo disparo (mesmo click) não duplica: continua 1 FTD', async () => {
+    const db = makeFirestore(seed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const qs = 's=seg&offer=22007840&event=ftd&click=c1&tag=mauricio';
+    await fire(app, qs).expect(200);
+    const res2 = await fire(app, qs).expect(200);
+    expect(res2.body.duplicate).toBe(true);
+    const rows = [...db.__store.get('house_results')!.values()];
+    expect(rows.find((r: any) => r.affiliateId === null)?.first_deposits).toBe(1);
+  });
+
+  it('lead vira cadastro; evento desconhecido fica só no ledger', async () => {
+    const db = makeFirestore(seed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await fire(app, 's=seg&offer=22007840&event=lead&click=c2&tag=mauricio').expect(200);
+    await fire(app, 's=seg&offer=22007840&event=install&click=c3&tag=mauricio').expect(200);
+    const rows = [...db.__store.get('house_results')!.values()];
+    const agg = rows.find((r: any) => r.affiliateId === null);
+    expect(agg).toMatchObject({ registrations: 1, first_deposits: 0, qualified_cpa: 0 });
+    expect(db.__store.get('postback_events')!.size).toBe(2);
+  });
+
+  it('oferta sem casa: evento fica no ledger, nada em house_results, 200 (sem retry na rede)', async () => {
+    const db = makeFirestore(seed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await fire(app, 's=seg&offer=99999&event=ftd&click=c9').expect(200);
+    expect(res.body.unmapped).toBe(true);
+    expect(db.__store.get('postback_events')!.size).toBe(1);
+    expect(db.__store.get('house_results')?.size ?? 0).toBe(0);
+  });
+
+  it('POST /api/houses/:slug/pull (admin) reprocessa o ledger: apelido novo reatribui a tag pendente', async () => {
+    const base = seed();
+    const db = makeFirestore({
+      ...base,
+      affiliate_links: {},
+      postback_events: {
+        e1: { offerId: '22007840', event: 'ftd', tag: 'novatag', clickId: 'c1', day: HOJE, payout: 35, currency: 'EUR' },
+      },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+
+    const r1 = await request(app).post('/api/houses/spininio/pull').set('Authorization', 'Bearer admin-uid').send({}).expect(200);
+    expect(r1.body.attributed).toBe(0);
+    expect(r1.body.pending.map((p: any) => p.tag)).toEqual(['novatag']);
+
+    db.__store.get('affiliate_tag_aliases')!.set('novatag', { tag: 'novatag', affiliateId: 'AFF-2' });
+    const r2 = await request(app).post('/api/houses/spininio/pull').set('Authorization', 'Bearer admin-uid').send({}).expect(200);
+    expect(r2.body.attributed).toBe(1);
+    const attr = [...db.__store.get('house_results')!.values()].find((r: any) => r.affiliateId === 'AFF-2');
+    expect(attr).toMatchObject({ first_deposits: 1, qualified_cpa: 1 });
+    // O reprocesso é auditado (o disparo individual não é: o ledger é a trilha).
+    const logs = [...db.__store.get('audit_logs')!.values()];
+    expect(logs.some((l: any) => l.action === 'house_results.pull' && l.metadata?.via === 'postback-recompute')).toBe(true);
+  });
+
+  it('reprocesso sem ID da oferta na casa → 400 com instrução', async () => {
+    const base = seed();
+    (base.houses as any).spininio.integrationExternalId = null;
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(base) });
+    const res = await request(app).post('/api/houses/spininio/pull').set('Authorization', 'Bearer admin-uid').send({}).expect(400);
+    expect(res.body.error).toContain('ID da oferta');
+  });
+});
+
+describe('casas × rede 1:N — vínculo por integrationExternalId', () => {
+  const seed = () => ({
+    users: { 'admin-uid': { role: 'admin' } },
+    integrations: { 'fomento-offer18': { enabled: true, apiKey: 'seg' } },
+    houses: {
+      spininio: { slug: 'spininio', name: 'Spininio', dataSource: 'manual', integration: 'fomento-offer18', integrationExternalId: '22007840' },
+      slottica: { slug: 'slottica', name: 'Slottica', dataSource: 'manual' },
+    },
+  });
+
+  it('vincular a 2ª casa à rede NÃO desliga a 1ª (multiHouse não passa pelo vínculo 1:1)', async () => {
+    const db = makeFirestore(seed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .patch('/api/houses/slottica')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ integration: 'fomento-offer18', integrationExternalId: '21996441' })
+      .expect(200);
+    expect(db.__store.get('houses')!.get('slottica').integration).toBe('fomento-offer18');
+    // A 1ª casa segue vinculada e o doc da integração não aponta casa nenhuma.
+    expect(db.__store.get('houses')!.get('spininio').integration).toBe('fomento-offer18');
+    expect(db.__store.get('integrations')!.get('fomento-offer18').houseId ?? null).toBeNull();
+  });
+
+  it('o mesmo offer_id em duas casas da rede é recusado (409): o postback creditaria a casa errada', async () => {
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(seed()) });
+    const res = await request(app)
+      .patch('/api/houses/slottica')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ integration: 'fomento-offer18', integrationExternalId: '22007840' })
+      .expect(409);
+    expect(res.body.error).toContain('22007840');
   });
 });

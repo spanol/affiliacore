@@ -47,6 +47,9 @@ export interface House {
   // Conector de pull declarado PELA casa (ex.: 'esportiva-tap'), auto-carimbado
   // pelo conector a cada rodada. Fonte da verdade da integração automática.
   integration?: string | null;
+  // Id da casa DENTRO de uma integração multiHouse (rede 1:N) — ex.: o offer_id
+  // da Fomento/Offer18. É por ele que o postback acha a casa.
+  integrationExternalId?: string | null;
   // Anotado pelo servidor: flag `integration` presente E conector configurado
   // nesta instância. Gate do botão "Atualizar" em /casas.
   pullAvailable?: boolean;
@@ -71,8 +74,12 @@ export interface HouseInput {
   revInProfit?: boolean;
   logoBase64?: string | null;
   // Vínculo com um conector de /integracoes ('' / null desvincula). O servidor
-  // valida contra o catálogo e escreve os DOIS lados do vínculo.
+  // valida contra o catálogo e escreve os DOIS lados do vínculo (nas redes 1:N,
+  // só a flag da casa).
   integration?: string | null;
+  // Rede 1:N: id externo da casa na rede (ex.: offer_id da Fomento). O servidor
+  // recusa duplicado entre casas da mesma rede.
+  integrationExternalId?: string | null;
 }
 
 // Mapeia uma House (backend) para o BrandMeta usado pelos helpers de marca.

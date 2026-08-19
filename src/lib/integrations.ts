@@ -34,6 +34,13 @@ export interface IntegrationSpec {
   description: string;
   /** Casa a que o conector se liga (Esportiva é uma CASA, não um gateway). */
   scope: 'house' | 'global';
+  /**
+   * true = UMA credencial atende VÁRIAS casas (rede, ex.: Fomento/Offer18).
+   * O vínculo NÃO passa por `applyIntegrationLink` (que é 1:1 e limparia a casa
+   * anterior): cada casa carrega a flag `integration` + o id externo dela
+   * (`integrationExternalId`, ex.: o offer_id da rede) no próprio doc.
+   */
+  multiHouse?: boolean;
   /** Envs que serviam de fonte antes desta tela — viram fallback. */
   envKeys: { apiKey: string; house?: string; [k: string]: string | undefined };
   /** Casa assumida quando nem o doc nem o env dizem qual é. */
@@ -96,6 +103,23 @@ export const INTEGRATION_CATALOG: IntegrationSpec[] = [
       },
     ],
   },
+  {
+    // A 1ª integração por POSTBACK (push): a rede chama a gente a cada conversão,
+    // não há pull de relatório. A "chave" aqui é o SEGREDO da URL de postback, que
+    // o admin inventa e cola nos dois lados. Ver src/lib/fomentoPostback.ts.
+    id: 'fomento-offer18',
+    label: 'Fomento (rede Offer18)',
+    description:
+      'Recebe o postback da rede a cada conversão: "lead" vira cadastro e "ftd" vira FTD e CPA na casa vinculada. ' +
+      'Uma credencial atende várias casas: cada casa aponta a oferta dela no campo "ID da oferta" do modal de /casas. ' +
+      'No painel da Fomento (Offers, postagem global), cole a URL desta instância: ' +
+      'https://SEU-DOMINIO/api/postback/fomento?s=SEGREDO&offer={offerid}&event={event_token}&click={aff_click_id}&tag={sub_aff_id}&payout={payout}&currency={currency}&player={ig-user-id} ' +
+      'trocando SEGREDO pelo valor salvo aqui.',
+    scope: 'global',
+    multiHouse: true,
+    envKeys: { apiKey: 'FOMENTO_POSTBACK_SECRET' },
+    fields: [],
+  },
 ];
 
 export const findIntegrationSpec = (id: unknown): IntegrationSpec | null =>
@@ -118,6 +142,8 @@ export interface PublicIntegration {
   label: string;
   description: string;
   scope: 'house' | 'global';
+  /** Rede 1:N (ver IntegrationSpec.multiHouse) — o modal de /casas pede o id externo. */
+  multiHouse?: boolean;
   fields: IntegrationField[];
   enabled: boolean;
   hasKey: boolean;
@@ -264,6 +290,7 @@ export function toPublicIntegration(
     label: spec.label,
     description: spec.description,
     scope: spec.scope,
+    multiHouse: spec.multiHouse === true,
     fields: spec.fields,
     enabled: settings.enabled,
     hasKey: !!settings.apiKey,

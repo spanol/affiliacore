@@ -1,6 +1,19 @@
 # Recon · Fomento (rede Offer18) — integração de resultados
 
-**Data:** 2026-08-18 · **Branch:** `feat/integracao-fomento` · **Status:** recon completo; implementação BLOQUEADA na chave de API (o operador gera no painel).
+**Data:** 2026-08-18 · **Branch:** `feat/integracao-fomento` · **Status:** recon completo; **fase POSTBACK ENTREGUE em 19/08** (decisão do Jotta/Vinicius: começar só pelo postback, que não depende da chave de API). O pull da Reports API segue bloqueado na chave e vira a fase de RECONCILIAÇÃO.
+
+## Fase postback (entregue 19/08/2026)
+
+- **Endpoint público** `GET|POST /api/postback/fomento`, gated por segredo na query (`s=`, comparação em tempo constante), guardado em `integrations/fomento-offer18` pela tela `/integracoes` (entrada nova no catálogo, `scope: 'global'`, `multiHouse: true`; env fallback `FOMENTO_POSTBACK_SECRET`). A URL a colar no painel da rede está na descrição da integração e em `FOMENTO_POSTBACK_TEMPLATE`.
+- **Ledger `postback_events`** (server-only, sem rule): cada disparo vira doc idempotente (`fpb__offer__event__click`); retry da rede sobrescreve o mesmo doc. Disparo sem `aff_click_id` entra com id automático (sem âncora de dedupe, declarado).
+- **Só contagens**: `lead` → cadastros, `ftd` → FTD + CPA qualificado; evento desconhecido fica no ledger fora das métricas. **Dinheiro nunca entra pelas linhas**: a comissão da casa deriva do `defaultCpa` (EUR, cotação ao vivo na leitura), como toda casa EUR sem comissão importada; `payout`/`currency` crus ficam no ledger para auditoria.
+- **Recompute a partir do ledger** reescreve os dias com evento (`house_results`, `source: 'postback'`), com atribuição tag→afiliado pelo MESMO índice do import (links + apelidos). O botão "Atualizar" de /casas reprocessa a janela (7 dias default) para reatribuir tags vinculadas depois; é auditado (`via: 'postback-recompute'`). O disparo individual não gera audit_log: o ledger é a trilha.
+- **Rede 1:N**: casa vinculada por `integration: 'fomento-offer18'` + `integrationExternalId` (offer_id) no doc da casa, SEM passar pelo `applyIntegrationLink` (1:1). Campo novo no modal de /casas ("ID da oferta na rede", só para integração multiHouse), com recusa de offer_id duplicado na mesma rede (409). O modal MANTÉM a taxa padrão da casa nesse modo (o dinheiro deriva dela).
+- `sub_aff_id` entrou em `TAG_PARAMS` (linkTriage): link de casa com `...&sub_aff_id={ref}` resolve a tag no índice.
+- Dia do evento = dia BR do RECEBIMENTO (`resolveServerToday`); corte de meia-noite pode divergir do livro da rede. Limitação declarada; a reconciliação fina virá com a Reports API.
+- Testes: `src/lib/fomentoPostback.test.ts` (núcleo puro) + suíte de rotas no `server.test.ts` (segredo, dedupe, atribuição, unmapped, reprocesso, vínculo 1:N). Coleção `postback_events` isenta na trava da demo (ledger sem tela).
+
+**Operação (checklist do go-live):** (1) admin salva um segredo alto-entropia em `/integracoes` → Fomento; (2) cria a casa em /casas com origem "Pull automático" → Fomento + ID da oferta + `defaultCpa` em EUR = o CPA da oferta; (3) cola a URL de postback no painel da Fomento (Offers → postagem global, S2S); (4) testa com "teste de postagem" do painel; (5) links dos afiliados = template de cadastro da casa com `sub_aff_id={ref}`.
 
 ## O que é
 
