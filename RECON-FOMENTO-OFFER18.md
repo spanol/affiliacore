@@ -13,6 +13,23 @@
 - Dia do evento = dia BR do RECEBIMENTO (`resolveServerToday`); corte de meia-noite pode divergir do livro da rede. Limitação declarada; a reconciliação fina virá com a Reports API.
 - Testes: `src/lib/fomentoPostback.test.ts` (núcleo puro) + suíte de rotas no `server.test.ts` (segredo, dedupe, atribuição, unmapped, reprocesso, vínculo 1:N). Coleção `postback_events` isenta na trava da demo (ledger sem tela).
 
+### Ofertas escolhidas para a Infinity (19/08, Jotta)
+
+| Casa | Oferta (offer_id) | CPA (evento `ftd`) | Condições no termo da oferta |
+|---|---|---|---|
+| **Winhugo BR** | `21764206` | 25 EUR | Baseline R$ 30; redepósito mínimo de 30% dos FTDs, senão o total não valida nem paga |
+| **Blaze BR - Regulated** | `20997138` | 30 EUR | Baseline 5 EUR; redepósito mínimo de 30%; só vale o relatório da PRÓPRIA Fomento |
+| **Blaze Sports BR - Regulated** | `21960827` | 30 EUR | (segunda oferta da Blaze, para tráfego de esportes) |
+| **KTO BR - Regulated** | `21210669` | 15 EUR | Baseline R$ 20 + wagering R$ 20 |
+
+Todas com eventos `ftd` (paga) e `lead` (0 EUR), o exato mapa do conector. KTO e Blaze trazem no termo a diretriz de compliance das Portarias 73/2026 e 1.964/2026 (selo +18 + advertência do Ministério da Fazenda em 10% da tela, proibido guru/print de ganho) com retenção de pagamento por descumprimento — **repassar aos afiliados da Infinity antes de soltar link**. Link de clique: `https://fomentoindustriesltd10525901.o18.link/c?o=<OFFER_ID>&m=7910&a=703626&sub_aff_id={ref}` (o template exato sai do botão "link de rastreamento" da oferta).
+
+⚠️ O redepósito mínimo de 30% (Winhugo/Blaze) significa que CPA contado pelo postback pode ser INVALIDADO depois no fechamento da rede: mais um motivo para a fase de reconciliação via Reports API quando a chave sair.
+
+### Smoke na demo emulada (19/08, verificado)
+
+Fluxo completo exercitado em `npm run dev` (emuladores, zero contato com projeto real): segredo salvo via `PUT /api/integrations/fomento-offer18`, casa Winhugo criada com `integrationExternalId: 21764206` + `defaultCpa: 25 EUR`, e os disparos: segredo errado → 403; `ftd` → agregado do dia com 1 FTD + 1 CPA e dinheiro 0 (deriva do defaultCpa na leitura); retry do mesmo click → `duplicate: true` e continua 1; `lead` → 1 cadastro; oferta da KTO sem casa → `unmapped: true` com o evento retido no ledger (`fpb__21210669__ftd__smk3`); botão "Atualizar" → reprocesso com a tag `smoketag` na fila de pendentes. Ledger e `house_results` conferidos direto no Firestore emulado.
+
 **Operação (checklist do go-live):** (1) admin salva um segredo alto-entropia em `/integracoes` → Fomento; (2) cria a casa em /casas com origem "Pull automático" → Fomento + ID da oferta + `defaultCpa` em EUR = o CPA da oferta; (3) cola a URL de postback no painel da Fomento (Offers → postagem global, S2S); (4) testa com "teste de postagem" do painel; (5) links dos afiliados = template de cadastro da casa com `sub_aff_id={ref}`.
 
 ## O que é
