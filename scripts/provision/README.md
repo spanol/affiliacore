@@ -106,6 +106,12 @@ env:
   - variable: VITE_BRAND_FAVICON_URL
     value: 'https://<storage-ou-cdn>/favicon.svg'
     availability: [BUILD, RUNTIME]
+  - variable: VITE_BRAND_DESCRIPTION  # opcional: texto do card de preview do link
+    value: 'Área do afiliado da Alfa.'  # (WhatsApp/Google). Ausente = "Painel de
+    availability: [BUILD, RUNTIME]      # afiliados da {SHORT}. Acompanhe...".
+  - variable: VITE_BRAND_OG_IMAGE_URL # opcional: imagem do card, PNG/JPG 1200×630.
+    value: 'https://<storage-ou-cdn>/og.png'  # NÃO aponte p/ SVG: WhatsApp e
+    availability: [BUILD, RUNTIME]            # Telegram não renderizam SVG.
   - variable: VITE_BRAND_ACCENT     # P3.1: cor de destaque DO CLIENTE (1 hex; gera
     value: '<accent-do-cliente>'    # a escala inteira + contraste WCAG em runtime)
     availability: [BUILD, RUNTIME]

@@ -138,6 +138,22 @@ A versão vendida é naturalmente OTG-free (a x-api-key é da operação do Carl
   apphosting.boost.yaml). Zero sweep: `dark:bg-neutral-900` etc. já compilam p/
   `var(--color-neutral-900)`. Receita "tema corporativo completo" = `ACCENT` +
   `STYLE=solid` + `CANVAS` + `THEME=light`.
+- **P3.4 · Marca no HTML SERVIDO (preview de link) — ✅ ENTREGUE (2026-08-19):**
+  o gerente da Infinity mandou o link de convite aos afiliados e o card do WhatsApp
+  veio com "AffiliaCore". Causa: o `index.html` é o MESMO p/ todas as instâncias e
+  traz os defaults do produto; quem troca a marca é o `applyBrandToDocument`, em
+  RUNTIME, e rastreador de link (WhatsApp, Telegram, Slack, Google) lê o HTML cru
+  sem executar JavaScript. Correção: `src/lib/brandHtml.ts` (puro) + plugin
+  `transformIndexHtml` no `vite.config.ts` carimbam título, favicon e as tags
+  Open Graph/Twitter no BUILD, quando os `VITE_BRAND_*` da instância já estão
+  resolvidos (por isso a availability **BUILD** é obrigatória, como já era p/ o
+  bundle). Duas envs OPCIONAIS novas: `VITE_BRAND_DESCRIPTION` (default: "Painel
+  de afiliados da {SHORT}...", marca no feminino) e `VITE_BRAND_OG_IMAGE_URL`
+  (PNG/JPG 1200×630). **Sem imagem declarada nenhuma tag de imagem é emitida, de
+  propósito:** as logos das instâncias são SVG e WhatsApp/Telegram não renderizam
+  SVG, então apontar p/ elas trocaria "sem imagem" por "imagem quebrada".
+  ⚠️ Preview de link é CACHEADO pelo WhatsApp/Facebook: link já compartilhado pode
+  levar horas p/ mostrar o nome novo (o Sharing Debugger da Meta força o refresh).
 - Naming interno (`boostAffiliate`, `boost_<uuid>`, coleções) **não muda**.
 
 ## P4 · Playbook "novo cliente em 1 dia"
