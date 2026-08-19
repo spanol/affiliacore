@@ -78,6 +78,21 @@ https://fomentoindustriesltd10525901.o18.link/c?o=22007840&m=7910&a=703626&aff_c
 - **Eventos da oferta Spininio (padrão esperado da rede): `ftd` paga o CPA (tier 35 EUR) e `lead` paga 0 EUR** (rastreado, não pago). Mapeamento draft: conversões `event=ftd` → `qualified_cpa` (contagem) e `first_deposits`; conversões `event=lead` → `registrations`; `Affiliate_Price` somado → dinheiro de comissão; `Clicks` → `visits`.
 - **Moeda: EUR.** O produto já trata casa em moeda estrangeira (`/casas` + `src/lib/currency.ts`, regime live/fixed); decidir na implementação se a conversão acontece na gravação do pull ou no display, coerente com a casa EUR existente.
 
+## Postback (verificado 19/08, pergunta do Jotta/Infinity)
+
+**Postback NÃO é gated pela chave de API.** Com a chave ainda "não criado", as duas telas de configuração estão acessíveis e habilitadas no painel do afiliado:
+
+- **Global**: `#postback` ("postagem global") — campo de URL S2S (recomendado) + pixel, botão enviar.
+- **Por oferta**: aba "Postback" da página da oferta — URL por evento (`Initial Event`, `ftd`, `lead`) e por tipo (S2S, Pixel, HTML/iFrame, Facebook, TikTok…).
+
+A chave de API gate SÓ as APIs de pull (offers/reports/coupon/request). O toggle "desabilitar" da tela `#api` é do acesso à API, coisa separada do postback.
+
+Detalhes operacionais do postback:
+
+- **IPs de origem** (para allowlist/validação no nosso endpoint): `35.245.65.44`, `35.230.165.242`, `34.145.129.198`.
+- **Tokens disponíveis**: `{aff_click_id}`, `{sub_aff_id}`, `{aff_sub1..10}`, `{event_token}`, `{offerid}`, `{offername}`, `{omodel}`, `{payout}`, `{currency}`, `{ip}`, device ids… e os de iGaming: **`{ig-user-id}` (iGaming User ID)**, `{ig-product-id}`, `{ig-deposit-amount}`, `{ig-bet-amount}`, `{ig-win-amount}`, `{ig-withdrawal-amount}`, `{ig-bonus-amount}`. Ou seja: dá atribuição POR JOGADOR e valores de depósito/aposta por evento — o que a OTG nunca deu (o `/go/:code` está gated em postback da OTG até hoje).
+- **Limites de "só postback"**: (1) só empurra EVENTOS dali em diante — sem backfill de histórico e sem cliques (funil/visits só pela Reports API); (2) evento perdido com o endpoint fora do ar não tem garantia de reenvio do lado do afiliado; (3) fechamento contábil confiável continua sendo o pull da Reports API — o desenho são os dois: postback para tempo real/atribuição, pull para reconciliação.
+
 ## Perguntas em aberto (probe assim que a chave existir)
 
 1. O report agrega pelas dimensões pedidas em `fields` (date+offer+s_affiliate+event) ou devolve log linha a linha? Define o adapter.
