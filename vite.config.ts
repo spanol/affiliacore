@@ -2,7 +2,9 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, type Plugin, type ResolvedConfig} from 'vite';
+import {resolveBrand} from './src/lib/branding';
+import {applyBrandToHtml, resolveBrandMeta} from './src/lib/brandHtml';
 
 // Versão deste build, gerada por scripts/gen-version.mjs (hook prebuild/predev) em
 // public/version.json. Injetada no bundle via `define` p/ o cliente saber a própria
@@ -14,6 +16,32 @@ function readBuildVersion() {
   } catch {
     return {version: 'dev', buildTime: '', commit: ''};
   }
+}
+
+// P4.1 (marca por instância) no HTML SERVIDO. O index.html é o mesmo p/ todas as
+// instâncias e traz os defaults do PRODUTO; o applyBrandToDocument só troca o título
+// depois que o JS roda, e rastreador de link (WhatsApp, Telegram, Google) NÃO roda JS
+// — o convite que o gerente da Infinity mandou aos afiliados aparecia como
+// "AffiliaCore" no card de preview (19/08/2026). Aqui o nome/favicon/OG entram no
+// HTML em build time, quando os VITE_BRAND_* da instância já estão resolvidos
+// (config.env é exatamente o que vira import.meta.env). Vale no dev também: o Vite
+// roda transformIndexHtml no middleware.
+function brandHtmlPlugin(): Plugin {
+  let config: ResolvedConfig;
+  return {
+    name: 'affiliacore:brand-html',
+    configResolved(resolved) {
+      config = resolved;
+    },
+    transformIndexHtml: {
+      order: 'pre',
+      handler(html: string) {
+        const env = (config?.env ?? {}) as Record<string, unknown>;
+        const brand = resolveBrand(env, config?.base ?? '/');
+        return applyBrandToHtml(html, brand, resolveBrandMeta(env, brand));
+      },
+    },
+  };
 }
 
 export default defineConfig(() => {
@@ -30,7 +58,7 @@ export default defineConfig(() => {
       // NÃO é segredo (config web do Firebase é pública por natureza).
       __FIREBASE_WEBAPP_CONFIG__: JSON.stringify(process.env.FIREBASE_WEBAPP_CONFIG || ''),
     },
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), brandHtmlPlugin()],
     // SECURITY (MEDIUM-3): NÃO inlinar GEMINI_API_KEY (nem qualquer segredo) no
     // bundle via `define` — o Vite substituiria `process.env.GEMINI_API_KEY` pelo
     // valor real, vazando a chave a todos os navegadores assim que houvesse uma
