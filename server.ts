@@ -5971,7 +5971,12 @@ export function createApp(deps: ServerDeps) {
       const houseName = (houseSnap.data() as any)?.name ?? slug;
 
       const days = Number(req.body?.days);
-      const { dateFrom, dateTo } = pullWindow(resolveServerToday(), Number.isFinite(days) && days > 0 ? days : 2);
+      // 7 dias de reprocessamento (era 2): CPA qualificado é creditado com DIAS de
+      // atraso e a API o atribui à data do EVENTO original — com 2 dias, crédito
+      // retroativo além de ontem nunca entrava (causa real da divergência que o
+      // painel antigo acusou em julho/2026). Reescrever a janela é idempotente,
+      // então o custo de 7 é só a leitura.
+      const { dateFrom, dateTo } = pullWindow(resolveServerToday(), Number.isFinite(days) && days > 0 ? days : 7);
       // `dateTo` acima é INCLUSIVO (hoje); a API trata `date_to` como EXCLUSIVO —
       // sem o +1 aqui, "hoje" nunca entrava na consulta. Ver toApiDateTo().
       const url = buildMediaReportUrl(dateFrom, toApiDateTo(dateTo), settings.config.apiBase || ESPORTIVA_API_BASE);

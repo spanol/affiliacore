@@ -900,9 +900,10 @@ function manualBrandRow(slug: string, m: Metrics): any {
     deposit: m.deposit,
     cpa: 0,
     total_commission: m.total_commission,
-    // Funil opcional: presente só quando a casa reporta (ausência ≠ 0).
-    ...(m.visits !== undefined ? { visits: m.visits } : {}),
-    ...(m.deposit_count !== undefined ? { deposit_count: m.deposit_count } : {}),
+    // Opcionais (funil/qualidade): presentes só quando a casa reporta (ausência ≠ 0).
+    ...Object.fromEntries(
+      OPTIONAL_METRIC_KEYS.filter((k) => m[k] !== undefined).map((k) => [k, m[k]])
+    ),
   };
 }
 

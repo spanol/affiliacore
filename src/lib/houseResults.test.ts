@@ -230,7 +230,7 @@ describe('parseResultsRows (matriz — caminho Excel)', () => {
 
 describe('planilha modelo (constantes)', () => {
   it('o cabeçalho do modelo é reconhecido pelo parser (round-trip)', () => {
-    const grid = [TEMPLATE_HEADERS, ['2026-06-01', 'João Silva', 'joao@x.com', '120', '40', '18', '12', '80', '25', '2400', '2400']];
+    const grid = [TEMPLATE_HEADERS, ['2026-06-01', 'João Silva', 'joao@x.com', '120', '40', '18', '12', '80', '25', '2400', '1800', '-350', '2400']];
     const r = parseResultsRows(grid);
     expect(r.errors).toEqual([]);
     // todas as colunas do modelo foram mapeadas
@@ -238,14 +238,15 @@ describe('planilha modelo (constantes)', () => {
     expect(r.rows[0]).toMatchObject({
       date: '2026-06-01', affiliate: 'João Silva', email: 'joao@x.com',
       registrations: 40, total_commission: 2400, visits: 120, deposit_count: 25,
+      net_deposits: 1800, net_pl: -350, // qualidade (19/08) — PL negativo preservado
     });
   });
 
-  it('o modelo tem data obrigatória, as 6 métricas canônicas e as 2 opcionais do funil', () => {
+  it('o modelo tem data obrigatória, as 6 canônicas, as 2 do funil e as 2 de qualidade', () => {
     expect(TEMPLATE_COLUMNS.find((c) => c.key === 'date')?.required).toBe(true);
     expect(TEMPLATE_COLUMNS.some((c) => c.key === 'email')).toBe(true);
     const metricCount = TEMPLATE_COLUMNS.filter((c) => !['date', 'affiliate', 'email'].includes(c.key)).length;
-    expect(metricCount).toBe(8); // 6 canônicas + visitas + qtd_depositos (call 12/08)
+    expect(metricCount).toBe(10); // 6 canônicas + visitas/qtd_depositos (12/08) + deposito_liquido/pl (19/08)
   });
 });
 

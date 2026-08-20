@@ -49,6 +49,21 @@ describe('adaptEsportivaRows', () => {
     expect(rows.map((r) => r.deposit_count)).toEqual([25, 12, 0, 6]);
   });
 
+  it('qualidade (19/08): net_deposits e net_pl entram PRESERVANDO o sinal', () => {
+    const { rows } = adaptEsportivaRows(
+      [{ dt: '2026-07-10T00:00:00.000Z', afp: 'infinitw01', ftd_count: 1, deposit_total: 1168.5, net_deposits: -600.96, net_pl: -307.13 }],
+      { cpaBase: 120 },
+    );
+    expect(rows[0].net_deposits).toBeCloseTo(-600.96); // caça-bônus: negativo é dado
+    expect(rows[0].net_pl).toBeCloseTo(-307.13);
+  });
+
+  it('qualidade AUSENTE na resposta não vira 0 fabricado (ausência ≠ 0)', () => {
+    const { rows } = adaptEsportivaRows(API_ROWS, { cpaBase: 120 });
+    expect(rows[0].net_deposits).toBeUndefined();
+    expect(rows[0].net_pl).toBeUndefined();
+  });
+
   it('sem régua de CPA a contagem fica em 0 — não inventa divisor (ausência ≠ zero)', () => {
     const { rows } = adaptEsportivaRows(API_ROWS, {});
     expect(rows[0].qualified_cpa).toBe(0);

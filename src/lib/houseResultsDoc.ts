@@ -19,8 +19,10 @@ export type HrMetricKey = (typeof HR_METRICS)[number];
 // Métricas OPCIONAIS: só são gravadas quando o payload as trouxe (ausência ≠ 0, e
 // `undefined` não pode ir ao Firestore). Espelha OPTIONAL_METRIC_KEYS de
 // houseResults.ts — `visits`/`deposit_count` são funil, `cpa_commission` é a
-// parcela CPA da comissão em DINHEIRO, informada pelos conectores de pull.
-export const HR_OPTIONAL_METRICS = ['visits', 'deposit_count', 'cpa_commission'] as const;
+// parcela CPA da comissão em DINHEIRO, informada pelos conectores de pull, e
+// `net_deposits`/`net_pl` são QUALIDADE (depósitos − saques e resultado dos
+// jogadores; `net_pl` pode ser negativo — o sinal importa, não sanitizar).
+export const HR_OPTIONAL_METRICS = ['visits', 'deposit_count', 'cpa_commission', 'net_deposits', 'net_pl'] as const;
 export type HrOptionalMetricKey = (typeof HR_OPTIONAL_METRICS)[number];
 
 // id determinístico: casa__data__afiliado (ou 'agg' p/ a linha agregada da casa).

@@ -36,6 +36,11 @@ export interface EsportivaApiRow {
   commissions_cpa?: number;
   commissions_rev_share?: number;
   commissions_total?: number;
+  // Qualidade (pedido Infinity 19/08): depósitos − saques e o resultado dos
+  // jogadores p/ a casa. Confirmados na resposta real da API em 19/08/2026 —
+  // eram descartados aqui, e é a régua que a casa usa p/ decidir pagamento.
+  net_deposits?: number;
+  net_pl?: number;
 }
 
 export function buildMediaReportUrl(
@@ -122,6 +127,11 @@ export function adaptEsportivaRows(
       // por linha — alimentam os cards de funil e o ticket médio/média de depósito.
       visits: numOf(r?.visit_count),
       deposit_count: numOf(r?.deposit_count),
+      // Qualidade (19/08): condicionais porque ausência ≠ 0 — se a API deixar de
+      // mandar o campo um dia, a UI mostra indisponível em vez de um zero falso.
+      // `numOf` preserva o sinal: PL negativo (jogador ganhando) é dado, não erro.
+      ...(r?.net_deposits !== undefined && r?.net_deposits !== null ? { net_deposits: numOf(r.net_deposits) } : {}),
+      ...(r?.net_pl !== undefined && r?.net_pl !== null ? { net_pl: numOf(r.net_pl) } : {}),
     });
   }
 

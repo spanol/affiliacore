@@ -77,6 +77,8 @@ import { canViewAffiliateNetProfit } from '../lib/affiliateView';
 import { cn, humanizeName } from '../lib/utils';
 import { sumFunnelForAffiliate } from '../lib/analyticsDoc';
 import { buildDailyExtractCsv } from '../lib/exportExtract';
+import { OPTIONAL_METRIC_KEYS } from '../lib/houseResults';
+import QualityGrid from '../components/QualityGrid';
 import { buildCsvFilename } from '../lib/csv';
 import { downloadCsvFile } from '../lib/browserDownload';
 import { motion } from 'motion/react';
@@ -93,17 +95,28 @@ const maskSensitive = (v?: string) => {
 // Soma N linhas (groupBy=affiliate) numa linha agregada. Usado quando o afiliado
 // é um especial com rede: a página deve contabilizar own + subs, não só a
 // produção própria do especial (que costuma ser zero). [[boost-special-as-scoped-master]]
+// As métricas OPCIONAIS (funil/qualidade) entram com a regra de ausência ≠ 0:
+// só existem no agregado se alguma linha as trouxe — antes eram DESCARTADAS aqui
+// e a visão de rede perdia cliques/qtd de depósitos que as linhas tinham.
 const sumResultRows = (rows: any[]) =>
   (Array.isArray(rows) ? rows : []).reduce(
-    (acc, r) => ({
-      registrations: acc.registrations + (r?.registrations || 0),
-      first_deposits: acc.first_deposits + (r?.first_deposits || 0),
-      qualified_cpa: acc.qualified_cpa + (r?.qualified_cpa || 0),
-      rvs: acc.rvs + (r?.rvs || 0),
-      deposit: acc.deposit + (r?.deposit || 0),
-      total_commission: acc.total_commission + (r?.total_commission || 0),
-    }),
-    { registrations: 0, first_deposits: 0, qualified_cpa: 0, rvs: 0, deposit: 0, total_commission: 0 }
+    (acc, r) => {
+      const out: any = {
+        ...acc,
+        registrations: acc.registrations + (r?.registrations || 0),
+        first_deposits: acc.first_deposits + (r?.first_deposits || 0),
+        qualified_cpa: acc.qualified_cpa + (r?.qualified_cpa || 0),
+        rvs: acc.rvs + (r?.rvs || 0),
+        deposit: acc.deposit + (r?.deposit || 0),
+        total_commission: acc.total_commission + (r?.total_commission || 0),
+      };
+      for (const k of OPTIONAL_METRIC_KEYS) {
+        if (r?.[k] === undefined || r?.[k] === null) continue;
+        out[k] = (Number(out[k]) || 0) + (Number(r[k]) || 0);
+      }
+      return out;
+    },
+    { registrations: 0, first_deposits: 0, qualified_cpa: 0, rvs: 0, deposit: 0, total_commission: 0 } as any
   );
 
 export default function AffiliateDetails() {
@@ -831,6 +844,12 @@ export default function AffiliateDetails() {
                     registrationsBadge={<TrendBadge change={isAllBrands ? percentChange(row.registrations || 0, prevRegistrations ?? 0) : 0} />}
                     registrationsSubtitle={isNetworkView ? 'Clientes cadastrados na rede' : 'Clientes cadastrados'}
                   />
+
+                  {/* Qualidade da produção (19/08) — a régua da CASA (líquido/PL).
+                      Dado de GESTÃO: mesmo gate do lucro (admin ou especial vendo
+                      sub); o afiliado NÃO vê a própria régua. Sem dado no período
+                      o componente some sozinho (casa que não informa). */}
+                  {isSuperiorView && <QualityGrid rows={[row]} />}
 
                   {/* Per-house breakdown (real data from groupBy=brand) */}
                   <BrandBreakdown data={brandResults} config={config} />

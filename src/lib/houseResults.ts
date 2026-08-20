@@ -30,7 +30,12 @@ export type MetricKey = (typeof METRIC_KEYS)[number];
 // `houseCpaCommissionForRow` não precise reconstruí-la por `contagem × régua`.
 // O funil NÃO itera esta lista (tem a sua própria em lib/funnel.ts) — senão um
 // campo de dinheiro entraria nos totais de contagem.
-export const OPTIONAL_METRIC_KEYS = ['visits', 'deposit_count', 'cpa_commission'] as const;
+//
+// `net_deposits`/`net_pl` são QUALIDADE (pedido Infinity 19/08): depósitos menos
+// saques e o resultado dos jogadores para a casa. É a régua que a casa usa para
+// decidir pagamento, então entram por afiliado — e `net_pl` é NEGATIVO com
+// frequência (jogador ganhando), o sinal importa: nada aqui pode fazer abs/clamp.
+export const OPTIONAL_METRIC_KEYS = ['visits', 'deposit_count', 'cpa_commission', 'net_deposits', 'net_pl'] as const;
 export type OptionalMetricKey = (typeof OPTIONAL_METRIC_KEYS)[number];
 export type Metrics = Record<MetricKey, number> & Partial<Record<OptionalMetricKey, number>>;
 
@@ -84,6 +89,11 @@ const COLUMN_ALIASES: Record<ColumnKey, string[]> = {
   // arquivo dela, tratada por `adaptHouseTagReport`; aqui os apelidos são só os
   // explícitos, para que um "cpa" solto continue significando contagem.
   cpa_commission: ['comissao_cpa', 'comissoes_cpa', 'commissions_cpa', 'cpa_commission', 'cpa_profit', 'valor_cpa'],
+  // Qualidade (nem toda casa exporta): depósitos LÍQUIDOS (depósitos − saques) e
+  // o resultado dos jogadores p/ a casa (PL/NGR — negativo = jogador ganhando).
+  // "pl"/"ngr" soltos são aceitos porque nenhuma outra coluna disputa o nome.
+  net_deposits: ['deposito_liquido', 'depositos_liquidos', 'net_deposits', 'netdeposits', 'net_deposit'],
+  net_pl: ['pl', 'net_pl', 'netpl', 'ngr', 'resultado_jogadores', 'player_loss'],
 };
 
 const stripKey = (s: string) =>
@@ -112,6 +122,8 @@ export const TEMPLATE_COLUMNS: TemplateColumn[] = [
   { key: 'rvs', header: 'rev', label: 'REV', required: false, help: 'Valor de revenue share (R$).' },
   { key: 'deposit_count', header: 'qtd_depositos', label: 'Qtd. de depósitos', required: false, help: 'Quantidade de depósitos no dia (opcional; nem toda casa informa).' },
   { key: 'deposit', header: 'deposito', label: 'Depósito', required: false, help: 'Valor depositado (R$).' },
+  { key: 'net_deposits', header: 'deposito_liquido', label: 'Depósito líquido', required: false, help: 'Depósitos menos saques (R$). Opcional; nem toda casa informa.' },
+  { key: 'net_pl', header: 'pl', label: 'Resultado (PL)', required: false, help: 'Resultado dos jogadores para a casa (R$). Pode ser negativo. Opcional; nem toda casa informa.' },
   { key: 'total_commission', header: 'comissao', label: 'Comissão', required: false, help: 'Comissão total (R$).' },
 ];
 

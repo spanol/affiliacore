@@ -63,6 +63,23 @@ describe('buildPullPayload', () => {
     );
   });
 
+  it('qualidade (19/08): net_deposits/net_pl atravessam o payload com sinal, e ausência não vira 0', () => {
+    const rows = [
+      { date: '2026-07-10', tag: 'infinitw280', registrations: 1, first_deposits: 1, qualified_cpa: 1, rvs: 0, deposit: 100, total_commission: 120, net_deposits: -600.96, net_pl: -307.13 },
+      // Linha SEM os campos (fonte antiga): não pode zerar o agregado nem a atribuída.
+      { date: '2026-07-10', tag: 'infinitw292', registrations: 1, first_deposits: 0, qualified_cpa: 0, rvs: 0, deposit: 50, total_commission: 0 },
+    ];
+    const { rows: stored } = buildPullPayload(rows, index);
+    const agg = stored.find((r) => r.affiliateId === null)!;
+    expect(agg.net_deposits).toBeCloseTo(-600.96); // só quem trouxe entra na soma
+    expect(agg.net_pl).toBeCloseTo(-307.13);
+    const mine = stored.find((r) => r.affiliateId === 'AFF-280')!;
+    expect(mine.net_pl).toBeCloseTo(-307.13);
+    // E quando NENHUMA linha traz os campos, eles ficam AUSENTES no gravado.
+    const semQualidade = buildPullPayload(ROWS, index).rows;
+    expect(semQualidade.every((r) => r.net_deposits === undefined && r.net_pl === undefined)).toBe(true);
+  });
+
   it('linha sem data é ignorada', () => {
     const rows = [{ date: '', tag: 'x', registrations: 1, first_deposits: 0, qualified_cpa: 0, rvs: 0, deposit: 0, total_commission: 0 }];
     expect(buildPullPayload(rows, new Map()).rows).toEqual([]);

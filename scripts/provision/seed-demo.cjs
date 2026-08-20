@@ -289,6 +289,23 @@ function buildRowsForHouse(house, targets, days, { forceYesterdayFor = new Set()
         deposit: depDay[j] / 100,
         total_commission: commDay[j] / 100,
       };
+      // Qualidade (19/08): SÓ a Superbet "informa" net_deposits/net_pl na demo —
+      // as outras casas ficam sem os campos de propósito, para a demo mostrar os
+      // DOIS estados (seção de qualidade presente × ausente; ausência ≠ 0). O PL
+      // sai negativo em ~1/4 das células (jogador ganhando é cenário real), e o
+      // Pedro Barros fecha o AGREGADO negativo de propósito: é o perfil caça-bônus
+      // do caso real de julho/2026 — sem ele a demo nunca mostraria o card em
+      // vermelho, que é o estado que vende a régua de qualidade.
+      if (house.slug === 'superbet' && row.deposit > 0) {
+        const bonusHunter = p.name === 'Pedro Barros';
+        row.net_deposits = bonusHunter
+          ? -Math.round(row.deposit * (0.3 + rnd() * 0.5) * 100) / 100
+          : Math.round(row.deposit * (0.25 + rnd() * 0.4) * 100) / 100;
+        const plFactor = bonusHunter
+          ? -(0.2 + rnd() * 0.3)
+          : rnd() < 0.25 ? -(0.05 + rnd() * 0.25) : (0.1 + rnd() * 0.3);
+        row.net_pl = Math.round(row.deposit * plFactor * 100) / 100;
+      }
       if (registrations || row.qualified_cpa || row.rvs || row.deposit || row.total_commission) rows.push(row);
     });
   });
