@@ -26,6 +26,10 @@ import {
 import { buildPullPayload, pullWindow } from './src/lib/housePull';
 import { buildStatisticsUrl, adaptLeonBetRows, LEONBET_API_BASE } from './src/lib/leonbetPull';
 import {
+  parseFomentoPostback, fomentoPostbackDocId, fomentoEventsToPullRows,
+  FOMENTO_INTEGRATION_ID, type FomentoEventDoc,
+} from './src/lib/fomentoPostback';
+import {
   INTEGRATION_CATALOG, findIntegrationSpec, integrationFromDoc, resolveConnectorSettings,
   sanitizeIntegrationPatch, toPublicIntegration, numericSetting,
   type ConnectorSettings, type IntegrationDoc,
@@ -4457,6 +4461,9 @@ export function createApp(deps: ServerDeps) {
       lastResultsDate: data.lastResultsDate ?? null,
       // Conector de pull declarado PELA casa (auto-carimbado pelo conector).
       integration: data.integration ?? null,
+      // Id da casa DENTRO da integração multiHouse (ex.: offer_id na rede
+      // Fomento/Offer18) — é por ele que o postback acha a casa.
+      integrationExternalId: data.integrationExternalId ?? null,
     };
   };
 
@@ -4487,6 +4494,21 @@ export function createApp(deps: ServerDeps) {
         .set({ integration: integrationId }, { merge: true })
         .catch((e) => console.error('[integrations] falha ao carimbar a casa:', e));
     }
+  };
+
+  // Rede 1:N (multiHouse): o MESMO id externo (offer_id) em duas casas faria o
+  // postback creditar a casa errada sem nenhum erro na tela. Recusado na gravação.
+  const findExternalIdClash = async (
+    integrationId: string,
+    externalId: string,
+    exceptSlug: string,
+  ): Promise<string | null> => {
+    if (!adminDb) return null;
+    const snap = await adminDb.collection('houses').where('integrationExternalId', '==', externalId).get();
+    const clash = snap.docs.find(
+      (d) => d.id !== exceptSlug && String((d.data() as any)?.integration ?? '').trim() === integrationId,
+    );
+    return clash ? String((clash.data() as any)?.name ?? clash.id) : null;
   };
 
   // Lista as casas (qualquer signed-in: o afiliado precisa p/ logos/filtros).
@@ -4531,9 +4553,11 @@ export function createApp(deps: ServerDeps) {
     try {
       const { name, brandId, registerUrlTemplate, active, order, dataSource, logoBase64, integration } = req.body || {};
       const wantedIntegration = integration ? String(integration).trim() : '';
-      if (wantedIntegration && !findIntegrationSpec(wantedIntegration)) {
+      const wantedSpec = wantedIntegration ? findIntegrationSpec(wantedIntegration) : null;
+      if (wantedIntegration && !wantedSpec) {
         return res.status(400).json({ error: `Integração desconhecida: "${wantedIntegration}".` });
       }
+      const externalId = String(req.body?.integrationExternalId ?? '').trim() || null;
       // Taxa padrão da casa (comissão casa→agência): número finito OU null (vazio).
       const numOrNull = (v: any) => (v == null || v === '' ? null : (Number.isFinite(Number(v)) ? Number(v) : null));
       const cleanName = String(name ?? '').trim();
@@ -4550,6 +4574,12 @@ export function createApp(deps: ServerDeps) {
       const ref = adminDb.collection('houses').doc(slug);
       if ((await ref.get()).exists) {
         return res.status(409).json({ error: `Já existe uma casa com o slug "${slug}".` });
+      }
+      if (wantedSpec?.multiHouse && externalId) {
+        const clash = await findExternalIdClash(wantedIntegration, externalId, slug);
+        if (clash) {
+          return res.status(409).json({ error: `O ID "${externalId}" já está na casa "${clash}".` });
+        }
       }
       let logo: string | null = null;
       if (logoBase64) logo = await uploadHouseLogo(slug, String(logoBase64));
@@ -4571,12 +4601,15 @@ export function createApp(deps: ServerDeps) {
         fxMode: houseFx.fxMode,
         fxRate: houseFx.fxRate,
         issPercent: numOrNull(req.body?.issPercent),
+        // Rede 1:N grava a flag DIRETO na casa (o vínculo por applyIntegrationLink
+        // é 1:1 e desligaria a casa anterior da mesma rede) + o id externo dela.
+        ...(wantedSpec?.multiHouse ? { integration: wantedIntegration, integrationExternalId: externalId } : {}),
         createdByUid: (req as any).user?.uid ?? null,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
       // Casa nova já nascendo integrada: o vínculo vale nos DOIS docs.
-      if (wantedIntegration) await applyIntegrationLink(wantedIntegration, slug);
+      if (wantedIntegration && !wantedSpec?.multiHouse) await applyIntegrationLink(wantedIntegration, slug);
       // ...e já nascendo com o acordo, p/ o admin não recadastrar a operadora em
       // /acordos. RASCUNHO (inativo): card sem baseline nem taxa na vitrine é pior
       // que card nenhum, e é a mesma decisão dos presets (PESQUISA-PRESETS-DEALS).
@@ -4681,21 +4714,44 @@ export function createApp(deps: ServerDeps) {
         }
         nextIntegration = wanted || null;
         // O campo da casa é escrito por applyIntegrationLink (que cuida dos DOIS
-        // lados); aqui só o caso de DESVINCULAR, que não tem integração destino.
+        // lados); aqui o DESVINCULAR (sem integração destino) e a rede 1:N, cujo
+        // vínculo é só a flag da casa (applyIntegrationLink desligaria a casa
+        // anterior da mesma rede).
         if (!nextIntegration && prevIntegration) patch.integration = null;
+        if (nextIntegration && findIntegrationSpec(nextIntegration)?.multiHouse) patch.integration = nextIntegration;
+      }
+
+      // Id da casa dentro da rede 1:N (ex.: offer_id da Fomento). Duplicado entre
+      // casas da MESMA rede é recusado: o postback creditaria a casa errada.
+      if (body.integrationExternalId !== undefined) {
+        patch.integrationExternalId = String(body.integrationExternalId ?? '').trim() || null;
+      }
+      const effectiveIntegration = nextIntegration !== undefined ? nextIntegration : prevIntegration;
+      const effectiveExternalId = patch.integrationExternalId !== undefined
+        ? patch.integrationExternalId
+        : (String((snap.data() as any)?.integrationExternalId ?? '').trim() || null);
+      if (effectiveIntegration && findIntegrationSpec(effectiveIntegration)?.multiHouse && effectiveExternalId) {
+        const clash = await findExternalIdClash(effectiveIntegration, effectiveExternalId, slugOfHouse);
+        if (clash) {
+          return res.status(409).json({ error: `O ID "${effectiveExternalId}" já está na casa "${clash}".` });
+        }
       }
 
       await ref.set(patch, { merge: true });
 
       if (nextIntegration !== undefined && nextIntegration !== prevIntegration) {
-        if (prevIntegration) await applyIntegrationLink(prevIntegration, null);
-        if (nextIntegration) await applyIntegrationLink(nextIntegration, slugOfHouse);
+        if (prevIntegration && !findIntegrationSpec(prevIntegration)?.multiHouse) {
+          await applyIntegrationLink(prevIntegration, null);
+        }
+        if (nextIntegration && !findIntegrationSpec(nextIntegration)?.multiHouse) {
+          await applyIntegrationLink(nextIntegration, slugOfHouse);
+        }
       }
 
       // Auditoria: só os campos que de fato mudaram (antes→depois). 'logo' marcada à
       // parte (não logamos o base64/URL inteiro — só que houve troca).
       const changes = diffChanges(snap.data() as any, patch,
-        ['name', 'brandId', 'registerUrlTemplate', 'active', 'order', 'dataSource', 'defaultCpa', 'defaultRev', 'cpaCurrency', 'fxMode', 'fxRate', 'issPercent', 'revInProfit']);
+        ['name', 'brandId', 'registerUrlTemplate', 'active', 'order', 'dataSource', 'defaultCpa', 'defaultRev', 'cpaCurrency', 'fxMode', 'fxRate', 'issPercent', 'revInProfit', 'integrationExternalId']);
       if ('logo' in patch) changes.push({ field: 'logo', before: '(anterior)', after: patch.logo ? '(nova)' : null });
       // `integration` fica fora do diffChanges: no desvínculo o patch carrega um
       // FieldValue.delete(), que o diff leria como valor.
@@ -6120,6 +6176,207 @@ export function createApp(deps: ServerDeps) {
   };
   app.post('/api/internal/leonbet-pull', allowCronOrAdmin, leonbetPullHandler);
 
+  // === FOMENTO (rede Offer18) · POSTBACK =====================================
+  // A 1ª integração por PUSH: a rede chama /api/postback/fomento a cada conversão
+  // e o dia da casa é RECOMPUTADO a partir do ledger `postback_events` (fonte da
+  // verdade, idempotente por offer|event|click). Sem pull de relatório: a chave
+  // da Reports API ainda não existe e o postback não depende dela (verificado em
+  // 19/08/2026, RECON-FOMENTO-OFFER18.md). Dinheiro NÃO entra pelas linhas: só
+  // contagens (lead=cadastro, ftd=FTD+CPA) — a comissão deriva da taxa padrão da
+  // casa (defaultCpa em EUR, conversão ao vivo na leitura), como toda casa EUR
+  // sem comissão importada. O payout/moeda crus ficam no ledger p/ auditoria.
+
+  // Rede 1:N: a casa é achada pelo offer_id (`integrationExternalId`), nunca pelo
+  // houseId do doc da integração (que é o vínculo 1:1 dos conectores de pull).
+  const fomentoHouseByOffer = async (offerId: string) => {
+    if (!adminDb) return null;
+    const snap = await adminDb.collection('houses').where('integrationExternalId', '==', offerId).get();
+    return snap.docs.find(
+      (d) => String((d.data() as any)?.integration ?? '').trim() === FOMENTO_INTEGRATION_ID,
+    ) ?? null;
+  };
+
+  // Recomputa e REESCREVE os dias com evento no ledger (mesma semântica do
+  // upload/pull: datas presentes são reescritas, reprocessar nunca duplica; dia
+  // sem evento não é tocado, então upload manual de outros dias convive).
+  // `onlyDays` limita a janela: o disparo recomputa só o dia do evento; o botão
+  // "Atualizar" reprocessa a janela p/ reatribuir tags vinculadas depois.
+  const fomentoRecompute = async (
+    houseDoc: { id: string; ref: any; data: () => any },
+    offerId: string,
+    onlyDays: string[] | null,
+    byUid: string | null,
+  ) => {
+    const slug = String((houseDoc.data() as any)?.slug ?? houseDoc.id);
+    const eventsSnap = await adminDb!.collection('postback_events').where('offerId', '==', offerId).get();
+    const wanted = onlyDays ? new Set(onlyDays) : null;
+    const events = eventsSnap.docs
+      .map((d) => d.data() as FomentoEventDoc)
+      .filter((e) => !wanted || wanted.has(String(e?.day ?? '')));
+    const { rows: pullRows, ignored } = fomentoEventsToPullRows(events);
+
+    // Tag -> afiliado pelo MESMO índice do import manual (links + apelidos):
+    // uma fonte só, senão a atribuição diverge entre o postback e o upload.
+    const [linksSnap, aliasSnap] = await Promise.all([
+      adminDb!.collection('affiliate_links').get(),
+      adminDb!.collection('affiliate_tag_aliases').get(),
+    ]);
+    const tagIndex = buildTagIndex(
+      linksSnap.docs.map((d) => d.data() as any),
+      aliasSnap.docs.map((d) => ({ ...(d.data() as any), tag: (d.data() as any)?.tag ?? d.id })),
+    );
+    const payload = buildPullPayload(pullRows, tagIndex as any);
+
+    const stampedAt = admin.firestore.FieldValue.serverTimestamp();
+    if (payload.rows.length === 0) {
+      await houseDoc.ref.set({
+        lastResultsCheckAt: stampedAt,
+        integration: FOMENTO_INTEGRATION_ID,
+      }, { merge: true });
+      return { payload, deleted: 0, ignored };
+    }
+
+    const dates = new Set(payload.dates);
+    const existing = await adminDb!.collection('house_results').where('houseSlug', '==', slug).get();
+    const toDelete = existing.docs.filter((d) => dates.has((d.data() as any)?.date));
+
+    const ops: ((b: admin.firestore.WriteBatch) => void)[] = [];
+    toDelete.forEach((d) => ops.push((b) => b.delete(d.ref)));
+    payload.rows.forEach((row) => {
+      const rowRef = adminDb!.collection('house_results').doc(hrDocId(slug, row.date, row.affiliateId));
+      ops.push((b) => b.set(rowRef, {
+        houseSlug: slug, date: row.date, affiliateId: row.affiliateId, ...sanitizeMetrics(row),
+        importedByUid: byUid, importedAt: stampedAt, source: 'postback',
+      }));
+    });
+    ops.push((b) => b.set(houseDoc.ref, {
+      lastResultsSyncAt: stampedAt,
+      lastResultsCheckAt: stampedAt,
+      lastResultsSyncSource: 'postback',
+      lastResultsDate: payload.dates[payload.dates.length - 1] ?? null,
+      integration: FOMENTO_INTEGRATION_ID,
+    }, { merge: true }));
+    await commitChunked(ops);
+    return { payload, deleted: toDelete.length, ignored };
+  };
+
+  // Endpoint PÚBLICO que a rede chama. A barreira é o SEGREDO da query (`s=`,
+  // comparado em tempo constante), guardado em integrations/fomento-offer18 —
+  // IP atrás do Cloud Run não é barreira confiável sozinho. Sem auditoria por
+  // disparo de propósito: o próprio ledger é a trilha, e um audit_log por
+  // conversão viraria ruído na /auditoria.
+  const fomentoPostbackHandler: express.RequestHandler = async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    const settings = await connectorSettings(FOMENTO_INTEGRATION_ID);
+    if (!settings?.enabled || !settings.apiKey) {
+      return res.status(503).json({ error: 'Postback da Fomento não configurado nesta instância.' });
+    }
+    const rawSecret = (req.query as any)?.s;
+    const provided = String(Array.isArray(rawSecret) ? rawSecret[0] ?? '' : rawSecret ?? '');
+    const a = Buffer.from(provided);
+    const b = Buffer.from(settings.apiKey);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      return res.status(403).json({ error: 'Segredo do postback inválido.' });
+    }
+    const parsed = parseFomentoPostback(req.query as Record<string, unknown>);
+    // 400 de propósito: o erro aparece no log de postback da Offer18, que é onde
+    // um template mal colado se denuncia.
+    if (parsed.ok === false) return res.status(400).json({ error: parsed.error });
+    const data = parsed.data;
+    try {
+      // Dia BR do RECEBIMENTO (fonte única resolveServerToday) — o token de data
+      // não existe no postback. Divergência de corte perto da meia-noite é
+      // limitação declarada; a reconciliação fina virá com a Reports API.
+      const day = resolveServerToday();
+      const eventDoc = {
+        offerId: data.offerId, event: data.event, tag: data.tag, clickId: data.clickId,
+        playerId: data.playerId, payout: data.payout, currency: data.currency, day,
+        receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      const docId = fomentoPostbackDocId(data);
+      let duplicate = false;
+      if (docId) {
+        const eventRef = adminDb.collection('postback_events').doc(docId);
+        duplicate = (await eventRef.get()).exists;
+        // Retry da rede cai no MESMO doc (id determinístico): o original é
+        // preservado (dia inclusive — retry de madrugada não migra a conversão
+        // de dia) e o recompute não muda.
+        if (!duplicate) await eventRef.set(eventDoc);
+      } else {
+        // Sem aff_click_id não há âncora de dedupe: aceita com id automático.
+        await adminDb.collection('postback_events').add(eventDoc);
+      }
+
+      const houseDoc = await fomentoHouseByOffer(data.offerId);
+      if (!houseDoc) {
+        // Oferta ainda sem casa: o evento fica no ledger e entra quando o admin
+        // vincular a casa e clicar em "Atualizar". 200 de propósito: 4xx viraria
+        // retry na rede por um estado que é nosso.
+        return res.json({ ok: true, unmapped: true });
+      }
+      if (duplicate) return res.json({ ok: true, house: houseDoc.id, duplicate: true });
+
+      await fomentoRecompute(houseDoc as any, data.offerId, [day], null);
+      return res.json({ ok: true, house: houseDoc.id, day });
+    } catch (e: any) {
+      console.error('[fomento-postback] falhou:', e);
+      return res.status(500).json({ error: 'Falha ao processar o postback.' });
+    }
+  };
+  app.get('/api/postback/fomento', fomentoPostbackHandler);
+  app.post('/api/postback/fomento', fomentoPostbackHandler);
+
+  // Botão "Atualizar" de /casas: reprocessa a janela a partir do LEDGER, sem
+  // nenhuma chamada externa — o uso típico é reatribuir tags que ganharam dono
+  // (link emitido ou apelido salvo) depois dos disparos.
+  const fomentoRecomputeHandler: express.RequestHandler = async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    const settings = await connectorSettings(FOMENTO_INTEGRATION_ID);
+    if (!settings?.enabled) {
+      return res.status(503).json({ error: 'Integração desligada em Integrações.' });
+    }
+    const slug = String(req.body?.houseSlug ?? '').trim();
+    if (!slug) return res.status(400).json({ error: 'Informe a casa (houseSlug).' });
+    try {
+      const houseSnap = await adminDb.collection('houses').doc(slug).get();
+      if (!houseSnap.exists) return res.status(404).json({ error: `Casa "${slug}" não encontrada.` });
+      const offerId = String((houseSnap.data() as any)?.integrationExternalId ?? '').trim();
+      if (!offerId) {
+        return res.status(400).json({ error: 'Defina o ID da oferta da Fomento no cadastro desta casa.' });
+      }
+      const days = Number(req.body?.days);
+      const span = Number.isFinite(days) && days > 0 ? Math.floor(days) : 7;
+      const { dateFrom, dateTo } = pullWindow(resolveServerToday(), span);
+      const windowDays: string[] = [];
+      const cursor = new Date(`${dateFrom}T12:00:00Z`);
+      while (cursor.toISOString().slice(0, 10) <= dateTo) {
+        windowDays.push(cursor.toISOString().slice(0, 10));
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+      const { payload, deleted, ignored } = await fomentoRecompute(
+        houseSnap as any, offerId, windowDays, (req as any).user?.uid ?? null,
+      );
+      await writeAuditLog(req, {
+        entityType: 'house_results', entityId: slug,
+        entityLabel: (houseSnap.data() as any)?.name ?? slug, action: 'house_results.pull',
+        metadata: {
+          dateFrom, dateTo, imported: payload.rows.length, deleted,
+          attributed: payload.attributed, pendingTags: payload.pending.map((p) => p.tag),
+          ignored, via: 'postback-recompute',
+        },
+      });
+      return res.json({
+        ok: true, house: slug, dateFrom, dateTo,
+        imported: payload.rows.length, deleted,
+        attributed: payload.attributed, pending: payload.pending,
+        note: payload.rows.length === 0 ? 'Nenhum evento de postback na janela.' : undefined,
+      });
+    } catch (e: any) {
+      console.error('[fomento-recompute] falhou:', e);
+      return res.status(500).json({ error: e?.message || 'Falha ao reprocessar o postback da casa.' });
+    }
+  };
+
   // Registro de CONECTORES de pull POR CASA. A casa declara o seu na flag
   // `integration` do doc dela (auto-carimbada pelo conector a cada rodada) —
   // Esportiva é uma CASA, não um gateway: integração nova (ex.: MyAffiliates)
@@ -6134,6 +6391,12 @@ export function createApp(deps: ServerDeps) {
     'leonbet-r2d': {
       configured: async () => !!(await connectorSettings('leonbet-r2d'))?.configured,
       handler: leonbetPullHandler,
+    },
+    // Push, não pull: o "Atualizar" reprocessa o ledger de postback (reatribui
+    // tags), nunca chama a rede.
+    [FOMENTO_INTEGRATION_ID]: {
+      configured: async () => !!(await connectorSettings(FOMENTO_INTEGRATION_ID))?.configured,
+      handler: fomentoRecomputeHandler,
     },
   };
 

@@ -59,6 +59,9 @@ export const DEMO_EXEMPTIONS: Record<string, DemoExemption> = {
   app_meta: {
     reason: 'O servidor publica app_meta/version no boot (publishAppVersion). Semear à mão com versão diferente do bundle faria o banner "Nova versão disponível" aparecer indevidamente.',
   },
+  postback_events: {
+    reason: 'Ledger server-only dos disparos de postback da Fomento (rede Offer18); nenhuma tela o lê. O que a demo mostra é o efeito derivado dele em house_results, que já é semeado.',
+  },
 };
 
 /**
