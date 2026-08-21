@@ -409,6 +409,67 @@ Enquanto isso não for decidido, o campo continua informativo — que é o compo
 que o afiliado já produziu muda de valor por causa dele. Ver §5 (meta mensal do legado), que é a
 mesma feature vista pelo lado do afiliado.
 
+### 9. ⏰ LEMBRETE 21/08/2026 — conferir se os 5 cadastros do Maurício na LEON caíram no nome dele
+
+Em 20/08 à noite o Maurício subiu **5 contas de cassino** na LEON com depósito acima da baseline e
+disse que "contou o FTD normal" no painel da casa. A LEON é **T+1**, então isso só aparece no pull
+das **06:35 BRT de 21/08**. O que precisa ser conferido é **por qual link ele cadastrou**, porque o
+link dele na plataforma (`J9A9htCI`) estava com **0 cliques** — ou seja, ele NÃO usou o nosso.
+
+Como conferir (tudo somente leitura):
+
+1. Rodar o pull ou esperar o cron, e olhar o `audit_logs` com `action == 'house_results.pull'` e
+   `entityId == 'leon-bet'`: o campo `metadata.pendingTags` diz quais tags a casa reportou sem dono.
+2. Cruzar com `house_results` de `houseSlug == 'leon-bet'` e `date == '2026-08-20'`.
+
+Os três desfechos e o que cada um significa:
+
+- **Tag `mauriciofernandes3`** → ele usou o link da plataforma. Atribui sozinho, nada a fazer.
+- **Tag `mauriciofernandes2`** → ele usou um link CRU da casa. Essa tag existe, mas está no link
+  `70ZD2WJ1`, que está no **pool sem dono** — então cai em `pendingTags` e **não credita a ele**.
+  Conserto: atribuir aquele link do pool a ele, ou criar o apelido em `affiliate_tag_aliases`.
+- **Outra tag qualquer** → link cru com tag que não conhecemos; vira apelido de tag.
+
+Vale a mesma pergunta ao Maurício sobre os `anid` que ele usa por fora, porque enquanto houver link
+cru circulando em paralelo ao da plataforma a atribuição vai depender de qual dos dois o jogador
+clicou. Ver §10, que é o outro lado do mesmo problema.
+
+Contexto de como isso apareceu: a aprovação de parceria emitia link com o placeholder cru
+(`anid={tag}`), corrigida no commit "Link de parceria sai com a tag do afiliado" + migração dos 16
+links já gravados (`scripts/fix/fix-link-placeholders.ts`, aplicado em 21/08 04:51 UTC).
+
+### 10. `/meus-links` do GERENTE lista os links da rede inteira como se fossem dele
+
+Pedido do Maurício em 20/08: "limpar alguns links repetidos que são listados nos meus". **Não são
+repetidos e não são dele** — são os links dos SUBS aparecendo na página pessoal.
+
+`GET /api/affiliate-links` (server.ts) devolve, para afiliado especial, os links de toda a sub-rede
+(`specialNetworkScope`), que é o certo para as telas de GESTÃO. Mas `/meus-links` é a página do
+afiliado ("Meus Links", "Seus links de divulgação, um por casa") e o `buildMyLinkCards` desenha um
+cartão por link **sem dizer de quem é cada um**. Medido na conta dele em 20/08: 8 cartões, sendo
+4 "Esportiva Bet" visualmente idênticos (mesmo nome, mesmos chips de CPA/baseline/rollover, porque
+`soleDealForHouse` resolve o mesmo acordo para todos). Só 1 é dele:
+
+| link | dono | cliques |
+|---|---|---|
+| `aFAJOvso` | **Maurício** (tag `mauriciofernandes`) | 21 |
+| `_KlfaYEP` | luiz felipe maciel de souza | 1 |
+| `yDjhYwU4` | MICKAEL VINICIUS ANGELO DOS SANTOS | 0 |
+| `SoRGTbul` | teste031 | 0 |
+
+O risco não é estético: os quatro são indistinguíveis na tela, então ele pode copiar e divulgar o
+link de um sub, e aí o FTD é creditado ao sub, não a ele.
+
+Duas saídas, e a escolha é de produto:
+
+1. **Escopar `/meus-links` ao próprio `affiliateId`** e deixar a visão da rede em `/network/afiliados`,
+   que já é a tela de gestão. É o que o título e o subtítulo da página prometem.
+2. **Manter a rede e rotular** cada cartão com o dono, agrupando "meus" e "da minha equipe".
+
+Em qualquer uma delas, o subtítulo "um por casa" precisa sair ou virar verdade: hoje ele mente
+sempre que um afiliado tem mais de um link na mesma casa. Ver §9, que é o outro lado do mesmo tema
+(qual link o afiliado de fato divulga).
+
 ### Bloqueios que NÃO são nossos
 
 - ~~**Cron da Esportiva** depende da casa isentar `/api/*` do challenge~~ → **RESOLVIDO 04/08/2026**:
