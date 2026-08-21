@@ -438,7 +438,7 @@ Contexto de como isso apareceu: a aprovação de parceria emitia link com o plac
 (`anid={tag}`), corrigida no commit "Link de parceria sai com a tag do afiliado" + migração dos 16
 links já gravados (`scripts/fix/fix-link-placeholders.ts`, aplicado em 21/08 04:51 UTC).
 
-### 10. `/meus-links` do GERENTE lista os links da rede inteira como se fossem dele
+### 10. ✅ ENTREGUE (21/08/2026) — `/meus-links` do GERENTE listava os links da rede como se fossem dele
 
 Pedido do Maurício em 20/08: "limpar alguns links repetidos que são listados nos meus". **Não são
 repetidos e não são dele** — são os links dos SUBS aparecendo na página pessoal.
@@ -460,15 +460,21 @@ cartão por link **sem dizer de quem é cada um**. Medido na conta dele em 20/08
 O risco não é estético: os quatro são indistinguíveis na tela, então ele pode copiar e divulgar o
 link de um sub, e aí o FTD é creditado ao sub, não a ele.
 
-Duas saídas, e a escolha é de produto:
+**Escolhido o escopo pelo dono**, e não rotular o cartão com o nome de quem é: a visão da rede já
+existe inteira em `/network/afiliados` (o gerente vê, gera e copia o link de cada sub por lá desde
+`cfe4893`), então manter a rede aqui era duplicar a tela de gestão dentro da página pessoal. Um
+cartão rotulado ainda deixaria o gerente a um clique de copiar o link errado.
 
-1. **Escopar `/meus-links` ao próprio `affiliateId`** e deixar a visão da rede em `/network/afiliados`,
-   que já é a tela de gestão. É o que o título e o subtítulo da página prometem.
-2. **Manter a rede e rotular** cada cartão com o dono, agrupando "meus" e "da minha equipe".
+O filtro é o 5º argumento de `buildMyLinkCards` (`ownerId`, puro e testado), não um `.filter` no JSX:
+as duas rotas continuam devolvendo a rede, porque as telas de gestão dependem disso. Omitir o
+argumento preserva o comportamento antigo; passar vazio não devolve nada (fail-closed, para conta
+sem afiliado vinculado).
 
-Em qualquer uma delas, o subtítulo "um por casa" precisa sair ou virar verdade: hoje ele mente
-sempre que um afiliado tem mais de um link na mesma casa. Ver §9, que é o outro lado do mesmo tema
-(qual link o afiliado de fato divulga).
+O subtítulo "um por casa" também saiu: ele mentia sempre que um afiliado tinha mais de um link na
+mesma casa (link migrado do legado convivendo com o da parceria). Agora é só "Seus links de
+divulgação. Compartilhe e acompanhe os cliques."
+
+Ver §9, que é o outro lado do mesmo tema (qual link o afiliado de fato divulga).
 
 ### Bloqueios que NÃO são nossos
 

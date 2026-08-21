@@ -281,6 +281,9 @@ export interface MyLinkPartnership {
   operatorName?: string | null;
   dealLabel?: string | null;
   houseId?: string | null;
+  /** Dono da parceria. A lista chega com a dos filhos diretos junto (o gerente
+   *  precifica a fila deles), então a página pessoal precisa saber de quem é. */
+  affiliateId?: string | null;
 }
 
 export interface MyLinkHouse {
@@ -346,17 +349,32 @@ export function houseForBrandKey(
  *
  * `deals` é OPCIONAL: instância sem marketplace (o módulo é opt-in por env) não tem
  * a rota, a página passa lista vazia e os cartões saem como sempre saíram.
+ *
+ * ⚠️ `ownerId` é o ESCOPO da página, e para o gerente ele não é opcional na
+ * prática: as duas fontes chegam com a REDE dentro de propósito
+ * (`GET /api/affiliate-links` devolve a sub-rede e `GET /api/partnerships` a fila
+ * dos filhos diretos, ambos porque existem telas de GESTÃO que precisam disso).
+ * Sem filtrar, a página PESSOAL do gerente lista o link do sub com exatamente a
+ * mesma cara do dele (mesmo nome de casa, mesmos chips, porque `soleDealForHouse`
+ * resolve o mesmo acordo) e ele pode divulgar o errado, creditando o FTD ao sub.
+ * Medido na Infinity em 20/08/2026: 8 cartões, dos quais 3 eram de subs.
+ * Omitir o argumento mantém o comportamento antigo (sem filtro); passar string
+ * vazia não devolve nada, que é o certo para quem não tem afiliado vinculado.
  */
 export function buildMyLinkCards(
   partnerships: MyLinkPartnership[] | null | undefined,
   links: TriageLink[] | null | undefined,
   houses: MyLinkHouse[] | null | undefined,
   deals?: Deal[] | null,
+  ownerId?: string | null,
 ): MyLinkCard[] {
+  const own = ownerId === undefined ? null : String(ownerId ?? '').trim();
+  const isMine = (id: unknown): boolean => own === null || String(id ?? '').trim() === own;
+
   const byCode = new Map<string, TriageLink>();
   for (const l of Array.isArray(links) ? links : []) {
     const code = String(l?.code ?? '').trim();
-    if (code) byCode.set(code, l);
+    if (code && isMine(l?.affiliateId)) byCode.set(code, l);
   }
   const dealById = new Map<string, Deal>();
   for (const d of Array.isArray(deals) ? deals : []) {
@@ -370,6 +388,7 @@ export function buildMyLinkCards(
   for (const p of Array.isArray(partnerships) ? partnerships : []) {
     const code = String(p?.code ?? '').trim();
     if (!code) continue; // parceria sem link emitido não vira cartão
+    if (!isMine(p?.affiliateId)) continue; // parceria de sub: é da tela de gestão
     used.add(code);
     const link = byCode.get(code) ?? null;
     // Na parceria o acordo é EXPLÍCITO (`dealId`), então não há adivinhação: acordo

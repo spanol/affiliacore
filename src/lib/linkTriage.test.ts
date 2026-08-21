@@ -290,6 +290,43 @@ describe('buildMyLinkCards (ponta do afiliado)', () => {
     expect(buildMyLinkCards(null, null, null)).toEqual([]);
   });
 
+  // Incidente Infinity 20/08/2026: o gerente via 8 cartões em /meus-links, dos
+  // quais 3 eram links de SUBS. As duas rotas devolvem a rede de propósito (há
+  // telas de gestão que precisam), então o recorte da página pessoal é aqui.
+  describe('escopo do dono (ownerId)', () => {
+    const parcerias = [
+      { id: 'p1', code: 'MEU', operatorName: 'Esportiva Bet', houseId: 'esportiva-bet', affiliateId: 'gerente' },
+      { id: 'p2', code: 'SUB', operatorName: 'Esportiva Bet', houseId: 'esportiva-bet', affiliateId: 'sub1' },
+    ];
+    const links = [
+      { code: 'MEU', affiliateId: 'gerente', brandId: 'esportiva-bet', registerUrl: 'https://e.bet/?afp=meu', active: true, clicks: 21 },
+      { code: 'SUB', affiliateId: 'sub1', brandId: 'esportiva-bet', registerUrl: 'https://e.bet/?afp=sub', active: true, clicks: 1 },
+      { code: 'SOLTO', affiliateId: 'sub2', brandId: 'esportiva-bet', registerUrl: 'https://e.bet/?afp=s2', active: true },
+    ];
+
+    it('com ownerId, só entram os cartões do próprio afiliado', () => {
+      const cards = buildMyLinkCards(parcerias, links, houses, [], 'gerente');
+      expect(cards.map((c) => c.code)).toEqual(['MEU']);
+      expect(cards[0].clicks).toBe(21);
+    });
+
+    it('filtra as DUAS origens: parceria de sub e link atribuído de sub', () => {
+      const doSub = buildMyLinkCards(parcerias, links, houses, [], 'sub2');
+      expect(doSub.map((c) => c.code)).toEqual(['SOLTO']); // nem a parceria nem o link do sub1
+    });
+
+    // Compatibilidade: quem não passa o argumento (admin, chamadas antigas)
+    // continua vendo tudo, senão o recorte novo esconderia dado de outra tela.
+    it('sem o argumento, nada é filtrado', () => {
+      expect(buildMyLinkCards(parcerias, links, houses).map((c) => c.code).sort()).toEqual(['MEU', 'SOLTO', 'SUB']);
+    });
+
+    // Fail-closed: conta sem afiliado vinculado não pode cair na lista da rede.
+    it('ownerId vazio não devolve nada', () => {
+      expect(buildMyLinkCards(parcerias, links, houses, [], '')).toEqual([]);
+    });
+  });
+
   // A chave é a MESMA que a precificação/aprovação grava no byBrand (dealBrandKey):
   // errar aqui faria a tela buscar a comissão do afiliado na casa errada.
   it('brandKey segue a convenção do byBrand: brandId da OTG, slug da manual, houseId quando a casa sumiu', () => {

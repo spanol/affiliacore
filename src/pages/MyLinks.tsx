@@ -41,7 +41,10 @@ export default function MyLinks() {
           // aqui só faz o chip de comissão não aparecer, a tela segue inteira.
           fetchAffiliateConfigs().catch(() => ({} as Record<string, AffiliateConfig>)),
         ]);
-        setCards(buildMyLinkCards(parts, allLinks as any, houses as any, deals as any));
+        // O 5º argumento é o ESCOPO: as duas listas chegam com a rede do gerente
+        // dentro (as rotas servem também as telas de gestão). Aqui é a página
+        // pessoal, então só entram os links de quem está logado.
+        setCards(buildMyLinkCards(parts, allLinks as any, houses as any, deals as any, profile?.affiliateId ?? ''));
         setMyConfig(profile?.affiliateId ? configs[String(profile.affiliateId)] ?? null : null);
         const hmap: Record<string, string | null> = {};
         (houses as any[]).forEach((h) => {
@@ -78,7 +81,9 @@ export default function MyLinks() {
             <span className="px-2.5 py-1 rounded-full bg-accent-500/15 text-accent-500 text-[11px] font-bold">{pluralize(cards.length, 'link')} · {pluralize(totalClicks, 'clique')}</span>
           )}
         </div>
-        <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">Seus links de divulgação, um por casa. Compartilhe e acompanhe os cliques.</p>
+        {/* Nada de "um por casa": a mesma casa pode ter mais de um link do mesmo
+            afiliado (link migrado do legado convivendo com o da parceria). */}
+        <p className="text-slate-500 dark:text-neutral-400 text-sm mt-2">Seus links de divulgação. Compartilhe e acompanhe os cliques.</p>
       </motion.header>
 
       {loading ? (
