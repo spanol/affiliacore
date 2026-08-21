@@ -4044,6 +4044,41 @@ describe('geracao de link (/api/affiliate-links/generate)', () => {
     expect(res.body.tag).toBe('mauriciofernandes');
   });
 
+  // A tag de um link do POOL já foi cunhada na casa. Sugeri-la a outra pessoa
+  // poria duas pessoas sob a mesma tag no relatório, e o índice de atribuição
+  // (first-wins) daria o resultado de uma à outra.
+  it('não SUGERE tag que já está num link do pool (standby, sem dono)', async () => {
+    const withPool: any = {
+      ...seed,
+      affiliate_links: {
+        POOL1: { code: 'POOL1', affiliateId: null, brandId: 'esportiva', tag: 'mauriciofernandes', active: false },
+      },
+    };
+    const res = await request(buildApp({ seed: withPool }))
+      .post('/api/affiliate-links/generate')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'AFF-1', brandId: 'esportiva' })
+      .expect(201);
+    expect(res.body.tag).toBe('mauriciofernandes2');
+  });
+
+  // Mas reivindicar a tag do pool EXPLICITAMENTE continua valendo: é exatamente
+  // o que "atribuir um link do pool" significa, e o pool não tem dono a proteger.
+  it('a tag do pool ainda pode ser PEDIDA de propósito', async () => {
+    const withPool: any = {
+      ...seed,
+      affiliate_links: {
+        POOL1: { code: 'POOL1', affiliateId: null, brandId: 'esportiva', tag: 'infinitw55', active: false },
+      },
+    };
+    const res = await request(buildApp({ seed: withPool }))
+      .post('/api/affiliate-links/generate')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'AFF-1', brandId: 'esportiva', tag: 'infinitw55' })
+      .expect(201);
+    expect(res.body.tag).toBe('infinitw55');
+  });
+
   it('idempotente por afiliado x casa: regerar ATUALIZA o mesmo code (o afiliado ja compartilhou)', async () => {
     const db = makeFirestore(seed);
     const app = createApp({ adminApp: makeAdminApp(), adminDb: db });

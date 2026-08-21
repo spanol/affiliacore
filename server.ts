@@ -4076,7 +4076,13 @@ export function createApp(deps: ServerDeps) {
       const tag = normalizeTag(data?.tag) || normalizeTag(extractTagFromUrl(String(data?.registerUrl ?? '')));
       // Placeholder cru não é tag de ninguém: reservá-lo faria o próximo afiliado
       // receber uma tag com sufixo por causa de uma colisão que não existe.
-      if (tag && owner && !hasUnresolvedPlaceholder(tag) && !ownerByTag.has(tag)) ownerByTag.set(tag, owner);
+      if (!tag || hasUnresolvedPlaceholder(tag)) continue;
+      // Link do POOL (standby) entra com dono VAZIO: a tag já foi cunhada na casa,
+      // então não pode ser SUGERIDA a mais ninguém — mas segue reivindicável de
+      // propósito, que é o que atribuir um link do pool significa. Dono real vence
+      // o pool: senão a tag de alguém ficaria mascarada e o 409 não dispararia.
+      const prev = ownerByTag.get(tag);
+      if (prev === undefined || (!prev && owner)) ownerByTag.set(tag, owner);
     }
     for (const d of aliasSnap.docs) {
       const data = d.data() as any;
