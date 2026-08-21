@@ -4,6 +4,7 @@ import {
   suggestTag,
   buildTaggedUrl,
   tagParamForTemplate,
+  hasUnresolvedPlaceholder,
   DEFAULT_TAG_PARAM,
 } from './linkGeneration';
 
@@ -108,5 +109,33 @@ describe('tagParamForTemplate', () => {
     expect(tagParamForTemplate(TEMPLATE)).toBe(DEFAULT_TAG_PARAM);
     expect(tagParamForTemplate('lixo')).toBe(DEFAULT_TAG_PARAM);
     expect(tagParamForTemplate(TEMPLATE, 'subid')).toBe('subid');
+  });
+});
+
+// A guarda que impede um link emitido com o template CRU de virar tag de alguém.
+// Ver o incidente de 20/08/2026 no comentário de `buildTagIndex`.
+describe('hasUnresolvedPlaceholder', () => {
+  it('acusa os quatro placeholders aceitos, em qualquer caixa e com espaco', () => {
+    expect(hasUnresolvedPlaceholder('https://9behi4y9oh.com/?anid={tag}')).toBe(true);
+    expect(hasUnresolvedPlaceholder('https://fomento.o18.link/c?sub_aff_id={ref}')).toBe(true);
+    expect(hasUnresolvedPlaceholder('https://casa.bet/?x={AFP}')).toBe(true);
+    expect(hasUnresolvedPlaceholder('https://casa.bet/?x={ subid }')).toBe(true);
+  });
+
+  it('URL ja resolvida passa, e o texto vazio nao acusa nada', () => {
+    expect(hasUnresolvedPlaceholder('https://9behi4y9oh.com/?anid=infinitw02')).toBe(false);
+    expect(hasUnresolvedPlaceholder('tagdojoao')).toBe(false);
+    expect(hasUnresolvedPlaceholder('')).toBe(false);
+    expect(hasUnresolvedPlaceholder(null)).toBe(false);
+    expect(hasUnresolvedPlaceholder(undefined)).toBe(false);
+  });
+
+  // O regex de substituicao e global; um `test` compartilhado avancaria o
+  // lastIndex e a 2a chamada devolveria false com a MESMA entrada.
+  it('e estavel entre chamadas repetidas (sem estado de regex global)', () => {
+    const url = 'https://casa.bet/?a={tag}&b={ref}';
+    expect(hasUnresolvedPlaceholder(url)).toBe(true);
+    expect(hasUnresolvedPlaceholder(url)).toBe(true);
+    expect(hasUnresolvedPlaceholder(url)).toBe(true);
   });
 });

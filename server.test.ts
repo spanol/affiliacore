@@ -2418,10 +2418,14 @@ describe('deals + parcerias (P2)', () => {
     // byBrand keyed pelo SLUG da casa manual (betano), com a taxa do deal (120/0)
     const cfg = db.__store.get('affiliate_configs')?.get('affX');
     expect(cfg.byBrand.betano).toEqual({ cpaValue: 120, revPercentage: 0 });
-    // affiliate_links emitido (afiliado×betano, registerUrl da casa, ativo)
+    // affiliate_links emitido (afiliado×betano, ativo) com a TAG do afiliado na
+    // URL: o template da casa não traz parâmetro de rastreio, então a tag entra
+    // como `?afp=` — sem ela a casa não tem como dizer de quem é o cadastro.
     const links = [...(db.__store.get('affiliate_links')?.values() ?? [])];
     expect(links).toHaveLength(1);
-    expect(links[0]).toMatchObject({ affiliateId: 'affX', brandId: 'betano', registerUrl: 'https://betano.example/aff', active: true, dealId: 'd1' });
+    expect(links[0]).toMatchObject({ affiliateId: 'affX', brandId: 'betano', active: true, dealId: 'd1' });
+    expect(links[0].tag).toBeTruthy();
+    expect(links[0].registerUrl).toBe(`https://betano.example/aff?afp=${links[0].tag}`);
     // parceria aprovada + code setado
     const p = db.__store.get('partnership_requests')?.get('p1');
     expect(p.status).toBe('approved');
@@ -2509,6 +2513,80 @@ describe('deals + parcerias (P2)', () => {
     expect(cfg.byBrand['sb-brand']).toEqual({ cpaValue: 0, revPercentage: 30 }); // revshare
     const links = [...(db.__store.get('affiliate_links')?.values() ?? [])];
     expect(links[0]).toMatchObject({ brandId: 'sb-brand', active: false }); // sem template → link inativo
+  });
+
+  // Regressão do incidente de 20/08/2026 na Infinity: a aprovação gravava o
+  // `registerUrlTemplate` CRU, então os 16 links do marketplace (LEON/Blaze/KTO/
+  // Winhugo) saíram com `{tag}`/`{ref}` literal na URL. Todo afiliado da casa
+  // chegava no relatório sob a MESMA tag e o resultado ia para uma pessoa só.
+  it('APROVAÇÃO substitui o placeholder do template pela tag do afiliado', async () => {
+    const seed: any = baseSeed();
+    seed.houses.betano.registerUrlTemplate = 'https://casa.example/?serial=61260&anid={tag}';
+    seed.partnership_requests = { p1: { affiliateId: 'affX', dealId: 'd1', status: 'requested', code: null } };
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).patch('/api/partnerships/p1').set('Authorization', 'Bearer admin-uid').send({ status: 'approved' }).expect(200);
+
+    const link = [...(db.__store.get('affiliate_links')?.values() ?? [])][0] as any;
+    expect(link.tag).toBeTruthy();
+    expect(link.registerUrl).toBe(`https://casa.example/?serial=61260&anid=${link.tag}`);
+    expect(link.registerUrl).not.toContain('{tag}');
+    expect(link.active).toBe(true);
+  });
+
+  it('APROVAÇÃO dá tags DIFERENTES a dois afiliados na mesma casa', async () => {
+    const seed: any = baseSeed();
+    seed.houses.betano.registerUrlTemplate = 'https://casa.example/?anid={tag}';
+    seed.partnership_requests = {
+      p1: { affiliateId: 'affX', dealId: 'd1', status: 'requested', code: null },
+      p2: { affiliateId: 'affY', dealId: 'd1', status: 'requested', code: null },
+    };
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).patch('/api/partnerships/p1').set('Authorization', 'Bearer admin-uid').send({ status: 'approved' }).expect(200);
+    await request(app).patch('/api/partnerships/p2').set('Authorization', 'Bearer admin-uid').send({ status: 'approved' }).expect(200);
+
+    const tags = [...(db.__store.get('affiliate_links')?.values() ?? [])].map((l: any) => l.tag);
+    expect(tags).toHaveLength(2);
+    expect(tags[0]).not.toBe(tags[1]); // colidir = dar o resultado de um ao outro
+    expect(new Set(tags).size).toBe(2);
+  });
+
+  // O `code` é estável (já foi compartilhado); reaprovar não pode reescrever a
+  // tag, senão o afiliado perde o que já trouxe naquela tag.
+  it('REAPROVAÇÃO preserva a tag que o link já tinha', async () => {
+    const seed: any = baseSeed();
+    seed.houses.betano.registerUrlTemplate = 'https://casa.example/?anid={tag}';
+    seed.partnership_requests = { p1: { affiliateId: 'affX', dealId: 'd1', status: 'requested', code: 'LINK1' } };
+    seed.affiliate_links = {
+      LINK1: { code: 'LINK1', affiliateId: 'affX', brandId: 'betano', tag: 'infinitw42', registerUrl: 'https://casa.example/?anid=infinitw42', active: true },
+    };
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).patch('/api/partnerships/p1').set('Authorization', 'Bearer admin-uid').send({ status: 'approved' }).expect(200);
+
+    const link = db.__store.get('affiliate_links')?.get('LINK1') as any;
+    expect(link.tag).toBe('infinitw42');
+    expect(link.registerUrl).toBe('https://casa.example/?anid=infinitw42');
+  });
+
+  // Link que JÁ está quebrado em produção se conserta sozinho na próxima
+  // aprovação: o placeholder gravado não conta como tag existente.
+  it('REAPROVAÇÃO conserta link cuja tag gravada é o placeholder', async () => {
+    const seed: any = baseSeed();
+    seed.houses.betano.registerUrlTemplate = 'https://casa.example/?anid={tag}';
+    seed.partnership_requests = { p1: { affiliateId: 'affX', dealId: 'd1', status: 'requested', code: 'LINK1' } };
+    seed.affiliate_links = {
+      LINK1: { code: 'LINK1', affiliateId: 'affX', brandId: 'betano', registerUrl: 'https://casa.example/?anid={tag}', active: true },
+    };
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).patch('/api/partnerships/p1').set('Authorization', 'Bearer admin-uid').send({ status: 'approved' }).expect(200);
+
+    const link = db.__store.get('affiliate_links')?.get('LINK1') as any;
+    expect(link.tag).toBeTruthy();
+    expect(link.tag).not.toContain('{');
+    expect(link.registerUrl).not.toContain('{tag}');
   });
 
   it('guarda de transição: aprovar uma parceria já RECUSADA → 409', async () => {

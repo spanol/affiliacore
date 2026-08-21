@@ -30,7 +30,24 @@ export const DEFAULT_TAG_PARAM = 'afp';
 
 // Placeholders aceitos no template cadastrado em /casas. O `{ref}` é o que a
 // própria tela de casas documenta ("URL base de cadastro com {ref}").
-const PLACEHOLDER = /\{\s*(ref|tag|afp|subid)\s*\}/gi;
+const PLACEHOLDER_SOURCE = '\\{\\s*(?:ref|tag|afp|subid)\\s*\\}';
+const PLACEHOLDER = new RegExp(PLACEHOLDER_SOURCE, 'gi');
+// Mesma expressão SEM /g para teste de presença: `test` num regex global avança
+// o `lastIndex` e alterna entre true e false a cada chamada.
+const PLACEHOLDER_ONCE = new RegExp(PLACEHOLDER_SOURCE, 'i');
+
+/**
+ * A URL ainda carrega um placeholder por substituir.
+ *
+ * É a guarda de quem CONSOME um link já emitido: gravar o `registerUrlTemplate`
+ * cru manda o literal `{tag}` para a casa, e esse literal não é a tag de
+ * ninguém. Pior, ele tem cara de tag válida — sem esta checagem o índice de
+ * atribuição o aceita, o resultado de TODOS os afiliados da casa vai para o
+ * primeiro link que colidir com `{tag}` e nada aparece como pendente.
+ */
+export function hasUnresolvedPlaceholder(value: unknown): boolean {
+  return PLACEHOLDER_ONCE.test(String(value ?? ''));
+}
 
 const MAX_TAG_LENGTH = 24;
 
@@ -106,8 +123,7 @@ export function buildTaggedUrl(template: unknown, tag: unknown, param?: string |
   const value = String(tag ?? '').trim();
   if (!raw || !value) return '';
 
-  if (PLACEHOLDER.test(raw)) {
-    PLACEHOLDER.lastIndex = 0; // regex global: `test` move o cursor
+  if (PLACEHOLDER_ONCE.test(raw)) {
     const replaced = raw.replace(PLACEHOLDER, encodeURIComponent(value));
     return /^https?:\/\/.+/i.test(replaced) ? replaced : '';
   }
@@ -133,10 +149,7 @@ export function buildTaggedUrl(template: unknown, tag: unknown, param?: string |
  */
 export function tagParamForTemplate(template: unknown, fallback?: string | null): string {
   const raw = String(template ?? '').trim();
-  if (PLACEHOLDER.test(raw)) {
-    PLACEHOLDER.lastIndex = 0;
-    return 'placeholder';
-  }
+  if (PLACEHOLDER_ONCE.test(raw)) return 'placeholder';
   try {
     const url = new URL(raw);
     const existing = TAG_PARAMS.find((p) => url.searchParams.has(p));

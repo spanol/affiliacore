@@ -108,6 +108,33 @@ describe('buildTagIndex', () => {
     expect(buildTagIndex(null, null).size).toBe(0);
     expect(buildTagIndex([], [{ tag: '', affiliateId: 'A1' }]).size).toBe(0);
   });
+
+  // Incidente Infinity 20/08/2026: link emitido com o template CRU manda o
+  // literal `{tag}` para a casa. Indexado, ele daria o resultado de TODOS os
+  // afiliados daquela casa ao primeiro link da ordem de leitura, e sem cair em
+  // pendente ninguém veria. Fora do índice, a linha vira pendência visível.
+  it('placeholder cru NÃO vira tag (senão o 1º link rouba o resultado de todos)', () => {
+    const quebrados = [
+      { affiliateId: 'MICKAEL', registerUrl: 'https://9behi4y9oh.com/?serial=61260&anid={tag}' },
+      { affiliateId: 'JOTA', registerUrl: 'https://9behi4y9oh.com/?serial=61260&anid={tag}' },
+      { affiliateId: 'LUIZ', registerUrl: 'https://fomento.o18.link/c?o=1&sub_aff_id={ref}' },
+    ];
+    const idx = buildTagIndex(quebrados, []);
+    expect(idx.has('{tag}')).toBe(false);
+    expect(idx.has('{ref}')).toBe(false);
+    expect(idx.size).toBe(0);
+  });
+
+  it('placeholder na tag GRAVADA também não entra, nem por apelido', () => {
+    expect(buildTagIndex([{ affiliateId: 'A1', tag: '{tag}', registerUrl: 'https://x/y' }], []).size).toBe(0);
+    expect(buildTagIndex([], [{ tag: '{ref}', affiliateId: 'A1' }]).size).toBe(0);
+  });
+
+  // A guarda é do placeholder, não da chave: tag legítima com o mesmo miolo segue valendo.
+  it('tag legítima que só CONTÉM a palavra "tag" continua indexada', () => {
+    const idx = buildTagIndex([{ affiliateId: 'A1', tag: 'tagdojoao', registerUrl: 'https://x/y' }], []);
+    expect(idx.get('tagdojoao')).toEqual({ affiliateId: 'A1', origin: 'link' });
+  });
 });
 
 describe('resolução ponta a ponta (adaptador -> parser -> tag)', () => {

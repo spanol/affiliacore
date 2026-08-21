@@ -50,7 +50,7 @@ import { sanitizeTier, sanitizeTierPatch } from './src/lib/achievements';
 import { sanitizeSupportContact, SUPPORT_CONTACT_EMPTY } from './src/lib/supportContact';
 import { sanitizeShowcase, buildShowcasePayload } from './src/lib/showcase';
 import { parseStandbyLinks, extractTagFromUrl } from './src/lib/linkTriage';
-import { buildTaggedUrl, suggestTag } from './src/lib/linkGeneration';
+import { buildTaggedUrl, suggestTag, hasUnresolvedPlaceholder } from './src/lib/linkGeneration';
 import { buildResultsNotification, type ResultsNotificationVariant } from './src/lib/resultsNotification';
 import { normalizeDealInput, buildDealLabel, dealBrandKey, dealToBrandRates, dealFxSpec, buildDraftDealFromHouse } from './src/lib/deal';
 import { canTransition, nextStatusAfterPricing, isActivePartnership, selectCurrentPartnerships, PARTNERSHIP_STATUS_LABEL, type PartnershipStatus } from './src/lib/partnership';
@@ -4060,6 +4060,33 @@ export function createApp(deps: ServerDeps) {
     }
   });
 
+  // Tag -> dono, a partir dos links já emitidos mais os apelidos salvos. Fonte
+  // ÚNICA das DUAS portas que cunham link (a tela /links e a aprovação de parceria
+  // do marketplace): com dois índices, cada porta sugeriria uma tag que a outra já
+  // deu a alguém, e a colisão só apareceria no relatório da casa.
+  const loadTagOwners = async (): Promise<Map<string, string>> => {
+    const [linksSnap, aliasSnap] = await Promise.all([
+      adminDb!.collection('affiliate_links').get(),
+      adminDb!.collection('affiliate_tag_aliases').get(),
+    ]);
+    const ownerByTag = new Map<string, string>();
+    for (const d of linksSnap.docs) {
+      const data = d.data() as any;
+      const owner = String(data?.affiliateId ?? '').trim();
+      const tag = normalizeTag(data?.tag) || normalizeTag(extractTagFromUrl(String(data?.registerUrl ?? '')));
+      // Placeholder cru não é tag de ninguém: reservá-lo faria o próximo afiliado
+      // receber uma tag com sufixo por causa de uma colisão que não existe.
+      if (tag && owner && !hasUnresolvedPlaceholder(tag) && !ownerByTag.has(tag)) ownerByTag.set(tag, owner);
+    }
+    for (const d of aliasSnap.docs) {
+      const data = d.data() as any;
+      const tag = normalizeTag(data?.tag ?? d.id);
+      const owner = String(data?.affiliateId ?? '').trim();
+      if (tag && owner) ownerByTag.set(tag, owner); // apelido vence, como no import
+    }
+    return ownerByTag;
+  };
+
   // Gera o link de um afiliado a partir do TEMPLATE da casa (`registerUrlTemplate`)
   // + uma tag nossa. Admin OU afiliado especial ativo — o especial só gera para a
   // PRÓPRIA rede (ele mesmo + subs; item 1 da call Infinity 12/08). Sub comum
@@ -4113,23 +4140,7 @@ export function createApp(deps: ServerDeps) {
 
       // Tags já em uso: links emitidos + apelidos salvos. Serve para sugerir sem
       // colidir E para recusar a tag digitada que já é de outra pessoa.
-      const [linksSnap, aliasSnap] = await Promise.all([
-        adminDb.collection('affiliate_links').get(),
-        adminDb.collection('affiliate_tag_aliases').get(),
-      ]);
-      const ownerByTag = new Map<string, string>();
-      for (const d of linksSnap.docs) {
-        const data = d.data() as any;
-        const owner = String(data?.affiliateId ?? '').trim();
-        const tag = normalizeTag(data?.tag) || normalizeTag(extractTagFromUrl(String(data?.registerUrl ?? '')));
-        if (tag && owner && !ownerByTag.has(tag)) ownerByTag.set(tag, owner);
-      }
-      for (const d of aliasSnap.docs) {
-        const data = d.data() as any;
-        const tag = normalizeTag(data?.tag ?? d.id);
-        const owner = String(data?.affiliateId ?? '').trim();
-        if (tag && owner) ownerByTag.set(tag, owner); // apelido vence, como no import
-      }
+      const ownerByTag = await loadTagOwners();
 
       const requested = normalizeTag(req.body?.tag);
       const tag = requested || suggestTag(
@@ -5408,14 +5419,42 @@ export function createApp(deps: ServerDeps) {
         const cfgChanges = applyDealRates ? diffChanges(cfgData, { byBrand: nextByBrand }, ['byBrand']) : [];
 
         // Emite (idempotente por afiliado×brandKey) o link de divulgação p/ o /go.
+        //
+        // A TAG é obrigatória aqui, e é o que esta rota errava: gravar o
+        // `registerUrlTemplate` CRU deixa o `{tag}` literal na URL, então toda
+        // visita chega na casa sob a mesma tag e o resultado dos afiliados vira
+        // um balde só. `buildTaggedUrl` é a mesma porta do /affiliate-links/generate
+        // — a diferença entre as duas era exatamente o bug.
         let code: string | null = cur.code ?? null;
-        const registerUrl = (house as any).registerUrlTemplate || null;
-        if (!code) {
+        let linkSnap: admin.firestore.DocumentSnapshot | null = null;
+        if (code) {
+          linkSnap = await adminDb.collection('affiliate_links').doc(code).get();
+        } else {
           const existingLink = await adminDb.collection('affiliate_links')
             .where('affiliateId', '==', affiliateId).where('brandId', '==', brandKey).limit(1).get();
-          if (!existingLink.empty) code = existingLink.docs[0].id;
-          else code = crypto.randomBytes(6).toString('base64url');
+          if (!existingLink.empty) {
+            linkSnap = existingLink.docs[0];
+            code = existingLink.docs[0].id;
+          } else {
+            code = crypto.randomBytes(6).toString('base64url');
+          }
         }
+
+        const template = String((house as any).registerUrlTemplate ?? '').trim();
+        // Reaproveita a tag que o link já tem: o `code` é estável e pode já estar
+        // circulando, então trocar a tag agora tiraria do afiliado o que ele já
+        // trouxe. Placeholder gravado por engano NÃO conta como tag existente.
+        const storedTag = normalizeTag((linkSnap?.data() as any)?.tag);
+        let tag = storedTag && !hasUnresolvedPlaceholder(storedTag) ? storedTag : '';
+        if (!tag && template) {
+          tag = suggestTag(
+            { name: await affiliateNameOf(affiliateId), affiliateId },
+            (await loadTagOwners()).keys(),
+          );
+        }
+        // Sem template não há link (casa OTG, ou casa cujo cadastro ainda não foi
+        // configurado): o doc nasce inativo e o afiliado vê "link indisponível".
+        const registerUrl = template ? buildTaggedUrl(template, tag) : '';
 
         const batch = adminDb.batch();
         if (applyDealRates) {
@@ -5423,7 +5462,10 @@ export function createApp(deps: ServerDeps) {
         }
         batch.set(adminDb.collection('affiliate_links').doc(code), {
           code, affiliateId, brandId: brandKey,
-          registerUrl: registerUrl ? String(registerUrl) : null,
+          registerUrl: registerUrl || null,
+          // A tag fica no doc além de na URL: é ela que o `buildTagIndex` lê para
+          // casar o relatório da casa de volta com o afiliado.
+          ...(tag ? { tag } : {}),
           dealId: String(cur.dealId),
           active: !!registerUrl,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -5434,7 +5476,7 @@ export function createApp(deps: ServerDeps) {
         if (cfgChanges.length) {
           appendAuditLog(batch, req, { entityType: 'affiliate_config', entityId: affiliateId, entityLabel: await affiliateNameOf(affiliateId), action: 'config.update', changes: cfgChanges });
         }
-        appendAuditLog(batch, req, { entityType: 'partnership', entityId: id, entityLabel: buildDealLabel(deal), action: 'partnership.approve', metadata: { affiliateId, dealId: cur.dealId, brandKey, ratesFrom: applyDealRates ? 'deal' : 'gerente', ...(applyDealRates && rates ? { cpaValue: rates.cpaValue, revPercentage: rates.revPercentage, currency: dealFx.currency, ...(dealFx.currency !== 'BRL' ? { fxMode: dealFx.fxMode, fxRate: usedFxRate } : {}) } : {}), linkIssued: !!registerUrl } });
+        appendAuditLog(batch, req, { entityType: 'partnership', entityId: id, entityLabel: buildDealLabel(deal), action: 'partnership.approve', metadata: { affiliateId, dealId: cur.dealId, brandKey, ratesFrom: applyDealRates ? 'deal' : 'gerente', ...(applyDealRates && rates ? { cpaValue: rates.cpaValue, revPercentage: rates.revPercentage, currency: dealFx.currency, ...(dealFx.currency !== 'BRL' ? { fxMode: dealFx.fxMode, fxRate: usedFxRate } : {}) } : {}), linkIssued: !!registerUrl, ...(tag ? { tag } : {}) } });
         await batch.commit();
         return res.json(partnershipFromDoc(await ref.get()));
       }

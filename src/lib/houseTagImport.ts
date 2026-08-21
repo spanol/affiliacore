@@ -24,6 +24,7 @@ import {
   type AffiliateLookup,
 } from './houseResults';
 import { extractTagFromUrl } from './linkTriage';
+import { hasUnresolvedPlaceholder } from './linkGeneration';
 
 // --- Normalização da tag -----------------------------------------------------
 
@@ -155,6 +156,14 @@ export interface TagIndexEntry {
  * Constrói o mapa tag -> afiliado a partir dos links já emitidos
  * (`affiliate_links`, cuja `registerUrl` carrega `?afp=`) mais os apelidos salvos.
  * O apelido SOBREPÕE o link: é a decisão explícita do admin.
+ *
+ * ⚠️ Tag que ainda é PLACEHOLDER (`{tag}`, `{ref}`) fica de fora, e isto é uma
+ * guarda de dinheiro, não higiene: um link emitido com o template cru manda o
+ * literal `{tag}` para a casa, todos os afiliados daquela casa passam a chegar
+ * no relatório sob a MESMA tag e, indexada, ela daria o resultado de todo mundo
+ * ao primeiro link da ordem de leitura. Fora do índice, a linha cai em
+ * `pending` e aparece na tela de vínculo, que é onde o erro fica visível.
+ * Incidente real: 16 links da Infinity (LEON/Blaze/KTO/Winhugo) em 20/08/2026.
  */
 export function buildTagIndex(
   links: TagSourceLink[] | null | undefined,
@@ -165,13 +174,13 @@ export function buildTagIndex(
     const affiliateId = String(link?.affiliateId ?? '').trim();
     if (!affiliateId) continue; // link do pool (standby) não atribui nada
     const tag = normalizeTag(link?.tag) || normalizeTag(extractTagFromUrl(String(link?.registerUrl ?? '')));
-    if (!tag || index.has(tag)) continue;
+    if (!tag || hasUnresolvedPlaceholder(tag) || index.has(tag)) continue;
     index.set(tag, { affiliateId, origin: 'link' });
   }
   for (const alias of Array.isArray(aliases) ? aliases : []) {
     const tag = normalizeTag(alias?.tag);
     const affiliateId = String(alias?.affiliateId ?? '').trim();
-    if (!tag || !affiliateId) continue;
+    if (!tag || !affiliateId || hasUnresolvedPlaceholder(tag)) continue;
     index.set(tag, { affiliateId, origin: 'alias' }); // vence o link
   }
   return index;
