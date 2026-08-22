@@ -7,9 +7,10 @@
 
 ## TL;DR
 
-1. **27 casas** estão no catálogo (`src/lib/housePresets.ts`) — 26 da coleta de
-   28/07 + **Esportiva Bet em 13/08/2026** (ver §4.3) — todas com autorização
-   confirmada do **SPA/MF** e domínio `.bet.br`.
+1. **32 casas** estão no catálogo (`src/lib/housePresets.ts`) — 26 da coleta de
+   28/07 + **Esportiva Bet em 13/08/2026** (ver §4.3) + **Rei do Pitaco, JonBet,
+   BetWarrior, BacanaPlay e OleyBet em 22/08/2026** (ver §4.4) — todas com
+   autorização confirmada do **SPA/MF** e domínio `.bet.br`.
 2. **As cores não foram escolhidas a olho.** Cada uma foi **medida na fonte oficial
    da própria casa** em 28/07/2026 — logo/favicon decodificada pixel a pixel, ou o
    `theme-color` que o site `.bet.br` declara. O campo `colorSource` registra o
@@ -65,7 +66,7 @@ navy+dourado, BetMGM preto+dourado, Blaze escuro+vermelho), o par foi preservado
 fundo = `color`, monograma = `accent`. Sem par declarado, o monograma é o
 branco/quase-preto de **maior contraste medido** sobre o fundo.
 
-## 3. O catálogo (27 casas)
+## 3. O catálogo (32 casas)
 
 Ordenado por notoriedade no BR — é a ordem em que aparecem na grade do seletor.
 
@@ -98,10 +99,16 @@ Ordenado por notoriedade no BR — é a ordem em que aparecem na grade do seleto
 | 25 | Lotogreen | `#1dbf24` | theme-color | Sabiá Administração LTDA | 399, 24/02/2025 | lotogreen.bet.br |
 | 26 | MC Games | `#171d25` + `#f4b942` | theme-color | Sistema Lotérico de Pernambuco LTDA | 2.007, 09/09/2025 | mcgames.bet.br |
 | 27 | Esportiva Bet | `#ff3a00` | logo-oficial | EA Entretenimento e Esportes S.A. | 523, 14/03/2025 | esportiva.bet.br |
+| 28 | Rei do Pitaco | `#a919ff` | logo-oficial | MMD Tecnologia, Entretenimento e Marketing LTDA | 2.092, 30/12/2024 | reidopitaco.bet.br |
+| 29 | JonBet | `#131521` + `#05e10d` | theme-color | Foggo Entertainment LTDA | 471, 10/03/2025 | jonbet.bet.br |
+| 30 | BetWarrior | `#ff3900` | logo-oficial | Track Gaming Brasil LTDA | 470, 10/03/2025 | betwarrior.bet.br |
+| 31 | BacanaPlay | `#f08f00` | logo-oficial | Skill On Net LTDA | 374, 24/02/2025 | bacanaplay.bet.br |
+| 32 | OleyBet | `#001d3d` + `#5e86fe` | logo-oficial | Lindau Gaming Brasil S.A. | 2.105, 30/12/2024 | oleybet.bet.br |
 
 > **BR4BET e Lotogreen dividem a mesma portaria** (399) porque são duas marcas da
-> mesma autorizada, a Sabiá Administração. A autorização é da EMPRESA, não da marca —
-> por isso o catálogo guarda `legalEntity` além do nome comercial.
+> mesma autorizada, a Sabiá Administração. **Blaze e JonBet idem** (471, ambas da
+> Foggo Entertainment). A autorização é da EMPRESA, não da marca — por isso o
+> catálogo guarda `legalEntity` além do nome comercial.
 
 ## 4. Casas conhecidas que ficaram DE FORA (e por quê)
 
@@ -132,7 +139,10 @@ Duas tolerâncias além disso:
   de painel legado (a Infinity chama assim), mesma casa em instância nova. Restrito a
   esse formato de propósito — aceitar qualquer sobra faria `"StakeBet"` virar Stake.
 - **Apelidos declarados** (`aliases`), só pro que a normalização não pega: `"7k"` →
-  Bet7k, `"Viva Sorte Bet"` → Viva Sorte.
+  Bet7k, `"Viva Sorte Bet"` → Viva Sorte, `"RdP"` → Rei do Pitaco — e o **sufixo de
+  SEGMENTO** que a Infinity usa no cadastro (`"JonBet Sports"` → JonBet,
+  `"Blaze Sports"` → Blaze): não é sufixo de versão, então cada um é declarado à mão
+  na marca-mãe.
 
 Casamento **exato sempre vence** a tolerância de versão, pra um preset de nome curto
 não sequestrar uma casa que já casa exatamente com outro.
@@ -167,7 +177,7 @@ resolvido na MOLDURA, não descartando as logos: toda logo oficial é embutida n
 **mesma caixa 64×64 com o mesmo raio** do ícone autoral, então a lista continua
 uniforme mesmo misturando as duas origens. Ver §4.2.
 
-## 4.2 O conjunto híbrido (14 oficiais + 13 autorais)
+## 4.2 O conjunto híbrido (16 oficiais + 16 autorais)
 
 Cada logo oficial é normalizada (PNG RGBA, moldura transparente cortada) e embutida
 no SVG do preset como data URI. Dois modos, decididos pela **cobertura opaca medida**
@@ -193,10 +203,11 @@ Nada de "escolhi a olho". Uma logo coletada só vira ícone se passar em todos:
    dele é arte **fotográfica** (um leão), que vira borrão a 36px. **Novibet** media
    1,26:1 contra o navy dela, mas 14,7:1 contra o branco → passou com fundo claro.
 
-**Resultado:** 14 com logo oficial (Betano, Superbet, Sportingbet, Betnacional, KTO,
+**Resultado:** 16 com logo oficial (Betano, Superbet, Sportingbet, Betnacional, KTO,
 Brazino777, Stake, Bet7k, 7Games, Viva Sorte, Pixbet, MC Games, Novibet, Esportiva
-Bet) e 13 autorais (bet365, Betfair, Esportes da Sorte, EstrelaBet, Vbet, H2bet,
-Blaze, Betsson, F12.Bet, Aposta Ganha, BR4BET, BetMGM, Lotogreen).
+Bet, Rei do Pitaco, BacanaPlay) e 16 autorais (bet365, Betfair, Esportes da Sorte,
+EstrelaBet, Vbet, H2bet, Blaze, Betsson, F12.Bet, Aposta Ganha, BR4BET, BetMGM,
+Lotogreen, JonBet, BetWarrior, OleyBet).
 
 As artes-fonte ficam em **`scripts/house-logos/<slug>.png`** (168 kB no total), fora
 de `public/` porque são material do gerador — quem é servido é só o SVG final. Trocar
@@ -231,10 +242,48 @@ As duas casas reais da Infinity que faltavam:
   `theme_color: #000000`) e gravado em **`public/brands/leon-bet.svg`** — pra exibir
   na instância, o admin sobe esse SVG como logo da casa (upload vence preset).
 
+## 4.4 Adendo 22/08/2026 — 5 casas criadas na Infinity entram (#28–#32)
+
+Cinco casas recém-cadastradas na instância Infinity caíam no avatar genérico de
+letra. Todas passaram no filtro de licença — conferidas na **planilha oficial do
+SPA/MF** (PDF de 13/05/2026, texto extraído e casado marca a marca), com o número
+cruzado em fonte secundária — e tiveram a cor **medida** pelo mesmo método do §2:
+
+- **Rei do Pitaco (tile).** Favicon oficial 400×400 decodificado
+  (`stylized-assets.reidopitacofantasy.com.br`): coroa branca sobre degradê roxo,
+  cobertura opaca 97,8% → `tile`. Cor = tom saturado dominante **`#a919ff`** (18,7%
+  dos px); o site declara `theme-color: #4624D0`, mas a logo vence em confiança.
+  Contraste branco vs `#a919ff` 4,94:1 ✓. Autorizada: MMD Tecnologia (portaria
+  2.092, do lote de 30/12/2024 das 14 primeiras definitivas). Alias `RdP` (marca da
+  mesma portaria, rdp.bet.br); "Pitaco" ficou de fora — é marca/domínio próprio.
+- **JonBet (monograma).** Irmã da Blaze: MESMA Foggo Entertainment, MESMA portaria
+  471 (caso BR4BET/Lotogreen) — e o manifest do site se chama literalmente "blaze".
+  Reprovou nos MESMOS critérios que a Blaze: favicon-512/192/apple-touch são PNG
+  **Adam7** (indecodificável) e o ICO tem 48px (< 64). Fundo `#131521` =
+  `theme_color` declarado; accent **`#05e10d`** = verde vivo do gradiente do favicon
+  medido (contraste 10:1 sobre o fundo). Alias **`JonBet Sports`** — o sufixo de
+  segmento usado no cadastro da Infinity (a Blaze ganhou `Blaze Sports` na mesma
+  leva).
+- **BetWarrior (monograma).** A única arte que o site serve é o favicon **32×32**
+  (o 1200×1200 institucional referenciado no HTML devolve o fallback do SPA) —
+  reprova o piso de 64px. A cor veio dele mesmo: **`#ff3900`**, 100% dos px
+  saturados da arte. Sem `officialLogoUrl`: um ICO de 32px não serve de logo.
+  Autorizada: Track Gaming Brasil (portaria 470, alterada pela 1.030/2026).
+- **BacanaPlay (tile).** Ícone PWA oficial **512×512** do `manifest.webmanifest`,
+  cobertura opaca 95,4% → `tile`. O manifest declara `theme_color: #000000` (cor de
+  chrome, não de marca); a cor é o laranja dominante medido na arte, **`#f08f00`**
+  (tinta média `#e66a12`, contraste 3,26:1 sobre o fundo branco do tile ✓).
+  Autorizada: Skill On Net (portaria 374 — a mesma dona do PlayUZU).
+- **OleyBet (monograma).** As duas artes reprovam: favicon ICO de **48px** (< 64) e
+  `logo.png` wordmark **208×41** (5:1, > 2:1). Par próprio da marca, medido nas
+  duas: fundo **`#001d3d`** (cor exata dominante do favicon) + accent **`#5e86fe`**
+  (93% da tinta do wordmark), contraste 5,06:1 ✓. Autorizada: Lindau Gaming
+  (portaria 2.105, do lote de 30/12/2024).
+
 ## 5. Como usar
 
 **No app** — `/casas` → **Nova casa** → o bloco **"Usar um preset de casa"** abre com a
-grade das 27. Clicar numa:
+grade das 32. Clicar numa:
 - preenche **nome** e **slug** canônicos (ao criar);
 - carrega o **ícone** na cor da casa;
 - mostra a **empresa autorizada + portaria**, um link pro site oficial e, quando
@@ -243,7 +292,7 @@ grade das 27. Clicar numa:
 Para usar a logo real em vez do ícone autoral: baixe pelo link e clique em
 **"Trocar logo"** — o upload manual vence o preset.
 
-**No repo** — os SVGs ficam em `public/brands/presets/<slug>.svg` (27 arquivos), então
+**No repo** — os SVGs ficam em `public/brands/presets/<slug>.svg` (32 arquivos), então
 dá pra usar em qualquer lugar (landing, material comercial) sem passar pelo app.
 
 ## 6. Arquitetura

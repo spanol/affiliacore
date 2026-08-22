@@ -157,7 +157,11 @@ export const HOUSE_PRESETS: HousePreset[] = [
     legalEntity: 'Pixbet Soluções Tecnológicas LTDA', spaPortaria: 'SPA/MF nº 2.326, de 14/10/2025' },
   { slug: 'blaze', name: 'Blaze', monogram: 'BZ', color: '#131521', accent: '#e60026', colorSource: 'theme-color',
     site: 'blaze.bet.br', officialLogoUrl: 'https://blaze.bet.br/apple-touch-icon.png',
-    legalEntity: 'Foggo Entertainment LTDA', spaPortaria: 'SPA/MF nº 471, de 10/03/2025' },
+    legalEntity: 'Foggo Entertainment LTDA', spaPortaria: 'SPA/MF nº 471, de 10/03/2025',
+    // "Blaze Sports" é a casa cadastrada com sufixo de SEGMENTO (padrão da Infinity,
+    // igual a "JonBet Sports") — mesma marca. A regra de sufixo só tolera versão
+    // (v?<dígitos>), então o segmento entra como apelido declarado.
+    aliases: ['Blaze Sports'] },
   { slug: 'betsson', name: 'Betsson', monogram: 'bs', color: '#ff6600', colorSource: 'theme-color',
     site: 'betsson.bet.br',
     legalEntity: 'Simulcasting Brasil Som e Imagem S.A.', spaPortaria: 'SPA/MF nº 371, de 24/02/2025' },
@@ -191,6 +195,40 @@ export const HOUSE_PRESETS: HousePreset[] = [
     site: 'esportiva.bet.br', officialLogoUrl: 'https://static.esportiva.bet.br/public-assets/maskable-icon-512x512.png',
     legalEntity: 'EA Entretenimento e Esportes S.A.', spaPortaria: 'SPA/MF nº 523, de 14/03/2025',
     aliases: ['Esportiva'] }, // o manifest oficial grafa "EsportivaBet", que já normaliza sozinho
+  // ---- Coleta 22/08/2026: casas criadas na instância Infinity (ver §4.4 do doc) ----
+  // Favicon oficial 400×400 (fundo em degradê roxo, coroa branca), cobertura opaca
+  // 97,8% → tile. A cor é o tom saturado dominante MEDIDO na arte (18,7% dos px);
+  // o site declara theme-color #4624d0, mas a logo vence em confiança (§2).
+  { slug: 'rei-do-pitaco', name: 'Rei do Pitaco', monogram: 'RdP', officialIcon: 'tile', color: '#a919ff', colorSource: 'logo-oficial',
+    site: 'reidopitaco.bet.br', officialLogoUrl: 'https://stylized-assets.reidopitacofantasy.com.br/web/icons/favicon.png',
+    legalEntity: 'MMD Tecnologia, Entretenimento e Marketing LTDA', spaPortaria: 'SPA/MF nº 2.092, de 30/12/2024',
+    aliases: ['RdP'] }, // marca registrada na MESMA portaria (rdp.bet.br); "Pitaco" fica fora — é domínio próprio
+  // Irmã da Blaze (MESMA Foggo, MESMA portaria — caso BR4BET/Lotogreen). E o mesmo
+  // problema dela: favicon-512 é PNG Adam7 (indecodificável) e o ICO tem 48px → sem
+  // logo embutida. theme_color #131521 declarado no manifest (que se chama "blaze");
+  // o verde é o tom vivo do gradiente do favicon, medido.
+  { slug: 'jonbet', name: 'JonBet', monogram: 'JB', color: '#131521', accent: '#05e10d', colorSource: 'theme-color',
+    site: 'jonbet.bet.br', officialLogoUrl: 'https://jonbet.bet.br/favicon-512x512.png',
+    legalEntity: 'Foggo Entertainment LTDA', spaPortaria: 'SPA/MF nº 471, de 10/03/2025',
+    aliases: ['JonBet Sports'] }, // sufixo de SEGMENTO usado no cadastro da Infinity (igual a "Blaze Sports")
+  // Única arte servida é o favicon 32×32 (100% dos px saturados em #ff3900) —
+  // reprova o piso de 64px, então monograma. Sem officialLogoUrl: um ICO de 32px
+  // não serve de logo pra subir no lugar do ícone.
+  { slug: 'betwarrior', name: 'BetWarrior', monogram: 'BW', color: '#ff3900', colorSource: 'logo-oficial',
+    site: 'betwarrior.bet.br',
+    legalEntity: 'Track Gaming Brasil LTDA', spaPortaria: 'SPA/MF nº 470, de 10/03/2025' },
+  // Ícone PWA oficial 512×512 (manifest.webmanifest), cobertura opaca 95,4% → tile.
+  // O manifest declara theme_color #000000 (chrome, não marca); a cor é o laranja
+  // dominante medido na arte. Skill On Net = a mesma dona do PlayUZU.
+  { slug: 'bacanaplay', name: 'BacanaPlay', monogram: 'BP', officialIcon: 'tile', color: '#f08f00', colorSource: 'logo-oficial',
+    site: 'bacanaplay.bet.br', officialLogoUrl: 'https://service.image-tech-storage.com/pwa/bacanaplay/icon_512x512.png',
+    legalEntity: 'Skill On Net LTDA', spaPortaria: 'SPA/MF nº 374, de 24/02/2025' },
+  // Favicon ICO tem só 48px e a logo é wordmark 208×41 (5:1) — as duas reprovam →
+  // monograma. Par PRÓPRIO da marca, medido: navy do favicon + azul do wordmark
+  // (93% da tinta do logo.png); contraste 5.06:1.
+  { slug: 'oleybet', name: 'OleyBet', monogram: 'OB', color: '#001d3d', accent: '#5e86fe', colorSource: 'logo-oficial',
+    site: 'oleybet.bet.br', officialLogoUrl: 'https://oleybet.bet.br/logo.png', // wordmark, não é quadrado
+    legalEntity: 'Lindau Gaming Brasil S.A.', spaPortaria: 'SPA/MF nº 2.105, de 30/12/2024' },
 ];
 
 // Busca um preset pelo slug (o mesmo slug que o modal sugere pra casa).

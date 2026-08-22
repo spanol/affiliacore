@@ -183,6 +183,24 @@ describe('fallback de logo por preset', () => {
   it('casa apelidos declarados no catálogo', () => {
     expect(findHousePresetFor('7k')?.slug).toBe('bet7k');
     expect(findHousePresetFor('Viva Sorte Bet')?.slug).toBe('vivasorte');
+    expect(findHousePresetFor('RdP')?.slug).toBe('rei-do-pitaco');
+  });
+
+  // Sufixo de SEGMENTO ("Sports") é como a Infinity cadastra a casa da marca-mãe.
+  // Não é sufixo de versão (a regra v?<dígitos> não o pega de propósito), então
+  // cada um entra como apelido declarado — e some se a marca sair do catálogo.
+  it('casa o sufixo de segmento da Infinity no preset da marca-mãe', () => {
+    expect(findHousePresetFor('JonBet Sports')?.slug).toBe('jonbet');
+    expect(findHousePresetFor('jonbet-sports')?.slug).toBe('jonbet');
+    expect(findHousePresetFor('Blaze Sports')?.slug).toBe('blaze');
+  });
+
+  it('casa as 5 casas da coleta de 22/08 pelo nome de cadastro', () => {
+    expect(findHousePresetFor('Rei do Pitaco')?.slug).toBe('rei-do-pitaco');
+    expect(findHousePresetFor('JonBet')?.slug).toBe('jonbet');
+    expect(findHousePresetFor('Bet Warrior')?.slug).toBe('betwarrior');
+    expect(findHousePresetFor('Bacana Play')?.slug).toBe('bacanaplay');
+    expect(findHousePresetFor('Oley Bet')?.slug).toBe('oleybet');
   });
 
   // A tolerância de versão é estreita de propósito: qualquer sobra faria "StakeBet"
