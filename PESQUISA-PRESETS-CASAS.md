@@ -177,7 +177,7 @@ resolvido na MOLDURA, não descartando as logos: toda logo oficial é embutida n
 **mesma caixa 64×64 com o mesmo raio** do ícone autoral, então a lista continua
 uniforme mesmo misturando as duas origens. Ver §4.2.
 
-## 4.2 O conjunto híbrido (16 oficiais + 16 autorais)
+## 4.2 O conjunto híbrido (17 oficiais + 15 autorais)
 
 Cada logo oficial é normalizada (PNG RGBA, moldura transparente cortada) e embutida
 no SVG do preset como data URI. Dois modos, decididos pela **cobertura opaca medida**
@@ -203,11 +203,11 @@ Nada de "escolhi a olho". Uma logo coletada só vira ícone se passar em todos:
    dele é arte **fotográfica** (um leão), que vira borrão a 36px. **Novibet** media
    1,26:1 contra o navy dela, mas 14,7:1 contra o branco → passou com fundo claro.
 
-**Resultado:** 16 com logo oficial (Betano, Superbet, Sportingbet, Betnacional, KTO,
+**Resultado:** 17 com logo oficial (Betano, Superbet, Sportingbet, Betnacional, KTO,
 Brazino777, Stake, Bet7k, 7Games, Viva Sorte, Pixbet, MC Games, Novibet, Esportiva
-Bet, Rei do Pitaco, BacanaPlay) e 16 autorais (bet365, Betfair, Esportes da Sorte,
-EstrelaBet, Vbet, H2bet, Blaze, Betsson, F12.Bet, Aposta Ganha, BR4BET, BetMGM,
-Lotogreen, JonBet, BetWarrior, OleyBet).
+Bet, Rei do Pitaco, BacanaPlay, e OleyBet por exceção documentada de 48px — §4.5) e
+15 autorais (bet365, Betfair, Esportes da Sorte, EstrelaBet, Vbet, H2bet, Blaze,
+Betsson, F12.Bet, Aposta Ganha, BR4BET, BetMGM, Lotogreen, JonBet, BetWarrior).
 
 As artes-fonte ficam em **`scripts/house-logos/<slug>.png`** (168 kB no total), fora
 de `public/` porque são material do gerador — quem é servido é só o SVG final. Trocar
@@ -274,11 +274,32 @@ cruzado em fonte secundária — e tiveram a cor **medida** pelo mesmo método d
   chrome, não de marca); a cor é o laranja dominante medido na arte, **`#f08f00`**
   (tinta média `#e66a12`, contraste 3,26:1 sobre o fundo branco do tile ✓).
   Autorizada: Skill On Net (portaria 374 — a mesma dona do PlayUZU).
-- **OleyBet (monograma).** As duas artes reprovam: favicon ICO de **48px** (< 64) e
-  `logo.png` wordmark **208×41** (5:1, > 2:1). Par próprio da marca, medido nas
-  duas: fundo **`#001d3d`** (cor exata dominante do favicon) + accent **`#5e86fe`**
-  (93% da tinta do wordmark), contraste 5,06:1 ✓. Autorizada: Lindau Gaming
-  (portaria 2.105, do lote de 30/12/2024).
+- **OleyBet (tile, por exceção — ver §4.5).** O favicon ICO tem **48px** (< 64) e a
+  `logo.png` é wordmark **208×41** (5:1, > 2:1); pela régua do §4.1 seria monograma,
+  e foi assim que entrou. Promovida a `tile` no mesmo dia (§4.5). Par próprio da
+  marca, medido nas duas artes: fundo **`#001d3d`** (cor exata dominante do favicon)
+  + accent **`#5e86fe`** (93% da tinta do wordmark), contraste 5,06:1 ✓. Autorizada:
+  Lindau Gaming (portaria 2.105, do lote de 30/12/2024).
+
+## 4.5 Exceção documentada ao piso de 64px — OleyBet (22/08/2026)
+
+O piso de 64px existe para o tile de 64×64 não embutir raster sub-amostrado (numa
+tela 2× o ícone do card pede ~80 px físicos). A OleyBet virou a primeira exceção,
+por decisão de produto do Vinicius, com três condições que a sustentam:
+
+1. **É a maior arte oficial que EXISTE.** O site só serve o favicon.ico (16/32/48);
+   o `manifest.webmanifest` é template da plataforma (chama-se "Betofcourse") e os
+   oito ícones que declara (72–512px) devolvem o fallback HTML do SPA. Não há asset
+   melhor a esperar.
+2. **A arte tolera o upscale.** O "O" é chapado e geométrico (tile navy com glifo
+   claro): 48→64 é 1,33× em formas planas, sem serrilhado perceptível no tamanho de
+   exibição real. Fica mais fiel à marca que um monograma "OB" autoral.
+3. **A exceção é declarada**, aqui e no comentário da entrada do catálogo — não é
+   afrouxamento silencioso da régua. O caso análogo que NÃO passou: BetWarrior tem
+   só 32px (upscale de 2×, visivelmente borrado) e segue de monograma.
+
+Arte-fonte: entrada de 48px do favicon extraída do ICO, convertida a PNG RGBA e
+gravada em `scripts/house-logos/oleybet.png` (bbox sem margem a cortar).
 
 ## 5. Como usar
 

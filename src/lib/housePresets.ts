@@ -223,11 +223,14 @@ export const HOUSE_PRESETS: HousePreset[] = [
   { slug: 'bacanaplay', name: 'BacanaPlay', monogram: 'BP', officialIcon: 'tile', color: '#f08f00', colorSource: 'logo-oficial',
     site: 'bacanaplay.bet.br', officialLogoUrl: 'https://service.image-tech-storage.com/pwa/bacanaplay/icon_512x512.png',
     legalEntity: 'Skill On Net LTDA', spaPortaria: 'SPA/MF nº 374, de 24/02/2025' },
-  // Favicon ICO tem só 48px e a logo é wordmark 208×41 (5:1) — as duas reprovam →
-  // monograma. Par PRÓPRIO da marca, medido: navy do favicon + azul do wordmark
-  // (93% da tinta do logo.png); contraste 5.06:1.
-  { slug: 'oleybet', name: 'OleyBet', monogram: 'OB', color: '#001d3d', accent: '#5e86fe', colorSource: 'logo-oficial',
-    site: 'oleybet.bet.br', officialLogoUrl: 'https://oleybet.bet.br/logo.png', // wordmark, não é quadrado
+  // EXCEÇÃO DOCUMENTADA ao piso de 64px (decisão 22/08/2026, ver §4.5 do doc): a
+  // maior arte oficial que o site serve é a entrada de 48px do favicon.ico (o
+  // manifest é template "Betofcourse" com ícones que devolvem o fallback do SPA).
+  // O "O" é chapado e geométrico, então o upscale de 1,33× na moldura de 64 não
+  // degrada de forma visível — e fica mais fiel que um monograma "OB" autoral.
+  // A logo.png (wordmark 208×41, 5:1) segue reprovada como arte de tile.
+  { slug: 'oleybet', name: 'OleyBet', monogram: 'OB', officialIcon: 'tile', color: '#001d3d', accent: '#5e86fe', colorSource: 'logo-oficial',
+    site: 'oleybet.bet.br', officialLogoUrl: 'https://oleybet.bet.br/favicon.ico',
     legalEntity: 'Lindau Gaming Brasil S.A.', spaPortaria: 'SPA/MF nº 2.105, de 30/12/2024' },
 ];
 
