@@ -168,6 +168,18 @@ describe('toPublicIntegration · o que chega ao browser', () => {
     expect(pub.hasKey).toBe(false);
     expect(pub.configured).toBe(false);
   });
+
+  // O eixo push/pull viaja até o client porque quem fala com o admin (a Saúde da
+  // configuração) precisa dele: sem isso o card volta a chamar de "pull parado"
+  // uma rede que só recebe postback.
+  it('leva os eixos multiHouse e push do catálogo ao browser', () => {
+    const rede = toPublicIntegration(findIntegrationSpec('fomento-offer18')!, null, {});
+    expect(rede.multiHouse).toBe(true);
+    expect(rede.push).toBe(true);
+    const pull = toPublicIntegration(spec, null, {});
+    expect(pull.multiHouse).toBe(false);
+    expect(pull.push).toBe(false);
+  });
 });
 
 describe('numericSetting', () => {

@@ -41,6 +41,14 @@ export interface IntegrationSpec {
    * (`integrationExternalId`, ex.: o offer_id da rede) no próprio doc.
    */
   multiHouse?: boolean;
+  /**
+   * true = a rede EMPURRA o dado (postback/webhook) em vez de a gente puxar.
+   * Não há rodada de pull nem botão "Atualizar": a chave é o SEGREDO da URL que
+   * autentica o disparo. Separado de `multiHouse` de propósito: uma rede 1:N que
+   * se puxa por relatório e um postback de casa única são combinações possíveis,
+   * e quem fala com o usuário (avisos de configuração) precisa do eixo certo.
+   */
+  push?: boolean;
   /** Envs que serviam de fonte antes desta tela — viram fallback. */
   envKeys: { apiKey: string; house?: string; [k: string]: string | undefined };
   /** Casa assumida quando nem o doc nem o env dizem qual é. */
@@ -117,6 +125,7 @@ export const INTEGRATION_CATALOG: IntegrationSpec[] = [
       'trocando SEGREDO pelo valor salvo aqui.',
     scope: 'global',
     multiHouse: true,
+    push: true,
     envKeys: { apiKey: 'FOMENTO_POSTBACK_SECRET' },
     fields: [],
   },
@@ -144,6 +153,8 @@ export interface PublicIntegration {
   scope: 'house' | 'global';
   /** Rede 1:N (ver IntegrationSpec.multiHouse) — o modal de /casas pede o id externo. */
   multiHouse?: boolean;
+  /** Recebe por postback (ver IntegrationSpec.push): não existe pull nem alvo 1:1. */
+  push?: boolean;
   fields: IntegrationField[];
   enabled: boolean;
   hasKey: boolean;
@@ -291,6 +302,7 @@ export function toPublicIntegration(
     description: spec.description,
     scope: spec.scope,
     multiHouse: spec.multiHouse === true,
+    push: spec.push === true,
     fields: spec.fields,
     enabled: settings.enabled,
     hasKey: !!settings.apiKey,

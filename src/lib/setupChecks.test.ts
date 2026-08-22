@@ -6,6 +6,7 @@ import {
   checkCasasSemIss,
   checkCasasManuaisSemRegua,
   checkPullSemChave,
+  checkRedeSemIdDaOferta,
   checkVinculoIntegracao,
   checkCasasOtgSemFonte,
   checkCasasSemAcordo,
@@ -185,6 +186,75 @@ describe('checkPullSemChave', () => {
       ]),
     ).toBeNull();
   });
+
+  // Conector por POSTBACK não puxa nada: falar em "pull parado" manda o admin
+  // procurar um botão "Atualizar" que a casa dele nunca teve.
+  it('conector por postback fala em segredo, não em pull', () => {
+    const finding = checkPullSemChave(
+      [{ slug: 'casa-rede', name: 'Casa da Rede', integration: 'fomento-offer18' }],
+      [{ id: 'fomento-offer18', label: 'Fomento', enabled: true, hasKey: false, houseId: null, multiHouse: true, push: true }],
+    );
+    expect(finding?.title).toBe('Postback da rede recusado');
+    expect(finding?.subjects[0]).toContain('segredo do postback');
+    expect(finding?.detail).not.toContain('pull');
+  });
+
+  it('pull e postback juntos caem num título que serve aos dois', () => {
+    const finding = checkPullSemChave(
+      [
+        { slug: 'esportiva-bet', name: 'Esportiva Bet', integration: 'esportiva-tap' },
+        { slug: 'casa-rede', name: 'Casa da Rede', integration: 'fomento-offer18' },
+      ],
+      [
+        { id: 'esportiva-tap', label: 'TAP', enabled: true, hasKey: false, houseId: 'esportiva-bet' },
+        { id: 'fomento-offer18', label: 'Fomento', enabled: true, hasKey: false, houseId: null, multiHouse: true, push: true },
+      ],
+    );
+    expect(finding?.title).toBe('Integração de resultados parada');
+    expect(finding?.subjects).toHaveLength(2);
+  });
+});
+
+// Rede 1:N (postback): o vínculo mora no doc da CASA e o `houseId` do conector é
+// sempre nulo. O que de fato falta é o id da oferta.
+describe('checkRedeSemIdDaOferta', () => {
+  const fomento = [{ id: 'fomento-offer18', label: 'Fomento', enabled: true, hasKey: true, houseId: null, multiHouse: true, push: true }];
+
+  it('casa da rede sem o id da oferta é achado', () => {
+    const finding = checkRedeSemIdDaOferta(
+      [{ slug: 'casa-rede', name: 'Casa da Rede', integration: 'fomento-offer18' }],
+      fomento,
+    );
+    expect(finding?.id).toBe('rede-sem-id-oferta');
+    expect(finding?.subjects).toEqual(['Casa da Rede']);
+  });
+
+  it('com o id preenchido fica em silêncio', () => {
+    expect(
+      checkRedeSemIdDaOferta(
+        [{ slug: 'casa-rede', name: 'Casa da Rede', integration: 'fomento-offer18', integrationExternalId: '22007840' }],
+        fomento,
+      ),
+    ).toBeNull();
+  });
+
+  it('conector 1:1 não pede id de oferta nenhum', () => {
+    expect(
+      checkRedeSemIdDaOferta(
+        [{ slug: 'esportiva-bet', name: 'Esportiva Bet', integration: 'esportiva-tap' }],
+        [{ id: 'esportiva-tap', label: 'TAP', enabled: true, hasKey: true, houseId: 'esportiva-bet' }],
+      ),
+    ).toBeNull();
+  });
+
+  it('casa inativa fica de fora', () => {
+    expect(
+      checkRedeSemIdDaOferta(
+        [{ slug: 'casa-rede', name: 'Casa da Rede', integration: 'fomento-offer18', active: false }],
+        fomento,
+      ),
+    ).toBeNull();
+  });
 });
 
 describe('checkVinculoIntegracao', () => {
@@ -220,6 +290,25 @@ describe('checkVinculoIntegracao', () => {
       checkVinculoIntegracao(
         [{ slug: 'esportiva-bet', name: 'Esportiva Bet', integration: 'esportiva-tap' }],
         [{ id: 'esportiva-tap', enabled: true, hasKey: true, houseId: 'esportiva-bet' }],
+      ),
+    ).toBeNull();
+  });
+
+  // O falso positivo que motivou o conserto: numa rede 1:N o `houseId` do conector
+  // é nulo POR CONSTRUÇÃO, e comparar com ele acusava de "vínculo pela metade"
+  // toda casa de postback que estava perfeitamente configurada.
+  it('rede 1:N não é vínculo 1:1 e fica em silêncio nos dois sentidos', () => {
+    expect(
+      checkVinculoIntegracao(
+        [{ slug: 'casa-rede', name: 'Casa da Rede', integration: 'fomento-offer18', integrationExternalId: '22007840' }],
+        [{ id: 'fomento-offer18', label: 'Fomento', enabled: true, hasKey: true, houseId: null, multiHouse: true, push: true }],
+      ),
+    ).toBeNull();
+    // ...e nem um `houseId` residual de antes da rede reabre o achado.
+    expect(
+      checkVinculoIntegracao(
+        [{ slug: 'casa-rede', name: 'Casa da Rede', integration: 'fomento-offer18' }],
+        [{ id: 'fomento-offer18', label: 'Fomento', enabled: true, hasKey: true, houseId: 'outra-casa', multiHouse: true, push: true }],
       ),
     ).toBeNull();
   });

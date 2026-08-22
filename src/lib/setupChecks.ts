@@ -60,6 +60,8 @@ export interface SetupHouse extends IssHouse {
   active?: boolean;
   dataSource?: string | null;
   integration?: string | null;
+  /** Id da casa DENTRO de uma rede 1:N (offer_id) — é por ele que o postback a acha. */
+  integrationExternalId?: string | null;
   defaultCpa?: number | null;
   defaultRev?: number | null;
 }
@@ -70,6 +72,10 @@ export interface SetupIntegration {
   enabled?: boolean;
   hasKey?: boolean;
   houseId?: string | null;
+  /** Rede 1:N: o vínculo vive no doc da CASA, não no `houseId` do conector. */
+  multiHouse?: boolean;
+  /** Conector por postback: a rede empurra o dado, não existe pull. */
+  push?: boolean;
 }
 
 export interface SetupInputs {
@@ -271,8 +277,11 @@ export function checkCasasManuaisSemRegua(
 }
 
 /**
- * Casa vinculada a um conector que não está pronto (sem chave ou desligado):
- * o botão de atualizar responde erro e o cron não grava nada.
+ * Casa vinculada a um conector que não está pronto (sem chave ou desligado): sem
+ * chave o pull responde erro e o cron não grava nada; num conector por POSTBACK
+ * o efeito é outro (a rede dispara e a gente recusa por segredo inválido), então
+ * o texto acompanha o eixo do conector. Chamar de "pull parado" uma integração
+ * que nunca puxou mandava o admin procurar um botão "Atualizar" que não existe.
  */
 export function checkPullSemChave(
   houses: SetupHouse[] | null | undefined,
@@ -282,26 +291,69 @@ export function checkPullSemChave(
     (Array.isArray(integrations) ? integrations : []).map((i) => [String(i.id), i]),
   );
   const subjects: string[] = [];
+  let temPull = false;
+  let temPostback = false;
   for (const h of Array.isArray(houses) ? houses : []) {
     if (h?.active === false || !h?.integration) continue;
     const conn = intById.get(String(h.integration));
     if (!conn) continue; // conector fora do catálogo é assunto do check de vínculo
-    if (conn.enabled === false) {
-      subjects.push(`${h.name || h.slug}: conector ${conn.label || conn.id} desligado`);
-    } else if (!conn.hasKey) {
-      subjects.push(`${h.name || h.slug}: conector ${conn.label || conn.id} sem chave`);
-    }
+    const quebrado = conn.enabled === false || !conn.hasKey;
+    if (!quebrado) continue;
+    const push = conn.push === true;
+    const motivo = conn.enabled === false
+      ? 'desligado'
+      : push ? 'sem o segredo do postback' : 'sem chave';
+    subjects.push(`${h.name || h.slug}: conector ${conn.label || conn.id} ${motivo}`);
+    if (push) temPostback = true;
+    else temPull = true;
   }
   if (!subjects.length) return null;
   return {
     id: 'pull-sem-chave',
     severity: 'warning',
-    title: 'Pull automático parado',
-    detail:
-      'A casa está vinculada a um conector sem chave ou desligado; a atualização automática responde erro até ajustar a integração.',
+    title: temPull && temPostback
+      ? 'Integração de resultados parada'
+      : temPostback ? 'Postback da rede recusado' : 'Pull automático parado',
+    detail: temPull && temPostback
+      ? 'Há casa vinculada a conector sem chave ou desligado. Enquanto isso o resultado dela não entra por integração nenhuma.'
+      : temPostback
+        ? 'A rede envia a conversão, mas sem o segredo salvo aqui o disparo é recusado e nada é gravado. Cole o mesmo segredo que está na URL de postback do painel da rede.'
+        : 'A casa está vinculada a um conector sem chave ou desligado; a atualização automática responde erro até ajustar a integração.',
     fixRoute: '/integracoes',
     fixLabel: 'Abrir integrações',
     subjects,
+  };
+}
+
+/**
+ * Rede 1:N (postback): casa vinculada ao conector SEM o id da oferta. O disparo
+ * chega e não acha dono, e o evento fica no ledger como "sem casa" até alguém
+ * preencher e reprocessar. É o que o antigo check de vínculo tentava dizer e
+ * dizia errado: numa rede 1:N o `houseId` do conector não é o vínculo, então ele
+ * acusava TODA casa de postback de estar apontando para lugar nenhum.
+ */
+export function checkRedeSemIdDaOferta(
+  houses: SetupHouse[] | null | undefined,
+  integrations: SetupIntegration[] | null | undefined,
+): SetupFinding | null {
+  const intById = new Map(
+    (Array.isArray(integrations) ? integrations : []).map((i) => [String(i.id), i]),
+  );
+  const missing = (Array.isArray(houses) ? houses : []).filter((h) => {
+    if (h?.active === false || !h?.integration) return false;
+    const conn = intById.get(String(h.integration));
+    return conn?.multiHouse === true && !String(h.integrationExternalId ?? '').trim();
+  });
+  if (!missing.length) return null;
+  return {
+    id: 'rede-sem-id-oferta',
+    severity: 'warning',
+    title: `${pluralize(missing.length, 'casa')} sem o ID da oferta na rede`,
+    detail:
+      'A mesma credencial atende várias casas, e é o ID da oferta que diz a qual delas cada conversão pertence. Sem ele o disparo fica registrado sem casa e não vira resultado.',
+    fixRoute: '/casas',
+    fixLabel: 'Informar o ID',
+    subjects: missing.map((h) => h.name || String(h.slug ?? h.id ?? '')),
   };
 }
 
@@ -311,6 +363,12 @@ export function checkPullSemChave(
  * de integrações diz "ligada na casa X" e o botão de atualizar da casa X não
  * aparece. No sentido integração→casa só checamos conector COM chave: sem doc e
  * sem chave o alvo vem do default do catálogo e não significa vínculo.
+ *
+ * REDE 1:N fica FORA dos dois sentidos: lá o vínculo mora só no doc da casa
+ * (`integration` + `integrationExternalId`) e o `houseId` do conector é sempre
+ * nulo por construção — compará-lo acusava de "vínculo pela metade" toda casa
+ * de postback corretamente configurada. O que de fato falta numa rede é o id da
+ * oferta, e disso cuida [[checkRedeSemIdDaOferta]].
  */
 export function checkVinculoIntegracao(
   houses: SetupHouse[] | null | undefined,
@@ -331,6 +389,7 @@ export function checkVinculoIntegracao(
       subjects.push(`${h.name || slug}: conector "${h.integration}" não existe no catálogo`);
       continue;
     }
+    if (conn.multiHouse === true) continue; // o vínculo da rede não é 1:1
     const target = String(conn.houseId ?? '');
     if (target !== slug) {
       const alvo = target ? `a casa "${target}"` : 'nenhuma casa';
@@ -343,7 +402,7 @@ export function checkVinculoIntegracao(
   }
 
   for (const conn of intList) {
-    if (!conn?.hasKey || !conn?.houseId) continue;
+    if (!conn?.hasKey || !conn?.houseId || conn.multiHouse === true) continue;
     const slug = String(conn.houseId);
     if (seenPairs.has(`${conn.id}|${slug}`)) continue;
     const h = houseBySlug.get(slug);
@@ -438,6 +497,7 @@ export function runSetupChecks(inputs: SetupInputs): SetupFinding[] {
     checkAffiliatesSemTaxa(affiliates, configs, specials, users),
     checkCasasSemIss(houses),
     checkPullSemChave(houses, integrations),
+    checkRedeSemIdDaOferta(houses, integrations),
     checkVinculoIntegracao(houses, integrations),
     checkCasasOtgSemFonte(houses, otgEnabled),
     checkCasasManuaisSemRegua(houses),
