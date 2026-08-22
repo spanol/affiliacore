@@ -1,15 +1,19 @@
 // ============================================================================
-// Conserta links de divulgação emitidos com o PLACEHOLDER CRU na URL.
+// Conserta links de divulgação emitidos SEM a tag do afiliado na URL.
 // ----------------------------------------------------------------------------
-// O QUE ACONTECEU (Infinity, medido em 20/08/2026): a aprovação de parceria do
-// marketplace gravava `houses.registerUrlTemplate` sem substituir o placeholder,
-// então o link ia para a casa com o literal `{tag}` (LEON) ou `{ref}` (Fomento:
-// Blaze/KTO/Winhugo). Consequências:
+// O QUE ACONTECEU (Infinity): a aprovação de parceria do marketplace gravava
+// `houses.registerUrlTemplate` sem passar por `buildTaggedUrl`. O estrago tem
+// DUAS caras, conforme o template da casa:
 //
-//   1. todo afiliado daquela casa chega no relatório sob a MESMA tag;
-//   2. `{tag}` tem cara de tag válida, então o índice de atribuição a aceitava e
-//      dava o resultado de TODOS ao primeiro link da ordem de leitura;
-//   3. como resolvia, nada caía em "pendente" e o erro não aparecia em tela.
+//   a) PLACEHOLDER CRU (medido 20/08/2026): template com `{tag}`/`{ref}` ia
+//      literal na URL (LEON, Blaze/KTO/Winhugo). Como `{tag}` tem cara de tag
+//      válida, o índice de atribuição a aceitava e dava o resultado de TODOS ao
+//      primeiro link da ordem de leitura — nada caía em "pendente".
+//   b) URL SEM TAG NENHUMA (medido 21/08/2026): template PELADO (Esportiva:
+//      `go.aff.esportiva.bet/urto4foy`) ia como está, então o clique chegava na
+//      casa sem AFP e a produção não atribuía a ninguém. A aparência é de URL
+//      sã, e a 1ª rodada deste script (que só caçava placeholder) a pulou. Um
+//      dos 6 casos era um link SÃO de 29/07 que a aprovação SOBRESCREVEU.
 //
 // A causa raiz está corrigida no `server.ts` (commit "Link de parceria sai com a
 // tag do afiliado"), mas o código só conserta na PRÓXIMA aprovação, e essas
@@ -20,6 +24,11 @@
 //     guarda a oferta/criativo que foi combinado com aquele afiliado (no Fomento
 //     cada casa tem seu `o=`), e reescrever pela casa poderia trocar a oferta
 //     dele. O script AVISA quando as duas divergem.
+//   • O caso (b) só é tratado em casa com EVIDÊNCIA de que a tag viaja na URL:
+//     outro link da mesma casa carrega um param de `TAG_PARAMS`, ou o template
+//     da casa tem placeholder. Casa que cruza por e-mail (sem tag na URL) tem
+//     link pelado LEGÍTIMO e fica de fora — aparece em "Ignorados" para o
+//     operador conferir. O param anexado é o que os irmãos da casa usam.
 //   • Tag por afiliado × casa, que é o mesmo comportamento de
 //     `/api/affiliate-links/generate` (idempotente por afiliado×casa). Tag já
 //     gravada no doc é REAPROVEITADA; placeholder gravado não conta como tag.
@@ -37,7 +46,20 @@ import { readFileSync } from 'fs';
 import admin from 'firebase-admin';
 import { buildTaggedUrl, suggestTag, hasUnresolvedPlaceholder } from '../../src/lib/linkGeneration';
 import { normalizeTag } from '../../src/lib/houseTagImport';
-import { extractTagFromUrl } from '../../src/lib/linkTriage';
+import { extractTagFromUrl, TAG_PARAMS } from '../../src/lib/linkTriage';
+
+// Qual param de TAG_PARAMS esta URL carrega (com valor)? '' = nenhum.
+const tagParamInUrl = (rawUrl: string): string => {
+  try {
+    const url = new URL(rawUrl);
+    for (const param of TAG_PARAMS) {
+      if (String(url.searchParams.get(param) ?? '').trim()) return param;
+    }
+  } catch {
+    /* URL inválida: as seleções abaixo já recusam a linha */
+  }
+  return '';
+};
 
 const args = process.argv.slice(2);
 const flag = (name: string): string | null => {
@@ -98,6 +120,22 @@ async function main() {
     }
   });
 
+  // Evidência POR CASA de que a tag viaja na URL (caso b): o param que os
+  // links irmãos da casa usam, ou o default quando o template tem placeholder
+  // (aí `buildTaggedUrl` substitui e o param nem é usado). Casa sem nenhuma
+  // evidência fica FORA do caso (b) — link pelado pode ser legítimo lá.
+  const tagParamDaCasa = new Map<string, string>();
+  for (const d of linksSnap.docs) {
+    const l = d.data() as any;
+    const brandId = String(l?.brandId ?? '').trim();
+    if (!brandId || tagParamDaCasa.has(brandId)) continue;
+    const param = tagParamInUrl(String(l?.registerUrl ?? ''));
+    if (param) tagParamDaCasa.set(brandId, param);
+  }
+  for (const [key, tpl] of houseTemplate) {
+    if (!tagParamDaCasa.has(key) && hasUnresolvedPlaceholder(tpl)) tagParamDaCasa.set(key, '');
+  }
+
   // Índice tag -> dono, MESMA regra do `loadTagOwners` do server.ts: serve para
   // não sugerir uma tag que já é de outra pessoa. Placeholder fica de fora — se
   // entrasse, reservaria "{tag}" como se fosse a tag de alguém.
@@ -131,6 +169,7 @@ async function main() {
     urlAfter: string;
     clicks: number;
     divergeDaCasa: boolean;
+    motivo: 'placeholder' | 'sem-tag';
   }
   const plans: Plan[] = [];
   const skipped: string[] = [];
@@ -138,14 +177,19 @@ async function main() {
   for (const d of linksSnap.docs) {
     const l = d.data() as any;
     const urlBefore = String(l?.registerUrl ?? '');
-    if (!hasUnresolvedPlaceholder(urlBefore)) continue; // já está são
     const brandId = String(l?.brandId ?? '').trim();
+    const comPlaceholder = hasUnresolvedPlaceholder(urlBefore);
+    // Caso (b): URL válida sem NENHUM param de tag, numa casa onde a tag
+    // comprovadamente viaja na URL. Sem evidência da casa, não inventamos.
+    const semTag =
+      !comPlaceholder && !!urlBefore && !tagParamInUrl(urlBefore) && tagParamDaCasa.has(brandId);
+    if (!comPlaceholder && !semTag) continue; // são (ou pelado legítimo)
     if (houseFilter && brandId !== houseFilter) continue;
 
     const affiliateId = String(l?.affiliateId ?? '').trim();
     if (!affiliateId) {
-      skipped.push(`${d.id} (pool/standby, sem dono — não atribui nada)`);
-      continue;
+      if (comPlaceholder) skipped.push(`${d.id} (pool/standby, sem dono — não atribui nada)`);
+      continue; // pool pelado é o formato normal do standby, nem lista
     }
 
     const storedTag = normalizeTag(l?.tag);
@@ -159,7 +203,7 @@ async function main() {
     // a mesma tag nesta rodada e um roubaria o resultado do outro.
     ownerByTag.set(tagAfter, affiliateId);
 
-    const urlAfter = buildTaggedUrl(urlBefore, tagAfter);
+    const urlAfter = buildTaggedUrl(urlBefore, tagAfter, tagParamDaCasa.get(brandId));
     if (!urlAfter || hasUnresolvedPlaceholder(urlAfter)) {
       skipped.push(`${d.id} (não consegui montar a URL a partir de "${urlBefore}")`);
       continue;
@@ -178,11 +222,12 @@ async function main() {
       urlAfter,
       clicks: money(l?.clicks),
       divergeDaCasa: !!tplCasa && tplCasa !== urlBefore,
+      motivo: comPlaceholder ? 'placeholder' : 'sem-tag',
     });
   }
 
   if (!plans.length) {
-    line('\nNenhum link com placeholder por corrigir.');
+    line('\nNenhum link por corrigir (placeholder ou URL sem tag).');
     if (skipped.length) { line('\nIgnorados:'); skipped.forEach((s) => line(`  - ${s}`)); }
     return;
   }
@@ -192,7 +237,7 @@ async function main() {
   line(`\n${plans.length} link(es) a corrigir: ${[...porCasa].map(([h, n]) => `${h}=${n}`).join('  ')}\n`);
 
   for (const p of plans) {
-    line(`  ${p.code}  ${p.brandId.padEnd(14)} ${p.who.slice(0, 26).padEnd(26)} cliques=${p.clicks}`);
+    line(`  ${p.code}  ${p.brandId.padEnd(14)} ${p.who.slice(0, 26).padEnd(26)} cliques=${p.clicks}  [${p.motivo}]`);
     line(`     tag:  ${p.tagBefore}  ->  ${p.tagAfter}  (${p.tagFrom})`);
     line(`     de:   ${p.urlBefore}`);
     line(`     para: ${p.urlAfter}`);
@@ -241,8 +286,16 @@ async function main() {
         { field: 'tag', before: p.tagBefore === '(nenhuma)' ? null : p.tagBefore, after: p.tagAfter },
         { field: 'registerUrl', before: p.urlBefore, after: p.urlAfter },
       ],
-      metadata: { code: p.code, brandId: p.brandId, motivo: 'placeholder cru na URL emitida pela aprovação de parceria' },
-      reason: 'Correção do link emitido com {tag}/{ref} literal',
+      metadata: {
+        code: p.code,
+        brandId: p.brandId,
+        motivo: p.motivo === 'placeholder'
+          ? 'placeholder cru na URL emitida pela aprovação de parceria'
+          : 'URL emitida pela aprovação de parceria sem nenhum param de tag (template pelado)',
+      },
+      reason: p.motivo === 'placeholder'
+        ? 'Correção do link emitido com {tag}/{ref} literal'
+        : 'Correção do link emitido sem a tag na URL (casa de template pelado)',
       affiliateId: p.affiliateId,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -258,17 +311,22 @@ async function main() {
   check.forEach((d) => {
     const l = d.data() as any;
     if (!String(l?.affiliateId ?? '').trim()) return;
-    if (hasUnresolvedPlaceholder(String(l?.registerUrl ?? ''))) aindaQuebrados.push(`${d.id} (${l?.brandId})`);
+    const url = String(l?.registerUrl ?? '');
+    const brandId = String(l?.brandId ?? '').trim();
+    if (hasUnresolvedPlaceholder(url)) aindaQuebrados.push(`${d.id} (${brandId}, placeholder)`);
+    else if (url && !tagParamInUrl(url) && tagParamDaCasa.has(brandId)) {
+      aindaQuebrados.push(`${d.id} (${brandId}, sem tag na URL)`);
+    }
     const alvo = plans.find((p) => p.code === d.id);
     if (alvo && l?.registerUrl === alvo.urlAfter && normalizeTag(l?.tag) === alvo.tagAfter) conferidos.push(d.id);
   });
   line(`  ${conferidos.length}/${plans.length} links conferidos com a URL e a tag novas.`);
   if (aindaQuebrados.length) {
-    line(`  ⚠️ ainda com placeholder: ${aindaQuebrados.join(', ')}`);
+    line(`  ⚠️ ainda quebrados: ${aindaQuebrados.join(', ')}`);
     if (houseFilter) line('     (esperado: você filtrou por --house; rode sem o filtro para os demais)');
     process.exitCode = 1;
   } else {
-    line('  ✅ nenhum link atribuído ficou com placeholder.');
+    line('  ✅ nenhum link atribuído ficou com placeholder ou sem tag.');
   }
 }
 
