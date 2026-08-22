@@ -4467,6 +4467,13 @@ export function createApp(deps: ServerDeps) {
       fxRate: Number.isFinite(Number(data.fxRate)) && Number(data.fxRate) > 0 ? Number(data.fxRate) : null,
       // Alíquota de ISS retida no repasse ao afiliado. VARIA POR CASA (ver src/lib/tax.ts).
       issPercent: Number.isFinite(Number(data.issPercent)) ? Number(data.issPercent) : null,
+      // Redepósito mínimo (R$) exigido pela casa. Informativo: ausente = não declarado,
+      // que NÃO é o mesmo que "sem mínimo" (a tela mostra o vazio, não um zero). O
+      // `== null` explícito é o que segura isso: `Number(null)` é 0 e FINITO, então a
+      // régua dos outros campos leria uma casa que teve o mínimo APAGADO como R$ 0,00.
+      minRedeposit: data.minRedeposit == null || !Number.isFinite(Number(data.minRedeposit))
+        ? null
+        : Number(data.minRedeposit),
       // Toggle "REV no lucro líquido" (call Infinity 12/08). Ausente = true (sempre foi assim).
       revInProfit: data.revInProfit !== false,
       // Frescor do dado (pull horário OU upload) — o afiliado lê isto no painel.
@@ -4618,6 +4625,8 @@ export function createApp(deps: ServerDeps) {
         fxMode: houseFx.fxMode,
         fxRate: houseFx.fxRate,
         issPercent: numOrNull(req.body?.issPercent),
+        // Redepósito mínimo do jogador, sempre em R$ (o apostador BR deposita em real).
+        minRedeposit: numOrNull(req.body?.minRedeposit),
         // Rede 1:N grava a flag DIRETO na casa (o vínculo por applyIntegrationLink
         // é 1:1 e desligaria a casa anterior da mesma rede) + o id externo dela.
         ...(wantedSpec?.multiHouse ? { integration: wantedIntegration, integrationExternalId: externalId } : {}),
@@ -4713,6 +4722,9 @@ export function createApp(deps: ServerDeps) {
         patch.fxRate = fx.fxRate;
       }
       if (body.issPercent !== undefined) patch.issPercent = numOrNull(body.issPercent);
+      // Campo vazio volta a null (casa que deixou de exigir mínimo), nunca a 0: zero
+      // seria lido como "redeposite qualquer valor" no material do afiliado.
+      if (body.minRedeposit !== undefined) patch.minRedeposit = numOrNull(body.minRedeposit);
       // Toggle "REV no lucro líquido" (call 12/08): grava booleano cru; ausente
       // no doc = true (a leitura normaliza). Mudar isto MUDA o lucro do /admin.
       if (body.revInProfit !== undefined) patch.revInProfit = body.revInProfit !== false;
@@ -4768,7 +4780,7 @@ export function createApp(deps: ServerDeps) {
       // Auditoria: só os campos que de fato mudaram (antes→depois). 'logo' marcada à
       // parte (não logamos o base64/URL inteiro — só que houve troca).
       const changes = diffChanges(snap.data() as any, patch,
-        ['name', 'brandId', 'registerUrlTemplate', 'active', 'order', 'dataSource', 'defaultCpa', 'defaultRev', 'cpaCurrency', 'fxMode', 'fxRate', 'issPercent', 'revInProfit', 'integrationExternalId']);
+        ['name', 'brandId', 'registerUrlTemplate', 'active', 'order', 'dataSource', 'defaultCpa', 'defaultRev', 'cpaCurrency', 'fxMode', 'fxRate', 'issPercent', 'minRedeposit', 'revInProfit', 'integrationExternalId']);
       if ('logo' in patch) changes.push({ field: 'logo', before: '(anterior)', after: patch.logo ? '(nova)' : null });
       // `integration` fica fora do diffChanges: no desvínculo o patch carrega um
       // FieldValue.delete(), que o diff leria como valor.

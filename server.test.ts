@@ -4818,6 +4818,71 @@ describe('integracoes (/api/integrations)', () => {
 });
 
 // =============================================================================
+// Redeposito minimo da casa (valor minimo de um deposito POSTERIOR ao primeiro).
+// Informativo, nunca entra em calculo de comissao. AUSENCIA != R$ 0: casa que nao
+// declarou tem que sair `null`, senao o material diria "redeposite qualquer valor".
+// =============================================================================
+describe('redeposito minimo da casa', () => {
+  const depSeed = {
+    users: { 'admin-uid': { role: 'admin' } },
+    houses: { stake: { slug: 'stake', name: 'Stake', dataSource: 'manual', minRedeposit: 20 } },
+  };
+
+  it('casa nova grava o valor com centavos e devolve o numero', async () => {
+    const db = makeFirestore(depSeed);
+    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .post('/api/houses')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ name: 'Casa Nova', slug: 'casa-nova', minRedeposit: 19.9 })
+      .expect(201);
+    expect(res.body.minRedeposit).toBe(19.9);
+    expect(db.__store.get('houses')?.get('casa-nova')?.minRedeposit).toBe(19.9);
+  });
+
+  it('casa sem o campo sai null (ausencia != R$ 0)', async () => {
+    const db = makeFirestore(depSeed);
+    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .post('/api/houses')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ name: 'Sem Minimo', slug: 'sem-minimo' })
+      .expect(201);
+    expect(res.body.minRedeposit).toBeNull();
+  });
+
+  it('PATCH com campo vazio LIMPA o minimo (volta a nao declarado)', async () => {
+    const db = makeFirestore(depSeed);
+    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .patch('/api/houses/stake')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ minRedeposit: '' })
+      .expect(200);
+    expect(res.body.minRedeposit).toBeNull();
+    expect(db.__store.get('houses')?.get('stake')?.minRedeposit).toBeNull();
+  });
+
+  it('PATCH sem tocar no campo PRESERVA o minimo gravado', async () => {
+    const db = makeFirestore(depSeed);
+    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .patch('/api/houses/stake')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ name: 'Stake Brasil' })
+      .expect(200);
+    expect(res.body.minRedeposit).toBe(20);
+  });
+
+  it('a mudanca entra na auditoria da casa (antes -> depois)', async () => {
+    const db = makeFirestore(depSeed);
+    await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+      .patch('/api/houses/stake')
+      .set('Authorization', 'Bearer admin-uid')
+      .send({ minRedeposit: 50 })
+      .expect(200);
+    const log = [...(db.__store.get('audit_logs')?.values() ?? [])].find((l: any) => l.action === 'house.update');
+    expect(log.changes).toContainEqual({ field: 'minRedeposit', before: 20, after: 50 });
+  });
+});
+
+// =============================================================================
 // Logo da casa SEM Storage — fallback inline (data URL no doc da casa). Caso
 // real: a Infinity nunca ativou o Storage no projeto e o upload da logo da LEON
 // morria em "bucket inexistente" (2026-08-14). Nos testes NÃO existe app default
