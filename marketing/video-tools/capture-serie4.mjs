@@ -137,6 +137,27 @@ async function stage(page, path) {
   await dismissPopups(page);
   await page.evaluate(() => window.scrollTo(0, 0));
   await sleep(400);
+  await assertClean(page, path);
+}
+
+// Trava de qualidade da tomada: se o banner de versão estiver VISÍVEL, a gravação
+// para aqui em vez de render um vídeo com ruído de dev no meio da cena. Sujeira
+// que passa desapercebida na gravação só aparece depois de compor, e aí é tarde.
+async function assertClean(page, path) {
+  const sujeira = await page.evaluate(() => {
+    const visivel = (n) => {
+      const cs = getComputedStyle(n);
+      return cs.display !== 'none' && cs.visibility !== 'hidden' && Number(cs.opacity) > 0.05;
+    };
+    const banner = Array.from(document.querySelectorAll('[role="alert"]'))
+      .filter((n) => n.textContent.includes('Nova versão disponível') && visivel(n));
+    const emulador = Array.from(document.querySelectorAll('.firebase-emulator-warning')).filter(visivel);
+    return [...banner.map(() => 'banner de nova versão'), ...emulador.map(() => 'aviso do emulador')];
+  });
+  if (sujeira.length) {
+    console.error(`quadro sujo em ${path}: ${sujeira.join(', ')}. Corrija a limpeza antes de gravar.`);
+    process.exit(1);
+  }
 }
 
 // ---------- V1 · cena 1 · o afiliado pede a parceria na vitrine ----------
