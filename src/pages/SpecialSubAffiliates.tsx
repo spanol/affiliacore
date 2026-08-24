@@ -38,6 +38,7 @@ import {
   EMPTY_RATE_DRAFT,
   type RateDraft,
 } from '../lib/subHouseRates';
+import { networkHouseKeys, filterHouseOptions } from '../lib/networkHouses';
 import { resolveRepasseCap, hasConfiguredRate } from '../lib/network';
 import { MARKETPLACE_ENABLED } from '../lib/instanceClient';
 import { buildNetworkInviteUrl } from '../lib/networkInvite';
@@ -295,7 +296,18 @@ export default function SpecialSubAffiliates() {
   // O seletor sai do BACKOFFICE de casas, não da marca das linhas: numa instância
   // OTG-free a linha agregada do afiliado não tem marca, e o seletor ficaria vazio
   // justamente onde ele passou a ser obrigatório para editar a comissão.
-  const houseOptions = useMemo(() => buildHouseOptions(houses), [houses]);
+  // ...e o seletor mostra só as casas DELE (pedido Infinity, 24/08): as em que a
+  // rede tem link ativo ou já produziu no período. Ver src/lib/networkHouses.ts —
+  // rede sem nenhuma das duas coisas cai no fail-open (catálogo inteiro), porque
+  // seletor vazio aqui é ausência de gesto, não tela limpa.
+  const activeHouseKeys = useMemo(
+    () => networkHouseKeys(links, payoutParts, brandIdOf),
+    [links, payoutParts, brandIdOf]
+  );
+  const houseOptions = useMemo(
+    () => filterHouseOptions(buildHouseOptions(houses), activeHouseKeys),
+    [houses, activeHouseKeys]
+  );
   const houseNames = useMemo(() => houseOptions.map((o) => o.name), [houseOptions]);
   const selectedHouseKey = useMemo(
     () => (brandFilter === ALL_BRANDS ? null : houseKeyByName(houseOptions, brandFilter)),

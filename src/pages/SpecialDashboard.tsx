@@ -13,13 +13,16 @@ import {
   fetchAllDailyResults,
   fetchAffiliateDailyResults,
   fetchAffiliateConfigs,
+  fetchAffiliateLinks,
   calcAffiliatePayout,
   resolveBrandRates,
   SpecialAffiliate,
   AffiliateConfig,
   CampaignRow,
+  type AffiliateLink,
 } from '../services/affiliateService';
 import { buildPerHousePayout, type HouseMetricRow } from '../lib/perHousePayout';
+import { networkHouseKeys, filterBrandRows } from '../lib/networkHouses';
 import { buildFunnelItems, sumFunnelTotals, formatFunnelValue, type FunnelItemKey } from '../lib/funnel';
 import { buildSpecialDailySeries } from '../lib/specialDaily';
 import DateRangePicker from '../components/DateRangePicker';
@@ -58,6 +61,9 @@ export default function SpecialDashboard() {
   const [ownDailyResults, setOwnDailyResults] = useState<any[]>([]);
   const [configs, setConfigs] = useState<Record<string, AffiliateConfig>>({});
   const [pool, setPool] = useState<any[]>([]); // mirror p/ afiliado→brandId (byBrand)
+  // Links da rede (own + subs, escopados no servidor) — junto com a produção, são
+  // o que define quais casas são DELE nas visões por casa. Ver lib/networkHouses.
+  const [links, setLinks] = useState<AffiliateLink[]>([]);
 
   const ownId = profile?.affiliateId ? String(profile.affiliateId) : '';
 
@@ -76,7 +82,7 @@ export default function SpecialDashboard() {
       const networkIds = [ownId, ...((mine?.subAffiliateIds || []).map(String))];
       // brand/campaign/daily vão SEM affiliateIds — o proxy escopa à sub-rede do
       // especial (own + subs). Agregados pela API por casa/campanha/dia.
-      const [split, byBrand, byCampaign, byDay, ownByDay, cfgs, poolData] = await Promise.all([
+      const [split, byBrand, byCampaign, byDay, ownByDay, cfgs, poolData, netLinks] = await Promise.all([
         fetchResultsForAffiliatesSplit(networkIds, range),
         fetchAllResultsByBrand(range),
         fetchAllResultsByCampaign(range),
@@ -84,6 +90,7 @@ export default function SpecialDashboard() {
         fetchAffiliateDailyResults(ownId, range.startDate, range.endDate).catch(() => []),
         fetchAffiliateConfigs(),
         fetchAffiliates().catch(() => []),
+        fetchAffiliateLinks().catch(() => []),
       ]);
       setSpecial(mine);
       setResults(split.rows);
@@ -94,6 +101,7 @@ export default function SpecialDashboard() {
       setOwnDailyResults(Array.isArray(ownByDay) ? ownByDay : []);
       setConfigs(cfgs);
       setPool(Array.isArray(poolData) ? poolData : []);
+      setLinks(Array.isArray(netLinks) ? netLinks : []);
     } catch (err) {
       console.error('Erro ao carregar painel da sub-rede:', err);
       setResults([]);
@@ -138,9 +146,22 @@ export default function SpecialDashboard() {
   // demais blocos seguem na rede inteira — o spread não se divide por casa aqui.
   const brandNameOf = (r: any) =>
     getKnownBrandName(String(r?.id ?? ''), String(r?.label || r?.name || '')) ?? String(r?.label || r?.name || 'Casa');
-  const availableBrands = Array.from(new Set(brandResults.map(brandNameOf))).filter(Boolean);
+  // Só as casas DELE (pedido Infinity, 24/08): link ativo na rede ou produção no
+  // período. As demais entravam aqui zeradas por `withKnownHouses` (modelo do portal
+  // OTG, que lista a casa acesa e vazia) e enchiam o "Por casa" e o filtro de linhas
+  // R$ 0,00 de casa que ele não opera. Linha COM número passa sempre — o filtro não
+  // esconde dinheiro. Ver src/lib/networkHouses.ts.
+  const activeHouseKeys = useMemo(
+    () => networkHouseKeys(links, payoutParts, brandIdOf),
+    [links, payoutParts, brandIdOf]
+  );
+  const networkBrandResults = useMemo(
+    () => filterBrandRows(brandResults, activeHouseKeys),
+    [brandResults, activeHouseKeys]
+  );
+  const availableBrands = Array.from(new Set(networkBrandResults.map(brandNameOf))).filter(Boolean);
   const isAllBrands = selectedBrand === ALL_BRANDS;
-  const selectedBrandRow = isAllBrands ? null : brandResults.find((r) => brandNameOf(r) === selectedBrand);
+  const selectedBrandRow = isAllBrands ? null : networkBrandResults.find((r) => brandNameOf(r) === selectedBrand);
   const metricRows = isAllBrands ? results : (selectedBrandRow ? [selectedBrandRow] : []);
 
   // Funil agregado da sub-rede (own + subs), escopado pela casa selecionada —
@@ -424,7 +445,7 @@ export default function SpecialDashboard() {
         <h3 className="text-[10px] uppercase font-bold tracking-widest text-slate-400 dark:text-neutral-500 mb-3 px-1">
           Por casa (sua rede)
         </h3>
-        <BrandBreakdown data={brandResults} config={ownConfig} />
+        <BrandBreakdown data={networkBrandResults} config={ownConfig} />
       </section>
 
       {/* Por campanha — desempenho da rede por campanha. "Sua comissão" = repasse à
