@@ -18,8 +18,14 @@ const activeKnownBrands = () =>
   getKnownBrands().filter((b) => b.active !== false && (OTG_ENABLED || b.dataSource !== 'otg'));
 
 // Linha de marca ZERADA (casa vazia) no shape do groupBy=brand da API.
-const emptyBrandRow = (b: { id?: string; name: string }) => ({
-  id: b.id ?? b.name,
+// `id` = brandId da OTG quando existe, senão o SLUG — a mesma chave de
+// `manualBrandRow` (casa manual que produziu), de `houseRateKey` e do `byBrand`.
+// Cair no NOME aqui punha a casa vazia num espaço de chaves diferente do da casa
+// cheia: a taxa por casa lida no breakdown do gerente saía de `byBrand['Winhugo']`
+// enquanto o dinheiro do /admin saía de `byBrand['winhugo']`, e a config da Infinity
+// acabou com as DUAS chaves gravadas — divergiriam na primeira edição de taxa.
+const emptyBrandRow = (b: { id?: string; slug?: string; name: string }) => ({
+  id: b.id ?? b.slug ?? b.name,
   label: b.name,
   registrations: 0,
   first_deposits: 0,
