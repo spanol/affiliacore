@@ -66,6 +66,7 @@ const ACTION_LABELS: Record<string, string> = {
   'link.delete': 'Removeu link',
   'deal.create': 'Criou acordo',
   'deal.update': 'Editou acordo',
+  'deal.delete': 'Removeu acordo',
   'partnership.request': 'Solicitou parceria',
   'partnership.approve': 'Aprovou parceria',
   'partnership.reject': 'Recusou parceria',
