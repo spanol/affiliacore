@@ -63,6 +63,31 @@ Números na tela = demo (fictícios) e a moldura declara "Ambiente de demonstra�
 de aposta — é software de gestão white-label. Publish imediato NUNCA; padrão =
 Schedule. Push do commit = decisão do operador (push na main = deploy).
 
+## Série 4 · vídeos de feature (2026-08-24) — o pipeline atual
+
+Para vídeo NOVO de produto, comece por aqui (a receita acima segue valendo por
+baixo). Plano, briefings e gotchas: `marketing/affiliacore/CAMPANHA-VIDEOS-EVOLUCAO.md`.
+
+1. `node marketing/affiliacore/generator/gen-serie4-frames.mjs` — molduras da
+   série: cenas com janela + **cartões de tela cheia** (gancho e fecho), texto
+   grande porque o feed roda sem som.
+2. `DEMO_FULL=1 npm run dev` e então
+   `VIDEO_BASE=http://127.0.0.1:3123 VIDEO_OUT=marketing/affiliacore/video/serie4/raw DEMO_ADMIN_PASS=… DEMO_AFILIADO_PASS=… node marketing/video-tools/capture-serie4.mjs`
+   — uma persona por contexto anônimo do browser, clique por TEXTO do botão, e a
+   limpeza de quadro (banner de versão escondido por CSS, host da demo reescrito
+   para `app.suaagencia.com.br`).
+3. `node marketing/video-tools/compose-serie4.mjs v1` — cartões + cenas + concat.
+   Cada cena aceita `zoom` (recorte ANTES do scale; `1080:608:190:96` tira a
+   sidebar e é o que torna o painel legível no celular) e `seconds` por cartão.
+4. `node marketing/video-tools/narrate-serie4.mjs v1` — versão narrada à parte
+   (falas datadas em `narracao/<v>-narracao.txt`, WAVs pela voz Maria do Windows,
+   encaixe por `atempo`). **O arquivo do feed continua MUDO**: o trending audio
+   entra no app do IG, único caminho medido que dá alcance nesta conta.
+
+Armadilha que custou três tomadas: `evaluateOnNewDocument` roda antes de existir
+`documentElement`, e `observe(null)` LANÇA — a exceção derruba a inicialização
+inteira em silêncio. Observe o `document` e registre o `setInterval` antes.
+
 ## Estado (2026-07-23)
 
 Kit pronto (commit `9abae18`, SEM push). 3 reels AGENDADOS FB+IG: reel 1
