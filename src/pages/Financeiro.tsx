@@ -14,6 +14,7 @@ import { fetchHouses } from '../services/houseService';
 import { computeNetPayout, computeNetPayoutWindows, issRateMap } from '../lib/tax';
 import { unionRateWindows, projectConfigAt } from '../lib/rateHistory';
 import DateRangePicker from '../components/DateRangePicker';
+import { hasProduction } from '../lib/networkHouses';
 import BrandFilter from '../components/BrandFilter';
 import BrandLogo from '../components/BrandLogo';
 import { ALL_BRANDS } from '../lib/brand';
@@ -147,9 +148,15 @@ export default function Financeiro() {
   // `label` quando há, senão a chave). É por NOME que o filtro casa com o snapshot
   // `houseLabel` gravado nas solicitações.
   const houseNameOf = (r: any) => String(r?.label ?? r?.id ?? '').trim();
+  // Só casas em que ELE produziu no período (pedido Infinity de 24/08). As linhas
+  // vêm de `fetchAffiliateResultsByBrand`, que passa por `withKnownHouses` e acende
+  // TODA casa ativa do backoffice: a carteira listava 15 casas e o seletor de saque
+  // deixava pedir numa casa que nunca rendeu nada. Aqui a régua é a produção pura,
+  // não o link: link sem apuração não tem o que sacar. Com uma casa só o BrandFilter
+  // se esconde sozinho e `openWithdrawModal` passa a acertar a pré-seleção.
   const houseNames = useMemo(
     () => Array.from(new Set(
-      payoutInputs.windows.flatMap((w) => w.rows.map(houseNameOf)).filter(Boolean),
+      payoutInputs.windows.flatMap((w) => w.rows.filter(hasProduction).map(houseNameOf)).filter(Boolean),
     )).sort((a, b) => a.localeCompare(b, 'pt-BR')),
     [payoutInputs.windows],
   );

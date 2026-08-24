@@ -4,6 +4,7 @@ import {
   networkHouseKeys,
   filterHouseOptions,
   filterBrandRows,
+  linksOfAffiliates,
 } from './networkHouses';
 import type { HouseOption } from './subHouseRates';
 
@@ -157,5 +158,32 @@ describe('filterBrandRows', () => {
       (r) => r.slug
     );
     expect(kept).toEqual([{ slug: 'winhugo' }]);
+  });
+});
+
+describe('linksOfAffiliates', () => {
+  const links = [
+    { affiliateId: 'a1', brandId: 'winhugo', active: true },
+    { affiliateId: 'a2', brandId: 'kto', active: true },
+    { affiliateId: null, brandId: 'blaze', active: true },
+  ];
+
+  it('recorta ao dono — o GET do admin devolve os links de TODO MUNDO', () => {
+    expect(linksOfAffiliates(links, ['a1'])).toEqual([links[0]]);
+  });
+
+  it('aceita mais de um dono (visão de rede do especial)', () => {
+    expect(linksOfAffiliates(links, ['a1', 'a2'])).toHaveLength(2);
+  });
+
+  it('sem dono informado não devolve NADA (nunca cai em "todos")', () => {
+    expect(linksOfAffiliates(links, [])).toEqual([]);
+    expect(linksOfAffiliates(links, null)).toEqual([]);
+    expect(linksOfAffiliates(links, [''])).toEqual([]);
+  });
+
+  it('a casa do afiliado sai do link DELE, não do link do vizinho', () => {
+    const keys = networkHouseKeys(linksOfAffiliates(links, ['a1']), { otg: [], manual: [] }, () => undefined);
+    expect([...keys]).toEqual(['winhugo']);
   });
 });

@@ -63,6 +63,25 @@ export function hasProduction(row: unknown): boolean {
 }
 
 /**
+ * Recorta os links aos donos informados. `fetchAffiliateLinks` devolve o que o
+ * PAPEL alcança (admin = todos; gerente = own + subs; afiliado = só os dele), e
+ * uma tela de UM afiliado tem que recortar de novo — senão a página de um sub
+ * aberta pelo admin acenderia a casa por causa do link de OUTRA pessoa.
+ */
+export function linksOfAffiliates(
+  links: NetworkLinkLike[] | null | undefined,
+  ids: Iterable<string> | null | undefined,
+): NetworkLinkLike[] {
+  const wanted = new Set<string>();
+  for (const id of ids ?? []) {
+    const k = String(id ?? '').trim();
+    if (k) wanted.add(k);
+  }
+  if (wanted.size === 0) return [];
+  return (Array.isArray(links) ? links : []).filter((l) => wanted.has(String(l?.affiliateId ?? '').trim()));
+}
+
+/**
  * Casas em que a rede do gerente está ativa: link de divulgação ATIVO (dele ou
  * de um sub) + casa com produção no período.
  *

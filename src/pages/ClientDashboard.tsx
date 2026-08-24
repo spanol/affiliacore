@@ -17,9 +17,12 @@ import {
   fetchAffiliateResultsByBrand,
   fetchAffiliateDailyResults,
   fetchAffiliates,
+  fetchAffiliateLinks,
   rateStatus,
   resolveBrandRates,
+  type AffiliateLink,
 } from '../services/affiliateService';
+import { networkHouseKeys, filterBrandRows, linksOfAffiliates } from '../lib/networkHouses';
 import BrandBreakdown from '../components/BrandBreakdown';
 import DataFreshness from '../components/DataFreshness';
 import FunnelGrid from '../components/FunnelGrid';
@@ -30,7 +33,6 @@ import InfoTooltip from '../components/InfoTooltip';
 import TrendBadge from '../components/TrendBadge';
 import { DateRange, getDefaultRange, getPreviousRange, percentChange } from '../lib/dateRange';
 import { ALL_BRANDS, getKnownBrandName } from '../lib/brand';
-import { withKnownBrandNames } from '../lib/knownHouses';
 import { cn } from '../lib/utils';
 import { buildDailyExtractCsv } from '../lib/exportExtract';
 import { buildCsvFilename } from '../lib/csv';
@@ -44,6 +46,9 @@ export default function ClientDashboard() {
   const [dailyResults, setDailyResults] = useState<any[]>([]);
   const [prevRegistrations, setPrevRegistrations] = useState<number | null>(null);
   const [config, setConfig] = useState<AffiliateConfig | null>(null);
+  // Links DELE: junto com a produção, definem quais casas a tela lista. Ver lib/networkHouses.
+  const [links, setLinks] = useState<AffiliateLink[]>([]);
+  const [ownId, setOwnId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<DateRange>(() => getDefaultRange());
@@ -67,6 +72,7 @@ export default function ClientDashboard() {
       let brandData: any[] = [];
       let dailyData: any[] = [];
       let prevData: any[] = [];
+      let linkData: AffiliateLink[] = [];
 
       if (affiliateId) {
         affiliateDetails = await fetchAffiliateById(affiliateId).catch(() => null);
@@ -82,7 +88,7 @@ export default function ClientDashboard() {
 
       if (affiliateId) {
         const prevRange = getPreviousRange(range);
-        [resultsData, allConfigs, brandData, dailyData, prevData] = await Promise.all([
+        [resultsData, allConfigs, brandData, dailyData, prevData, linkData] = await Promise.all([
           fetchAffiliateResults(affiliateId, range).catch((err) => {
             console.error('Error fetching results:', err);
             return [];
@@ -94,6 +100,7 @@ export default function ClientDashboard() {
           fetchAffiliateResultsByBrand(affiliateId, range),
           fetchAffiliateDailyResults(affiliateId, range.startDate, range.endDate),
           fetchAffiliateResults(affiliateId, prevRange).catch(() => []),
+          fetchAffiliateLinks().catch(() => []),
         ]);
       }
 
@@ -111,6 +118,8 @@ export default function ClientDashboard() {
       setDailyResults(Array.isArray(dailyData) ? dailyData : []);
       setPrevRegistrations((Array.isArray(prevData) ? prevData : []).reduce((sum: number, r: any) => sum + (r.registrations || 0), 0));
       setConfig(affiliateId ? allConfigs[affiliateId] || null : null);
+      setLinks(Array.isArray(linkData) ? linkData : []);
+      setOwnId(affiliateId);
       setError(null);
     } catch (err) {
       console.error('Error loading client dashboard data:', err);
@@ -159,17 +168,29 @@ export default function ClientDashboard() {
   const clientRows: Array<{ name: string; firstDeposit: string; createdAt: string }> = [];
   const resultsToRender = results.length > 0 ? results : [emptyResult];
 
-  // Casas disponíveis (nome canônico): casas reais das linhas + casas conhecidas
-  // SEMPRE listadas (modelo do portal OTG), pra que o filtro apareça mesmo quando
-  // a API só trouxe uma casa pro afiliado. Espelha o availableBrands do /admin —
-  // antes o cliente derivava só do brandResults cru e o dropdown sumia com 1 casa.
+  // Casas que a tela lista: só as DELE (pedido Infinity de 24/08, o mesmo que
+  // recortou as telas do gerente) — casa com link de divulgação ativo dele, mais
+  // casa em que ele produziu. `fetchAffiliateResultsByBrand` passa por
+  // `withKnownHouses`, que acende TODA casa ativa do backoffice (modelo do portal
+  // OTG): numa instância com 15 casas, o painel do afiliado virava 14 barras de
+  // R$ 0,00 de casa que ele nem opera. Linha COM número passa sempre e afiliado
+  // ainda sem link nem produção segue vendo o catálogo (fail-open, o de hoje).
+  // Ver src/lib/networkHouses.ts. Sem useMemo de propósito: esta parte do corpo
+  // roda depois dos early returns de carregamento, onde hook não pode entrar.
   const brandNameOf = (r: any) =>
     getKnownBrandName(String(r?.id ?? ''), String(r?.label || r?.name || '')) ?? String(r?.label || r?.name || 'Casa');
-  const availableBrands = withKnownBrandNames(
-    Array.from(new Set(brandResults.map(brandNameOf))).filter(Boolean)
+  const myBrandResults = filterBrandRows(
+    brandResults,
+    networkHouseKeys(linksOfAffiliates(links, [ownId]), { otg: [], manual: [] }, () => undefined)
   );
+  // Sem `withKnownBrandNames`: ele re-injeta TODA casa ativa do backoffice e era o
+  // que enchia o dropdown do afiliado com casa que não é dele. Sobrando uma casa só,
+  // o BrandFilter se esconde sozinho — "todas × a única" não é escolha.
+  const availableBrands = Array.from(new Set(myBrandResults.map(brandNameOf)))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const isAllBrands = selectedBrand === ALL_BRANDS;
-  const selectedBrandRow = isAllBrands ? null : brandResults.find((r) => brandNameOf(r) === selectedBrand);
+  const selectedBrandRow = isAllBrands ? null : myBrandResults.find((r) => brandNameOf(r) === selectedBrand);
 
   // Export CSV do extrato diário do período (convergente Affility+NovaEra). Reusa a
   // MESMA taxa/casa do card "Comissão total" acima — nunca reimplementa o cálculo.
@@ -329,7 +350,7 @@ export default function ClientDashboard() {
                 />
 
                 {/* Per-house breakdown (real data from groupBy=brand) */}
-                <BrandBreakdown data={brandResults} config={config} />
+                <BrandBreakdown data={myBrandResults} config={config} />
 
                 {/* Frescor por casa: o painel mistura o clique (nosso, ao vivo)
                     com o resultado da casa (pull horário / upload, D-1). Sem o

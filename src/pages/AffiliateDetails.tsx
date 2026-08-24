@@ -39,6 +39,8 @@ import {
   fetchAffiliateResultsByCampaign,
   fetchAffiliateDailyResults,
   fetchAffiliateConfigs,
+  fetchAffiliateLinks,
+  type AffiliateLink,
   calcAffiliatePayout,
   resolveBrandRates,
   rateStatus,
@@ -59,6 +61,7 @@ import {
 } from '../services/affiliateService';
 import { useAuth } from '../contexts/AuthContext';
 import SpecialAffiliateModal from '../components/SpecialAffiliateModal';
+import { networkHouseKeys, filterBrandRows, linksOfAffiliates } from '../lib/networkHouses';
 import BrandBreakdown from '../components/BrandBreakdown';
 import BrandFilter from '../components/BrandFilter';
 import BrandConfigEditor from '../components/BrandConfigEditor';
@@ -72,7 +75,6 @@ import TrendBadge from '../components/TrendBadge';
 import { DateRange, getDefaultRange, getPreviousRange, percentChange } from '../lib/dateRange';
 import { ALL_BRANDS, getKnownBrandName, buildBrandIdOf } from '../lib/brand';
 import { buildPerHousePayout, type HouseMetricRow } from '../lib/perHousePayout';
-import { withKnownBrandNames } from '../lib/knownHouses';
 import { canViewAffiliateNetProfit } from '../lib/affiliateView';
 import { cn, humanizeName } from '../lib/utils';
 import { sumFunnelForAffiliate } from '../lib/analyticsDoc';
@@ -161,6 +163,9 @@ export default function AffiliateDetails() {
   const [loadingNetwork, setLoadingNetwork] = useState(false);
   // Quando o afiliado é um especial com rede, os cards agregam own + subs.
   const [isNetworkView, setIsNetworkView] = useState(false);
+  // Links do afiliado em tela: com a produção, definem as casas que ele opera.
+  const [links, setLinks] = useState<AffiliateLink[]>([]);
+  const [scopeIds, setScopeIds] = useState<string[]>([]);
   // Partes SEPARADAS (OTG × manual) das linhas por afiliado (own + subs) — base
   // do card de lucro líquido do afiliado (ganho dele: direto + spread da rede):
   // a linha manual é precificada pela casa da LINHA (perHousePayout), nunca o
@@ -260,11 +265,15 @@ export default function AffiliateDetails() {
       setSpecials(specialsMap);
       // Pool p/ resolver afiliado→brandId (byBrand do lucro). Não-bloqueante.
       fetchAffiliates().then((p) => setAffiliatesPool(Array.isArray(p) ? p : [])).catch(() => {});
+      // Links do afiliado (ou da rede dele, quando é especial). O GET devolve o que o
+      // PAPEL alcança — para o admin, TODOS —, então o recorte por dono é obrigatório.
+      fetchAffiliateLinks().then((l) => setLinks(Array.isArray(l) ? l : [])).catch(() => {});
       const subIds = (specialsMap[String(affId)]?.subAffiliateIds || []).map(String);
       const isNetwork = subIds.length > 0;
       const networkIds = [String(affId), ...subIds];
       const idsCsv = networkIds.join(',');
       setIsNetworkView(isNetwork);
+      setScopeIds(networkIds);
 
       const [detailsData, resultsSplit, allConfigs, brandData, campaignData, dailyData, prevResults, funnelData] = await Promise.all([
         fetchAffiliateById(affId),
@@ -519,11 +528,22 @@ export default function AffiliateDetails() {
   // por-casa). "Todas as casas" usa o agregado e a taxa de topo.
   const brandNameOf = (r: any) =>
     getKnownBrandName(String(r?.id ?? ''), String(r?.label || r?.name || '')) ?? String(r?.label || r?.name || 'Casa');
-  const availableBrands = withKnownBrandNames(
-    Array.from(new Set(brandResults.map(brandNameOf))).filter(Boolean)
+  // Só as casas que ELE opera (pedido Infinity de 24/08, o mesmo das telas do
+  // gerente): link de divulgação ativo do afiliado (ou da rede dele, na visão de
+  // especial) + casa em que produziu. `withKnownBrandNames`/`withKnownHouses`
+  // re-injetavam TODA casa ativa do backoffice, e a página virava uma parede de
+  // R$ 0,00. Linha COM número passa sempre (src/lib/networkHouses.ts).
+  // O `BrandConfigEditor` do admin segue recebendo `brandResults` CRU de propósito:
+  // é ele que precifica a casa ANTES do afiliado começar nela.
+  const shownBrandResults = filterBrandRows(
+    brandResults,
+    networkHouseKeys(linksOfAffiliates(links, scopeIds), { otg: [], manual: [] }, () => undefined)
   );
+  const availableBrands = Array.from(new Set(shownBrandResults.map(brandNameOf)))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const isAllBrands = selectedBrand === ALL_BRANDS;
-  const selectedBrandRow = isAllBrands ? null : brandResults.find((r) => brandNameOf(r) === selectedBrand);
+  const selectedBrandRow = isAllBrands ? null : shownBrandResults.find((r) => brandNameOf(r) === selectedBrand);
 
   // Export CSV do extrato diário do afiliado em tela (convergente Affility+NovaEra).
   // Reusa a MESMA taxa/casa dos cards acima — nunca reimplementa o cálculo.
@@ -852,7 +872,7 @@ export default function AffiliateDetails() {
                   {isSuperiorView && <QualityGrid rows={[row]} />}
 
                   {/* Per-house breakdown (real data from groupBy=brand) */}
-                  <BrandBreakdown data={brandResults} config={config} />
+                  <BrandBreakdown data={shownBrandResults} config={config} />
 
                   {/* B6 · editor de comissão por casa — admin, dev-gated (≥2 casas). */}
                   {isAdmin && id && (
