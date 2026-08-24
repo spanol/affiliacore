@@ -41,12 +41,16 @@ nova custa minutos, não uma tarde.
   tela cheia (cartão de texto, sem screencast) e corta para a tela que resolve.
   É o formato da prova social sem depoimento gravado.
 
-**Áudio (decisão que precisa do seu ok):** o dado medido nesta conta é duro. Reel
-com trending audio publicado pelo app do IG fez 194 alcance / 265 views; reel
-mudo agendado pelo MBS fez 3 / 6. Recomendação: **trending audio + texto grande
-na tela**, e a narração (que já existe calibrada nos vídeos de apresentação)
-fica para as versões de onboarding e WhatsApp, não para o feed. Publicação do IG
-segue manual pelo app; o FB entra pelo MBS como higiene de marca.
+**Áudio (decidido em 24/08): as DUAS saídas por vídeo.** O dado medido nesta
+conta é duro: reel com trending audio publicado pelo app do IG fez 194 alcance /
+265 views; reel mudo agendado pelo MBS fez 3 / 6. Então o arquivo do FEED sai
+mudo, com texto grande na tela, para receber o trending audio no app na hora de
+publicar; e um segundo arquivo, NARRADO, fica para onboarding, WhatsApp e pitch.
+Publicação do IG segue manual pelo app; o FB entra pelo MBS como higiene de marca.
+
+**Prova social (decidido em 24/08): sem nome.** O formato B fala em "pedido real
+de cliente". Nomear a Infinity exige um ok novo do Maurício e pode virar um vídeo
+próprio depois.
 
 ## Calendário (2×/semana, ter e sex, 12h)
 
@@ -209,6 +213,56 @@ conta?"
 > Ambiente de demonstração, dados fictícios.
 
 ---
+
+## V1 ENTREGUE (24/08)
+
+Arquivos em `marketing/affiliacore/video/serie4/`:
+
+- `s4-v1-loja-de-acordos.mp4` — 32s, 1080×1920, h264/30fps, **sem áudio**. É o
+  arquivo do feed: sobe pelo app do IG com trending audio.
+- `s4-v1-loja-de-acordos-narrado.mp4` — o mesmo vídeo com locução. A voz é a
+  **sintética do Windows (Maria, pt-BR), em rascunho**: serve para WhatsApp e
+  para aprovar o texto, e vale trocar por uma gravação sua mantendo os nomes dos
+  WAVs em `narracao/`.
+- `s4-v1-loja-de-acordos-capa.png` — capa (o cartão de gancho).
+- `s4-v1-{hook,1,2,3,cta}.png` — as molduras, e `raw/` com os screencasts (fora
+  do git, como no kit de apresentação).
+
+Montagem: gancho 2,6s → vitrine do afiliado 8,7s → fila da agência 9,5s →
+Meus Links 7,6s → cartão de marca 3,6s. As cenas são reais, gravadas em sequência
+na demo: o pedido que a agência aprova na cena 2 é o que o afiliado fez na cena 1.
+
+Ferramentas novas (as três valem para os próximos vídeos, é só acrescentar a
+entrada em `VIDEOS`):
+
+| Script | O que faz |
+|---|---|
+| `marketing/affiliacore/generator/gen-serie4-frames.mjs` | molduras da série, incluindo os cartões de tela cheia |
+| `marketing/video-tools/capture-serie4.mjs` | coreografia das cenas na demo (uma persona por contexto do browser) |
+| `marketing/video-tools/compose-serie4.mjs` | cartões + cenas emolduradas + concat, com `zoom` por cena |
+| `marketing/video-tools/narrate-serie4.mjs` | encaixa as falas datadas nas janelas das cenas e muxa a versão narrada |
+
+### Gotchas medidos nesta gravação (custaram três tomadas)
+
+- **`evaluateOnNewDocument` roda antes de existir `documentElement`**, e
+  `observer.observe(null)` LANÇA. A exceção aborta o script de inicialização
+  inteiro em silêncio, então nada da limpeza roda. Observe o `document` e
+  registre o `setInterval` ANTES do observer. O `capture-scenes.mjs` dos vídeos
+  de apresentação tem o mesmo trecho e portanto a mesma falha latente.
+- **O banner "Nova versão disponível" aparece no meio da cena** (o dev regera o
+  `version.json` com a aba aberta). Remover o nó não resolve, o React o repõe:
+  quem esconde é uma regra CSS (`[role="alert"].bottom-4`). Os toasts, que também
+  são `role="alert"`, precisam continuar visíveis, e continuam.
+- **O link da demo sai como `127.0.0.1:3123`.** Na gravação ele é reescrito para
+  `app.suaagencia.com.br`, que é o que o afiliado de uma instância real vê.
+- **`/acordos` tem ABAS** (Acordos · Solicitações · Aguardando link): a fila de
+  aprovação não está na rolagem, está na aba "Solicitações".
+- **A captura 1280×720 dentro da janela 1024×576 fica pequena no celular.** Cada
+  cena leva `zoom` (recorte antes do scale); `1080:608:190:96` tira a sidebar e
+  mantém a coluna da direita inteira.
+- A voz sintética fala mais devagar que a leitura calibrada de 2,5 palavras por
+  segundo. O `narrate-serie4.mjs` encaixa com `atempo` e avisa quando a fala não
+  cabe: aí o certo é encurtar o texto, não espremer mais a voz.
 
 ## Produção (o passo a passo por vídeo)
 

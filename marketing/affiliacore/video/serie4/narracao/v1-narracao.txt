@@ -1,0 +1,5 @@
+0.0|Seu afiliado quer uma casa nova.
+2.6|Na loja de acordos ele escolhe sozinho: as casas abertas, com os termos, e solicita num toque.
+11.3|O pedido cai numa fila no painel, não no chat. Você aprova com a sua taxa: CPA, RevShare e ciclo.
+20.8|O link volta pronto, já com a tag dele e os termos do acordo.
+28.4|AffiliaCore: a plataforma da sua agência.
