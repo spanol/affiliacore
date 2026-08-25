@@ -26,6 +26,35 @@ Todas com eventos `ftd` (paga) e `lead` (0 EUR), o exato mapa do conector. KTO e
 
 ⚠️ O redepósito mínimo de 30% (Winhugo/Blaze) significa que CPA contado pelo postback pode ser INVALIDADO depois no fechamento da rede: mais um motivo para a fase de reconciliação via Reports API quando a chave sair.
 
+### Mapa casa→oferta em produção (Infinity, conferido 24/08)
+
+O `integrationExternalId` de cada casa vive só no doc dela, e **a exclusão de casa
+não guarda o documento na auditoria** (só o nome), então este mapa é o que
+permite refazer um cadastro apagado sem entrar no painel:
+
+| Casa (slug) | Oferta | offer_id | CPA |
+|---|---|---|---|
+| `bacanaplay` | Bacanaplay CPA BR - Regulated | 19782128 | 13 EUR |
+| `betnacional` | BetNacional Casino BR - Regulated | 20914058 | 25 EUR |
+| `betwarrior` | BetWarrior BR | 21764673 | 20 EUR |
+| `blaze` | Blaze BR - Regulated | 20997138 | 30 EUR |
+| `estrelabet` | EstrelaBet BR | 21236152 | 20 EUR |
+| `jonbet` | JonBet BR | 21279644 | 16 EUR |
+| `kto` | KTO BR - Regulated | 21210669 | 15 EUR |
+| `novibet` | Novibet BR | 20280494 | 15 EUR |
+| `oleybet` | OleyBet BR | 21316885 | 20 EUR |
+| `rei-do-pitaco` | Rei do Pitaco BR - Regulated | 21983091 | 9 EUR |
+| `winhugo` | Winhugo BR | 21764206 | 25 EUR |
+
+**Frente "Sports" retirada (pedido do Jotta, 22 a 24/08):** as casas
+`blaze-sports`, `estrelabet-sports`, `jonbet-sports` e `betnacional-sports` foram
+apagadas e, em 24/08, os 4 acordos correspondentes saíram da vitrine. As ofertas
+Sports continuam existindo na rede (ex.: BetNacional Sports `21960807`, Blaze
+Sports `21960827`, ambas 25 e 30 EUR); simplesmente não são operadas aqui.
+
+Termos da oferta da Betnacional Casino, lidos no painel em 24/08: baseline
+depósito R$ 55 + apostado R$ 165, e **50 FTDs mínimos para pagamento**.
+
 ### Smoke na demo emulada (19/08, verificado)
 
 Fluxo completo exercitado em `npm run dev` (emuladores, zero contato com projeto real): segredo salvo via `PUT /api/integrations/fomento-offer18`, casa Winhugo criada com `integrationExternalId: 21764206` + `defaultCpa: 25 EUR`, e os disparos: segredo errado → 403; `ftd` → agregado do dia com 1 FTD + 1 CPA e dinheiro 0 (deriva do defaultCpa na leitura); retry do mesmo click → `duplicate: true` e continua 1; `lead` → 1 cadastro; oferta da KTO sem casa → `unmapped: true` com o evento retido no ledger (`fpb__21210669__ftd__smk3`); botão "Atualizar" → reprocesso com a tag `smoketag` na fila de pendentes. Ledger e `house_results` conferidos direto no Firestore emulado.

@@ -476,6 +476,26 @@ divulgação. Compartilhe e acompanhe os cliques."
 
 Ver §9, que é o outro lado do mesmo tema (qual link o afiliado de fato divulga).
 
+### 11. Apagar casa não guarda o documento na auditoria (aberto em 24/08/2026)
+
+`DELETE /api/houses/:id` lê o doc só para salvar o NOME no `audit_logs` e apaga o
+resto. Quem apagar a casa errada perde `integrationExternalId`, `defaultCpa`,
+`registerUrlTemplate`, moeda, ISS e redepósito mínimo, sem nenhuma cópia: a
+restauração vira arqueologia (foi o que aconteceu com a Betnacional da Infinity
+em 24/08, e o offer id só voltou porque o operador abriu o painel da Fomento).
+
+O conserto é barato e cabe no padrão que já existe: gravar o doc inteiro em
+`metadata.snapshot` no log de `house.delete`, do mesmo jeito que o `diffChanges`
+já guarda antes/depois no update. Com isso, desfazer é reler o log. Vale o mesmo
+para `link.delete` e `legal_document.delete`.
+
+Segunda ponta do mesmo incidente: **acordo não tem rota de exclusão** (o produto
+só desativa). Limpar a vitrine de acordos órfãos exigiu escrita manual pelo Admin
+SDK, com a ação `deal.delete` que a tela de auditoria só passou a saber nomear
+depois. Ou o produto ganha a exclusão (com a mesma trava de parceria viva que a
+desativação já faz em cascata), ou a limpeza vira um script versionado em
+`scripts/fix/`, não um arquivo temporário.
+
 ### Bloqueios que NÃO são nossos
 
 - ~~**Cron da Esportiva** depende da casa isentar `/api/*` do challenge~~ → **RESOLVIDO 04/08/2026**:
