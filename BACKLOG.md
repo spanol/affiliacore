@@ -465,10 +465,19 @@ nenhuma tela que mostre "estas tags chegaram e não são de ninguém", então pr
 órfã só aparece quando alguém abre o Firestore, que foi o que aconteceu hoje: a LEON
 vinha reportando o placeholder `%7btag%7d` desde 21/08, em todo pull, sem ninguém ver.
 
-Escopo aproximado: a fila do import por planilha (`LinkTriage` / vínculo tag→afiliado)
-já existe e resolve o mesmo problema pelo outro caminho. Falta alimentá-la também pelo
-pull, ou dar à casa integrada um aviso de "N tags sem dono" no card de `/casas`, com o
-atalho para criar o apelido. O dado já está gravado; o que falta é superfície.
+**ENTREGUE (24/08/2026).** O pull agora GRAVA a fila no doc da casa
+(`pendingTags`, resumida por `summarizePendingTags`: tag, dias, cadastros, FTDs,
+CPAs e dinheiro, ordenada por dinheiro e cortada em 20), e ela aparece em dois
+lugares: um aviso âmbar no card de `/casas` ("N tags sem dono · R$ X", que abre o
+modal) e a lista dentro do modal de resultados, com o mesmo botão "Vincular" que o
+import por planilha já usava. Vinculada a tag, ela sai da fila na hora (o servidor
+tira do doc no `POST /api/tag-aliases`, sem esperar a próxima rodada) e a próxima
+leitura do robô passa a atribuir. Vale para os três caminhos que alimentam casa
+integrada: pull da Esportiva, pull da LEON e o reprocesso do postback da Fomento.
+
+O que ficou de fora: a tela não diz de QUEM é a tag (não há como saber), e a fila
+não notifica ninguém — quem não abrir `/casas` continua sem ver. Se a operação
+crescer, o lugar natural é o card "Saúde da configuração" do `/admin`.
 
 Em 20/08 à noite o Maurício subiu **5 contas de cassino** na LEON com depósito acima da baseline e
 disse que "contou o FTD normal" no painel da casa. A LEON é **T+1**, então isso só aparece no pull
@@ -567,15 +576,20 @@ O que ficou de FORA: restaurar continua sendo trabalho de operador lendo o log
 pelo Admin SDK. Não há botão de desfazer nem tela que mostre o `snapshot` na
 `/auditoria` (a página lista ação, ator e `changes`, não o `metadata`).
 
-Segunda ponta do mesmo incidente: **acordo não tem rota de exclusão** (o produto
-só desativa). Limpar a vitrine de acordos órfãos exigiu escrita manual pelo Admin
-SDK, com a ação `deal.delete` que a tela de auditoria só passou a saber nomear
-depois. Ou o produto ganha a exclusão (com a mesma trava de parceria viva que a
-desativação já faz em cascata), ou a limpeza vira um script versionado em
-`scripts/fix/`, não um arquivo temporário.
+**SEGUNDA PONTA ENTREGUE (24/08/2026).** O produto ganhou `DELETE /api/deals/:id`
+e o botão de remover no card de `/acordos`, com duas travas: só apaga acordo
+**INATIVO** (desativar é o passo que encerra as parcerias vivas e desliga os
+links, em cascata que já existia) e recusa acordo com parceria em `requested`,
+`priced` ou `approved`. O doc inteiro vai para a auditoria antes de sumir. O
+histórico de parcerias SOBREVIVE à exclusão: cada parceria guarda `operatorName` e
+`dealLabel` denormalizados, então a tela do afiliado continua legível.
 
-**Terceira ponta, achada na varredura de 24/08: apagar a casa deixa o
-acordo-rascunho dela ÓRFÃO.** Criar casa cria junto um acordo em rascunho
+**TERCEIRA PONTA ENTREGUE (24/08/2026): apagar a casa leva junto o acordo-rascunho
+dela.** A régua é pura e conservadora (`isUntouchedDraftDeal`): só vai junto o que
+está inativo, com todos os números zerados, exatamente como o gerador deixou, e
+sem nenhuma parceria apontando para ele. Acordo já precificado FICA, e a resposta
+da rota diz quantos foram e quantos ficaram (`draftDealsRemoved` / `dealsKept`),
+além de registrar os dois na auditoria. Contexto de como isso apareceu: Criar casa cria junto um acordo em rascunho
 (`buildDraftDealFromHouse`, com `metadata.via: 'house.create'`), e o
 `DELETE /api/houses/:id` não encosta nele. Foi exatamente isso que produziu o
 pedido de hoje na Infinity: as 4 casas "Sports" foram apagadas em 22 e 24/08, mas

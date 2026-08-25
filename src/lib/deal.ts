@@ -222,6 +222,33 @@ export function normalizeDealInput(raw: any): { deal?: Omit<Deal, 'id'>; error?:
 // NÃO passa por normalizeDealInput de propósito: o validador exige CPA > 0 para o
 // modelo `cpa`, o que é certo na publicação e errado num rascunho vazio.
 // Devolve null quando a casa não tem identidade (sem slug/id ou sem nome).
+/**
+ * O acordo ainda é o RASCUNHO que nasceu junto da casa, sem ninguém ter mexido?
+ *
+ * POR QUE existe: criar casa cria junto um acordo em rascunho
+ * (`buildDraftDealFromHouse`), e apagar a casa não encostava nele. As 4 casas
+ * "Sports" da Infinity sumiram em 22 e 24/08/2026 e os 4 cards continuaram na
+ * tela de acordos até alguém removê-los à mão (§11 do BACKLOG).
+ *
+ * A régua é conservadora de propósito: só é rascunho o que está INATIVO e com
+ * todos os números zerados, exatamente como o gerador o deixou. Acordo inativo
+ * que alguém já precificou NÃO é rascunho — apagá-lo junto com a casa jogaria
+ * fora trabalho de configuração sem aviso nenhum.
+ */
+export function isUntouchedDraftDeal(deal: Partial<Deal> | null | undefined): boolean {
+  if (!deal) return false;
+  if (deal.active !== false) return false;
+  const zerado = (v: unknown) => v == null || Number(v) === 0;
+  return (
+    zerado(deal.cpaValue) &&
+    zerado(deal.revPercentage) &&
+    zerado(deal.baseline) &&
+    zerado(deal.rollover) &&
+    zerado(deal.ggrPercentage) &&
+    zerado(deal.minCpaGoal)
+  );
+}
+
 export function buildDraftDealFromHouse(
   house: { id?: string | null; slug?: string | null; name?: string | null },
   type: DealTypeId = 'direto'

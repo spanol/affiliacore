@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildDealLabel, dealBrandKey, dealToBrandRates, normalizeDealInput, buildDraftDealFromHouse,
-  PAYMENT_CYCLES, PAYMENT_CYCLE_LABEL, dealFxSpec,
+  isUntouchedDraftDeal, PAYMENT_CYCLES, PAYMENT_CYCLE_LABEL, dealFxSpec,
 } from './deal';
 
 describe('buildDealLabel · padrão Operadora-Modelo-Ciclo-Moeda-Geo', () => {
@@ -240,5 +240,37 @@ describe('buildDraftDealFromHouse · a casa cria o acordo', () => {
   it('o rascunho seria REJEITADO pelo validador de publicação, e tudo bem', () => {
     const draft = buildDraftDealFromHouse(house)!;
     expect(normalizeDealInput({ ...draft, active: true }).error).toBeTruthy();
+  });
+});
+
+// Régua de "isto ainda é o rascunho que nasceu com a casa" (§11 do BACKLOG): é ela
+// que decide o que pode ser apagado junto com a casa.
+describe('isUntouchedDraftDeal', () => {
+  const rascunho = () => buildDraftDealFromHouse({ slug: 'blaze-sports', name: 'Blaze Sports' })!;
+
+  it('o rascunho recém-criado pela casa É rascunho', () => {
+    expect(isUntouchedDraftDeal(rascunho())).toBe(true);
+  });
+
+  it('acordo ATIVO nunca é rascunho, mesmo zerado', () => {
+    expect(isUntouchedDraftDeal({ ...rascunho(), active: true })).toBe(false);
+  });
+
+  it('inativo mas já precificado NÃO é rascunho: apagar jogaria fora configuração', () => {
+    expect(isUntouchedDraftDeal({ ...rascunho(), cpaValue: 150 })).toBe(false);
+    expect(isUntouchedDraftDeal({ ...rascunho(), revPercentage: 25 })).toBe(false);
+    expect(isUntouchedDraftDeal({ ...rascunho(), baseline: 40 })).toBe(false);
+    expect(isUntouchedDraftDeal({ ...rascunho(), rollover: 3 })).toBe(false);
+    expect(isUntouchedDraftDeal({ ...rascunho(), ggrPercentage: 30 })).toBe(false);
+    expect(isUntouchedDraftDeal({ ...rascunho(), minCpaGoal: 5 })).toBe(false);
+  });
+
+  it('campo ausente conta como zerado (acordo antigo, sem os KPIs novos)', () => {
+    expect(isUntouchedDraftDeal({ active: false, houseId: 'x', operatorName: 'X' } as any)).toBe(true);
+  });
+
+  it('nada não é rascunho', () => {
+    expect(isUntouchedDraftDeal(null)).toBe(false);
+    expect(isUntouchedDraftDeal(undefined)).toBe(false);
   });
 });

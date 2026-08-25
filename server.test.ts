@@ -2413,6 +2413,90 @@ describe('deals + parcerias (P2)', () => {
     },
   });
 
+  // §11 do BACKLOG: até 24/08/2026 o produto só sabia DESATIVAR acordo, e limpar
+  // acordo órfão da vitrine era escrita manual pelo Admin SDK.
+  describe('DELETE /api/deals/:id', () => {
+    const comParceria = (status: string) => {
+      const seed = baseSeed();
+      (seed as any).partnership_requests = { p1: { affiliateId: 'affX', dealId: 'd2', status } };
+      return seed;
+    };
+
+    it('acordo ATIVO é recusado: desativar é o passo que encerra parceria e desliga link', async () => {
+      const res = await request(buildApp({ seed: baseSeed() })).delete('/api/deals/d1')
+        .set('Authorization', 'Bearer admin-uid').expect(409);
+      expect(res.body.error).toMatch(/Desative o acordo antes de remover/);
+    });
+
+    it('afiliado não remove acordo nenhum', async () => {
+      await request(buildApp({ seed: baseSeed() })).delete('/api/deals/d2')
+        .set('Authorization', 'Bearer aff-uid').expect(403);
+    });
+
+    it('acordo inativo com parceria VIVA é recusado', async () => {
+      for (const status of ['requested', 'priced', 'approved']) {
+        const res = await request(buildApp({ seed: comParceria(status) })).delete('/api/deals/d2')
+          .set('Authorization', 'Bearer admin-uid').expect(409);
+        expect(res.body.error).toMatch(/parceria viva|parcerias vivas/);
+      }
+    });
+
+    it('acordo inativo com parceria ENCERRADA sai, e o histórico da parceria fica', async () => {
+      const seed = comParceria('discontinued');
+      const db = makeFirestore(seed);
+      const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+      const res = await request(app).delete('/api/deals/d2').set('Authorization', 'Bearer admin-uid').expect(200);
+      expect(res.body).toMatchObject({ deleted: true, partnerships: 1 });
+      expect(db.__store.get('deals')?.has('d2')).toBe(false);
+      expect(db.__store.get('partnership_requests')?.has('p1')).toBe(true);
+      const log = [...(db.__store.get('audit_logs')?.values() ?? [])].find((a: any) => a.action === 'deal.delete');
+      expect(log.metadata.snapshot).toMatchObject({ houseId: 'superbet', operatorName: 'Superbet', revPercentage: 30 });
+    });
+
+    it('acordo inexistente → 404', async () => {
+      await request(buildApp({ seed: baseSeed() })).delete('/api/deals/nao-existe')
+        .set('Authorization', 'Bearer admin-uid').expect(404);
+    });
+  });
+
+  // §11, terceira ponta: casa criada cria um acordo-rascunho, e apagar a casa
+  // deixava esse rascunho órfão na vitrine (foi o que sobrou das frentes "Sports").
+  describe('DELETE /api/houses/:id · cascata no acordo-rascunho', () => {
+    const seedCasa = (deal: any) => ({
+      users: { 'admin-uid': { role: 'admin' } },
+      houses: { 'blaze-sports': { slug: 'blaze-sports', name: 'Blaze Sports', dataSource: 'manual' } },
+      deals: { draft: { houseId: 'blaze-sports', operatorName: 'Blaze Sports', model: 'cpa', ...deal } },
+    });
+    const rascunho = { cpaValue: 0, revPercentage: 0, baseline: 0, rollover: 0, minCpaGoal: 0, active: false };
+
+    it('o rascunho intocado vai junto com a casa', async () => {
+      const db = makeFirestore(seedCasa(rascunho));
+      const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+      const res = await request(app).delete('/api/houses/blaze-sports').set('Authorization', 'Bearer admin-uid').expect(200);
+      expect(res.body).toMatchObject({ draftDealsRemoved: 1, dealsKept: 0 });
+      expect(db.__store.get('deals')?.has('draft')).toBe(false);
+      const log = [...(db.__store.get('audit_logs')?.values() ?? [])].find((a: any) => a.action === 'house.delete');
+      expect(log.metadata.draftDealsRemoved).toEqual(['draft']);
+    });
+
+    it('acordo já precificado FICA: apagar jogaria fora configuração sem aviso', async () => {
+      const db = makeFirestore(seedCasa({ ...rascunho, cpaValue: 150 }));
+      const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+      const res = await request(app).delete('/api/houses/blaze-sports').set('Authorization', 'Bearer admin-uid').expect(200);
+      expect(res.body).toMatchObject({ draftDealsRemoved: 0, dealsKept: 1 });
+      expect(db.__store.get('deals')?.has('draft')).toBe(true);
+    });
+
+    it('rascunho COM parceria fica, mesmo zerado', async () => {
+      const seed: any = seedCasa(rascunho);
+      seed.partnership_requests = { p1: { affiliateId: 'affX', dealId: 'draft', status: 'discontinued' } };
+      const db = makeFirestore(seed);
+      const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+      const res = await request(app).delete('/api/houses/blaze-sports').set('Authorization', 'Bearer admin-uid').expect(200);
+      expect(res.body).toMatchObject({ draftDealsRemoved: 0, dealsKept: 1 });
+    });
+  });
+
   it('GET /api/deals: afiliado vê só os ATIVOS; admin vê todos', async () => {
     const seed = baseSeed();
     const affRes = await request(buildApp({ seed })).get('/api/deals').set('Authorization', 'Bearer aff-uid').expect(200);

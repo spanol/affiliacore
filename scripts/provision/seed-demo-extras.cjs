@@ -260,7 +260,17 @@ async function main() {
     active: true, order: 10 + i, dataSource: 'manual',
     // vínculo casa↔integração é 1:1 e vive nos DOIS docs (applyIntegrationLink):
     // aqui a flag da casa; o alvo (houseId) vai no doc integrations/esportiva-tap.
-    ...(h.slug === 'esportiva' ? { integration: 'esportiva-tap' } : {}),
+    ...(h.slug === 'esportiva' ? {
+      integration: 'esportiva-tap',
+      // Fila de tags sem dono do robô (§12): a casa reportou produção com tags que
+      // não são de ninguém. Sem isto semeado, a demo abre o card da casa integrada
+      // sem o aviso e a feature fica invisível para quem está avaliando o produto.
+      pendingTags: [
+        { tag: 'infinitw02', days: 3, registrations: 4, first_deposits: 2, qualified_cpa: 2, total_commission: 220 },
+        { tag: 'promo-julho', days: 1, registrations: 1, first_deposits: 1, qualified_cpa: 1, total_commission: 110 },
+      ],
+      pendingTagsAt: daysAgoTs(0),
+    } : {}),
     defaultCpa: h.defaultCpa, defaultRev: h.defaultRev,
     cpaCurrency: h.cpaCurrency ?? 'EUR',
     fxMode: h.fxMode ?? 'live',

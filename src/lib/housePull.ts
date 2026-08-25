@@ -123,3 +123,63 @@ export function pullWindow(today: string, days = 2): { dateFrom: string; dateTo:
   const start = new Date(end.getTime() - (span - 1) * 24 * 60 * 60 * 1000);
   return { dateFrom: start.toISOString().slice(0, 10), dateTo: today };
 }
+
+/** O que fica GRAVADO na casa para a tela mostrar a fila de tags sem dono. */
+export interface StoredPendingTag {
+  tag: string;
+  days: number;
+  registrations: number;
+  first_deposits: number;
+  qualified_cpa: number;
+  total_commission: number;
+}
+
+/** Teto do que vai para o doc da casa. Fila maior que isso é problema de operação, não de tela. */
+export const MAX_STORED_PENDING_TAGS = 20;
+
+/**
+ * Resume a fila de pendentes para GRAVAR no doc da casa.
+ *
+ * POR QUE existe: até 24/08/2026 o `pending` do pull só era escrito no `metadata`
+ * do log de auditoria, que ninguém abre. A LEON passou dias reportando a tag
+ * `%7btag%7d` (o placeholder `{tag}` percent-encoded, de um link cru que circulou
+ * fora da plataforma) sem que nenhuma tela dissesse nada, e um CPA qualificado
+ * ficou sem dono. O import por planilha sempre teve essa fila à vista; o pull não.
+ *
+ * Guarda só as métricas que a fila usa para PRIORIZAR (dinheiro, CPA, cadastros),
+ * não o `Metrics` inteiro: é campo de leitura de tela, e o doc da casa não é lugar
+ * de acumular série histórica. Já vem ordenado por dinheiro, o mesmo critério do
+ * `buildPullPayload`, e cortado no teto — a cauda longa não muda a decisão de
+ * quem vai vincular a tag.
+ */
+export function summarizePendingTags(
+  pending: PendingTag[] | null | undefined,
+  limit: number = MAX_STORED_PENDING_TAGS,
+): StoredPendingTag[] {
+  const teto = Math.max(0, Math.floor(limit));
+  return (Array.isArray(pending) ? pending : [])
+    .filter((p) => !!normalizeTag(p?.tag))
+    .map((p) => ({
+      tag: normalizeTag(p.tag),
+      days: Number(p.days) || 0,
+      registrations: Number(p.registrations) || 0,
+      first_deposits: Number(p.first_deposits) || 0,
+      qualified_cpa: Number(p.qualified_cpa) || 0,
+      total_commission: Number(p.total_commission) || 0,
+    }))
+    .sort((a, b) => b.total_commission - a.total_commission || b.qualified_cpa - a.qualified_cpa || a.tag.localeCompare(b.tag))
+    .slice(0, teto);
+}
+
+/**
+ * Tira uma tag da fila gravada. É o que faz o aviso sumir no instante em que o
+ * admin vincula o dono, sem esperar a próxima rodada do pull.
+ */
+export function removePendingTag(
+  stored: StoredPendingTag[] | null | undefined,
+  tag: string | null | undefined,
+): StoredPendingTag[] {
+  const alvo = normalizeTag(tag);
+  if (!alvo) return Array.isArray(stored) ? stored : [];
+  return (Array.isArray(stored) ? stored : []).filter((p) => normalizeTag(p?.tag) !== alvo);
+}

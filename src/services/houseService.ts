@@ -7,6 +7,16 @@ import { BrandMeta, setKnownBrands } from '../lib/brand';
 import { StoredManualRow, Metrics } from '../lib/houseResults';
 import { HouseCpaCurrency, resolveCpaCurrency, resolveFxMode, type FxMode } from '../lib/currency';
 
+/** Uma tag sem dono na fila da casa (o resumo que o pull grava). */
+export interface HousePendingTag {
+  tag: string;
+  days: number;
+  registrations: number;
+  first_deposits: number;
+  qualified_cpa: number;
+  total_commission: number;
+}
+
 export interface House {
   id: string;        // doc id (= slug)
   slug: string;
@@ -55,6 +65,11 @@ export interface House {
   // Id da casa DENTRO de uma integração multiHouse (rede 1:N) — ex.: o offer_id
   // da Fomento/Offer18. É por ele que o postback acha a casa.
   integrationExternalId?: string | null;
+  // Tags que a casa reportou no pull e que não são de NINGUÉM (nem link emitido,
+  // nem apelido salvo). Produção órfã: entra no total da casa e não gera repasse.
+  // Até 24/08/2026 isto só existia no metadata do log de auditoria e ninguém via.
+  pendingTags?: HousePendingTag[];
+  pendingTagsAt?: string | null;
   // Anotado pelo servidor: flag `integration` presente E conector configurado
   // nesta instância. Gate do botão "Atualizar" em /casas.
   pullAvailable?: boolean;

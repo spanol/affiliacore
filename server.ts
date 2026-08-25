@@ -52,13 +52,15 @@ import { sanitizeShowcase, buildShowcasePayload } from './src/lib/showcase';
 import { parseStandbyLinks, extractTagFromUrl } from './src/lib/linkTriage';
 import { buildTaggedUrl, suggestTag, hasUnresolvedPlaceholder } from './src/lib/linkGeneration';
 import { buildResultsNotification, type ResultsNotificationVariant } from './src/lib/resultsNotification';
-import { normalizeDealInput, buildDealLabel, dealBrandKey, dealToBrandRates, dealFxSpec, buildDraftDealFromHouse } from './src/lib/deal';
+import { normalizeDealInput, buildDealLabel, dealBrandKey, dealToBrandRates, dealFxSpec, buildDraftDealFromHouse,
+  isUntouchedDraftDeal } from './src/lib/deal';
 import { canTransition, nextStatusAfterPricing, isActivePartnership, selectCurrentPartnerships, PARTNERSHIP_STATUS_LABEL, type PartnershipStatus } from './src/lib/partnership';
 import {
   resolveDealType, dealPolicy, effectivePricedBy, sanitizeDealsForViewer, type DealTypeId,
 } from './src/lib/dealType';
 import { normalizeLegalDocInput, computeNextVersion } from './src/lib/legal';
 import { buildAuditSnapshot } from './src/lib/auditSnapshot';
+import { summarizePendingTags, removePendingTag } from './src/lib/housePull';
 import { canTransitionWithdrawal, normalizeWithdrawalAmount, type WithdrawalStatus } from './src/lib/withdrawal';
 import { buildNetworkTree, resolveRepasseCap, exceedsRepasseCap, hasConfiguredRate } from './src/lib/network';
 import { scheduleRateChange, brandRateEntry, isRateConfigured, type BrandRateEntry } from './src/lib/rateHistory';
@@ -3547,6 +3549,21 @@ export function createApp(deps: ServerDeps) {
         createdByUid: (req as any).user?.uid ?? null,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
+      // A tag acabou de ganhar dono: sai da fila de pendentes da casa AGORA, em vez
+      // de o admin ficar olhando um aviso resolvido até a próxima rodada do pull.
+      // Best-effort: falhar aqui não pode derrubar o vínculo, que é o que importa.
+      if (houseSlug) {
+        try {
+          const casaRef = adminDb.collection('houses').doc(houseSlug);
+          const casaSnap = await casaRef.get();
+          const fila = ((casaSnap.data() as any)?.pendingTags ?? []) as any[];
+          if (Array.isArray(fila) && fila.length) {
+            await casaRef.set({ pendingTags: removePendingTag(fila, tag) }, { merge: true });
+          }
+        } catch (e) {
+          console.error('[tag-aliases] vínculo salvo, mas a fila da casa não atualizou:', e);
+        }
+      }
       await writeAuditLog(req, {
         entityType: 'affiliate',
         entityId: affiliateId,
@@ -4487,6 +4504,10 @@ export function createApp(deps: ServerDeps) {
       // Última VERIFICAÇÃO do conector (rodada vazia também carimba) ≠ último dado.
       lastResultsCheckAt: data.lastResultsCheckAt?.toDate?.().toISOString?.() ?? data.lastResultsCheckAt ?? null,
       lastResultsSyncSource: data.lastResultsSyncSource ?? null,
+      // Tags que a casa reportou e que não são de ninguém. Normalizada na leitura:
+      // casa que nunca rodou pull não tem o campo, e a tela lê lista vazia.
+      pendingTags: summarizePendingTags((data.pendingTags as any[]) ?? []),
+      pendingTagsAt: serializeTimestamp(data.pendingTagsAt),
       lastResultsDate: data.lastResultsDate ?? null,
       // Conector de pull declarado PELA casa (auto-carimbado pelo conector).
       integration: data.integration ?? null,
@@ -4820,12 +4841,43 @@ export function createApp(deps: ServerDeps) {
       const before = snap.exists ? (snap.data() as any) : null;
       const snapshot = buildAuditSnapshot(before);
       await ref.delete();
+      // Criar casa cria junto um acordo em RASCUNHO. Apagar a casa e deixar o
+      // rascunho para trás foi o que manteve as 4 frentes "Sports" da Infinity na
+      // tela de acordos depois das casas já terem sumido (§11 do BACKLOG). Só vai
+      // junto o que ainda é rascunho intocado E não tem parceria nenhuma: acordo
+      // já precificado fica, e a resposta diz que ficou.
+      const rascunhosRemovidos: string[] = [];
+      const acordosMantidos: string[] = [];
+      try {
+        const daCasa = await adminDb.collection('deals').where('houseId', '==', String(req.params.id)).get();
+        for (const d of daCasa.docs) {
+          const deal = d.data() as any;
+          const parcerias = await adminDb.collection('partnership_requests').where('dealId', '==', d.id).limit(1).get();
+          if (!isUntouchedDraftDeal(deal) || !parcerias.empty) { acordosMantidos.push(d.id); continue; }
+          await d.ref.delete();
+          rascunhosRemovidos.push(d.id);
+          await writeAuditLog(req, {
+            entityType: 'deal', entityId: d.id, entityLabel: deal?.label ?? deal?.operatorName ?? null,
+            action: 'deal.delete',
+            metadata: { via: 'house.delete', houseId: String(req.params.id), draft: true, snapshot: buildAuditSnapshot(deal) },
+          });
+        }
+      } catch (e) {
+        console.error('[houses] casa apagada, mas a limpeza do rascunho falhou:', e);
+      }
+      // Sem snapshot e sem cascata não há metadata: casa inexistente continua
+      // gravando um log enxuto, como antes.
+      const metaCasa = {
+        ...(snapshot ? { snapshot } : {}),
+        ...(rascunhosRemovidos.length ? { draftDealsRemoved: rascunhosRemovidos } : {}),
+        ...(acordosMantidos.length ? { dealsKept: acordosMantidos } : {}),
+      };
       await writeAuditLog(req, {
         entityType: 'house', entityId: String(req.params.id),
         entityLabel: before?.name ?? null, action: 'house.delete',
-        metadata: snapshot ? { snapshot } : null,
+        metadata: Object.keys(metaCasa).length ? metaCasa : null,
       });
-      return res.json({ ok: true });
+      return res.json({ ok: true, draftDealsRemoved: rascunhosRemovidos.length, dealsKept: acordosMantidos.length });
     } catch (e) {
       console.error('[houses] erro ao remover:', e);
       return res.status(500).json({ error: 'Erro ao remover a casa' });
@@ -4991,6 +5043,45 @@ export function createApp(deps: ServerDeps) {
     } catch (e: any) {
       console.error('[deals] erro ao atualizar:', e);
       return res.status(500).json({ error: e?.message || 'Erro ao atualizar acordo' });
+    }
+  });
+
+  // Remove um acordo (admin). Até 24/08/2026 o produto só sabia DESATIVAR, então
+  // limpar acordo órfão da vitrine era escrita manual pelo Admin SDK (§11 do
+  // BACKLOG). Duas travas: só apaga acordo INATIVO, porque desativar já encerra em
+  // cascata as parcerias vivas e desliga os links (é o passo que protege quem está
+  // divulgando), e o doc inteiro vai para a auditoria antes de sumir.
+  app.delete('/api/deals/:id', requireAdmin, requireMarketplace, async (req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
+    try {
+      const id = String(req.params.id || '').trim();
+      const ref = adminDb.collection('deals').doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return res.status(404).json({ error: 'Acordo não encontrado.' });
+      const deal = snap.data() as any;
+      if (deal?.active !== false) {
+        return res.status(409).json({ error: 'Desative o acordo antes de remover. Desativar encerra as parcerias vivas e desliga os links.' });
+      }
+      const parcerias = await adminDb.collection('partnership_requests').where('dealId', '==', id).get();
+      const vivas = parcerias.docs.filter((p) => {
+        const st = String((p.data() as any)?.status ?? '');
+        return st === 'requested' || st === 'priced' || st === 'approved';
+      });
+      if (vivas.length) {
+        return res.status(409).json({ error: `Este acordo ainda tem ${pluralize(vivas.length, 'parceria viva', 'parcerias vivas')}. Desative-o para encerrá-las antes de remover.` });
+      }
+      await ref.delete();
+      await writeAuditLog(req, {
+        entityType: 'deal', entityId: id, entityLabel: deal?.label ?? deal?.operatorName ?? null,
+        action: 'deal.delete',
+        // O histórico de parcerias SOBREVIVE: cada uma guarda operatorName e
+        // dealLabel denormalizados, então a tela do afiliado continua legível.
+        metadata: { houseId: deal?.houseId ?? null, partnerships: parcerias.size, snapshot: buildAuditSnapshot(deal) },
+      });
+      return res.json({ deleted: true, partnerships: parcerias.size });
+    } catch (e: any) {
+      console.error('[deals] erro ao remover:', e);
+      return res.status(500).json({ error: e?.message || 'Erro ao remover acordo' });
     }
   });
 
@@ -6113,6 +6204,11 @@ export function createApp(deps: ServerDeps) {
         lastResultsCheckAt: importedAt,
         lastResultsSyncSource: 'api',
         lastResultsDate: payload.dates[payload.dates.length - 1] ?? null,
+        // Fila de tags sem dono, GRAVADA na casa. Sem isto ela só existiria no
+        // metadata do log de auditoria, que ninguém abre: a LEON passou dias
+        // reportando o placeholder `{tag}` sem nenhuma tela dizer nada (§12).
+        pendingTags: summarizePendingTags(payload.pending),
+        pendingTagsAt: importedAt,
         // A casa DECLARA seu conector: é a flag que liga o "Atualizar" em /casas
         // e roteia o pull por casa. Auto-carimbada aqui — instância que já roda o
         // cron ganha a flag na primeira rodada, sem migração de dados.
@@ -6232,6 +6328,11 @@ export function createApp(deps: ServerDeps) {
         lastResultsCheckAt: importedAt,
         lastResultsSyncSource: 'api',
         lastResultsDate: payload.dates[payload.dates.length - 1] ?? null,
+        // Fila de tags sem dono, GRAVADA na casa. Sem isto ela só existiria no
+        // metadata do log de auditoria, que ninguém abre: a LEON passou dias
+        // reportando o placeholder `{tag}` sem nenhuma tela dizer nada (§12).
+        pendingTags: summarizePendingTags(payload.pending),
+        pendingTagsAt: importedAt,
         integration: 'leonbet-r2d',
       }, { merge: true }));
 
@@ -6336,6 +6437,9 @@ export function createApp(deps: ServerDeps) {
       lastResultsCheckAt: stampedAt,
       lastResultsSyncSource: 'postback',
       lastResultsDate: payload.dates[payload.dates.length - 1] ?? null,
+      // Mesma fila do pull: evento de oferta cuja tag não é de ninguém fica à vista.
+      pendingTags: summarizePendingTags(payload.pending),
+      pendingTagsAt: stampedAt,
       integration: FOMENTO_INTEGRATION_ID,
     }, { merge: true }));
     await commitChunked(ops);

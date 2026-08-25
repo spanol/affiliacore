@@ -278,6 +278,26 @@ export default function Houses() {
                     })()}
                   </dd>
                 </div>
+                {/* Fila de tags sem dono do robô. Fica no card porque o sintoma é
+                    SILENCIOSO: a produção entra no total da casa, não gera repasse
+                    nenhum, e antes disso só aparecia no metadata do log (§12). */}
+                {(h.pendingTags?.length ?? 0) > 0 && (
+                  <button
+                    onClick={() => setResultsModal({ open: true, house: h })}
+                    className="w-full flex items-center justify-between gap-2 text-left rounded-lg -mx-1 px-1 py-0.5 hover:bg-amber-500/10 transition-colors"
+                    title="Tags que a casa reportou e que não são de ninguém. Clique para vincular."
+                  >
+                    <dt className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                      <AlertTriangle size={11} /> Tags sem dono
+                    </dt>
+                    <dd className="text-amber-600 dark:text-amber-400 font-bold">
+                      {pluralize(h.pendingTags!.length, 'tag')}
+                      <span className="font-semibold text-amber-600/70 dark:text-amber-400/70">
+                        {' '}· {formatBrl(h.pendingTags!.reduce((acc, t) => acc + (Number(t.total_commission) || 0), 0))}
+                      </span>
+                    </dd>
+                  </button>
+                )}
               </dl>
 
               {h.dataSource === 'manual' && (
@@ -1154,6 +1174,10 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
   const [tagQuery, setTagQuery] = useState('');
   const [savingTag, setSavingTag] = useState(false);
   const [tagMode, setTagMode] = useState(false);                        // arquivo = relatório da casa por tag
+  // Fila de tags sem dono que o ROBÔ deixou (vem gravada na casa). Estado local
+  // para a linha sumir no instante do vínculo: o servidor tira do doc, mas o card
+  // que abriu este modal já foi renderizado com a lista antiga.
+  const [pullPending, setPullPending] = useState(house.pendingTags ?? []);
 
   // Nome do afiliado (p/ rotular a tag já resolvida sem re-consultar o roster).
   const nameById = useMemo(() => {
@@ -1263,6 +1287,7 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
     try {
       await createTagAlias(tag, affiliateId, house.slug);
       push({ type: 'success', message: `Tag ${tag} vinculada.` });
+      setPullPending((fila) => fila.filter((p) => p.tag !== tag));
       setLinkingTag(null); setTagQuery('');
       await loadMeta();
     } catch (e: any) {
@@ -1427,6 +1452,66 @@ function HouseResultsModal({ house, onClose }: { house: House; onClose: () => vo
           </div>
 
           <div className="p-6 space-y-5 overflow-y-auto">
+            {/* Fila do ROBÔ: tags que a casa reportou e que não são de ninguém.
+                Elas entram no total da casa e não geram repasse nenhum, então
+                ficam no topo, antes do upload. Vinculada aqui, a tag passa a
+                atribuir na próxima rodada (o pull reescreve a janela). */}
+            {pullPending.length > 0 && (
+              <section className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 p-3">
+                <p className="font-bold text-amber-700 dark:text-amber-300 mb-1 flex items-center gap-1.5 text-[11px]">
+                  <AlertTriangle size={13} /> {pluralize(pullPending.length, 'tag')} sem dono no relatório da casa
+                </p>
+                <p className="text-[11px] text-amber-700/80 dark:text-amber-300/70 mb-2">
+                  A casa reportou produção com estas tags e nenhuma delas tem link nosso nem vínculo salvo. O valor
+                  entra no total da casa e não vira comissão de ninguém. Vincule ao dono e a próxima rodada atribui.
+                </p>
+                <div className="space-y-1.5">
+                  {pullPending.map((p) => (
+                    <div key={p.tag} className="text-[11px]">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate">
+                          <span className="font-mono font-bold text-slate-700 dark:text-neutral-200">{p.tag}</span>
+                          <span className="text-slate-500 dark:text-neutral-400">
+                            {' '}· {formatBrl(p.total_commission)} · {p.qualified_cpa} CPA · {pluralize(p.days, 'dia')}
+                          </span>
+                        </span>
+                        <button
+                          onClick={() => { setLinkingTag(linkingTag === p.tag ? null : p.tag); setTagQuery(''); }}
+                          className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-accent-600 dark:text-accent-400 hover:underline"
+                        >
+                          <Link2 size={11} /> {linkingTag === p.tag ? 'Cancelar' : 'Vincular'}
+                        </button>
+                      </div>
+                      {linkingTag === p.tag && (
+                        <div className="mt-1.5">
+                          <input
+                            value={tagQuery}
+                            onChange={(e) => setTagQuery(e.target.value)}
+                            placeholder="Buscar afiliado…"
+                            className="w-full px-2 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-[11px] text-slate-900 dark:text-white focus:outline-none focus:border-accent-500"
+                          />
+                          <div className="mt-1 max-h-32 overflow-y-auto rounded-lg border border-slate-100 dark:border-neutral-800 bg-white dark:bg-neutral-900">
+                            {tagOptions.length === 0 ? (
+                              <p className="px-2 py-1.5 text-[11px] text-slate-400 dark:text-neutral-500">Nenhum afiliado encontrado.</p>
+                            ) : tagOptions.map((o) => (
+                              <button
+                                key={o.id}
+                                disabled={savingTag}
+                                onClick={() => handleLinkTag(p.tag, o.id)}
+                                className="block w-full text-left px-2 py-1.5 text-[11px] text-slate-600 dark:text-neutral-300 hover:bg-accent-500/10 disabled:opacity-50"
+                              >
+                                {o.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* Casa com conector: o upload continua disponível (serve pra tapar
                 buraco em data ANTIGA, fora da janela do robô), mas dentro da janela
                 ele é trabalho perdido — a rodada apaga as datas que vai reescrever

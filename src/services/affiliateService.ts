@@ -1605,6 +1605,17 @@ export async function updateDeal(id: string, patch: Partial<Deal>): Promise<Deal
   return resp.json();
 }
 
+// Remove um acordo. O servidor recusa acordo ATIVO e acordo com parceria viva:
+// desativar primeiro é o que encerra as parcerias e desliga os links.
+export async function deleteDeal(id: string): Promise<{ deleted: boolean; partnerships: number }> {
+  const resp = await authFetch(`/api/deals/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.error || e.message || `Erro na API: ${resp.status}`);
+  }
+  return resp.json();
+}
+
 export async function fetchPartnerships(status?: PartnershipStatus): Promise<PartnershipRequest[]> {
   try {
     const q = status ? `?status=${encodeURIComponent(status)}` : '';

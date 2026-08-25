@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { Tag, Loader2, Plus, Check, X, Ban, Power, Pencil, Inbox, Link2, Sparkles } from 'lucide-react';
+import { Tag, Loader2, Plus, Check, X, Ban, Power, Pencil, Inbox, Link2, Sparkles, Trash2 } from 'lucide-react';
 import {
-  fetchDeals, createDeal, updateDeal, fetchPartnerships, decidePartnership, fetchAffiliates,
+  fetchDeals, createDeal, updateDeal, deleteDeal, fetchPartnerships, decidePartnership, fetchAffiliates,
   buildDealLabel, DEAL_MODELS, PAYMENT_CYCLES, DEAL_CURRENCIES, DEAL_MODEL_LABEL, PAYMENT_CYCLE_LABEL,
   DEAL_TYPES, DEAL_TYPE_POLICY, DEAL_KPI_LABEL, dealPolicy, partnershipStatusLabel,
   type Deal, type DealModel, type PaymentCycle, type DealCurrency, type DealTypeId, type PartnershipRequest,
@@ -135,6 +135,8 @@ export default function Deals() {
     }
   };
 
+  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+
   const toggleDeal = async (deal: Deal) => {
     setBusy(deal.id);
     try {
@@ -142,6 +144,22 @@ export default function Deals() {
       await load();
     } catch (e: any) {
       push({ type: 'error', message: e?.message || 'Erro ao alterar o acordo.' });
+    } finally { setBusy(null); }
+  };
+
+  // Remoção em DOIS toques (o segundo clique confirma), e só em acordo inativo: o
+  // servidor recusa o resto. Existe para a agência limpar acordo que nunca foi ao
+  // ar, como os rascunhos que sobravam de casa apagada.
+  const removeDeal = async (deal: Deal) => {
+    if (confirmingDelete !== deal.id) { setConfirmingDelete(deal.id); return; }
+    setBusy(deal.id);
+    try {
+      await deleteDeal(deal.id);
+      push({ type: 'success', message: `Acordo ${deal.operatorName} removido.` });
+      setConfirmingDelete(null);
+      await load();
+    } catch (e: any) {
+      push({ type: 'error', message: e?.message || 'Erro ao remover o acordo.' });
     } finally { setBusy(null); }
   };
 
@@ -281,6 +299,25 @@ export default function Deals() {
                     {busy === deal.id ? <Loader2 size={13} className="animate-spin" /> : <Power size={13} />}
                     {deal.active ? 'Desativar' : 'Ativar'}
                   </button>
+                  {/* Só aparece no acordo inativo: desativar é o passo que encerra
+                      parceria viva e desliga link. O servidor recusa o resto. */}
+                  {!deal.active && (
+                    <button
+                      onClick={() => removeDeal(deal)}
+                      onBlur={() => setConfirmingDelete((id) => (id === deal.id ? null : id))}
+                      disabled={busy === deal.id}
+                      title={confirmingDelete === deal.id ? 'Clique de novo para confirmar' : 'Remover o acordo'}
+                      className={cn(
+                        'shrink-0 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50 border',
+                        confirmingDelete === deal.id
+                          ? 'bg-red-500/10 border-red-300 dark:border-red-900/40 text-red-600 dark:text-red-400'
+                          : 'bg-slate-50 dark:bg-neutral-800/60 border-slate-100 dark:border-neutral-700/60 text-slate-400 dark:text-neutral-500 hover:text-red-500 hover:border-red-200 dark:hover:border-red-900/40',
+                      )}
+                    >
+                      <Trash2 size={13} />
+                      {confirmingDelete === deal.id ? 'Confirmar?' : ''}
+                    </button>
+                  )}
                 </div>
               </motion.div>
             ))}

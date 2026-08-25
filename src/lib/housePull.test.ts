@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildPullPayload, pullWindow } from './housePull';
+import { buildPullPayload, pullWindow, summarizePendingTags, removePendingTag, MAX_STORED_PENDING_TAGS } from './housePull';
 
 // Amostra ADAPTADA (já no shape PullRow) — não importa de qual casa veio, é o
 // motor de agregação/atribuição que está sob teste aqui.
@@ -106,5 +106,73 @@ describe('pullWindow', () => {
 
   it('days < 1 vira o próprio dia', () => {
     expect(pullWindow('2026-08-04', 0)).toEqual({ dateFrom: '2026-08-04', dateTo: '2026-08-04' });
+  });
+});
+
+// A fila de tags sem dono que fica GRAVADA na casa (§12 do BACKLOG): antes ela só
+// existia no metadata do log de auditoria, onde ninguém olha.
+describe('summarizePendingTags', () => {
+  const pend = (tag: string, dinheiro: number, extra: Partial<Record<string, number>> = {}) => ({
+    tag, days: 1, registrations: 0, first_deposits: 0, qualified_cpa: 0,
+    rvs: 0, deposit: 0, total_commission: dinheiro, ...extra,
+  });
+
+  it('guarda só as métricas que a fila usa para priorizar', () => {
+    const [linha] = summarizePendingTags([pend('infinitw02', 970.5, { registrations: 10, first_deposits: 8, qualified_cpa: 8, deposit: 900 })]);
+    expect(linha).toEqual({
+      tag: 'infinitw02', days: 1, registrations: 10, first_deposits: 8, qualified_cpa: 8, total_commission: 970.5,
+    });
+    expect(linha).not.toHaveProperty('deposit');
+    expect(linha).not.toHaveProperty('rvs');
+  });
+
+  it('ordena por dinheiro, com o CPA como desempate', () => {
+    const fila = summarizePendingTags([pend('a', 10), pend('b', 300), pend('c', 300, { qualified_cpa: 5 })]);
+    expect(fila.map((p) => p.tag)).toEqual(['c', 'b', 'a']);
+  });
+
+  it('corta no teto: cauda longa não muda a decisão de quem vincula', () => {
+    const muitas = Array.from({ length: MAX_STORED_PENDING_TAGS + 7 }, (_, i) => pend(`tag${i}`, 100 - i));
+    expect(summarizePendingTags(muitas)).toHaveLength(MAX_STORED_PENDING_TAGS);
+    expect(summarizePendingTags(muitas, 3).map((p) => p.tag)).toEqual(['tag0', 'tag1', 'tag2']);
+  });
+
+  it('linha sem tag fica de fora: não é vinculável a ninguém', () => {
+    expect(summarizePendingTags([pend('', 500), pend('  ', 400)])).toEqual([]);
+  });
+
+  it('normaliza a tag do mesmo jeito que a atribuição', () => {
+    expect(summarizePendingTags([pend('  InfiniTW02  ', 1)])[0].tag).toBe('infinitw02');
+  });
+
+  it('entrada ausente ou inválida vira fila vazia', () => {
+    expect(summarizePendingTags(null)).toEqual([]);
+    expect(summarizePendingTags(undefined)).toEqual([]);
+    expect(summarizePendingTags([] as any)).toEqual([]);
+  });
+
+  it('métrica ausente ou NaN não vira lixo no doc', () => {
+    const [linha] = summarizePendingTags([{ tag: 'x', days: NaN, total_commission: 'nao-e-numero' } as any]);
+    expect(linha).toEqual({ tag: 'x', days: 0, registrations: 0, first_deposits: 0, qualified_cpa: 0, total_commission: 0 });
+  });
+});
+
+describe('removePendingTag', () => {
+  const fila = [
+    { tag: 'a', days: 1, registrations: 0, first_deposits: 0, qualified_cpa: 0, total_commission: 10 },
+    { tag: 'b', days: 1, registrations: 0, first_deposits: 0, qualified_cpa: 0, total_commission: 5 },
+  ];
+
+  it('tira a tag vinculada, para o aviso sumir sem esperar o próximo pull', () => {
+    expect(removePendingTag(fila, 'a').map((p) => p.tag)).toEqual(['b']);
+  });
+
+  it('compara pela tag normalizada', () => {
+    expect(removePendingTag(fila, '  A ').map((p) => p.tag)).toEqual(['b']);
+  });
+
+  it('tag vazia ou fila ausente não derruba nada', () => {
+    expect(removePendingTag(fila, '')).toEqual(fila);
+    expect(removePendingTag(null, 'a')).toEqual([]);
   });
 });
