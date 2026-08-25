@@ -14,7 +14,7 @@
 // nas métricas, somar linha a linha == aplicar à soma (o mesmo argumento do
 // `payoutOfMetrics` de network.ts, que já fazia isso no /rede do admin).
 
-import { calcAffiliatePayout, type AffiliateConfig } from './commission';
+import { calcAffiliatePayout, num, rateStatus, type AffiliateConfig } from './commission';
 
 export interface HouseMetricRow {
   houseSlug?: string | null;
@@ -99,4 +99,62 @@ export function buildPerHousePayout(
       return perHousePayout(otgBy.get(id), manualBy.get(id) ?? [], config, brandIdOf(id));
     },
   };
+}
+
+/** Linha de uma casa na visão "por marca" (`fetchAffiliateResultsByBrand`). */
+export interface BrandMetricRow {
+  id?: string | number | null;   // chave da casa (brandId da OTG ou slug da manual)
+  name?: string | null;
+  qualified_cpa?: number | string | null;
+  rvs?: number | string | null;
+}
+
+const brandKeyOfRow = (row: BrandMetricRow | null | undefined): string =>
+  String(row?.id ?? '').trim();
+
+/**
+ * Comissão do afiliado somando CASA A CASA a partir das linhas por marca.
+ *
+ * POR QUE existe: o painel do próprio afiliado, em "Todas as casas", multiplicava
+ * as métricas AGREGADAS pela taxa de TOPO. Quem só tem taxa por casa (`byBrand`,
+ * que é como a Infinity precifica) via a comissão sumir do total: o CPA aparecia
+ * contado, o dinheiro não. Filtrando a casa, o mesmo número aparecia certo, porque
+ * aí a taxa da casa entrava. Reportado em 25/08/2026.
+ *
+ * Somar por casa é o que compõe, e compõe exato porque `calcAffiliatePayout` é
+ * LINEAR nas métricas (mesmo argumento do `perHousePayout` e do `payoutOfMetrics`
+ * da rede). Casa sem chave cai na taxa de topo, que é o comportamento antigo.
+ */
+export function payoutOverBrandRows(
+  rows: BrandMetricRow[] | null | undefined,
+  config: AffiliateConfig | null | undefined,
+): PayoutParts {
+  let parts = ZERO;
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const key = brandKeyOfRow(row);
+    parts = addParts(parts, rowParts(row, config, key || undefined));
+  }
+  return parts;
+}
+
+/**
+ * Casas em que o afiliado PRODUZIU e para as quais não há taxa nenhuma (nem
+ * override da casa, nem topo). É o que separa "configurado como zero" de "ninguém
+ * configurou ainda" na visão agregada: sem isto, o painel de quem tem taxa só por
+ * casa mostrava o selo de "CPA não configurado" mesmo com todas as casas
+ * precificadas.
+ */
+export function unratedProducingBrands(
+  rows: BrandMetricRow[] | null | undefined,
+  config: AffiliateConfig | null | undefined,
+): string[] {
+  const out: string[] = [];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const produziu = num(row?.qualified_cpa) > 0 || num(row?.rvs) !== 0;
+    if (!produziu) continue;
+    const key = brandKeyOfRow(row);
+    const { cpaConfigured, revConfigured } = rateStatus(config, key || undefined);
+    if (!cpaConfigured && !revConfigured) out.push(String(row?.name ?? key ?? '').trim() || key);
+  }
+  return out;
 }

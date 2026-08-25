@@ -35,6 +35,8 @@ import { DateRange, getDefaultRange, getPreviousRange, percentChange } from '../
 import { ALL_BRANDS, getKnownBrandName } from '../lib/brand';
 import { cn } from '../lib/utils';
 import { buildDailyExtractCsv } from '../lib/exportExtract';
+import { payoutOverBrandRows, unratedProducingBrands } from '../lib/perHousePayout';
+import { pluralize } from '../lib/plural';
 import { buildCsvFilename } from '../lib/csv';
 import { downloadCsvFile } from '../lib/browserDownload';
 
@@ -258,22 +260,31 @@ export default function ClientDashboard() {
       <div className="grid grid-cols-1 gap-8">
         <div className="space-y-8">
           {resultsToRender.map((res: any, idx: number) => {
-            // Casa selecionada → usa a linha daquela casa e a taxa por-casa;
-            // "Todas as casas" → agregado do afiliado e taxa de topo (atual).
+            // Casa selecionada → a linha daquela casa, na taxa dela. "Todas as
+            // casas" → soma CASA A CASA (payoutOverBrandRows), nunca o agregado na
+            // taxa de topo: quem tem taxa só por casa (byBrand, que é como a
+            // Infinity precifica) via o CPA contado e o dinheiro sumir do total,
+            // e o mesmo número aparecia certo ao filtrar a casa (25/08/2026).
             const row = isAllBrands ? res : (selectedBrandRow ?? emptyResult);
-            const rates = isAllBrands
-              ? { cpaValue: config?.cpaValue || 0, revPercentage: config?.revPercentage || 0 }
-              : resolveBrandRates(config, String(selectedBrandRow?.id ?? ''));
-            const calculatedCpa = (row.qualified_cpa || 0) * rates.cpaValue;
-            const calculatedRev = (row.rvs || 0) * (rates.revPercentage / 100);
-            const totalCommission = calculatedCpa + calculatedRev;
+            const partes = isAllBrands
+              ? payoutOverBrandRows(myBrandResults, config)
+              : payoutOverBrandRows([selectedBrandRow ?? { id: '' }], config);
+            const rates = resolveBrandRates(config, isAllBrands ? undefined : String(selectedBrandRow?.id ?? ''));
+            const calculatedCpa = partes.cpa;
+            const calculatedRev = partes.rev;
+            const totalCommission = partes.total;
             // "Configurado como 0" ≠ "ainda não configurado": mesma regra (rateStatus)
             // da tela do admin — antes esta view do próprio afiliado mostrava R$0 como
-            // taxa real e o selo "Configurado" fixo, mesmo sem taxa definida.
-            const { cpaConfigured, revConfigured } = rateStatus(
+            // taxa real e o selo "Configurado" fixo, mesmo sem taxa definida. Em
+            // "Todas as casas" a pergunta é outra: alguma casa em que ele PRODUZIU
+            // ficou sem taxa? Só isso é "não configurado" aqui.
+            const semTaxa = isAllBrands ? unratedProducingBrands(myBrandResults, config) : [];
+            const statusCasa = rateStatus(
               config,
               isAllBrands ? undefined : String(selectedBrandRow?.id ?? '')
             );
+            const cpaConfigured = isAllBrands ? semTaxa.length === 0 : statusCasa.cpaConfigured;
+            const revConfigured = isAllBrands ? semTaxa.length === 0 : statusCasa.revConfigured;
 
             return (
               <div key={idx} className="space-y-8">
@@ -291,7 +302,12 @@ export default function ClientDashboard() {
                           <TrendingUp size={16} /> Configurado
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1 text-amber-700 dark:text-amber-400 font-bold text-sm bg-amber-500/10 px-2 py-0.5 rounded-lg" title="O valor de CPA do seu contrato ainda não foi configurado. Fale com a gerência.">
+                        <div
+                          className="flex items-center gap-1 text-amber-700 dark:text-amber-400 font-bold text-sm bg-amber-500/10 px-2 py-0.5 rounded-lg"
+                          title={semTaxa.length
+                            ? `Sem taxa configurada ${pluralize(semTaxa.length, 'nesta casa', 'nestas casas')}: ${semTaxa.join(', ')}. Fale com a gerência.`
+                            : 'O valor de CPA do seu contrato ainda não foi configurado. Fale com a gerência.'}
+                        >
                           <AlertCircle size={16} /> CPA não configurado
                         </div>
                       )}
@@ -306,7 +322,7 @@ export default function ClientDashboard() {
                         </div>
                         <div>
                           <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-neutral-300 uppercase tracking-widest mb-1">
-                            CPA Calculado{cpaConfigured ? ` (R$ ${rates.cpaValue}/CPA)` : ''} <InfoTooltip text="CPA Qualificado × valor de CPA do seu contrato. Quantos cadastros qualificaram, multiplicado pelo valor por aquisição." size={10} align="left" />
+                            CPA Calculado{!isAllBrands && cpaConfigured ? ` (R$ ${rates.cpaValue}/CPA)` : ''} <InfoTooltip text="CPA Qualificado × valor de CPA do seu contrato. Quantos cadastros qualificaram, multiplicado pelo valor por aquisição." size={10} align="left" />
                           </div>
                           {cpaConfigured ? (
                             <p className="text-xl font-black text-slate-800 dark:text-white">
@@ -326,7 +342,7 @@ export default function ClientDashboard() {
                         </div>
                         <div>
                           <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-neutral-300 uppercase tracking-widest mb-1">
-                            REV Share{revConfigured ? ` (${rates.revPercentage}%)` : ''} <InfoTooltip text="Participação na receita: percentual do seu contrato aplicado sobre o RVS (receita compartilhada) do período." size={10} align="left" />
+                            REV Share{!isAllBrands && revConfigured ? ` (${rates.revPercentage}%)` : ''} <InfoTooltip text="Participação na receita: percentual do seu contrato aplicado sobre o RVS (receita compartilhada) do período." size={10} align="left" />
                           </div>
                           {revConfigured ? (
                             <p className="text-xl font-black text-slate-800 dark:text-white">

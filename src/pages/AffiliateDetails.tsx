@@ -74,7 +74,7 @@ import InfoTooltip from '../components/InfoTooltip';
 import TrendBadge from '../components/TrendBadge';
 import { DateRange, getDefaultRange, getPreviousRange, percentChange } from '../lib/dateRange';
 import { ALL_BRANDS, getKnownBrandName, buildBrandIdOf } from '../lib/brand';
-import { buildPerHousePayout, type HouseMetricRow } from '../lib/perHousePayout';
+import { buildPerHousePayout, payoutOverBrandRows, unratedProducingBrands, type HouseMetricRow } from '../lib/perHousePayout';
 import { canViewAffiliateNetProfit } from '../lib/affiliateView';
 import { cn, humanizeName } from '../lib/utils';
 import { sumFunnelForAffiliate } from '../lib/analyticsDoc';
@@ -735,18 +735,26 @@ export default function AffiliateDetails() {
               const row = isAllBrands
                 ? res
                 : (selectedBrandRow ?? { registrations: 0, first_deposits: 0, qualified_cpa: 0, rvs: 0, total_commission: 0, deposit: 0 });
-              const rates = isAllBrands
-                ? { cpaValue: config?.cpaValue || 0, revPercentage: config?.revPercentage || 0 }
-                : resolveBrandRates(config, String(selectedBrandRow?.id ?? ''));
+              const rates = resolveBrandRates(config, isAllBrands ? undefined : String(selectedBrandRow?.id ?? ''));
+              // "Todas as casas" soma CASA A CASA. Multiplicar o agregado pela taxa de
+              // TOPO fazia o dinheiro sumir de quem só tem taxa por casa (`byBrand`,
+              // que é como a Infinity precifica): o CPA aparecia contado e a comissão
+              // não subia para o total, enquanto filtrar a casa mostrava o valor certo
+              // (Rodrigo da Silva Peres, 25/08/2026). A soma por casa fecha exata
+              // porque calcAffiliatePayout é LINEAR nas métricas.
+              const partes = isAllBrands
+                ? payoutOverBrandRows(shownBrandResults, config)
+                : payoutOverBrandRows([selectedBrandRow ?? { id: '' }], config);
               // "Configurado como 0" ≠ "ainda não configurado": rateStatus detecta a
-              // AUSÊNCIA do valor de CPA (config sem `cpaValue` de topo e sem override
-              // por casa) p/ não exibir R$0 como se fosse uma taxa real. Caso clássico:
-              // afiliado só com `byBrand` e sem default de topo → "Todas as casas" cai no
-              // topo ausente. Fonte única compartilhada com o ClientDashboard.
-              const { cpaConfigured } = rateStatus(config, isAllBrands ? undefined : String(selectedBrandRow?.id ?? ''));
-              const calculatedCpa = (row.qualified_cpa || 0) * rates.cpaValue;
-              const calculatedRev = (row.rvs || 0) * (rates.revPercentage / 100);
-              const totalCommission = calculatedCpa + calculatedRev;
+              // AUSÊNCIA do valor de CPA. Na visão agregada a pergunta é outra: alguma
+              // casa em que ele PRODUZIU ficou sem taxa? Só isso é "não configurado".
+              const semTaxa = isAllBrands ? unratedProducingBrands(shownBrandResults, config) : [];
+              const cpaConfigured = isAllBrands
+                ? semTaxa.length === 0
+                : rateStatus(config, String(selectedBrandRow?.id ?? '')).cpaConfigured;
+              const calculatedCpa = partes.cpa;
+              const calculatedRev = partes.rev;
+              const totalCommission = partes.total;
 
               return (
                 <div key={idx} className="space-y-8">
@@ -765,7 +773,9 @@ export default function AffiliateDetails() {
                             <TrendingUp size={16} /> Configurado
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1 text-amber-700 dark:text-amber-400 font-bold text-sm bg-amber-500/10 px-2 py-0.5 rounded-lg" title="O valor de CPA deste afiliado ainda não foi configurado nas taxas do contrato.">
+                          <div className="flex items-center gap-1 text-amber-700 dark:text-amber-400 font-bold text-sm bg-amber-500/10 px-2 py-0.5 rounded-lg" title={semTaxa.length
+                            ? `Sem taxa configurada ${pluralize(semTaxa.length, 'nesta casa', 'nestas casas')}: ${semTaxa.join(', ')}.`
+                            : 'O valor de CPA deste afiliado ainda não foi configurado nas taxas do contrato.'}>
                             <AlertCircle size={16} /> CPA não configurado
                           </div>
                         )}
@@ -780,7 +790,7 @@ export default function AffiliateDetails() {
                           </div>
                           <div>
                             <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-neutral-300 uppercase tracking-widest mb-1">
-                              CPA Calculado{cpaConfigured ? ` (R$ ${rates.cpaValue}/CPA)` : ''} <InfoTooltip text="CPA Qualificado × valor de CPA do seu contrato. Quantos cadastros qualificaram, multiplicado pelo valor por aquisição." size={10} align="left" />
+                              CPA Calculado{!isAllBrands && cpaConfigured ? ` (R$ ${rates.cpaValue}/CPA)` : ''} <InfoTooltip text="CPA Qualificado × valor de CPA do seu contrato. Quantos cadastros qualificaram, multiplicado pelo valor por aquisição." size={10} align="left" />
                             </div>
                             {cpaConfigured ? (
                               <p className="text-xl font-black text-slate-800 dark:text-white">

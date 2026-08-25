@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { perHousePayout, buildPerHousePayout } from './perHousePayout';
+import { perHousePayout, buildPerHousePayout, payoutOverBrandRows, unratedProducingBrands } from './perHousePayout';
 import type { AffiliateConfig } from './commission';
 
 // O caso REAL que motivou a lib (Infinity, 2026-08-12): Maurício tem
@@ -120,5 +120,83 @@ describe('buildPerHousePayout', () => {
       brandIdOf,
     );
     expect(idx.breakdownFor('boost_mau', cfg).total).toBe(280 + 110);
+  });
+});
+
+// O caso REAL de 25/08/2026 (Infinity): Rodrigo da Silva Peres tem taxa SÓ por
+// casa (byBrand), sem nada no topo. O CPA da Blaze contou, mas em "Todas as
+// casas" o dinheiro não subia para o total, porque a tela multiplicava o
+// agregado pela taxa de topo, que nele é ausente.
+describe('payoutOverBrandRows', () => {
+  const cfgRodrigo: AffiliateConfig = {
+    affiliateId: 'boost_rodrigo',
+    cpaValue: undefined as any,        // sem taxa de topo, como está em produção
+    revPercentage: undefined as any,
+    byBrand: {
+      blaze: { cpaValue: 120, revPercentage: 0 },
+      'esportiva-bet': { cpaValue: 100, revPercentage: 0 },
+      winhugo: { cpaValue: 100, revPercentage: 0 },
+    },
+  };
+  const linhas = [
+    { id: 'blaze', name: 'Blaze', qualified_cpa: 1, rvs: 0 },
+    { id: 'esportiva-bet', name: 'Esportiva Bet', qualified_cpa: 1, rvs: 0 },
+    { id: 'winhugo', name: 'Winhugo', qualified_cpa: 0, rvs: 0 },
+  ];
+
+  it('soma casa a casa: o que sumia do total volta', () => {
+    expect(payoutOverBrandRows(linhas, cfgRodrigo).total).toBe(220);
+  });
+
+  it('é a MESMA conta do filtro por casa, uma de cada vez', () => {
+    const porCasa = linhas.map((l) => payoutOverBrandRows([l], cfgRodrigo).total);
+    expect(porCasa).toEqual([120, 100, 0]);
+    expect(porCasa.reduce((a, b) => a + b, 0)).toBe(payoutOverBrandRows(linhas, cfgRodrigo).total);
+  });
+
+  it('devolve as parcelas separadas (CPA e REV)', () => {
+    const cfg: AffiliateConfig = { affiliateId: 'x', cpaValue: 0, revPercentage: 0, byBrand: { kto: { cpaValue: 50, revPercentage: 20 } } };
+    expect(payoutOverBrandRows([{ id: 'kto', qualified_cpa: 2, rvs: 300 }], cfg)).toEqual({ cpa: 100, rev: 60, total: 160 });
+  });
+
+  it('casa sem chave cai na taxa de topo (comportamento antigo)', () => {
+    const cfg: AffiliateConfig = { affiliateId: 'x', cpaValue: 70, revPercentage: 0 };
+    expect(payoutOverBrandRows([{ id: '', qualified_cpa: 2, rvs: 0 }], cfg).total).toBe(140);
+  });
+
+  it('lista vazia ou ausente não vira NaN', () => {
+    expect(payoutOverBrandRows([], cfgRodrigo)).toEqual({ cpa: 0, rev: 0, total: 0 });
+    expect(payoutOverBrandRows(null, cfgRodrigo).total).toBe(0);
+  });
+});
+
+describe('unratedProducingBrands', () => {
+  const cfg: AffiliateConfig = {
+    affiliateId: 'x', cpaValue: undefined as any, revPercentage: undefined as any,
+    byBrand: { blaze: { cpaValue: 120, revPercentage: 0 } },
+  };
+
+  it('com todas as casas produzidas precificadas, não acusa nada', () => {
+    expect(unratedProducingBrands([{ id: 'blaze', name: 'Blaze', qualified_cpa: 1 }], cfg)).toEqual([]);
+  });
+
+  it('acusa a casa que produziu e não tem taxa nenhuma', () => {
+    expect(unratedProducingBrands([
+      { id: 'blaze', name: 'Blaze', qualified_cpa: 1 },
+      { id: 'kto', name: 'KTO', qualified_cpa: 2 },
+    ], cfg)).toEqual(['KTO']);
+  });
+
+  it('casa sem produção não entra: não configurar taxa de casa parada é normal', () => {
+    expect(unratedProducingBrands([{ id: 'kto', name: 'KTO', qualified_cpa: 0, rvs: 0 }], cfg)).toEqual([]);
+  });
+
+  it('REV negativo conta como produção (a casa mexeu no dinheiro)', () => {
+    expect(unratedProducingBrands([{ id: 'kto', name: 'KTO', qualified_cpa: 0, rvs: -12 }], cfg)).toEqual(['KTO']);
+  });
+
+  it('taxa de topo cobre todas as casas', () => {
+    const comTopo: AffiliateConfig = { affiliateId: 'x', cpaValue: 90, revPercentage: 0 };
+    expect(unratedProducingBrands([{ id: 'kto', name: 'KTO', qualified_cpa: 2 }], comTopo)).toEqual([]);
   });
 });

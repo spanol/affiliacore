@@ -599,6 +599,24 @@ para quem não é admin, mas para a agência o rastro ficou à vista. O conserto
 junto da segunda ponta: ao apagar a casa, ou o rascunho vinculado vai junto (só o
 rascunho, nunca um acordo com parceria viva), ou a tela avisa que ele ficou.
 
+### 13. Superfícies que ainda precificam pela taxa de TOPO (aberto em 25/08/2026)
+
+O painel do afiliado foi corrigido em 25/08 (a visão "Todas as casas" soma casa a
+casa, `payoutOverBrandRows`), mas duas superfícies menores continuam multiplicando
+métrica agregada pela taxa de topo, e para quem só tem `byBrand` elas mostram R$ 0:
+
+- **Extrato CSV diário** (`buildDailyExtractCsv`, botão CSV do painel e do
+  `/afiliados/:id`): as linhas são por DIA, sem casa, então não há como precificar
+  por casa com o dado atual. A API agrupa por data OU por casa, nunca pelos dois.
+- **Tabela "por campanha"** (`AffiliateDetails` e `SpecialDashboard`): campanha não
+  é casa, e a linha não carrega a casa de origem.
+
+O conserto dos dois passa por uma leitura com granularidade dupla (dia × casa,
+campanha × casa). Enquanto isso não existir, o número honesto seria não exibir
+dinheiro nessas duas superfícies quando o afiliado tem taxa por casa; hoje elas
+exibem um valor calculado na taxa errada. Ver §9 da REDE (gráfico diário do
+especial), que é a mesma limitação.
+
 ### Bloqueios que NÃO são nossos
 
 - ~~**Cron da Esportiva** depende da casa isentar `/api/*` do challenge~~ → **RESOLVIDO 04/08/2026**:
