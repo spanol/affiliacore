@@ -6,7 +6,13 @@
 
 ---
 
-## B1 · Lucro líquido (após repasse aos afiliados)
+## B1 · ✅ ENTREGUE — Lucro líquido (após repasse aos afiliados)
+
+**Conferido em 24/08/2026:** entregue, inclusive a parte que faltava (por casa e por
+período). O headline e o detalhamento saem da mesma base escopada
+(`composeAdminProfit`), o lucro por casa é o `calcNetProfitByHouse`, e desde 12/08 há
+o toggle de incluir ou não o REV no líquido. Texto abaixo mantido como histórico da
+decisão.
 
 **Contexto.** A agência recebe comissão das casas (CPA + REV — o `total_commission` que a OTG
 reporta). Os afiliados recebem o que está configurado em `affiliate_configs`
@@ -29,7 +35,10 @@ Ou seja, o `calcNetProfit` atual (`total_commission` direto, sem custos fixos) *
 
 ---
 
-## B2 · Filtros de data na Boost
+## B2 · ✅ ENTREGUE — Filtros de data na Boost
+
+**Conferido em 24/08/2026:** o `DateRangePicker` está em 17 telas, com presets, e o
+período viaja até o proxy. Texto abaixo mantido como histórico.
 
 **Contexto.** Hoje o Boost fixa o período em `2024-01-01 → hoje` (hardcoded no `affiliateService`).
 A dashboard da OTG tem seletor de datas; o Boost precisa do mesmo.
@@ -46,7 +55,13 @@ A dashboard da OTG tem seletor de datas; o Boost precisa do mesmo.
 
 ---
 
-## B3 · Afiliado Especial (sub-afiliados / sub-rede)
+## B3 · ✅ ENTREGUE E SUPERADO — Afiliado Especial (sub-afiliados / sub-rede)
+
+**Conferido em 24/08/2026:** entregue e já ultrapassado pelo desenho atual. O que o
+esboço abaixo trava em **1 nível** virou rede de **N níveis** com comissão de upline
+(`REDE-AFILIADOS.md`, `src/lib/network.ts`), a sub-rede é derivada da árvore quando o
+especial é `fromNetwork`, e desde 17/08 a taxa do sub é **por casa**, não mais um gesto
+de topo. Leia o `REDE-AFILIADOS.md`, não este esboço, antes de mexer no assunto.
 
 > Refinado com a diretoria em 2026-05-29. Decisões abaixo travadas; **modelo de comissão
 > (spread) ainda a confirmar com o Carlos** — ver "Roteiro p/ o Carlos".
@@ -101,7 +116,12 @@ em vez de esconder/quebrar. Há um `TODO(B3 · afiliado master)` em `DashboardLa
 
 ---
 
-## B4 · Dados bancários do afiliado (para receber os repasses)
+## B4 · ✅ ENTREGUE — Dados bancários do afiliado (para receber os repasses)
+
+**Conferido em 24/08/2026:** vive em `payment_profiles`, o afiliado edita em
+`/financeiro` (PIX com tipo de chave, mais os dados de nota) e o admin vê em
+`/afiliados/:id` **mascarado**, com botão de revelar. A coleção é mediada pelo servidor,
+como manda o invariante de dado sensível. Texto abaixo mantido como histórico.
 
 **Contexto.** Os afiliados precisam cadastrar onde recebem os repasses. Novo item na **sidebar**:
 "Dados Bancários".
@@ -409,7 +429,46 @@ Enquanto isso não for decidido, o campo continua informativo — que é o compo
 que o afiliado já produziu muda de valor por causa dele. Ver §5 (meta mensal do legado), que é a
 mesma feature vista pelo lado do afiliado.
 
-### 9. ⏰ LEMBRETE 21/08/2026 — conferir se os 5 cadastros do Maurício na LEON caíram no nome dele
+### 9. ✅ CONFERIDO (24/08/2026) — os 5 cadastros do Maurício na LEON NÃO caíram no nome dele
+
+A verificação (só leitura, sobre `house_results` e os logs de `house_results.pull`)
+respondeu as duas perguntas do lembrete:
+
+- **Dia 20/08 a LEON reportou 1 cadastro e 1 FTD na casa inteira**, não 5. A linha
+  atribuída ao Maurício só aparece em **22/08** (1 cadastro, 1 FTD, 1 CPA qualificado,
+  17 EUR de `cpa_commission`). Ou seja, o que ele subiu naquela noite não entrou no
+  nome dele, e provavelmente nem entrou.
+- **Toda leitura da LEON traz `pendingTags: ["%7btag%7d"]`**, que é o placeholder
+  `{tag}` percent-encoded. Existe um link CRU da casa circulando com o placeholder não
+  substituído, e a produção que chega por ele não credita ninguém. É a terceira cara do
+  bug do placeholder: as duas primeiras foram corrigidas no banco (16 links migrados em
+  21/08 e mais 6 sem tag), mas **URL já enviada em WhatsApp não se migra**.
+  Consequência medida: em 17/08 a casa pagou um CPA qualificado (17 EUR) que ficou só na
+  linha agregada, sem dono.
+
+Também apareceu, e é ruído conhecido: a tag `cgverify0811`, do teste de recon da LEON.
+
+O que fica em aberto **depende de gente**: descobrir de quem é o cadastro que entrou
+pelo link cru (perguntar ao Maurício qual URL ele mandou) e então criar o apelido em
+`affiliate_tag_aliases`, do mesmo jeito que o `infinitw02` da Esportiva. Esse apelido,
+aliás, **está funcionando**: os pulls recentes da Esportiva saem com `pendingTags` vazio
+e a linha do Maurício atribuída.
+
+O que NÃO depende de gente, e virou item novo: hoje a fila de "tags sem dono" de uma
+casa de PULL só existe dentro do `metadata` do log de auditoria. Ninguém olha lá. O
+import por planilha tem tela para isso; o pull não tem. Ver §12.
+
+### 12. Tags sem dono nas casas de PULL não têm tela (aberto em 24/08/2026)
+
+O conector grava `pendingTags` no log de `house_results.pull` e segue a vida. Não há
+nenhuma tela que mostre "estas tags chegaram e não são de ninguém", então produção
+órfã só aparece quando alguém abre o Firestore, que foi o que aconteceu hoje: a LEON
+vinha reportando o placeholder `%7btag%7d` desde 21/08, em todo pull, sem ninguém ver.
+
+Escopo aproximado: a fila do import por planilha (`LinkTriage` / vínculo tag→afiliado)
+já existe e resolve o mesmo problema pelo outro caminho. Falta alimentá-la também pelo
+pull, ou dar à casa integrada um aviso de "N tags sem dono" no card de `/casas`, com o
+atalho para criar o apelido. O dado já está gravado; o que falta é superfície.
 
 Em 20/08 à noite o Maurício subiu **5 contas de cassino** na LEON com depósito acima da baseline e
 disse que "contou o FTD normal" no painel da casa. A LEON é **T+1**, então isso só aparece no pull
