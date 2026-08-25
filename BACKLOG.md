@@ -515,6 +515,17 @@ depois. Ou o produto ganha a exclusão (com a mesma trava de parceria viva que a
 desativação já faz em cascata), ou a limpeza vira um script versionado em
 `scripts/fix/`, não um arquivo temporário.
 
+**Terceira ponta, achada na varredura de 24/08: apagar a casa deixa o
+acordo-rascunho dela ÓRFÃO.** Criar casa cria junto um acordo em rascunho
+(`buildDraftDealFromHouse`, com `metadata.via: 'house.create'`), e o
+`DELETE /api/houses/:id` não encosta nele. Foi exatamente isso que produziu o
+pedido de hoje na Infinity: as 4 casas "Sports" foram apagadas em 22 e 24/08, mas
+os 4 cards continuaram no `/acordos` do admin até serem removidos à mão. O
+afiliado nunca chegou a vê-los, porque `GET /api/deals` já filtra acordo inativo
+para quem não é admin, mas para a agência o rastro ficou à vista. O conserto anda
+junto da segunda ponta: ao apagar a casa, ou o rascunho vinculado vai junto (só o
+rascunho, nunca um acordo com parceria viva), ou a tela avisa que ele ficou.
+
 ### Bloqueios que NÃO são nossos
 
 - ~~**Cron da Esportiva** depende da casa isentar `/api/*` do challenge~~ → **RESOLVIDO 04/08/2026**:
