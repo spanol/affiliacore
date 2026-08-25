@@ -58,6 +58,7 @@ import {
   resolveDealType, dealPolicy, effectivePricedBy, sanitizeDealsForViewer, type DealTypeId,
 } from './src/lib/dealType';
 import { normalizeLegalDocInput, computeNextVersion } from './src/lib/legal';
+import { buildAuditSnapshot } from './src/lib/auditSnapshot';
 import { canTransitionWithdrawal, normalizeWithdrawalAmount, type WithdrawalStatus } from './src/lib/withdrawal';
 import { buildNetworkTree, resolveRepasseCap, exceedsRepasseCap, hasConfiguredRate } from './src/lib/network';
 import { scheduleRateChange, brandRateEntry, isRateConfigured, type BrandRateEntry } from './src/lib/rateHistory';
@@ -4359,12 +4360,16 @@ export function createApp(deps: ServerDeps) {
       if (String(before?.affiliateId ?? '').trim()) {
         return res.status(409).json({ error: 'Este link pertence a um afiliado. Libere-o para o standby antes de remover.' });
       }
+      // Doc inteiro no log, mesma razão da casa: o link carrega tag, casa e a URL já
+      // cunhada, e nada disso se remonta depois. `registerUrl` fica solto por
+      // compatibilidade com quem já lia essa chave.
+      const snapshot = buildAuditSnapshot(before);
       await ref.delete();
       await writeAuditLog(req, {
         entityType: 'affiliate_link',
         entityId: ref.id,
         action: 'link.delete',
-        metadata: { registerUrl: before?.registerUrl ?? null },
+        metadata: { registerUrl: before?.registerUrl ?? null, ...(snapshot ? { snapshot } : {}) },
       });
       return res.json({ deleted: true });
     } catch (e) {
@@ -4806,11 +4811,19 @@ export function createApp(deps: ServerDeps) {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
     try {
       const ref = adminDb.collection('houses').doc(String(req.params.id));
-      const snap = await ref.get(); // lê antes p/ guardar o nome na auditoria
+      // Lê ANTES de apagar: o log vira a única cópia do doc. Sem ele, quem remove a
+      // casa errada perde `integrationExternalId`, CPA padrão, template de cadastro,
+      // moeda, ISS e redepósito mínimo, e restaurar vira arqueologia (Betnacional da
+      // Infinity, 24/08/2026). O `logo` (data URL de até ~200KB) entra resumido, senão
+      // o próprio log estouraria o teto de 1MB do Firestore. Ver src/lib/auditSnapshot.ts.
+      const snap = await ref.get();
+      const before = snap.exists ? (snap.data() as any) : null;
+      const snapshot = buildAuditSnapshot(before);
       await ref.delete();
       await writeAuditLog(req, {
         entityType: 'house', entityId: String(req.params.id),
-        entityLabel: (snap.data() as any)?.name ?? null, action: 'house.delete',
+        entityLabel: before?.name ?? null, action: 'house.delete',
+        metadata: snapshot ? { snapshot } : null,
       });
       return res.json({ ok: true });
     } catch (e) {
@@ -5603,8 +5616,12 @@ export function createApp(deps: ServerDeps) {
     try {
       const ref = adminDb.collection('legal_documents').doc(String(req.params.id));
       const snap = await ref.get();
+      // O texto publicado só existe aqui: sem o snapshot, apagar o documento apaga a
+      // redação e a versão junto. Texto muito longo entra resumido.
+      const before = snap.exists ? (snap.data() as any) : null;
+      const snapshot = buildAuditSnapshot(before);
       await ref.delete();
-      await writeAuditLog(req, { entityType: 'legal_document', entityId: String(req.params.id), entityLabel: (snap.data() as any)?.title ?? null, action: 'legal_document.delete' });
+      await writeAuditLog(req, { entityType: 'legal_document', entityId: String(req.params.id), entityLabel: before?.title ?? null, action: 'legal_document.delete', metadata: snapshot ? { snapshot } : null });
       return res.json({ ok: true });
     } catch (e) {
       console.error('[legal-documents] erro ao remover:', e);

@@ -2100,6 +2100,72 @@ describe('GET /api/houses — auto-seed das casas OTG', () => {
 });
 
 // =============================================================================
+// DELETE /api/houses/:id — a exclusão guarda o DOCUMENTO na auditoria.
+//
+// Antes, o log levava só o nome: apagar a casa errada torrava o offer id da
+// integração, o CPA padrão, o template de cadastro, a moeda, o ISS e o redepósito
+// mínimo, sem cópia nenhuma (Betnacional da Infinity, 24/08/2026 — BACKLOG §11).
+// Agora o doc inteiro vai em `metadata.snapshot` e desfazer é reler o log.
+// =============================================================================
+describe('DELETE /api/houses/:id · snapshot do doc apagado na auditoria', () => {
+  const LOGO = `data:image/png;base64,${'A'.repeat(200_000)}`;
+  const seed = () => ({
+    users: { 'admin-uid': { role: 'admin' } },
+    houses: {
+      betnacional: {
+        slug: 'betnacional', name: 'Betnacional', brandId: null, active: true, order: 2,
+        dataSource: 'manual', integration: 'fomento', integrationExternalId: '4821',
+        defaultCpa: 45, defaultRev: 0, cpaCurrency: 'EUR', fxMode: 'live', fxRate: null,
+        issPercent: 2, minRedeposit: 20,
+        registerUrlTemplate: 'https://betnacional.example/?aff={tag}',
+        logo: LOGO,
+        createdAt: { toDate: () => new Date('2026-08-01T10:00:00.000Z') },
+      },
+    },
+  });
+  const deleteHouse = async (id: string) => {
+    const db = makeFirestore(seed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).delete(`/api/houses/${id}`).set('Authorization', 'Bearer admin-uid').expect(200);
+    const log = [...(db.__store.get('audit_logs')?.values() ?? [])].find((a: any) => a.action === 'house.delete');
+    return { db, log };
+  };
+
+  it('apagar a casa grava o log com os campos de integração e comissão', async () => {
+    const { db, log } = await deleteHouse('betnacional');
+    expect(db.__store.get('houses')?.has('betnacional')).toBe(false);
+    expect(log.entityLabel).toBe('Betnacional');
+    expect(log.metadata.snapshot).toMatchObject({
+      slug: 'betnacional', name: 'Betnacional', active: true, order: 2,
+      dataSource: 'manual', integration: 'fomento', integrationExternalId: '4821',
+      defaultCpa: 45, defaultRev: 0, cpaCurrency: 'EUR', fxMode: 'live', fxRate: null,
+      issPercent: 2, minRedeposit: 20, brandId: null,
+      registerUrlTemplate: 'https://betnacional.example/?aff={tag}',
+    });
+  });
+
+  it('o timestamp do Firestore vira ISO (o log é gravável como está)', async () => {
+    const { log } = await deleteHouse('betnacional');
+    expect(log.metadata.snapshot.createdAt).toBe('2026-08-01T10:00:00.000Z');
+    expect(() => JSON.stringify(log.metadata)).not.toThrow();
+  });
+
+  it('o logo em data URL entra resumido, senão o próprio log estouraria 1MB', async () => {
+    const { log } = await deleteHouse('betnacional');
+    expect(log.metadata.snapshot.logo).toEqual({
+      truncated: true, chars: LOGO.length, preview: LOGO.slice(0, 64),
+    });
+    expect(JSON.stringify(log.metadata).length).toBeLessThan(10_000);
+  });
+
+  it('casa inexistente: continua respondendo ok e o log sai sem snapshot', async () => {
+    const { log } = await deleteHouse('nao-existe');
+    expect(log.entityLabel).toBeNull();
+    expect(log.metadata).toBeNull();
+  });
+});
+
+// =============================================================================
 // P2 — instância OTG-free (VITE_OTG_ENABLED='false'): módulo OTG desligado
 // =============================================================================
 describe('P2 · módulo OTG desligado por instância', () => {

@@ -478,16 +478,35 @@ Ver §9, que é o outro lado do mesmo tema (qual link o afiliado de fato divulga
 
 ### 11. Apagar casa não guarda o documento na auditoria (aberto em 24/08/2026)
 
-`DELETE /api/houses/:id` lê o doc só para salvar o NOME no `audit_logs` e apaga o
-resto. Quem apagar a casa errada perde `integrationExternalId`, `defaultCpa`,
-`registerUrlTemplate`, moeda, ISS e redepósito mínimo, sem nenhuma cópia: a
-restauração vira arqueologia (foi o que aconteceu com a Betnacional da Infinity
-em 24/08, e o offer id só voltou porque o operador abriu o painel da Fomento).
+**PRIMEIRA PONTA ENTREGUE (24/08/2026).** As três exclusões que perdiam o doc
+agora gravam ele inteiro em `metadata.snapshot`: `house.delete`, `link.delete` e
+`legal_document.delete`. Desfazer uma exclusão passou a ser reler o log.
 
-O conserto é barato e cabe no padrão que já existe: gravar o doc inteiro em
-`metadata.snapshot` no log de `house.delete`, do mesmo jeito que o `diffChanges`
-já guarda antes/depois no update. Com isso, desfazer é reler o log. Vale o mesmo
-para `link.delete` e `legal_document.delete`.
+Era assim: `DELETE /api/houses/:id` lia o doc só para salvar o NOME no
+`audit_logs` e apagava o resto. Quem apagasse a casa errada perdia
+`integrationExternalId`, `defaultCpa`, `registerUrlTemplate`, moeda, ISS e
+redepósito mínimo, sem nenhuma cópia: a restauração virava arqueologia (foi o que
+aconteceu com a Betnacional da Infinity em 24/08, e o offer id só voltou porque o
+operador abriu o painel da Fomento).
+
+A normalização é pura, em `src/lib/auditSnapshot.ts` (`buildAuditSnapshot`), com
+teste colocado. Duas decisões que o `JSON.stringify` cru não dá de graça:
+
+- **Timestamp vira ISO string.** `createdAt`/`updatedAt` chegam ora como objeto
+  com `toDate()`, ora como `{_seconds,_nanoseconds}`, e nenhuma das duas formas é
+  gravável de volta como está.
+- **Campo grande vira MARCADOR** (`{ truncated, chars, preview }`). O `logo` da
+  casa é um data URL de até ~200KB no próprio doc (as instâncias não usam Storage)
+  e um documento do Firestore não passa de 1MB: gravar o base64 inteiro faria a
+  escrita do LOG falhar, ou seja, perderíamos o snapshot todo por causa do campo
+  menos importante de restaurar. O limite é 60.000 caracteres por campo (texto de
+  documento legal cabe; logo não) e 200.000 no snapshot inteiro, com os maiores
+  campos caindo primeiro se o conjunto estourar. O `preview` de 64 caracteres ainda
+  identifica o que era (`data:image/png;base64,`).
+
+O que ficou de FORA: restaurar continua sendo trabalho de operador lendo o log
+pelo Admin SDK. Não há botão de desfazer nem tela que mostre o `snapshot` na
+`/auditoria` (a página lista ação, ator e `changes`, não o `metadata`).
 
 Segunda ponta do mesmo incidente: **acordo não tem rota de exclusão** (o produto
 só desativa). Limpar a vitrine de acordos órfãos exigiu escrita manual pelo Admin
