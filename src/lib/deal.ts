@@ -43,6 +43,9 @@ export interface Deal {
   baseline?: number;          // R$; informativo, NÃO entra no núcleo de comissão
   rollover?: number;          // multiplicador (2 = "rollover 2x"); informativo
   ggrPercentage?: number | null; // % de GGR quando a casa tem; informativo
+  // % dos FTDs que precisa REDEPOSITAR para o lote validar (termo das ofertas da
+  // rede: "redepósito mínimo de 30%"). Informativo, como baseline e rollover.
+  redepositRate?: number;
   // Meta MÍNIMA de CPAs qualificados por ciclo (pedido da Infinity, 17/08/2026).
   // É uma QUANTIDADE, não dinheiro, e é informativa: dizer ao afiliado quantas
   // qualificações a casa espera no período. NÃO entra no núcleo de comissão — quem
@@ -172,6 +175,12 @@ export function normalizeDealInput(raw: any): { deal?: Omit<Deal, 'id'>; error?:
   // A meta é uma CONTAGEM de CPAs. "2,5 CPAs" não existe do lado da casa, e aceitar
   // o valor quebrado só empurraria o arredondamento para a tela, onde cada leitor
   // arredondaria de um jeito.
+  // Redepósito é PERCENTUAL: acima de 100 seria "mais FTDs redepositando do que
+  // existem", que é sempre erro de digitação (o operador quis 30, digitou 300).
+  const redepositRate = num(raw?.redepositRate);
+  if (redepositRate < 0) return { error: 'A taxa de redepósito não pode ser negativa.' };
+  if (redepositRate > 100) return { error: 'A taxa de redepósito é um percentual: use um valor de 0 a 100.' };
+
   const minCpaGoal = num(raw?.minCpaGoal);
   if (minCpaGoal < 0) return { error: 'A meta mínima de CPA não pode ser negativa.' };
   if (!Number.isInteger(minCpaGoal)) {
@@ -206,6 +215,7 @@ export function normalizeDealInput(raw: any): { deal?: Omit<Deal, 'id'>; error?:
       baseline,
       rollover,
       ggrPercentage,
+      redepositRate,
       minCpaGoal,
       fxMode,
       fxRate: fx.fxRate,
@@ -270,6 +280,7 @@ export function buildDraftDealFromHouse(
     baseline: 0,
     rollover: 0,
     ggrPercentage: null,
+    redepositRate: 0,
     minCpaGoal: 0,
     // Rascunho nasce em real: sem câmbio a resolver, e o admin troca no modal.
     fxMode: 'none',

@@ -537,6 +537,13 @@ export default function Deals() {
                     <p className="text-[10px] text-slate-400 dark:text-neutral-500 mt-1">Multiplicador de rollover. 2 aparece como 2x no card.</p>
                   </div>
                 )}
+                {shows('redeposit') && (
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">{DEAL_KPI_LABEL.redeposit} (%)</label>
+                    <input data-testid="campo-redeposito" type="number" min="0" max="100" step="1" value={modal.redepositRate} onChange={(e) => setModal({ ...modal, redepositRate: e.target.value })} placeholder="30" className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white outline-none" />
+                    <p className="text-[10px] text-slate-400 dark:text-neutral-500 mt-1">Percentual dos FTDs que precisa redepositar para o lote validar. Em branco: a casa não exige.</p>
+                  </div>
+                )}
                 {shows('ggr') && (
                   <div>
                     <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">{DEAL_KPI_LABEL.ggr} (%)</label>

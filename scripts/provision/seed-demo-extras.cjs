@@ -458,8 +458,8 @@ async function main() {
     { slug: 'novibet', model: 'cpa', cpaValue: 45, revPercentage: 0, cycle: 'mensal', currency: 'USD', geo: 'Brasil', active: true, type: 'direto', minCpaGoal: 4, fxMode: 'fixed', fxRate: 5.4 },
     // ...e um em EURO pela cotação do dia, o outro regime.
     { slug: 'betmgm', model: 'hybrid', cpaValue: 30, revPercentage: 15, cycle: 'quinzenal', currency: 'EUR', geo: 'Portugal', active: true, type: 'direto', fxMode: 'live' },
-    { slug: 'esportiva', model: 'cpa', cpaValue: 300, revPercentage: 0, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'gerenciado', baseline: 2500, rollover: 2, ggrPercentage: null, minCpaGoal: 10 },
-    { slug: 'vaidebet', model: 'hybrid', cpaValue: 250, revPercentage: 20, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'gerenciado', baseline: 1500, rollover: 3, ggrPercentage: 30 },
+    { slug: 'esportiva', model: 'cpa', cpaValue: 300, revPercentage: 0, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'gerenciado', baseline: 2500, rollover: 2, ggrPercentage: null, minCpaGoal: 10, redepositRate: 30 },
+    { slug: 'vaidebet', model: 'hybrid', cpaValue: 250, revPercentage: 20, cycle: 'mensal', currency: 'BRL', geo: 'Brasil', active: true, type: 'gerenciado', baseline: 1500, rollover: 3, ggrPercentage: 30, redepositRate: 25 },
   ];
   const MODEL_LABEL = { cpa: 'CPA', revshare: 'RevShare', hybrid: 'Híbrido' };
   const CYCLE_LABEL = { semanal: 'Semanal', quinzenal: 'Quinzenal', mensal: 'Mensal', d30mais: 'D30+' };
@@ -472,6 +472,9 @@ async function main() {
       cpaValue: d.cpaValue, revPercentage: d.revPercentage, cycle: d.cycle,
       currency: d.currency, geo: d.geo, active: d.active, order: i,
       type: d.type, minCpaGoal: d.minCpaGoal ?? 0,
+      // Taxa de redepósito (% dos FTDs). Semeada porque é KPI de vitrine: sem dado,
+      // a demo abriria o card sem a linha e a feature ficaria invisível ao lead.
+      redepositRate: d.redepositRate ?? 0,
       fxMode: d.fxMode ?? 'none', fxRate: d.fxRate ?? null,
       ...(d.type === 'gerenciado' ? { baseline: d.baseline, rollover: d.rollover, ggrPercentage: d.ggrPercentage ?? null } : {}),
       label: dealLabel(d), createdByUid: adminUid,

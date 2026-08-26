@@ -246,14 +246,6 @@ export default function Houses() {
                       : <span className="text-slate-300 dark:text-neutral-600">—</span>}
                   </dd>
                 </div>
-                {/* Só quando a casa declarou: linha "—" ocupa espaço sem dizer nada, e
-                    R$ 0,00 seria lido como "deposite qualquer valor". */}
-                {h.minRedeposit != null && (
-                  <div className="flex items-center justify-between gap-2">
-                    <dt className="text-slate-400 dark:text-neutral-500 font-medium flex items-center gap-1"><Wallet size={11} /> Redepósito mínimo</dt>
-                    <dd className="text-slate-600 dark:text-neutral-300 font-semibold">{formatBrl(h.minRedeposit)}</dd>
-                  </div>
-                )}
                 {/* Frescor: o MESMO carimbo que o afiliado vê no painel dele. */}
                 <div className="flex items-center justify-between gap-2">
                   <dt className="text-slate-400 dark:text-neutral-500 font-medium flex items-center gap-1"><RefreshCw size={11} /> Dados atualizados</dt>
@@ -499,7 +491,6 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
   // Redepósito mínimo do JOGADOR na casa, sempre em R$ (quem deposita é o apostador
   // brasileiro). Não tem nada a ver com a moeda do CPA, que é o que a casa paga
   // à agência. String no input, parseada no save; vazio = casa não declarou.
-  const [minRedeposit, setMinRedeposit] = useState<string>(house?.minRedeposit != null ? String(house.minRedeposit) : '');
   // Toggle "REV no lucro líquido" (call 12/08). Ausente no doc = true (como sempre foi).
   const [revInProfit, setRevInProfit] = useState<boolean>(house?.revInProfit !== false);
   const [fxQuotes, setFxQuotes] = useState<FxQuotes>(() => getCachedFxQuotes());
@@ -619,7 +610,6 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
         fxRate: fxSpec.fxRate,
         defaultRev: defaultRev.trim() === '' ? null : Number(defaultRev),
         issPercent: issPercent.trim() === '' ? null : Number(issPercent),
-        minRedeposit: parseHouseCpaInput(minRedeposit, 'BRL'),
         revInProfit,
         ...(logoBase64 ? { logoBase64 } : {}),
       };
@@ -1024,32 +1014,6 @@ function HouseModal({ house, onClose, onSaved }: { house?: House; onClose: () =>
               </label>
             )}
 
-            {/* Regra DA CASA, não da agência: vale para qualquer origem de resultado e
-                não entra em conta nenhuma de comissão. Serve ao afiliado, que precisa
-                dizer ao jogador quanto vale um redepósito na casa. Sempre em R$: quem
-                deposita é o apostador, não a casa (a moeda do CPA é outra coisa). */}
-            <Field label="Redepósito mínimo">
-              <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-3 items-start">
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500 text-sm font-semibold">R$</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    data-testid="redeposito-minimo-casa"
-                    value={minRedeposit}
-                    onChange={(e) => setMinRedeposit(
-                      e.target.value.replace(/[^0-9.,]/g, '').replace(/([.,])(?=.*[.,])/g, '')
-                    )}
-                    placeholder="ex.: 20,00"
-                    className={`${inputCls} pl-9`}
-                  />
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-neutral-400 leading-relaxed sm:pt-3">
-                  Valor mínimo de um depósito posterior ao primeiro. Em branco = <b>não informado</b>:
-                  o campo some do card da casa em vez de aparecer como R$ 0,00.
-                </p>
-              </div>
-            </Field>
 
             {/* ISS vale para QUALQUER casa (OTG ou manual): o repasse ao afiliado é
                 tributado independentemente da origem do resultado. Por isso fica

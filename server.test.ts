@@ -5071,67 +5071,65 @@ describe('integracoes (/api/integrations)', () => {
 });
 
 // =============================================================================
-// Redeposito minimo da casa (valor minimo de um deposito POSTERIOR ao primeiro).
-// Informativo, nunca entra em calculo de comissao. AUSENCIA != R$ 0: casa que nao
-// declarou tem que sair `null`, senao o material diria "redeposite qualquer valor".
+// Taxa de redeposito do ACORDO (% dos FTDs que precisa redepositar). Mudou de
+// dono em 26/08 a pedido do Jotta: era um valor em R$ no cadastro da CASA, e o
+// que as ofertas da rede de fato cobram e um PERCENTUAL ("redeposito minimo de
+// 30%"), que e condicao comercial e por isso vive no acordo.
 // =============================================================================
-describe('redeposito minimo da casa', () => {
-  const depSeed = {
+describe('taxa de redeposito do acordo', () => {
+  beforeAll(() => { process.env.VITE_MARKETPLACE_ENABLED = 'true'; });
+  afterAll(() => { delete process.env.VITE_MARKETPLACE_ENABLED; });
+
+  const seed = () => ({
     users: { 'admin-uid': { role: 'admin' } },
-    houses: { stake: { slug: 'stake', name: 'Stake', dataSource: 'manual', minRedeposit: 20 } },
-  };
+    houses: { blaze: { slug: 'blaze', name: 'Blaze', dataSource: 'manual' } },
+    deals: { d1: { houseId: 'blaze', operatorName: 'Blaze', model: 'cpa', cpaValue: 150, revPercentage: 0, cycle: 'mensal', currency: 'BRL', active: true, redepositRate: 30 } },
+  });
 
-  it('casa nova grava o valor com centavos e devolve o numero', async () => {
-    const db = makeFirestore(depSeed);
-    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
-      .post('/api/houses')
-      .set('Authorization', 'Bearer admin-uid')
-      .send({ name: 'Casa Nova', slug: 'casa-nova', minRedeposit: 19.9 })
+  it('acordo novo grava o percentual', async () => {
+    const db = makeFirestore(seed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app).post('/api/deals').set('Authorization', 'Bearer admin-uid')
+      .send({ houseId: 'blaze', operatorName: 'Blaze', model: 'cpa', cpaValue: 150, redepositRate: 30 })
       .expect(201);
-    expect(res.body.minRedeposit).toBe(19.9);
-    expect(db.__store.get('houses')?.get('casa-nova')?.minRedeposit).toBe(19.9);
+    expect(res.body.redepositRate).toBe(30);
   });
 
-  it('casa sem o campo sai null (ausencia != R$ 0)', async () => {
-    const db = makeFirestore(depSeed);
-    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
-      .post('/api/houses')
-      .set('Authorization', 'Bearer admin-uid')
-      .send({ name: 'Sem Minimo', slug: 'sem-minimo' })
+  it('acima de 100 e recusado: e percentual, nao contagem', async () => {
+    const res = await request(buildApp({ seed: seed() })).post('/api/deals').set('Authorization', 'Bearer admin-uid')
+      .send({ houseId: 'blaze', operatorName: 'Blaze', model: 'cpa', cpaValue: 150, redepositRate: 300 })
+      .expect(400);
+    expect(res.body.error).toMatch(/percentual/i);
+  });
+
+  it('negativo e recusado', async () => {
+    await request(buildApp({ seed: seed() })).post('/api/deals').set('Authorization', 'Bearer admin-uid')
+      .send({ houseId: 'blaze', operatorName: 'Blaze', model: 'cpa', cpaValue: 150, redepositRate: -5 })
+      .expect(400);
+  });
+
+  it('acordo sem o campo sai 0 (a casa nao exige redeposito)', async () => {
+    const res = await request(buildApp({ seed: seed() })).post('/api/deals').set('Authorization', 'Bearer admin-uid')
+      .send({ houseId: 'blaze', operatorName: 'Blaze', model: 'cpa', cpaValue: 150 })
       .expect(201);
-    expect(res.body.minRedeposit).toBeNull();
+    expect(res.body.redepositRate ?? 0).toBe(0);
   });
 
-  it('PATCH com campo vazio LIMPA o minimo (volta a nao declarado)', async () => {
-    const db = makeFirestore(depSeed);
-    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
-      .patch('/api/houses/stake')
-      .set('Authorization', 'Bearer admin-uid')
-      .send({ minRedeposit: '' })
-      .expect(200);
-    expect(res.body.minRedeposit).toBeNull();
-    expect(db.__store.get('houses')?.get('stake')?.minRedeposit).toBeNull();
+  it('a mudanca entra na auditoria do acordo (antes -> depois)', async () => {
+    const db = makeFirestore(seed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).patch('/api/deals/d1').set('Authorization', 'Bearer admin-uid')
+      .send({ redepositRate: 40 }).expect(200);
+    const log = [...(db.__store.get('audit_logs')?.values() ?? [])].find((l: any) => l.action === 'deal.update');
+    expect(log.changes).toContainEqual({ field: 'redepositRate', before: 30, after: 40 });
   });
 
-  it('PATCH sem tocar no campo PRESERVA o minimo gravado', async () => {
-    const db = makeFirestore(depSeed);
-    const res = await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
-      .patch('/api/houses/stake')
-      .set('Authorization', 'Bearer admin-uid')
-      .send({ name: 'Stake Brasil' })
-      .expect(200);
-    expect(res.body.minRedeposit).toBe(20);
-  });
-
-  it('a mudanca entra na auditoria da casa (antes -> depois)', async () => {
-    const db = makeFirestore(depSeed);
-    await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
-      .patch('/api/houses/stake')
-      .set('Authorization', 'Bearer admin-uid')
-      .send({ minRedeposit: 50 })
-      .expect(200);
-    const log = [...(db.__store.get('audit_logs')?.values() ?? [])].find((l: any) => l.action === 'house.update');
-    expect(log.changes).toContainEqual({ field: 'minRedeposit', before: 20, after: 50 });
+  it('o cadastro da CASA nao aceita mais minRedeposit', async () => {
+    const db = makeFirestore({ users: { 'admin-uid': { role: 'admin' } } });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).post('/api/houses').set('Authorization', 'Bearer admin-uid')
+      .send({ name: 'Casa X', dataSource: 'manual', minRedeposit: 20 }).expect(201);
+    expect(db.__store.get('houses')?.get('casa-x')).not.toHaveProperty('minRedeposit');
   });
 });
 

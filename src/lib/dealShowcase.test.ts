@@ -206,3 +206,21 @@ describe('myCommissionChips · a comissão do PRÓPRIO afiliado no card (/meus-l
       .forEach((c) => expect(`${c.label} ${c.value}`).not.toContain('—'));
   });
 });
+
+describe('chip de redepósito', () => {
+  const deal: any = { houseId: 'h', operatorName: 'Blaze', model: 'cpa', cpaValue: 150, cycle: 'mensal', currency: 'BRL', active: true, type: 'direto' };
+
+  it('sai como percentual quando o acordo tem a taxa', () => {
+    expect(formatDealKpiValue('redeposit', { ...deal, redepositRate: 30 })).toBe('30%');
+  });
+
+  it('zero/ausente não desenha a linha (ausência ≠ 0%)', () => {
+    expect(formatDealKpiValue('redeposit', { ...deal, redepositRate: 0 })).toBeNull();
+    expect(formatDealKpiValue('redeposit', deal)).toBeNull();
+  });
+
+  it('entra nos chips da vitrine junto dos outros KPIs', () => {
+    const ids = dealKpiChips({ ...deal, redepositRate: 30 }).map((c) => c.id);
+    expect(ids).toContain('redeposit');
+  });
+});

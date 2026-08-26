@@ -50,6 +50,11 @@ export function formatDealKpiValue(kpi: DealKpiId, deal?: Deal | null): string |
       const v = positive(deal?.rollover);
       return v == null ? null : `${v.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}x`;
     }
+    // Percentual de FTDs que precisa redepositar. Mesmo formato do GGR.
+    case 'redeposit': {
+      const v = positive(deal?.redepositRate);
+      return v == null ? null : pct(v);
+    }
     case 'ggr': {
       const v = positive(deal?.ggrPercentage);
       return v == null ? null : pct(v);

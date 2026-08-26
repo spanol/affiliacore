@@ -17,7 +17,7 @@ import type { Deal } from './deal';
 export type DealTypeId = 'direto' | 'gerenciado';
 
 // Métricas que um card de acordo pode exibir. A política diz QUAIS entram.
-export type DealKpiId = 'cpa' | 'revshare' | 'baseline' | 'rollover' | 'ggr' | 'cycle' | 'geo' | 'cpaGoal';
+export type DealKpiId = 'cpa' | 'revshare' | 'baseline' | 'rollover' | 'redeposit' | 'ggr' | 'cycle' | 'geo' | 'cpaGoal';
 
 // Quem está lendo o deal. É o eixo da sanitização no servidor.
 export type DealViewer = 'admin' | 'affiliate';
@@ -47,7 +47,7 @@ export const DEAL_TYPE_POLICY: Record<DealTypeId, DealTypePolicy> = {
     // `cpaGoal` entra nos DOIS tipos: a meta é termo da oferta, não segredo de taxa.
     // Acordo sem meta não ganha linha nenhuma (visibleKpis corta KPI sem valor), então
     // instância que não usa meta continua vendo o card de hoje.
-    kpis: ['cpa', 'revshare', 'cpaGoal', 'cycle', 'geo'],
+    kpis: ['cpa', 'revshare', 'redeposit', 'cpaGoal', 'cycle', 'geo'],
   },
   gerenciado: {
     id: 'gerenciado',
@@ -55,7 +55,7 @@ export const DEAL_TYPE_POLICY: Record<DealTypeId, DealTypePolicy> = {
     hint: 'O afiliado vê só a baseline e os KPIs. A comissão dele é definida pelo gerente, e o link é emitido depois pela agência.',
     showRatesToAffiliate: false,
     pricedBy: 'upline',
-    kpis: ['baseline', 'rollover', 'cpaGoal', 'cycle', 'ggr'],
+    kpis: ['baseline', 'rollover', 'redeposit', 'cpaGoal', 'cycle', 'ggr'],
   },
 };
 
@@ -64,6 +64,12 @@ export const DEAL_KPI_LABEL: Record<DealKpiId, string> = {
   revshare: 'RevShare',
   baseline: 'Baseline',
   rollover: 'Rollover',
+  // Percentual dos FTDs que precisa REDEPOSITAR para o lote validar. É condição de
+  // qualificação da casa, não dinheiro: "redepósito mínimo de 30%" é como Winhugo e
+  // Blaze escrevem no termo da oferta. Vive no ACORDO (pedido do Jotta, 26/08), que
+  // é onde moram as condições comerciais — antes era um valor em R$ no cadastro da
+  // CASA, que não é o que casa nenhuma cobra.
+  redeposit: 'Redepósito',
   ggr: 'GGR',
   cycle: 'Ciclo',
   geo: 'Mercado',
@@ -122,6 +128,7 @@ export function visibleKpis(deal?: Deal | null): DealKpiId[] {
       case 'revshare': return has(deal?.revPercentage);
       case 'baseline': return has(deal?.baseline);
       case 'rollover': return has(deal?.rollover);
+      case 'redeposit': return has(deal?.redepositRate);
       case 'ggr': return has(deal?.ggrPercentage);
       case 'cpaGoal': return has(deal?.minCpaGoal);
       case 'cycle': return !!deal?.cycle;

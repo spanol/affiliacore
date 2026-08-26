@@ -28,6 +28,7 @@ export interface DealDraft {
   baseline: string;
   rollover: string;
   ggrPercentage: string;
+  redepositRate: string;
   minCpaGoal: string;
   cycle: PaymentCycle;
   currency: DealCurrency;
@@ -62,7 +63,7 @@ export function adminEditsKpi(type: DealTypeId | null | undefined, kpi: DealKpiI
 export function emptyDealDraft(type: DealTypeId = 'direto'): DealDraft {
   return {
     houseId: '', operatorName: '', type: resolveDealType(type), model: 'cpa',
-    cpaValue: '', revPercentage: '', baseline: '', rollover: '', ggrPercentage: '',
+    cpaValue: '', revPercentage: '', baseline: '', rollover: '', ggrPercentage: '', redepositRate: '',
     minCpaGoal: '', cycle: 'mensal', currency: 'BRL', geo: '', active: true,
     fxMode: 'none', fxRate: '',
   };
@@ -90,6 +91,7 @@ export function draftFromDeal(deal: Deal): DealDraft {
     baseline: numToField(deal.baseline),
     rollover: numToField(deal.rollover),
     ggrPercentage: ggrToField(deal.ggrPercentage),
+    redepositRate: numToField(deal.redepositRate),
     minCpaGoal: numToField(deal.minCpaGoal),
     // Acordo ANTIGO não tem regime e resolve como 'none': o modal abre mostrando
     // "não converter", e é o admin que decide ligar a conversão. Ver deal.ts.
@@ -120,6 +122,7 @@ export function buildDealPayload(draft: DealDraft): Partial<Deal> {
     baseline: fieldToNum(draft.baseline),
     rollover: fieldToNum(draft.rollover),
     ggrPercentage: isBlank(draft.ggrPercentage) ? null : fieldToNum(draft.ggrPercentage),
+    redepositRate: fieldToNum(draft.redepositRate),
     minCpaGoal: fieldToNum(draft.minCpaGoal),
     fxMode: draft.fxMode,
     // Vazio vira null (e o validador recusa 'fixed' sem cotação) — nunca 0, que

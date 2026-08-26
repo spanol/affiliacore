@@ -42,11 +42,6 @@ export interface House {
   // ISS retido no repasse ao afiliado, em % — VARIA POR CASA (5% / 2% / 2% no
   // legado da Infinity). Ausente = sem retenção. Núcleo em `src/lib/tax.ts`.
   issPercent?: number | null;
-  // Redepósito mínimo (R$): o valor mínimo de um depósito POSTERIOR ao primeiro para
-  // que ele conte na casa. É regra DA CASA, vale para qualquer origem de resultado, e
-  // é informativo: entra no material do afiliado, nunca no cálculo de comissão.
-  // Ausente = casa não declarou.
-  minRedeposit?: number | null;
   // Toggle "REV no lucro líquido" (call Infinity 12/08). O servidor normaliza:
   // ausente = true (REV compõe o lucro, como sempre). Só casas 'manual'.
   revInProfit?: boolean;
@@ -91,7 +86,6 @@ export interface HouseInput {
   fxMode?: FxMode | null;
   fxRate?: number | null;
   issPercent?: number | null;
-  minRedeposit?: number | null;
   revInProfit?: boolean;
   logoBase64?: string | null;
   // Vínculo com um conector de /integracoes ('' / null desvincula). O servidor

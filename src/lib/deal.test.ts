@@ -274,3 +274,36 @@ describe('isUntouchedDraftDeal', () => {
     expect(isUntouchedDraftDeal(undefined)).toBe(false);
   });
 });
+
+// Taxa de redepósito (pedido do Jotta, 26/08): o termo das ofertas da rede fala em
+// "redepósito mínimo de 30%", ou seja, PERCENTUAL de FTDs — o campo antigo era um
+// valor em R$ no cadastro da casa, que não é o que casa nenhuma cobra.
+describe('normalizeDealInput · taxa de redepósito', () => {
+  const base = { houseId: 'blaze', operatorName: 'Blaze', model: 'cpa', cpaValue: 150 };
+
+  it('grava o percentual', () => {
+    expect(normalizeDealInput({ ...base, redepositRate: 30 }).deal?.redepositRate).toBe(30);
+  });
+
+  it('ausente vira 0: a casa não exige redepósito', () => {
+    expect(normalizeDealInput(base).deal?.redepositRate).toBe(0);
+  });
+
+  it('recusa acima de 100 (o operador quis 30 e digitou 300)', () => {
+    const { error, deal } = normalizeDealInput({ ...base, redepositRate: 300 });
+    expect(deal).toBeUndefined();
+    expect(error).toMatch(/percentual/i);
+  });
+
+  it('recusa negativo', () => {
+    expect(normalizeDealInput({ ...base, redepositRate: -1 }).error).toMatch(/negativa/i);
+  });
+
+  it('aceita fração (12,5% dos FTDs)', () => {
+    expect(normalizeDealInput({ ...base, redepositRate: 12.5 }).deal?.redepositRate).toBe(12.5);
+  });
+
+  it('o rascunho que nasce com a casa vem zerado', () => {
+    expect(buildDraftDealFromHouse({ slug: 'x', name: 'X' })?.redepositRate).toBe(0);
+  });
+});

@@ -48,7 +48,7 @@ espalhando condicional. O que muda entre um cliente e outro não é um bit, é u
 | O afiliado vê as taxas do acordo? | Sim | Não |
 | Quem define a comissão do afiliado? | Admin | O gerente (upline direto) |
 | O link sai junto da aprovação? | Sim | Não, é um passo à parte do admin |
-| Que KPIs o card mostra? | CPA, RevShare, ciclo, geo | Baseline, rollover, ciclo, GGR |
+| Que KPIs o card mostra? | CPA, RevShare, redepósito, meta, ciclo, geo | Baseline, rollover, redepósito, meta, ciclo, GGR |
 
 Núcleo puro novo, `src/lib/dealType.ts`, importável pelo client e pelo
 `server.ts` (a regra do repo: o server não importa `services/`):
@@ -434,7 +434,7 @@ que a carteira preserva o apurado anterior). Ver `PLANO-COMISSAO-VIGENCIA.md`.
 | 2 | Gerente define CPA e Rev? | "A comissão que ele tem disponível: casa só de CPA, só CPA; casa com Rev, ele pode definir o Rev". Não pretendem liberar Rev nas casas de agora | Já é o comportamento: o teto por casa zera o que ele não tem. Falta a TELA só oferecer o campo que ele tem (F5) |
 | 3 | A comissão é por casa? | "Por casa, a critério dele: Esportiva 110 pode repassar 80, LEON 110 pode repassar 70. Controle total do que tem disponível" | Premissa confirmada, é o `byBrand` da rota de precificação |
 | 5 | Esconde o RevShare também? | **Não respondida** (ele leu como repetição da 2 e da 3) | Segue escondendo os dois. Reperguntar |
-| 6/7 | Lista e ordem dos KPIs | "Baseline da casa e roll, que normalmente gira de 1 a 3x. A princípio apenas esses". Ordem vem depois. Está pensando em somar **ticket médio** e **taxa de redepósito** | GGR saiu da lista. Não precisa mexer: `visibleKpis` já omite KPI sem valor, então um deal sem GGR mostra baseline, rollover e ciclo |
+| 6/7 ✅ | Lista e ordem dos KPIs (**taxa de redepósito entregue em 26/08**, ver §12) | "Baseline da casa e roll, que normalmente gira de 1 a 3x. A princípio apenas esses". Ordem vem depois. Está pensando em somar **ticket médio** e **taxa de redepósito** | GGR saiu da lista. Não precisa mexer: `visibleKpis` já omite KPI sem valor, então um deal sem GGR mostra baseline, rollover e ciclo |
 | 9 | Gerente pode recusar? | "Seria bom" | ✅ `POST /api/partnerships/:id/reject` |
 | 10 | Gerente altera a comissão depois? | "Sim, mesmo com o link gerado, **mas com um filtro onde a nova comissão não altere o que foi gerado antes da mudança**" | ⚠️ Ver §10, não implementado |
 | 11 | Pausar casa faz o quê? | "Barrar a entrada de novos dados" | ✅ Casa pausada some da vitrine e recusa solicitação nova, sem tocar em quem já entrou |
@@ -493,3 +493,31 @@ rollover 2x, "base online" = baseline, "Jill" = deal.
 > **[02:55]** A Loja de Deals basicamente tem que ficar com a tela igual a essa aqui. **[03:01]** Aí vai estar a baseline, o KPI e rollover 2x. Basicamente isso.
 > **[03:08]** Quando ele solicitar, o ideal seria ter algo como solicitação de link, pra ser gerado pelo suporte. O ideal seria pro painel admin ou pro suporte ficar responsável por isso, até pra evitar que, vamos supor, a Esportiva a gente pausou a operação e o afiliado queira iniciar, e sem querer o gerente dele acabe deixando ele iniciar. Esse trabalho de link deixa apenas pro suporte.
 > **[03:57]** Ele clicou aqui, solicitou o deal; o gerente dele vai colocar a comissão dele lá e o suporte vai colocar os links.
+
+## §12 · Taxa de redepósito (entregue 26/08/2026)
+
+Pedido do Jotta por WhatsApp, e é uma **correção de modelagem**, não um campo a
+mais: existia um "Redepósito mínimo" em **R$** no cadastro da CASA (22/08), e o
+que as ofertas de fato cobram é um **percentual dos FTDs** — "redepósito mínimo
+de 30%" é a letra do termo da Winhugo e da Blaze na Fomento. Valor em real não
+descrevia regra nenhuma que alguma casa aplicasse.
+
+O campo mudou de dono e de unidade: virou `redepositRate` (%) no **ACORDO**, ao
+lado de baseline e rollover, que é onde as condições comerciais moram. Entra na
+política dos DOIS tipos (`direto` e `gerenciado`), então aparece sozinho no card
+do admin, na vitrine `/parcerias` e no cartão de `/meus-links` pelo mesmo caminho
+dos outros KPIs (`visibleKpis` omite quando não há valor: ausência ≠ 0%).
+
+Validação: 0 a 100. Acima de 100 é recusado porque seria "mais FTDs
+redepositando do que existem", que é sempre o operador digitando 300 no lugar de
+30. Aceita fração (12,5%).
+
+**Sem migração:** nenhuma casa da Infinity tinha `minRedeposit` gravado (conferido
+antes de remover, 16 casas), e acordo antigo sem o campo lê 0 = "a casa não
+exige", igual ao `minCpaGoal`. O campo antigo saiu do cadastro da casa, do card e
+do servidor.
+
+A call de 15/08 já tinha antecipado isto (linha 6/7 da tabela de respostas do
+cliente: "está pensando em somar ticket médio e taxa de redepósito"). **Ticket
+médio segue fora** — quando entrar, é o mesmo caminho: um `DealKpiId` novo na
+política, e a tela acompanha.

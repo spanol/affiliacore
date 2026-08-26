@@ -32,8 +32,8 @@ describe('adminDealKpis · o que o ADMIN edita em cada tipo', () => {
   });
 
   it('acrescenta os KPIs da política do tipo', () => {
-    expect(adminDealKpis('direto')).toEqual(['cpa', 'revshare', 'cpaGoal', 'cycle', 'geo']);
-    expect(adminDealKpis('gerenciado')).toEqual(['cpa', 'revshare', 'baseline', 'rollover', 'cpaGoal', 'cycle', 'ggr']);
+    expect(adminDealKpis('direto')).toEqual(['cpa', 'revshare', 'redeposit', 'cpaGoal', 'cycle', 'geo']);
+    expect(adminDealKpis('gerenciado')).toEqual(['cpa', 'revshare', 'baseline', 'rollover', 'redeposit', 'cpaGoal', 'cycle', 'ggr']);
   });
 
   it('baseline/rollover/GGR só no tipo cuja política os pede', () => {
@@ -166,9 +166,9 @@ describe('adminDealCardRows · as linhas do card, no formato do card de casa', (
 
   it('as linhas seguintes saem da POLÍTICA do tipo, não de lista fixa', () => {
     const gerenciado = adminDealCardRows(deal({ type: 'gerenciado', model: 'hybrid' })).map((r) => r.id);
-    expect(gerenciado).toEqual(['tipo', 'cpa', 'revshare', 'baseline', 'rollover', 'cpaGoal', 'cycle', 'ggr']);
+    expect(gerenciado).toEqual(['tipo', 'cpa', 'revshare', 'baseline', 'rollover', 'redeposit', 'cpaGoal', 'cycle', 'ggr']);
     const direto = adminDealCardRows(deal({ type: 'direto', model: 'hybrid' })).map((r) => r.id);
-    expect(direto).toEqual(['tipo', 'cpa', 'revshare', 'cpaGoal', 'cycle', 'geo']);
+    expect(direto).toEqual(['tipo', 'cpa', 'revshare', 'redeposit', 'cpaGoal', 'cycle', 'geo']);
   });
 
   // Para o ADMIN o vazio é informação (baseline em branco é o que impede publicar),
