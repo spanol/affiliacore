@@ -35,6 +35,7 @@ permite refazer um cadastro apagado sem entrar no painel:
 | Casa (slug) | Oferta | offer_id | CPA |
 |---|---|---|---|
 | `bacanaplay` | Bacanaplay CPA BR - Regulated | 19782128 | 13 EUR |
+| `betfury` | BetFury BR - 1 | 21945140 | 25 EUR |
 | `betnacional` | BetNacional Casino BR - Regulated | 20914058 | 25 EUR |
 | `betwarrior` | BetWarrior BR | 21764673 | 20 EUR |
 | `blaze` | Blaze BR - Regulated | 20997138 | 30 EUR |
@@ -51,6 +52,12 @@ permite refazer um cadastro apagado sem entrar no painel:
 apagadas e, em 24/08, os 4 acordos correspondentes saíram da vitrine. As ofertas
 Sports continuam existindo na rede (ex.: BetNacional Sports `21960807`, Blaze
 Sports `21960827`, ambas 25 e 30 EUR); simplesmente não são operadas aqui.
+
+⚠️ A BetFury tem DUAS ofertas clonadas na rede ("BetFury BR" `21889241` e
+"BetFury BR - 1" `21945140`, mesmos 25 EUR/termos/validade). A casa aponta para a
+**`21945140`** porque foi nela que o teste de postback do go-live chegou em 26/08
+(evento `tag: "replace_it"` retido no ledger) — o ledger é quem diz qual oferta o
+tráfego usa, não o nome.
 
 Termos da oferta da Betnacional Casino, lidos no painel em 24/08: baseline
 depósito R$ 55 + apostado R$ 165, e **50 FTDs mínimos para pagamento**.
