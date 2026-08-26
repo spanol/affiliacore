@@ -242,6 +242,31 @@ As duas casas reais da Infinity que faltavam:
   `theme_color: #000000`) e gravado em **`public/brands/leon-bet.svg`** — pra exibir
   na instância, o admin sobe esse SVG como logo da casa (upload vence preset).
 
+## 4.5 Adendo 26/08/2026 — Winhugo ganha ícone avulso (pedido do Jotta)
+
+Segundo caso da regra do §4.3, e por isso curto: a **Winhugo** também **não consta
+na lista de autorizadas do SPA/MF** (188 marcas em agosto/2026, todas `.bet.br`) e
+opera por domínios fora do regime (`winhugo.lat`, `winhugo.site`). Logo, **não
+entra em `HOUSE_PRESETS`** — a trava de portaria + `.bet.br` existe para isso.
+
+O ícone foi montado a partir da **arte oficial que o Jotta enviou** (emblema WH em
+anel verde/amarelo sobre preto, 1254², com o wordmark e a assinatura "Aposte.
+Viva. Vença."), recortada no miolo do emblema e reduzida a 192px dentro da mesma
+moldura 64×64 dos demais, e gravada em **`public/brands/winhugo.svg`**. A cor da
+marca confere com o que o próprio operador declara no CSS (`--gold: #fdc605`,
+`--bg: #0a0a0a`) e com o `theme-color` do site de review, mas aqui ela é só
+conferência: a arte usada é a que veio do cliente, não uma derivação de favicon.
+
+**Por que o pedido apareceu:** a casa já tinha logo, mas era um banner da REDE
+(bandeira do Brasil + wordmark deitado); no tile de 64px a bandeira dominava e o
+nome ficava cortado. O `logo` gravado vence o preset na resolução de exibição,
+então o card mostrava o banner. A troca foi feita no doc da casa em prod (data
+URL, 88KB, sem Storage) com o antes/depois na auditoria.
+
+⚠️ Diferente da LEON, a arte **não** vai para `scripts/house-logos/`: aquele
+diretório é fonte dos presets do catálogo e tem trava anti-órfão (o teste acusa
+PNG sem preset declarado). Ícone avulso guarda só o SVG, que já embute a arte.
+
 ## 4.4 Adendo 22/08/2026 — 5 casas criadas na Infinity entram (#28–#32)
 
 Cinco casas recém-cadastradas na instância Infinity caíam no avatar genérico de
