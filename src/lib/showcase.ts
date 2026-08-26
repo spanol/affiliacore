@@ -40,7 +40,7 @@ export const SHOWCASE_URL_MAX = 200;
 
 export const SHOWCASE_EMPTY: ShowcaseConfig = { enabled: false, description: '', siteUrl: '' };
 
-const URL_ERROR = 'Site inválido — informe a URL completa começando com https:// (ex.: https://suaagencia.com.br).';
+const URL_ERROR = 'Site inválido. Informe a URL completa começando com https:// (ex.: https://suaagencia.com.br).';
 
 export interface ShowcaseSanitizeResult {
   ok: boolean;

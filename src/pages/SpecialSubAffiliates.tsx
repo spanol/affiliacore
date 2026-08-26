@@ -1008,7 +1008,7 @@ export default function SpecialSubAffiliates() {
               </p>
               {[
                 { key: 'name' as const, label: 'Nome *', type: 'text', placeholder: 'Nome do indicado' },
-                { key: 'email' as const, label: 'E-mail *', type: 'email', placeholder: 'email@exemplo.com — o convite vai para ele' },
+                { key: 'email' as const, label: 'E-mail *', type: 'email', placeholder: 'email@exemplo.com (o convite vai para ele)' },
                 { key: 'phone' as const, label: 'Telefone', type: 'tel', placeholder: '(11) 99999-9999 (opcional)' },
               ].map((f) => (
                 <label key={f.key} className="block">
