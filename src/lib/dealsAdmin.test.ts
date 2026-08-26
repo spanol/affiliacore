@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   adminDealKpis, adminEditsKpi, emptyDealDraft, draftFromDeal, buildDealPayload,
   adminDealCardRows, selectAdminPartnershipQueues, partnershipDecisionMessage,
-  ADMIN_ALWAYS_EDITABLE_KPIS, buildHouseDraftCards, draftFromHouse, type DraftHouse,
+  ADMIN_ALWAYS_EDITABLE_KPIS, buildHouseDraftCards, draftFromHouse, adminRequestAction,
+  adminCanPrice, type DraftHouse,
 } from './dealsAdmin';
 import { DEAL_TYPES, DEAL_TYPE_POLICY } from './dealType';
 import type { Deal } from './deal';
@@ -338,5 +339,33 @@ describe('buildHouseDraftCards · quais casas viram sugestão em /acordos', () =
   it('entrada nula ou vazia não quebra', () => {
     expect(buildHouseDraftCards(null, null)).toEqual([]);
     expect(buildHouseDraftCards(undefined, [{ houseId: 'x' }])).toEqual([]);
+  });
+});
+
+// Relato do Jotta (26/08): "mesmo aprovando pelo painel adm ainda aparece
+// aguardando liberação do Gerente". A fila oferecia Aprovar onde o servidor
+// recusa de propósito (canTransition), então o clique voltava 409 e nada mudava.
+describe('adminRequestAction · o que a fila do admin de fato permite', () => {
+  it('parceria que espera o gerente NÃO oferece aprovar', () => {
+    expect(adminRequestAction({ pricedBy: 'upline' })).toBe('aguardando-gerente');
+  });
+
+  it('acordo direto (agência precifica) segue aprovável', () => {
+    expect(adminRequestAction({ pricedBy: 'admin' })).toBe('aprovar');
+  });
+
+  it('sem o carimbo do servidor cai no comportamento antigo', () => {
+    expect(adminRequestAction({})).toBe('aprovar');
+    expect(adminRequestAction(null)).toBe('aprovar');
+    expect(adminRequestAction(undefined)).toBe('aprovar');
+  });
+
+  it('o carimbo é lido sem depender de caixa ou espaço', () => {
+    expect(adminRequestAction({ pricedBy: ' UPLINE ' })).toBe('aguardando-gerente');
+  });
+
+  it('só quem espera o gerente ganha o atalho de precificar', () => {
+    expect(adminCanPrice(adminRequestAction({ pricedBy: 'upline' }))).toBe(true);
+    expect(adminCanPrice(adminRequestAction({ pricedBy: 'admin' }))).toBe(false);
   });
 });

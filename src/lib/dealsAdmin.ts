@@ -298,3 +298,41 @@ export function partnershipDecisionMessage(
     ? 'Link emitido. A comissão definida pelo gerente foi mantida.'
     : 'Parceria aprovada. Taxa aplicada e link emitido.';
 }
+
+// --- Fila de solicitações do ADMIN: o que cada linha de fato permite ---------
+
+export type AdminRequestAction = 'aprovar' | 'aguardando-gerente';
+
+/**
+ * O que o admin pode fazer com uma solicitação PENDENTE.
+ *
+ * POR QUE existe (relato do Jotta, 26/08): a fila oferecia "Aprovar" em TODA
+ * parceria `requested`, inclusive nas de acordo gerenciado com gerente elegível —
+ * onde o servidor recusa a transição de propósito (`canTransition` só deixa
+ * `requested → priced | rejected` quando quem precifica é o gerente, senão o admin
+ * aprovaria antes de a comissão existir e ainda gravaria a taxa do DEAL por cima
+ * do spread). O clique sempre voltava 409, e o afiliado seguia lendo "aguardando
+ * liberação do Gerente" — que era a verdade, mas parecia bug de aprovação.
+ *
+ * A resposta sai do `pricedBy` que o próprio servidor carimba no
+ * `GET /api/partnerships` (effectivePricedBy: já considera se o afiliado TEM
+ * gerente ativo). Sem o carimbo, cai em 'aprovar', que é o comportamento antigo e
+ * o caso comum do acordo direto.
+ */
+export function adminRequestAction(
+  request?: { pricedBy?: unknown } | null,
+): AdminRequestAction {
+  return String(request?.pricedBy ?? '').trim().toLowerCase() === 'upline'
+    ? 'aguardando-gerente'
+    : 'aprovar';
+}
+
+/**
+ * O admin NÃO fica refém do gerente: a rota de precificação aceita o admin (grava
+ * `byAdmin` na auditoria e dispensa o teto de repasse, que é regra do gerente). É
+ * o que destrava uma fila parada — definir a comissão leva a parceria a `priced`,
+ * e daí o "Emitir link" é o fluxo normal.
+ */
+export function adminCanPrice(action: AdminRequestAction): boolean {
+  return action === 'aguardando-gerente';
+}

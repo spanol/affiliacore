@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 import { motion } from 'motion/react';
 import { Tag, Loader2, Plus, Check, X, Ban, Power, Pencil, Inbox, Link2, Sparkles, Trash2 } from 'lucide-react';
 import {
-  fetchDeals, createDeal, updateDeal, deleteDeal, fetchPartnerships, decidePartnership, fetchAffiliates,
+  fetchDeals, createDeal, updateDeal, deleteDeal, fetchPartnerships, decidePartnership, pricePartnership, fetchAffiliates,
   buildDealLabel, DEAL_MODELS, PAYMENT_CYCLES, DEAL_CURRENCIES, DEAL_MODEL_LABEL, PAYMENT_CYCLE_LABEL,
   DEAL_TYPES, DEAL_TYPE_POLICY, DEAL_KPI_LABEL, dealPolicy, partnershipStatusLabel,
   type Deal, type DealModel, type PaymentCycle, type DealCurrency, type DealTypeId, type PartnershipRequest,
@@ -12,6 +12,7 @@ import { houseLogoOrPreset } from '../lib/housePresets';
 import {
   emptyDealDraft, draftFromDeal, buildDealPayload, adminEditsKpi, adminDealCardRows,
   selectAdminPartnershipQueues, partnershipDecisionMessage, buildHouseDraftCards,
+  adminRequestAction,
   type DealDraft, type HouseDraftCard,
 } from '../lib/dealsAdmin';
 import { DEAL_TYPE_DEFAULT } from '../lib/instanceClient';
@@ -160,6 +161,24 @@ export default function Deals() {
       await load();
     } catch (e: any) {
       push({ type: 'error', message: e?.message || 'Erro ao remover o acordo.' });
+    } finally { setBusy(null); }
+  };
+
+  // Precificação PELO ADMIN: destrava a fila quando o gerente não define a comissão
+  // (a rota aceita admin e dispensa o teto de repasse, que é regra do gerente).
+  const [pricing, setPricing] = useState<{ r: PartnershipRequest; cpaValue: string; revPercentage: string } | null>(null);
+
+  const savePricing = async () => {
+    if (!pricing) return;
+    const { r, cpaValue, revPercentage } = pricing;
+    setBusy(r.id);
+    try {
+      await pricePartnership(r.id, { cpaValue: Number(cpaValue) || 0, revPercentage: Number(revPercentage) || 0 });
+      push({ type: 'success', message: 'Comissão definida. Agora é só emitir o link na aba "Aguardando link".' });
+      setPricing(null);
+      await load();
+    } catch (e: any) {
+      push({ type: 'error', message: e?.message || 'Erro ao definir a comissão.' });
     } finally { setBusy(null); }
   };
 
@@ -419,7 +438,29 @@ export default function Deals() {
               <div className="space-y-3">
                 {pending.map((r) => requestRow(r, (
                   <>
-                    <button onClick={() => decide(r, 'approved')} disabled={busy === r.id} className="px-3 py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5">{busy === r.id ? <Loader2 size={13} className="animate-spin" /> : <Check size={14} />} Aprovar</button>
+                    {/* Acordo gerenciado com gerente elegível: aqui "Aprovar" SEMPRE
+                        voltava 409 (o caminho passa por `priced`). Em vez do botão
+                        que falha, a linha diz o estado e oferece a saída real:
+                        o admin define a comissão e a fila anda. */}
+                    {adminRequestAction(r) === 'aguardando-gerente' ? (
+                      <>
+                        <span
+                          className="hidden sm:inline px-3 py-1.5 rounded-full text-[11px] font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"
+                          title="O acordo é gerenciado: quem define a comissão deste afiliado é o gerente dele. Você pode definir no lugar dele para destravar."
+                        >
+                          Aguardando o gerente
+                        </span>
+                        <button
+                          onClick={() => setPricing({ r, cpaValue: '', revPercentage: '' })}
+                          disabled={busy === r.id}
+                          className="px-3 py-2 rounded-xl bg-accent-500 text-accent-contrast text-xs font-bold hover:bg-accent-400 disabled:opacity-50 flex items-center gap-1.5"
+                        >
+                          {busy === r.id ? <Loader2 size={13} className="animate-spin" /> : <Tag size={14} />} Definir comissão
+                        </button>
+                      </>
+                    ) : (
+                      <button onClick={() => decide(r, 'approved')} disabled={busy === r.id} className="px-3 py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5">{busy === r.id ? <Loader2 size={13} className="animate-spin" /> : <Check size={14} />} Aprovar</button>
+                    )}
                     <button onClick={() => decide(r, 'rejected')} disabled={busy === r.id} className="px-3 py-2 rounded-xl border border-slate-200 dark:border-neutral-700 text-slate-600 dark:text-neutral-300 text-xs font-bold hover:text-red-500 hover:border-red-300 disabled:opacity-50 flex items-center gap-1.5"><X size={14} /> Recusar</button>
                   </>
                 )))}
@@ -654,6 +695,37 @@ export default function Deals() {
             <div className="flex items-center gap-2 mt-6">
               <button onClick={() => setModal(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 text-sm font-bold text-slate-600 dark:text-neutral-300">Cancelar</button>
               <button onClick={saveDeal} disabled={saving || !modal.houseId} className="flex-1 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-neutral-900 text-sm font-bold hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">{saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Comissão definida PELO ADMIN quando o gerente não define. Sem teto (o teto
+          de repasse é regra do gerente, não da agência) e a parceria vai para
+          `priced`, de onde o "Emitir link" segue o fluxo normal. */}
+      {pricing && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPricing(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm bg-white dark:bg-neutral-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-neutral-800 p-6">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Definir a comissão</h2>
+            <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-1">
+              {humanizeName(names[String(pricing.r.affiliateId)] || pricing.r.affiliateId)} · {pricing.r.dealLabel}
+            </p>
+            <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-3">
+              O gerente deste afiliado ainda não definiu a comissão. Definir aqui destrava a parceria e fica registrado como decisão da agência.
+            </p>
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">CPA (R$)</label>
+                <input data-testid="campo-precifica-cpa" type="number" min="0" step="0.01" value={pricing.cpaValue} onChange={(e) => setPricing({ ...pricing, cpaValue: e.target.value })} placeholder="0,00" className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white outline-none" />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400 dark:text-neutral-500 tracking-widest">RevShare (%)</label>
+                <input data-testid="campo-precifica-rev" type="number" min="0" step="0.1" value={pricing.revPercentage} onChange={(e) => setPricing({ ...pricing, revPercentage: e.target.value })} placeholder="0" className="mt-1 w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700 rounded-xl text-sm dark:text-white outline-none" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mt-6">
+              <button onClick={() => setPricing(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-neutral-700 text-sm font-bold text-slate-600 dark:text-neutral-300">Cancelar</button>
+              <button data-testid="salvar-precificacao" onClick={savePricing} disabled={busy === pricing.r.id} className="flex-1 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-neutral-900 text-sm font-bold hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">{busy === pricing.r.id ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Salvar</button>
             </div>
           </div>
         </div>

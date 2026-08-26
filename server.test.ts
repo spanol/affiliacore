@@ -2482,6 +2482,53 @@ describe('deals + parcerias (P2)', () => {
     },
   });
 
+  // Relato do Jotta (26/08): aprovar pelo /admin uma parceria de acordo GERENCIADO
+  // que o gerente ainda não precificou. O servidor recusa de propósito; o que
+  // faltava era a tela não oferecer o botão e dar a saída (precificar como admin).
+  describe('aprovação de parceria gerenciada sem o gerente', () => {
+    const seedGer = () => ({
+      users: {
+        'admin-uid': { role: 'admin' },
+        'aff-uid': { role: 'client', affiliateId: 'affX' },
+        'ger-uid': { role: 'client', affiliateId: 'GER', isSpecial: true },
+      },
+      houses: { oleybet: { slug: 'oleybet', name: 'OleyBet', dataSource: 'manual', registerUrlTemplate: 'https://oley.example/?ref={tag}' } },
+      deals: { dg: { houseId: 'oleybet', operatorName: 'OleyBet', model: 'cpa', cpaValue: 110, revPercentage: 0, cycle: 'mensal', currency: 'BRL', active: true, type: 'gerenciado', baseline: 40 } },
+      partnership_requests: { pr: { affiliateId: 'affX', dealId: 'dg', status: 'requested', operatorName: 'OleyBet', houseId: 'oleybet' } },
+      affiliate_uplines: { affX: { affiliateId: 'affX', uplineId: 'GER' } },
+      special_affiliates: { GER: { active: true, subAffiliateIds: ['affX'] } },
+      affiliate_configs: { GER: { affiliateId: 'GER', byBrand: { oleybet: { cpaValue: 110, revPercentage: 0 } } } },
+    });
+
+    it('a fila do admin CARIMBA que quem precifica é o gerente', async () => {
+      const res = await request(buildApp({ seed: seedGer() })).get('/api/partnerships')
+        .set('Authorization', 'Bearer admin-uid').expect(200);
+      expect(res.body.partnerships.find((p: any) => p.id === 'pr').pricedBy).toBe('upline');
+    });
+
+    it('aprovar direto é recusado, e a mensagem diz o motivo', async () => {
+      const res = await request(buildApp({ seed: seedGer() })).patch('/api/partnerships/pr')
+        .set('Authorization', 'Bearer admin-uid').send({ status: 'approved' }).expect(409);
+      expect(res.body.error).toMatch(/gerente deste afiliado ainda não definiu/i);
+    });
+
+    it('o ADMIN pode precificar no lugar do gerente e a fila anda', async () => {
+      const db = makeFirestore(seedGer());
+      const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+      await request(app).post('/api/partnerships/pr/price').set('Authorization', 'Bearer admin-uid')
+        .send({ cpaValue: 90, revPercentage: 0 }).expect(200);
+      expect(db.__store.get('partnership_requests')?.get('pr')?.status).toBe('priced');
+      // e agora a aprovação (emitir link) passa
+      await request(app).patch('/api/partnerships/pr').set('Authorization', 'Bearer admin-uid')
+        .send({ status: 'approved' }).expect(200);
+      expect(db.__store.get('partnership_requests')?.get('pr')?.status).toBe('approved');
+      // a taxa gravada é a que o ADMIN definiu, não a do deal (R$ 110)
+      const cfg = db.__store.get('affiliate_configs')?.get('affX');
+      const entry = cfg?.byBrand?.oleybet;
+      expect(entry?.cpaValue ?? entry).toMatchObject ? expect(entry.cpaValue).toBe(90) : expect(entry).toBe(90);
+    });
+  });
+
   // §11 do BACKLOG: até 24/08/2026 o produto só sabia DESATIVAR acordo, e limpar
   // acordo órfão da vitrine era escrita manual pelo Admin SDK.
   describe('DELETE /api/deals/:id', () => {
