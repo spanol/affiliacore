@@ -75,6 +75,7 @@ import TrendBadge from '../components/TrendBadge';
 import { DateRange, getDefaultRange, getPreviousRange, percentChange } from '../lib/dateRange';
 import { ALL_BRANDS, getKnownBrandName, buildBrandIdOf } from '../lib/brand';
 import { buildPerHousePayout, payoutOverBrandRows, unratedProducingBrands, type HouseMetricRow } from '../lib/perHousePayout';
+import { buildAffiliateDailySeries } from '../lib/affiliateDailySeries';
 import { canViewAffiliateNetProfit } from '../lib/affiliateView';
 import { cn, humanizeName } from '../lib/utils';
 import { sumFunnelForAffiliate } from '../lib/analyticsDoc';
@@ -973,7 +974,9 @@ export default function AffiliateDetails() {
                         Cadastros · Comissão
                       </div>
                     </div>
-                    <DailyPerformanceChart data={dailyResults} />
+                    {/* Reprecificado: o cru expunha a receita da casa como "Comissão" —
+                      esta rota é a HOME do afiliado comum. Coerente com o card acima. */}
+                  <DailyPerformanceChart data={buildAffiliateDailySeries(dailyResults, config)} />
                   </div>
 
                   {/* Lista de Clientes — desativada: a API de afiliados não expõe dados por

@@ -617,6 +617,51 @@ dinheiro nessas duas superfícies quando o afiliado tem taxa por casa; hoje elas
 exibem um valor calculado na taxa errada. Ver §9 da REDE (gráfico diário do
 especial), que é a mesma limitação.
 
+### 14. Caça de bugs 26/08: o que ficou depois dos consertos
+
+O workflow de caça (5 dimensões, verificação adversarial) rendeu 33 achados
+brutos; os 8 CONFIRMADOS de alta/média foram consertados no mesmo dia (projeção
+por papel no `GET /api/houses`, gráfico diário pelo `calcAffiliatePayout`, lista
+do especial preservada na desativação, cascata de acordo incluindo `priced`,
+desvínculo do conector no delete da casa e ator do log pelo token). Fica aqui o
+RESTO, com a honestidade de origem: **os itens abaixo NÃO passaram por
+verificação adversarial** (médias que não couberam no teto de céticos e baixas
+que passam direto por desenho do workflow). Confirmar antes de consertar.
+
+**Médias não verificadas (races de estado, todas da mesma família):**
+
+- Troca rápida de range/marca sem guarda de cancelamento: `/admin`,
+  ClientDashboard, `/network`, SpecialDashboard e SpecialSubAffiliates — resposta
+  antiga pode sobrescrever a nova. Navegar A→B em `/affiliates/:id` idem.
+- Modal "Cadastrar Usuário" (`AffiliateDetails`) reabre no estado de sucesso do
+  afiliado anterior.
+- Aprovar indicação em `/solicitacoes` não entra na lista do gerente do modelo
+  antigo (`RegistrationRequests.tsx:118`).
+
+**Baixas não verificadas (cada uma com cenário concreto no journal da caça):**
+
+- Aprovação de parceria com câmbio `live` CONGELA a cotação de FALLBACK
+  (EUR 6,00/USD 5,50) quando a AwesomeAPI falha, sem aviso — o `fixed` sem
+  cotação recusa (400), o `live` sem cotação chuta. Candidata a promoção de
+  severidade: é dinheiro gravado.
+- `SpecialDashboard.tsx:205` reimplementa a fórmula de comissão inline, sem
+  `num()` (classe proibida pelo CLAUDE.md).
+- `mustChangePassword` não é server-only nas rules: o usuário limpa a flag via
+  console sem trocar a senha.
+- Trocar conector 1:1 por rede 1:N na MESMA casa: o `applyIntegrationLink` do
+  conector antigo apaga a flag `integration` que o próprio PATCH acabou de gravar.
+- `accept-invite`: falha entre `createUser` e o `set` de `users/{uid}` deixa
+  conta Auth órfã sem caminho de UI para recuperar.
+- Formulários (Settings suporte/vitrine) sobrescritos quando o `profile`
+  re-snapshota (dep `[profile]` em vez de `[profile?.role]`); rascunhos de taxa
+  dos subs somem quando `load()` renova configs; erro do Ranking nunca limpa;
+  modal de saque reabre com valor/observação do pedido desistido.
+
+**Refutado com prova (não reabrir sem fato novo):** "liberar link pro standby
+credita outro afiliado" — o botão de copiar exige `linkReady` e o
+`GET /api/affiliate-links` escopa o link liberado para fora da lista do afiliado
+antigo; a tela dele passa a dizer "link em preparação".
+
 ### Bloqueios que NÃO são nossos
 
 - ~~**Cron da Esportiva** depende da casa isentar `/api/*` do challenge~~ → **RESOLVIDO 04/08/2026**:

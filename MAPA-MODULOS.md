@@ -99,9 +99,10 @@ rotas `app.delete` do `server.ts`).
 Decisões `mantem` que carregam uma ponta conhecida — declaradas aqui em vez de
 escondidas:
 
-1. **Casa apagada com conector ligado:** `integrations.houseId` fica apontando
-   para o slug morto, e `/integracoes` diz "ligada na casa X" de uma casa que não
-   existe. Baixo impacto (o pull 404a), mas é o próximo da fila se incomodar.
+1. ~~Casa apagada com conector ligado deixava `integrations.houseId` apontando
+   para o slug morto~~ → **consertado em 26/08** (caça de bugs): o `DELETE` desfaz
+   o vínculo 1:1 ANTES de apagar (depois, o `applyIntegrationLink` recriaria a
+   casa como fantasma). O doc da credencial fica, sem alvo.
 2. **Casa apagada com links vivos:** o `/go/:code` continua redirecionando para o
    `registerUrl` já cunhado. É até desejável (o link do WhatsApp não morre), mas o
    clique não vira resultado em casa nenhuma.

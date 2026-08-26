@@ -36,6 +36,7 @@ import { ALL_BRANDS, getKnownBrandName } from '../lib/brand';
 import { cn } from '../lib/utils';
 import { buildDailyExtractCsv } from '../lib/exportExtract';
 import { payoutOverBrandRows, unratedProducingBrands } from '../lib/perHousePayout';
+import { buildAffiliateDailySeries } from '../lib/affiliateDailySeries';
 import { pluralize } from '../lib/plural';
 import { buildCsvFilename } from '../lib/csv';
 import { downloadCsvFile } from '../lib/browserDownload';
@@ -385,7 +386,9 @@ export default function ClientDashboard() {
                 Cadastros · Comissão
               </div>
             </div>
-            <DailyPerformanceChart data={dailyResults} />
+            {/* Série reprecificada: o cru plotava total_commission (receita da CASA)
+                    como "Comissão" — ver src/lib/affiliateDailySeries.ts. */}
+            <DailyPerformanceChart data={buildAffiliateDailySeries(dailyResults, config)} />
           </div>
 
           {/* Lista de Clientes — desativada: a API de afiliados não expõe dados por

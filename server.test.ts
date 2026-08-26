@@ -837,6 +837,23 @@ describe('special_affiliates com fromNetwork — visão N níveis, dinheiro 1 n�
     expect(db.__store.get('users')?.get('ger-uid')?.isSpecial).toBe(true);
   });
 
+  it('desativar o especial PRESERVA a lista manual (reativar devolve a equipe)', async () => {
+    const db = makeFirestore({
+      users: { 'admin-uid': { role: 'admin' } },
+      special_affiliates: { GER: { active: true, subAffiliateIds: ['A1', 'A2'], fromNetwork: false } },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app)
+      .post('/api/special-affiliates')
+      .set('Authorization', 'Bearer admin-uid')
+      // o modal manda [] quando desativa: o servidor tem que IGNORAR a lista
+      .send({ affiliateId: 'GER', active: false, subAffiliateIds: [] })
+      .expect(200);
+    const doc = db.__store.get('special_affiliates')?.get('GER');
+    expect(doc.active).toBe(false);
+    expect(doc.subAffiliateIds).toEqual(['A1', 'A2']); // caça 26/08: zerava sem volta e sem trilha
+  });
+
   it('o proxy externo escopa pela subárvore derivada (IDOR)', async () => {
     const { fetchImpl, calls } = captureFetch();
     const app = buildApp({ seed, fetchImpl });
@@ -1885,6 +1902,23 @@ describe('Fase 4 — auditoria das ações de admin', () => {
 });
 
 // =============================================================================
+// POST /api/audit-logs — o ator sai do TOKEN, nunca do corpo (caça 26/08)
+// =============================================================================
+describe('POST /api/audit-logs — ator não-forjável', () => {
+  it('actorId/actorName do corpo são IGNORADOS: o log sai com o autor do token', async () => {
+    const db = makeFirestore({ users: { 'admin-uid': { role: 'admin', name: 'Equipe', email: 'adm@x.com' } } });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app).post('/api/audit-logs').set('Authorization', 'Bearer admin-uid')
+      .send({ affiliateId: 'affX', action: 'status.update', actorId: 'forjado', actorName: 'Outra Pessoa' })
+      .expect(201);
+    expect(res.body.actorId).toBe('admin-uid');
+    expect(res.body.actorName).not.toBe('Outra Pessoa');
+    const gravado = [...(db.__store.get('audit_logs')?.values() ?? [])].find((l: any) => l.action === 'status.update');
+    expect(gravado.actorId).toBe('admin-uid');
+  });
+});
+
+// =============================================================================
 // Fase 5 — GET /api/audit-logs: ?limit= e filtro por entidade (?entityType&entityId)
 // =============================================================================
 describe('Fase 5 — GET /api/audit-logs (limit + filtro por entidade)', () => {
@@ -2089,6 +2123,41 @@ describe('cron interno daily-ranking', () => {
 // =============================================================================
 // GET /api/houses — auto-seed das casas-semente (só com o módulo OTG LIGADO)
 // =============================================================================
+// Caça de 26/08 (2 achados ALTA): a rota é requireAuth e entregava a taxa
+// casa→agência e a fila pendingTags (com dinheiro) a qualquer logado.
+describe('GET /api/houses — projeção por papel', () => {
+  const seed = () => ({
+    users: { 'admin-uid': { role: 'admin' }, 'aff-uid': { role: 'client', affiliateId: 'affX' } },
+    houses: {
+      esportiva: {
+        slug: 'esportiva', name: 'Esportiva Bet', dataSource: 'manual', active: true,
+        defaultCpa: 280, defaultRev: 5, fxMode: 'live', fxRate: null, issPercent: 2,
+        integration: 'esportiva-tap',
+        pendingTags: [{ tag: 'orfa', days: 1, registrations: 1, first_deposits: 1, qualified_cpa: 1, total_commission: 280 }],
+      },
+    },
+  });
+
+  it('afiliado NÃO recebe defaultCpa/defaultRev/fx/pendingTags (removidos, não zerados)', async () => {
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(seed()) });
+    const res = await request(app).get('/api/houses').set('Authorization', 'Bearer aff-uid').expect(200);
+    const casa = res.body.houses.find((h: any) => h.slug === 'esportiva');
+    for (const campo of ['defaultCpa', 'defaultRev', 'fxMode', 'fxRate', 'pendingTags', 'pendingTagsAt', 'integration', 'pullAvailable', 'revInProfit']) {
+      expect(casa, `campo de gestão "${campo}" vazou ao afiliado`).not.toHaveProperty(campo);
+    }
+    // o que a tela dele precisa continua vindo
+    expect(casa).toMatchObject({ slug: 'esportiva', name: 'Esportiva Bet', issPercent: 2 });
+  });
+
+  it('admin segue recebendo a projeção completa', async () => {
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: makeFirestore(seed()) });
+    const res = await request(app).get('/api/houses').set('Authorization', 'Bearer admin-uid').expect(200);
+    const casa = res.body.houses.find((h: any) => h.slug === 'esportiva');
+    expect(casa.defaultCpa).toBe(280);
+    expect(casa.pendingTags).toHaveLength(1);
+  });
+});
+
 describe('GET /api/houses — auto-seed das casas OTG', () => {
   it('instância OTG ligada: coleção vazia → 1ª listagem semeia as DEFAULT_BRANDS', async () => {
     const fs = makeFirestore({ users: { 'admin-uid': { role: 'admin' } } });
@@ -2459,6 +2528,26 @@ describe('deals + parcerias (P2)', () => {
     });
   });
 
+  it('desativar acordo encerra também a parceria PRICED (fila fantasma da caça 26/08)', async () => {
+    const seed = baseSeed();
+    (seed as any).deals.d1.active = true;
+    (seed as any).partnership_requests = {
+      pReq: { affiliateId: 'affX', dealId: 'd1', status: 'requested' },
+      pPriced: { affiliateId: 'affY', dealId: 'd1', status: 'priced', code: 'LNK1' },
+      pDone: { affiliateId: 'affX', dealId: 'd1', status: 'rejected' },
+    };
+    (seed as any).affiliate_links = { LNK1: { affiliateId: 'affY', active: true } };
+    const db = makeFirestore(seed);
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await request(app).patch('/api/deals/d1').set('Authorization', 'Bearer admin-uid')
+      .send({ active: false }).expect(200);
+    const parts = db.__store.get('partnership_requests');
+    expect(parts?.get('pReq')?.status).toBe('discontinued');
+    expect(parts?.get('pPriced')?.status).toBe('discontinued'); // antes sobrevivia
+    expect(parts?.get('pDone')?.status).toBe('rejected');       // decidida fica
+    expect(db.__store.get('affiliate_links')?.get('LNK1')?.active).toBe(false);
+  });
+
   // §11, terceira ponta: casa criada cria um acordo-rascunho, e apagar a casa
   // deixava esse rascunho órfão na vitrine (foi o que sobrou das frentes "Sports").
   describe('DELETE /api/houses/:id · cascata no acordo-rascunho', () => {
@@ -2485,6 +2574,20 @@ describe('deals + parcerias (P2)', () => {
       const res = await request(app).delete('/api/houses/blaze-sports').set('Authorization', 'Bearer admin-uid').expect(200);
       expect(res.body).toMatchObject({ draftDealsRemoved: 0, dealsKept: 1 });
       expect(db.__store.get('deals')?.has('draft')).toBe(true);
+    });
+
+    it('apagar casa com conector 1:1 desfaz o vínculo SEM recriar a casa fantasma', async () => {
+      const db = makeFirestore({
+        users: { 'admin-uid': { role: 'admin' } },
+        houses: { 'esportiva': { slug: 'esportiva', name: 'Esportiva', dataSource: 'manual', integration: 'esportiva-tap' } },
+        integrations: { 'esportiva-tap': { id: 'esportiva-tap', houseId: 'esportiva' } },
+      });
+      const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+      await request(app).delete('/api/houses/esportiva').set('Authorization', 'Bearer admin-uid').expect(200);
+      // o alvo do conector foi limpo…
+      expect(db.__store.get('integrations')?.get('esportiva-tap')?.houseId).toBeNull();
+      // …e a casa NÃO renasceu como fantasma (o desvínculo roda ANTES do delete)
+      expect(db.__store.get('houses')?.has('esportiva')).toBe(false);
     });
 
     it('rascunho COM parceria fica, mesmo zerado', async () => {

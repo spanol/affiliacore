@@ -61,6 +61,7 @@ import {
 import { normalizeLegalDocInput, computeNextVersion } from './src/lib/legal';
 import { buildAuditSnapshot } from './src/lib/auditSnapshot';
 import { summarizePendingTags, removePendingTag } from './src/lib/housePull';
+import { sanitizeHousesForViewer } from './src/lib/houseView';
 import { canTransitionWithdrawal, normalizeWithdrawalAmount, type WithdrawalStatus } from './src/lib/withdrawal';
 import { buildNetworkTree, resolveRepasseCap, exceedsRepasseCap, hasConfiguredRate } from './src/lib/network';
 import { scheduleRateChange, brandRateEntry, isRateConfigured, type BrandRateEntry } from './src/lib/rateHistory';
@@ -1156,7 +1157,11 @@ export function createApp(deps: ServerDeps) {
       await adminDb.collection('special_affiliates').doc(affId).set({
         active: isActive,
         fromNetwork: derived,
-        subAffiliateIds: isActive ? subs : [],
+        // Desativar NÃO toca na lista: zerá-la aqui apagava o organograma manual
+        // sem volta e sem trilha (achado ALTA da caça de 26/08) — reativar o
+        // gerente o devolvia sem equipe. Inativo já é neutralizado na leitura
+        // (activeOnly), então preservar o campo não muda nenhuma visão.
+        ...(isActive ? { subAffiliateIds: subs } : {}),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
 
@@ -1803,16 +1808,20 @@ export function createApp(deps: ServerDeps) {
     }
 
     try {
-      const { affiliateId, actorId, actorName, action, reason } = req.body ?? {};
+      const { affiliateId, action, reason } = req.body ?? {};
 
       if (!affiliateId || !action) {
         return res.status(400).json({ error: 'affiliateId e action são obrigatórios.' });
       }
 
+      // O ATOR sai do token, nunca do corpo: aceitar actorId/actorName do client
+      // tornava a trilha forjável (achado da caça de 26/08) e contradizia o
+      // auditEntry, que carimba req.user em toda outra rota.
+      const actor = (req as any).user || {};
       const payload = {
         affiliateId: String(affiliateId),
-        actorId: actorId ? String(actorId) : null,
-        actorName: actorName ? String(actorName) : null,
+        actorId: actor.uid ?? null,
+        actorName: actor.name ?? actor.email ?? null,
         action: String(action),
         reason: reason ? String(reason) : null,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -4562,7 +4571,7 @@ export function createApp(deps: ServerDeps) {
   };
 
   // Lista as casas (qualquer signed-in: o afiliado precisa p/ logos/filtros).
-  app.get('/api/houses', requireAuth, async (_req, res) => {
+  app.get('/api/houses', requireAuth, async (req, res) => {
     if (!adminDb) return res.status(500).json({ error: 'Servidor indisponível' });
     try {
       await ensureHousesSeeded();
@@ -4585,12 +4594,15 @@ export function createApp(deps: ServerDeps) {
           connectorReady.set(id, await PULL_CONNECTORS[id].configured());
         }),
       );
-      return res.json({
-        houses: houses.map((h) => ({
-          ...h,
-          pullAvailable: !!(h.integration && connectorReady.get(h.integration)),
-        })),
-      });
+      // Projeção por PAPEL (espelho do sanitizeDealForViewer): o afiliado precisa
+      // de logo/frescor/ISS, nunca da taxa casa→agência, do câmbio da casa nem da
+      // fila de tags com dinheiro — campos REMOVIDOS, não zerados (ausência ≠ R$0).
+      // Achado ALTA da caça de 26/08: a margem da agência saía por subtração.
+      const full = houses.map((h) => ({
+        ...h,
+        pullAvailable: !!(h.integration && connectorReady.get(h.integration)),
+      }));
+      return res.json({ houses: sanitizeHousesForViewer(full, (req as any).user?.role) });
     } catch (e) {
       console.error('[houses] erro ao listar:', e);
       return res.status(500).json({ error: 'Erro ao listar as casas' });
@@ -4840,6 +4852,17 @@ export function createApp(deps: ServerDeps) {
       const snap = await ref.get();
       const before = snap.exists ? (snap.data() as any) : null;
       const snapshot = buildAuditSnapshot(before);
+      // Conector 1:1 é desvinculado ANTES do delete: `applyIntegrationLink` grava
+      // `integration: null` na casa, e rodar isso DEPOIS recriaria o doc apagado
+      // como fantasma. Sem este passo, `integrations/{id}.houseId` ficava
+      // apontando para slug morto e /integracoes exibia o vínculo com uma casa
+      // inexistente (caça de 26/08). Rede multiHouse não passa por aqui: o
+      // vínculo dela vive só no doc da casa, que está indo embora junto.
+      const integrationId = String(before?.integration ?? '').trim();
+      if (integrationId && !findIntegrationSpec(integrationId)?.multiHouse) {
+        await applyIntegrationLink(integrationId, null)
+          .catch((e) => console.error('[houses] casa vai ser apagada, mas o desvínculo do conector falhou:', e));
+      }
       await ref.delete();
       // Criar casa cria junto um acordo em RASCUNHO. Apagar a casa e deixar o
       // rascunho para trás foi o que manteve as 4 frentes "Sports" da Infinity na
@@ -5030,7 +5053,10 @@ export function createApp(deps: ServerDeps) {
         let touched = 0;
         for (const p of parts.docs) {
           const st = (p.data() as any)?.status;
-          if (st === 'requested' || st === 'approved') {
+          // Definição CANÔNICA de parceria viva (inclui 'priced'): a condição
+          // inline esquecia a precificada pelo gerente, que sobrevivia como fila
+          // fantasma e ainda travava o DELETE do acordo (caça de 26/08).
+          if (isActivePartnership(st)) {
             batch.set(p.ref, { status: 'discontinued', decidedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
             const code = (p.data() as any)?.code;
             if (code) batch.set(adminDb.collection('affiliate_links').doc(String(code)), { active: false }, { merge: true });

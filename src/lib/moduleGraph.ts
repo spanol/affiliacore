@@ -132,7 +132,7 @@ export const DELETE_CONTRACTS: Record<string, DeleteContract> = {
     cascata: {
       affiliate_configs: 'mantem',      // byBrand[casa] é histórico de taxa; apagar reprecificaria extrato
       house_results: 'mantem',          // produção é histórico financeiro
-      integrations: 'mantem',           // ⚠️ houseId fica apontando para slug morto (MAPA §observações)
+      integrations: 'mantem',           // o DOC fica; o houseId é limpo ANTES do delete (applyIntegrationLink)
       postback_events: 'mantem',        // ledger reprocessável
       affiliate_tag_aliases: 'mantem',  // vínculo tag→afiliado sobrevive a recriação da casa
       affiliate_links: 'mantem',        // ⚠️ /go continua redirecionando (MAPA §observações)
