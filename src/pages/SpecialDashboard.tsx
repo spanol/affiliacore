@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { pluralize } from '../lib/plural';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Loader2, DollarSign, User, UserPlus, Wallet, Target, Crown, HelpCircle, Users, BarChart3, TrendingUp, MousePointerClick, Hash, Divide, Receipt } from 'lucide-react';
+import { Loader2, DollarSign, UserPlus, Wallet, Target, Crown, HelpCircle, Users, BarChart3, TrendingUp, MousePointerClick, Hash, Divide, Receipt } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   fetchSpecialAffiliates,
@@ -29,6 +29,7 @@ import { buildSpecialDailySeries } from '../lib/specialDaily';
 import DateRangePicker from '../components/DateRangePicker';
 import NetworkHouseBreakdown from '../components/NetworkHouseBreakdown';
 import BrandFilter from '../components/BrandFilter';
+import InfoTooltip from '../components/InfoTooltip';
 import CampaignBreakdown from '../components/CampaignBreakdown';
 import DailyPerformanceChart from '../components/DailyPerformanceChart';
 import AffiliatePerformanceChart from '../components/AffiliatePerformanceChart';
@@ -209,21 +210,49 @@ export default function SpecialDashboard() {
       .filter((h) => h.key && (isAllBrands || h.key === houseKey))
   );
 
-  // Cards de métrica (espelham o /admin, capados à rede do especial). "Comissão
-  // própria" e "Comissão da rede" são o antigo "Comissão total" ABERTO: os mesmos
-  // números, sem o agregado sem rótulo que o gerente lia como saldo a receber (dos
-  // R$ 530 do exemplo, R$ 180 eram repasse aos subs). O total continua na tela, mas
-  // dizendo de quem é: "Total da rede".
+  // Cards de métrica (revisão do Jota, 28/08). Três decisões vieram dele:
+  //
+  // (1) SAIU o "Total da rede" (produção própria + bruto da rede). Ele resumia dois
+  //     dinheiros de naturezas diferentes num rótulo só, que é a confusão que esta
+  //     tela nasceu para desfazer: no exemplo dele, R$ 530 dos quais R$ 280 eram
+  //     repasse aos subs.
+  // (2) "Comissão total" é o que ele RECEBE: produção própria + a margem que sobra
+  //     da produção dos afiliados depois do repasse. É o mesmo número que o card
+  //     verde exibia como "lucro líquido"; mudou o nome e o lugar, não a conta.
+  // (3) A produção própria sozinha desceu para o card verde (ver o JSX).
+  //
+  // Os cards de CPA/REV só existem com REV ligado: com `VITE_REV_ENABLED=false` a
+  // comissão É o CPA (não há segunda parcela), então eles repetiriam, centavo a
+  // centavo, os cards de comissão ao lado. Foi o que o Jota apontou ao circular
+  // "CPA da rede" (R$ 330) tendo "Comissão da rede" (R$ 330) na mesma tela.
   const metrics = [
     { label: 'Afiliados na rede', value: String(subIds.length), icon: Users },
-    { label: 'Comissão própria', value: brl(split.propria.total), icon: User },
-    { label: 'Comissão da rede', value: brl(split.rede.total), icon: Users },
-    { label: 'Total da rede', value: brl(split.total.total), icon: DollarSign },
-    { label: 'CPA próprio', value: brl(split.propria.cpa), icon: BarChart3 },
-    { label: 'CPA da rede', value: brl(split.rede.cpa), icon: BarChart3 },
-    // Instância que fecha só CPA com as casas esconde o REV (VITE_REV_ENABLED).
-    ...(REV_ENABLED ? [{ label: 'REV da rede', value: brl(split.total.rev), icon: TrendingUp }] : []),
+    {
+      label: 'Comissão total',
+      value: brl(split.lucro),
+      icon: DollarSign,
+      hint: 'O que você recebe no período: sua produção própria mais a margem que sobra da produção dos seus afiliados, já descontado o repasse a eles.',
+    },
+    {
+      label: 'Comissão da rede',
+      value: brl(split.rede.total),
+      icon: Users,
+      hint: 'O que seus afiliados geraram, lido à sua taxa. Deste valor sai o repasse a eles; o que sobra é a sua margem e entra na comissão total.',
+    },
+    ...(REV_ENABLED
+      ? [
+          { label: 'CPA próprio', value: brl(split.propria.cpa), icon: BarChart3, hint: 'Parcela de CPA da sua produção própria.' },
+          { label: 'CPA da rede', value: brl(split.rede.cpa), icon: BarChart3, hint: 'Parcela de CPA da produção dos seus afiliados, à sua taxa.' },
+          { label: 'REV próprio', value: brl(split.propria.rev), icon: TrendingUp, hint: 'Parcela de REV Share da sua produção própria.' },
+          { label: 'REV da rede', value: brl(split.rede.rev), icon: TrendingUp, hint: 'Parcela de REV Share da produção dos seus afiliados, à sua taxa.' },
+        ]
+      : []),
   ];
+
+  // A margem sobre a rede não ganhou card (decisão de 28/08: o Jota pediu a tela
+  // enxuta), então ela é dita por extenso na legenda do card verde. Sem isso o
+  // gerente só chegaria nela subtraindo a produção própria da comissão total.
+  const margemRede = split.lucro - split.propria.total;
 
   // Série diária: a API agrega own+subs por dia. buildSpecialDailySeries troca a
   // comissão da CASA (total_commission cru) pela comissão DO ESPECIAL à taxa
@@ -353,7 +382,13 @@ export default function SpecialDashboard() {
                 <metric.icon size={20} className={cn(idx === 0 ? 'text-white' : 'text-slate-900 dark:text-neutral-100')} />
               </div>
             </div>
-            <p className={cn('text-[10px] uppercase font-bold tracking-widest mb-1.5', idx === 0 ? 'text-neutral-400' : 'text-slate-400 dark:text-neutral-500')}>{metric.label}</p>
+            <p className={cn('flex items-center gap-1 text-[10px] uppercase font-bold tracking-widest mb-1.5', idx === 0 ? 'text-neutral-400' : 'text-slate-400 dark:text-neutral-500')}>
+              {metric.label}
+              {/* "Comissão total" (o que ele recebe) e "Comissão da rede" (o bruto
+                  dos subs) são naturezas diferentes e a da rede é MAIOR. Sem dizer
+                  isso na tela, o número maior volta a parecer o saldo. */}
+              {'hint' in metric && metric.hint ? <InfoTooltip text={metric.hint} size={10} align="left" /> : null}
+            </p>
             <h3 className={cn('text-2xl font-bold tracking-tight truncate', idx === 0 ? 'text-white' : 'text-slate-900 dark:text-white')}>{metric.value}</h3>
           </motion.div>
         ))}
@@ -368,11 +403,16 @@ export default function SpecialDashboard() {
         <div className="absolute top-0 right-0 w-56 h-56 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
         <div className="relative">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 mb-3 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-widest">
-            Lucro líquido no período{isAllBrands ? '' : ` · ${selectedBrand}`} <HelpCircle size={12} />
+            Comissão própria no período{isAllBrands ? '' : ` · ${selectedBrand}`} <HelpCircle size={12} />
           </span>
-          <h3 className="text-3xl md:text-4xl font-bold tracking-tighter text-emerald-700 dark:text-emerald-400">{brl(split.lucro)}</h3>
+          <h3 className="text-3xl md:text-4xl font-bold tracking-tighter text-emerald-700 dark:text-emerald-400">{brl(split.propria.total)}</h3>
+          {/* A margem é dita aqui porque não tem card próprio. Quando não há rede
+              produzindo ela é zero, e aí a frase inteira sobra: uma linha dizendo
+              "somada à margem de R$ 0,00" só faz o gerente procurar o que não existe. */}
           <p className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 mt-2 max-w-2xl">
-            Total da rede ({brl(split.total.total)}) − repasses aos sub-afiliados ({brl(split.repasse)}). Inclui sua produção própria ({brl(split.propria.total)}) + o spread sobre a rede.
+            {margemRede > 0
+              ? `O que você mesmo produziu no período. Somada à sua margem sobre a rede (${brl(margemRede)}), fecha os ${brl(split.lucro)} de comissão total.`
+              : 'O que você mesmo produziu no período, sem a produção dos seus afiliados.'}
           </p>
         </div>
         <div className="relative shrink-0 p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500">
