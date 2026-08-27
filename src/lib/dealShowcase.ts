@@ -135,6 +135,36 @@ export function myCommissionChips(
   return out;
 }
 
+/**
+ * As parcerias DO AFILIADO que está olhando a tela, dentro da lista que o servidor
+ * devolveu.
+ *
+ * O `GET /api/partnerships` escopa por PAPEL, não por dono: para um especial ele
+ * devolve a rede inteira (own + subs), porque é disso que a fila do gerente e o
+ * /acordos precisam. A vitrine do afiliado precisa do oposto — só o que é dele —
+ * e sem este recorte o gerente via a solicitação do sub em "Minhas solicitações",
+ * com o recado "Seu gerente vai definir a sua comissão", que ele nem tem.
+ *
+ * Pior que a confusão visual: a MESMA lista alimenta `selectAvailableDeals`, que
+ * esconde a oferta já solicitada. Com as solicitações dos subs dentro, a casa que
+ * um sub pediu SUMIA das ofertas do gerente e ele não conseguia mais pedir para si
+ * (queixa do Kratos na Infinity, 27/08/2026: BetFury e OleyBet). É o mesmo defeito
+ * que o /meus-links do gerente teve em 21/08 (§10 do BACKLOG).
+ *
+ * Sem dono resolvido devolve VAZIO, nunca a lista crua: não dá para provar que
+ * alguma daquelas linhas é dele, e chutar é justamente o bug.
+ */
+export function selectOwnPartnerships<T extends { affiliateId?: unknown }>(
+  requests: T[] | null | undefined,
+  ownAffiliateId: string | null | undefined,
+): T[] {
+  const own = String(ownAffiliateId ?? '').trim();
+  if (!own) return [];
+  return (Array.isArray(requests) ? requests : []).filter(
+    (r) => String(r?.affiliateId ?? '').trim() === own
+  );
+}
+
 export type PricedBy = 'admin' | 'upline';
 
 // Quem está precificando ESTA solicitação. O servidor é a fonte boa (ele sabe se o

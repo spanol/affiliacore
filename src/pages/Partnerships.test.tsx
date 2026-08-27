@@ -13,9 +13,14 @@ const h = vi.hoisted(() => ({
   partnerships: [] as any[],
   links: [] as any[],
   requestPartnership: vi.fn(),
+  affiliateId: 'AFF-1' as string | undefined,
 }));
 
 vi.mock('../contexts/ToastContext', () => ({ useToast: () => ({ push: h.push }) }));
+// A tela é a vitrine DO afiliado logado: sem saber quem ele é não há o que mostrar.
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({ profile: { affiliateId: h.affiliateId } }),
+}));
 vi.mock('motion/react', () => ({
   motion: new Proxy({}, { get: () => (props: any) => props.children ?? null }),
 }));
@@ -60,6 +65,7 @@ beforeEach(() => {
   h.deals = [direto()];
   h.partnerships = [];
   h.links = [];
+  h.affiliateId = 'AFF-1';
   h.requestPartnership.mockResolvedValue({});
 });
 
@@ -197,6 +203,48 @@ describe('/parcerias · estados de Minhas solicitações', () => {
 
   it('sem solicitações mostra o estado vazio', async () => {
     await abrirMinhas();
+    expect(screen.getByText('Nenhuma solicitação ainda')).toBeInTheDocument();
+  });
+});
+
+// 27/08/2026 · a queixa do Kratos na Infinity. O GET /api/partnerships escopa por
+// PAPEL: para um gerente ele devolve a rede inteira (own + subs), porque é disso que
+// a fila dele e o /acordos precisam. A vitrine tem que recortar de volta ao dono.
+describe('/parcerias · o gerente vê a vitrine DELE, não a da rede', () => {
+  const minha = { id: 'p1', affiliateId: 'GER', dealId: 'd1', status: 'approved', operatorName: 'Esportiva Bet', dealLabel: 'Esportiva Bet - CPA', houseId: 'esportiva' };
+  const doSub = { id: 'p2', affiliateId: 'SUB', dealId: 'd2', status: 'requested', operatorName: 'LEON Bet', dealLabel: 'LEON Bet - CPA', houseId: 'esportiva' };
+
+  beforeEach(() => {
+    h.affiliateId = 'GER';
+    h.deals = [direto(), gerenciado()];
+    h.partnerships = [minha, doSub];
+  });
+
+  it('a contagem da aba conta só as dele', async () => {
+    await renderPage();
+    expect(screen.getByRole('button', { name: /Minhas solicitações \(1\)/ })).toBeInTheDocument();
+  });
+
+  it('a solicitação do SUB não aparece como se fosse dele', async () => {
+    await renderPage();
+    clickTab(/Minhas solicitações/);
+    expect(screen.getByTestId('recado-p1')).toBeInTheDocument();
+    expect(screen.queryByTestId('recado-p2')).not.toBeInTheDocument();
+  });
+
+  it('a oferta que o SUB pediu continua disponível para ele solicitar', async () => {
+    // O bloqueio real: com a lista crua, `selectAvailableDeals` via a parceria do sub
+    // e sumia com a casa da vitrine do gerente. Ele não conseguia pedir para si, e o
+    // admin não tinha nada para aprovar.
+    await renderPage();
+    expect(screen.getByText('LEON Bet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Solicitar parceria/ })).toBeInTheDocument();
+  });
+
+  it('perfil sem afiliado vinculado não herda a lista de ninguém', async () => {
+    h.affiliateId = undefined;
+    await renderPage();
+    clickTab(/Minhas solicitações/);
     expect(screen.getByText('Nenhuma solicitação ainda')).toBeInTheDocument();
   });
 });

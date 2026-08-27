@@ -12,7 +12,9 @@ import { useToast } from '../contexts/ToastContext';
 import { houseLogoOrPreset } from '../lib/housePresets';
 import {
   dealKpiChips, dealRequestHint, resolvePartnershipPricedBy, partnershipNote,
+  selectOwnPartnerships,
 } from '../lib/dealShowcase';
+import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
 
 type Tab = 'available' | 'mine';
@@ -30,9 +32,10 @@ const STATUS_STYLE: Record<string, { icon: any; cls: string }> = {
 
 export default function Partnerships() {
   const { push } = useToast();
+  const { profile } = useAuth();
   const [tab, setTab] = useState<Tab>('available');
   const [deals, setDeals] = useState<Deal[]>([]);
-  const [requests, setRequests] = useState<PartnershipRequest[]>([]);
+  const [allRequests, setAllRequests] = useState<PartnershipRequest[]>([]);
   const [links, setLinks] = useState<Record<string, AffiliateLink>>({});
   const [logos, setLogos] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
@@ -45,7 +48,7 @@ export default function Partnerships() {
     try {
       const [d, r, allLinks, houses] = await Promise.all([fetchDeals(), fetchPartnerships(), fetchAffiliateLinks(), fetchHouses().catch(() => [])]);
       setDeals(d);
-      setRequests(r);
+      setAllRequests(r);
       const lmap: Record<string, AffiliateLink> = {};
       allLinks.forEach((l) => { lmap[l.code] = l; });
       setLinks(lmap);
@@ -61,6 +64,15 @@ export default function Partnerships() {
     }
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+
+  // Esta tela é a vitrine DO AFILIADO, então tudo aqui sai das parcerias DELE. O
+  // servidor manda a rede inteira quando quem pede é um gerente (é o que a fila
+  // dele e o /acordos consomem); usar a lista crua aqui misturava a solicitação do
+  // sub com a dele E escondia das ofertas a casa que o sub já tinha pedido.
+  const requests = useMemo(
+    () => selectOwnPartnerships(allRequests, profile?.affiliateId),
+    [allRequests, profile?.affiliateId]
+  );
 
   const available = useMemo(() => {
     const q = search.trim().toLowerCase();

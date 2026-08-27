@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   formatDealKpiValue, dealKpiChips, dealRequestHint,
   resolvePartnershipPricedBy, partnershipNote, myCommissionChips,
+  selectOwnPartnerships,
 } from './dealShowcase';
 import { DEAL_KPI_LABEL, DEAL_TYPE_POLICY } from './dealType';
 import type { Deal } from './deal';
+import { selectAvailableDeals } from './partnership';
 import type { PartnershipRequest } from './partnership';
 
 // F4 do PLANO-TIPOS-DE-DEAL: o núcleo da vitrine do afiliado. O caso que dirige o
@@ -222,5 +224,47 @@ describe('chip de redepósito', () => {
   it('entra nos chips da vitrine junto dos outros KPIs', () => {
     const ids = dealKpiChips({ ...deal, redepositRate: 30 }).map((c) => c.id);
     expect(ids).toContain('redeposit');
+  });
+});
+
+describe('selectOwnPartnerships · a vitrine mostra só o que é do dono', () => {
+  const gerente = 'boost_kratos';
+  const sub = 'boost_douglas';
+  const lista = [
+    { id: 'r1', affiliateId: gerente, dealId: 'd-kto', status: 'approved' },
+    { id: 'r2', affiliateId: sub, dealId: 'd-betfury', status: 'requested' },
+    { id: 'r3', affiliateId: sub, dealId: 'd-oleybet', status: 'requested' },
+  ] as any[];
+
+  it('devolve só as parcerias do afiliado que está olhando', () => {
+    expect(selectOwnPartnerships(lista, gerente).map((r) => r.id)).toEqual(['r1']);
+    expect(selectOwnPartnerships(lista, sub).map((r) => r.id)).toEqual(['r2', 'r3']);
+  });
+
+  it('a oferta que o SUB pediu continua disponível para o gerente', () => {
+    // O bug do Kratos (27/08/2026): a lista crua entrava no selectAvailableDeals e
+    // a casa pedida pelo sub sumia das ofertas dele.
+    const deals = [
+      { id: 'd-betfury', operatorName: 'BetFury', active: true },
+      { id: 'd-kto', operatorName: 'KTO', active: true },
+    ] as any[];
+    const cru = selectAvailableDeals(deals, lista).map((d) => d.id);
+    expect(cru).not.toContain('d-betfury');
+
+    const doDono = selectAvailableDeals(deals, selectOwnPartnerships(lista, gerente)).map((d) => d.id);
+    expect(doDono).toContain('d-betfury');
+    expect(doDono).not.toContain('d-kto'); // a dele de verdade segue escondida
+  });
+
+  it('sem dono resolvido devolve vazio, nunca a lista crua', () => {
+    expect(selectOwnPartnerships(lista, '')).toEqual([]);
+    expect(selectOwnPartnerships(lista, null)).toEqual([]);
+    expect(selectOwnPartnerships(lista, undefined)).toEqual([]);
+  });
+
+  it('não lança com entrada torta', () => {
+    expect(selectOwnPartnerships(null, gerente)).toEqual([]);
+    expect(selectOwnPartnerships(undefined, gerente)).toEqual([]);
+    expect(selectOwnPartnerships([null, { affiliateId: null }] as any, gerente)).toEqual([]);
   });
 });
