@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { pluralize } from '../lib/plural';
 import { Navigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Loader2, DollarSign, UserPlus, Wallet, Target, Crown, HelpCircle, Users, BarChart3, TrendingUp, MousePointerClick, Hash, Divide, Receipt } from 'lucide-react';
+import { Loader2, DollarSign, User, UserPlus, Wallet, Target, Crown, HelpCircle, Users, BarChart3, TrendingUp, MousePointerClick, Hash, Divide, Receipt } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   fetchSpecialAffiliates,
@@ -15,13 +15,13 @@ import {
   fetchAffiliateConfigs,
   fetchAffiliateLinks,
   calcAffiliatePayout,
-  resolveBrandRates,
   SpecialAffiliate,
   AffiliateConfig,
   CampaignRow,
   type AffiliateLink,
 } from '../services/affiliateService';
 import { buildPerHousePayout, type HouseMetricRow } from '../lib/perHousePayout';
+import { splitSpecialCommission } from '../lib/specialCommissionSplit';
 import { networkHouseKeys, filterBrandRows } from '../lib/networkHouses';
 import { buildFunnelItems, sumFunnelTotals, formatFunnelValue, type FunnelItemKey } from '../lib/funnel';
 import { buildSpecialDailySeries } from '../lib/specialDaily';
@@ -138,6 +138,7 @@ export default function SpecialDashboard() {
     [payoutParts, brandIdOf]
   );
 
+  const rowAff = (r: any) => String(r?.affiliate_id ?? r?.id ?? '');
   const subIds = special?.subAffiliateIds?.map(String) || [];
 
   // Filtro por casa: "Todas as casas" usa as linhas por afiliado (own+subs); uma
@@ -168,56 +169,38 @@ export default function SpecialDashboard() {
   // na ORDEM do painel da Esportiva, com derivados (lib/funnel, call 12/08).
   const funnelItems = buildFunnelItems(sumFunnelTotals(metricRows));
 
-  // Lucro líquido do especial = link dele (produção própria) + lucro da rede (spread).
-  // Spread por sub = taxa própria do especial − taxa que ele definiu pro sub. TODO o
-  // dinheiro sai de `payoutOf` (perHousePayout): OTG na casa do afiliado (mirror),
-  // manual na casa da LINHA — precificar o agregado com a casa do mirror cobrou um
-  // QFTD da Esportiva à taxa da Super Bet (R$ 280 em vez de R$ 110, 2026-08-12).
-  const rowAff = (r: any) => String(r?.affiliate_id ?? r?.id ?? '');
-  const ownPayout = payoutOf.breakdownFor(ownId, ownConfig).total;
-  const spreadTotal = subIds.reduce(
-    (sum, id) => sum + (payoutOf.breakdownFor(id, ownConfig).total - payoutOf.breakdownFor(id, configs[id]).total),
-    0
-  );
-  const earnings = ownPayout + spreadTotal;
+  // TODO o dinheiro dos cards sai de UMA fonte (lib/specialCommissionSplit), e a
+  // casa selecionada escopa tudo junto. Antes esta página derivava o mesmo dinheiro
+  // em três lugares e só o dos cards enxergava o filtro: com uma casa selecionada, o
+  // lucro líquido ficava MAIOR que a comissão exibida logo acima dele e a legenda
+  // mostrava um segundo "Comissão total" com outro valor, na mesma tela (call com o
+  // Jotta, 27/08/2026). O spread continua sendo a diferença entre ler a produção do
+  // sub à taxa do gerente e à taxa dele — fórmula nenhuma foi reimplementada aqui.
+  const houseKey = isAllBrands ? undefined : String(selectedBrandRow?.id ?? '') || undefined;
+  const split = splitSpecialCommission({
+    otg: payoutParts.otg,
+    manual: payoutParts.manual,
+    ownId,
+    subIds,
+    ownConfig,
+    configs,
+    brandIdOf,
+    houseKey,
+  });
 
-  // Comissão total do especial = taxa PRÓPRIA aplicada sobre TODA a rede (própria + subs).
-  // É o que a agência paga ao especial; o lucro líquido = comissão total − repasse aos subs.
-  // Mantém a regra do lucro líquido: tudo à taxa do especial, nunca a comissão bruta da casa.
-  // `Rede` = sempre a rede inteira (alimenta o lucro líquido); as versões scopadas
-  // abaixo respeitam o filtro de casa e alimentam só a grade de métricas.
-  const comissaoTotalRede = results.reduce((sum, r) => sum + payoutOf.breakdownFor(rowAff(r), ownConfig).total, 0);
-  const repasse = comissaoTotalRede - earnings;
-  // Escopo do filtro de casa: "Todas as casas" → partes por afiliado (perHousePayout);
-  // casa selecionada → a linha agregada daquela casa à taxa DELA (groupBy=brand),
-  // caminho que já era por-casa e continua igual.
-  const scopedParts = isAllBrands
-    ? results.reduce(
-        (acc, r) => {
-          const b = payoutOf.breakdownFor(rowAff(r), ownConfig);
-          return { total: acc.total + b.total, cpa: acc.cpa + b.cpa, rev: acc.rev + b.rev };
-        },
-        { total: 0, cpa: 0, rev: 0 }
-      )
-    : metricRows.reduce(
-        (acc, r) => {
-          const rates = resolveBrandRates(ownConfig, String(selectedBrandRow?.id ?? '') || undefined);
-          const cpa = (r.qualified_cpa || 0) * rates.cpaValue;
-          const rev = (r.rvs || 0) * (rates.revPercentage / 100);
-          return { total: acc.total + cpa + rev, cpa: acc.cpa + cpa, rev: acc.rev + rev };
-        },
-        { total: 0, cpa: 0, rev: 0 }
-      );
-  const comissaoTotal = scopedParts.total;
-  const cpaPortion = scopedParts.cpa;
-  const revPortion = scopedParts.rev;
-
-  // Cards de métrica (espelham o /admin, capados à rede do especial).
+  // Cards de métrica (espelham o /admin, capados à rede do especial). "Comissão
+  // própria" e "Comissão da rede" são o antigo "Comissão total" ABERTO: os mesmos
+  // números, sem o agregado sem rótulo que o gerente lia como saldo a receber (dos
+  // R$ 530 do exemplo, R$ 180 eram repasse aos subs). O total continua na tela, mas
+  // dizendo de quem é: "Total da rede".
   const metrics = [
     { label: 'Afiliados na rede', value: String(subIds.length), icon: Users },
-    { label: 'Comissão total', value: brl(comissaoTotal), icon: DollarSign },
-    { label: 'Total CPA', value: brl(cpaPortion), icon: BarChart3 },
-    { label: 'Total REV', value: brl(revPortion), icon: TrendingUp },
+    { label: 'Comissão própria', value: brl(split.propria.total), icon: User },
+    { label: 'Comissão da rede', value: brl(split.rede.total), icon: Users },
+    { label: 'Total da rede', value: brl(split.total.total), icon: DollarSign },
+    { label: 'CPA próprio', value: brl(split.propria.cpa), icon: BarChart3 },
+    { label: 'CPA da rede', value: brl(split.rede.cpa), icon: BarChart3 },
+    { label: 'REV da rede', value: brl(split.total.rev), icon: TrendingUp },
   ];
 
   // Série diária: a API agrega own+subs por dia. buildSpecialDailySeries troca a
@@ -365,11 +348,11 @@ export default function SpecialDashboard() {
         <div className="absolute top-0 right-0 w-56 h-56 bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
         <div className="relative">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 mb-3 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-widest">
-            Lucro líquido no período <HelpCircle size={12} />
+            Lucro líquido no período{isAllBrands ? '' : ` · ${selectedBrand}`} <HelpCircle size={12} />
           </span>
-          <h3 className="text-3xl md:text-4xl font-bold tracking-tighter text-emerald-700 dark:text-emerald-400">{brl(earnings)}</h3>
+          <h3 className="text-3xl md:text-4xl font-bold tracking-tighter text-emerald-700 dark:text-emerald-400">{brl(split.lucro)}</h3>
           <p className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 mt-2 max-w-2xl">
-            Comissão total ({brl(comissaoTotalRede)}) − repasses aos sub-afiliados ({brl(repasse)}). Inclui sua produção própria ({brl(ownPayout)}) + o spread sobre a rede.
+            Total da rede ({brl(split.total.total)}) − repasses aos sub-afiliados ({brl(split.repasse)}). Inclui sua produção própria ({brl(split.propria.total)}) + o spread sobre a rede.
           </p>
         </div>
         <div className="relative shrink-0 p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500">
