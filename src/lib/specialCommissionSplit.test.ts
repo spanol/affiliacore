@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { splitSpecialCommission, type SpecialCommissionInput } from './specialCommissionSplit';
+import {
+  splitSpecialCommission,
+  splitSpecialCommissionByHouse,
+  type SpecialCommissionInput,
+} from './specialCommissionSplit';
 import type { AffiliateConfig } from './commission';
 
 // O cenário da call com o Jotta (27/08/2026), com os números que ele citou:
@@ -128,3 +132,38 @@ describe('splitSpecialCommission', () => {
     expect(s.lucro).toBe(0);
   });
 });
+
+describe('splitSpecialCommissionByHouse', () => {
+  const houses = [
+    { key: 'bacana-play', name: 'Bacana Play' },
+    { key: 'blaze', name: 'Blaze' },
+    { key: 'casa-sem-producao', name: 'Casa parada' },
+  ];
+
+  it('detalha cada casa em própria e rede, da maior para a menor', () => {
+    const linhas = splitSpecialCommissionByHouse(base(), houses);
+    expect(linhas.map((l) => l.name)).toEqual(['Bacana Play', 'Blaze']);
+    expect(linhas[0].split.propria.total).toBe(250);
+    expect(linhas[0].split.rede.total).toBe(140);
+    expect(linhas[1].split.propria.total).toBe(0);
+    expect(linhas[1].split.rede.total).toBe(140);
+  });
+
+  it('fecha com os cards de resumo, que é a razão de sair da mesma função', () => {
+    const geral = splitSpecialCommission(base());
+    const linhas = splitSpecialCommissionByHouse(base(), houses);
+    const soma = (pick: (l: (typeof linhas)[number]) => number) =>
+      linhas.reduce((acc, l) => acc + pick(l), 0);
+
+    expect(soma((l) => l.split.propria.total)).toBe(geral.propria.total);
+    expect(soma((l) => l.split.rede.total)).toBe(geral.rede.total);
+    expect(soma((l) => l.split.total.total)).toBe(geral.total.total);
+    expect(soma((l) => l.split.lucro)).toBe(geral.lucro);
+  });
+
+  it('não lista casa sem produção nenhuma no período', () => {
+    const linhas = splitSpecialCommissionByHouse(base(), houses);
+    expect(linhas.some((l) => l.key === 'casa-sem-producao')).toBe(false);
+  });
+});
+

@@ -21,13 +21,13 @@ import {
   type AffiliateLink,
 } from '../services/affiliateService';
 import { buildPerHousePayout, type HouseMetricRow } from '../lib/perHousePayout';
-import { splitSpecialCommission } from '../lib/specialCommissionSplit';
+import { splitSpecialCommission, splitSpecialCommissionByHouse } from '../lib/specialCommissionSplit';
 import { REV_ENABLED } from '../lib/instanceClient';
 import { networkHouseKeys, filterBrandRows } from '../lib/networkHouses';
 import { buildFunnelItems, sumFunnelTotals, formatFunnelValue, type FunnelItemKey } from '../lib/funnel';
 import { buildSpecialDailySeries } from '../lib/specialDaily';
 import DateRangePicker from '../components/DateRangePicker';
-import BrandBreakdown from '../components/BrandBreakdown';
+import NetworkHouseBreakdown from '../components/NetworkHouseBreakdown';
 import BrandFilter from '../components/BrandFilter';
 import CampaignBreakdown from '../components/CampaignBreakdown';
 import DailyPerformanceChart from '../components/DailyPerformanceChart';
@@ -189,6 +189,26 @@ export default function SpecialDashboard() {
     houseKey,
   });
 
+  // Detalhamento por casa pela MESMA função dos cards acima, uma chamada por casa
+  // (AF-04 do backlog do Jotta). Antes esta seção era o BrandBreakdown à taxa do
+  // gerente sobre as linhas por marca: número certo, mas sem dizer quanto daquela
+  // casa é produção dele. Com uma casa filtrada sobra a linha dela, senão a lista
+  // toda. Casa sem produção no período não entra (ver a pura).
+  const houseSplitRows = splitSpecialCommissionByHouse(
+    {
+      otg: payoutParts.otg,
+      manual: payoutParts.manual,
+      ownId,
+      subIds,
+      ownConfig,
+      configs,
+      brandIdOf,
+    },
+    networkBrandResults
+      .map((r: any) => ({ key: String(r?.id ?? ''), name: brandNameOf(r) }))
+      .filter((h) => h.key && (isAllBrands || h.key === houseKey))
+  );
+
   // Cards de métrica (espelham o /admin, capados à rede do especial). "Comissão
   // própria" e "Comissão da rede" são o antigo "Comissão total" ABERTO: os mesmos
   // números, sem o agregado sem rótulo que o gerente lia como saldo a receber (dos
@@ -255,8 +275,6 @@ export default function SpecialDashboard() {
     [results, ownConfig, ownId, payoutOf]
   );
 
-  // Mesma lógica para "Por casa": o BrandBreakdown calcula a comissão a partir do
-  // config informado — passamos a taxa própria do especial (o que ele recebe).
 
   const FUNNEL_ICONS: Record<FunnelItemKey, typeof UserPlus> = {
     visits: MousePointerClick,
@@ -424,13 +442,13 @@ export default function SpecialDashboard() {
         infoText="Afiliados da sua rede (você + subs) por comissão no período. Comissão/CPA/REV são o seu ganho à sua taxa, nunca o bruto da casa."
       />
 
-      {/* Por casa — distribuição da comissão da rede (own + subs) por casa de aposta,
-          calculada à TAXA PRÓPRIA do especial (o que ele recebe da agência). */}
-      <section>
+      {/* Por casa — o que cada casa gerou à TAXA PRÓPRIA do gerente, com a produção
+          dele separada da produção da rede. Mesma fonte dos cards de resumo. */}
+      <section className="pb-8">
         <h3 className="text-[10px] uppercase font-bold tracking-widest text-slate-400 dark:text-neutral-500 mb-3 px-1">
           Por casa (sua rede)
         </h3>
-        <BrandBreakdown data={networkBrandResults} config={ownConfig} />
+        <NetworkHouseBreakdown rows={houseSplitRows} />
       </section>
 
       {/* Por campanha — desempenho da rede por campanha. "Sua comissão" = repasse à

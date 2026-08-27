@@ -126,3 +126,27 @@ export function splitSpecialCommission(input: SpecialCommissionInput): SpecialCo
   const total = add(propria, rede);
   return { propria, rede, total, repasse, lucro: total.total - repasse };
 }
+
+export interface HouseSplitRow {
+  key: string;
+  name: string;
+  split: SpecialCommissionSplit;
+}
+
+/**
+ * O mesmo recorte, casa a casa — a visão "por casa" do painel do gerente.
+ *
+ * Sai daqui, e não de uma segunda conta sobre as linhas por marca, justamente
+ * para o detalhamento não poder divergir dos cards de resumo: é a MESMA função,
+ * chamada uma vez por casa. Ordena pela maior produção, e casa sem número nenhum
+ * fica de fora (uma lista de zeros não informa nada e some com o que informa).
+ */
+export function splitSpecialCommissionByHouse(
+  input: Omit<SpecialCommissionInput, 'houseKey'>,
+  houses: Array<{ key: string; name: string }> | null | undefined,
+): HouseSplitRow[] {
+  return (Array.isArray(houses) ? houses : [])
+    .map(({ key, name }) => ({ key, name, split: splitSpecialCommission({ ...input, houseKey: key }) }))
+    .filter((row) => row.split.total.total !== 0)
+    .sort((a, b) => b.split.total.total - a.split.total.total);
+}
