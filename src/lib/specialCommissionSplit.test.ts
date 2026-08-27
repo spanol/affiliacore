@@ -161,6 +161,42 @@ describe('splitSpecialCommissionByHouse', () => {
     expect(soma((l) => l.split.lucro)).toBe(geral.lucro);
   });
 
+  it('ordena pelo que o gerente recebe, não pelo bruto que passou pela casa', () => {
+    // Casa cara: a rede produz muito e ele repassa quase tudo. Casa boa: produz
+    // menos e é toda dele. Ordenar pelo bruto poria a casa cara em primeiro.
+    const input: SpecialCommissionInput = {
+      ...base(),
+      manual: [
+        { affiliateId: 'sub-1', houseSlug: 'bacana-play', qualified_cpa: 10, rvs: 0 }, // 1000 bruto
+        { affiliateId: 'ger-1', houseSlug: 'blaze', qualified_cpa: 3, rvs: 0 },        // 300, todo dele
+      ],
+      configs: {
+        'ger-1': cfg('ger-1', 100, 20),
+        'sub-1': cfg('sub-1', 99, 0), // repassa 990 dos 1000
+      },
+    };
+    const linhas = splitSpecialCommissionByHouse(input, houses);
+    expect(linhas.map((l) => l.name)).toEqual(['Blaze', 'Bacana Play']);
+    expect(linhas[0].split.lucro).toBe(300);
+    expect(linhas[1].split.lucro).toBe(10);
+    expect(linhas[1].split.rede.total).toBe(1000); // o bruto segue disponível
+  });
+
+  it('mantém na lista a casa em que a rede produziu e a margem saiu zero', () => {
+    // Ele não ganha nada ali, mas houve movimento: sumir com a linha esconderia
+    // uma casa inteira da rede dele.
+    const input: SpecialCommissionInput = {
+      ...base(),
+      manual: [{ affiliateId: 'sub-1', houseSlug: 'blaze', qualified_cpa: 1, rvs: 0 }],
+      configs: { 'ger-1': cfg('ger-1', 100, 20), 'sub-1': cfg('sub-1', 100, 20) },
+    };
+    const linhas = splitSpecialCommissionByHouse(input, houses);
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0].name).toBe('Blaze');
+    expect(linhas[0].split.lucro).toBe(0);
+    expect(linhas[0].split.rede.total).toBe(100);
+  });
+
   it('não lista casa sem produção nenhuma no período', () => {
     const linhas = splitSpecialCommissionByHouse(base(), houses);
     expect(linhas.some((l) => l.key === 'casa-sem-producao')).toBe(false);

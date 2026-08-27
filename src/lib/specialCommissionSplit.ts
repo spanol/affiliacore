@@ -138,8 +138,13 @@ export interface HouseSplitRow {
  *
  * Sai daqui, e não de uma segunda conta sobre as linhas por marca, justamente
  * para o detalhamento não poder divergir dos cards de resumo: é a MESMA função,
- * chamada uma vez por casa. Ordena pela maior produção, e casa sem número nenhum
- * fica de fora (uma lista de zeros não informa nada e some com o que informa).
+ * chamada uma vez por casa.
+ *
+ * Ordena pelo que o gerente RECEBE de cada casa (`lucro`), que é o número que a
+ * tela destaca; ordenar pelo bruto colocaria no topo a casa onde ele mais repassa.
+ * Já o corte é pela PRODUÇÃO: casa em que a rede produziu e a margem dele saiu
+ * zero continua na lista, porque o movimento existiu e ele precisa vê-lo. Só some
+ * a casa sem número nenhum, que não informa nada e afasta o que informa.
  */
 export function splitSpecialCommissionByHouse(
   input: Omit<SpecialCommissionInput, 'houseKey'>,
@@ -148,5 +153,5 @@ export function splitSpecialCommissionByHouse(
   return (Array.isArray(houses) ? houses : [])
     .map(({ key, name }) => ({ key, name, split: splitSpecialCommission({ ...input, houseKey: key }) }))
     .filter((row) => row.split.total.total !== 0)
-    .sort((a, b) => b.split.total.total - a.split.total.total);
+    .sort((a, b) => b.split.lucro - a.split.lucro);
 }
