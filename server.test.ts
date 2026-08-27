@@ -2527,6 +2527,61 @@ describe('deals + parcerias (P2)', () => {
       const entry = cfg?.byBrand?.oleybet;
       expect(entry?.cpaValue ?? entry).toMatchObject ? expect(entry.cpaValue).toBe(90) : expect(entry).toBe(90);
     });
+
+    // 27/08/2026: quatro pedidos da equipe do Kratos dormiram um dia na fila do
+    // gerente porque NADA avisava que era a vez dele, e o caso subiu ao suporte
+    // como bug de aprovação do admin.
+    describe('o gerente é avisado quando cai solicitação na fila dele', () => {
+      const semParceria = () => {
+        const seed: any = seedGer();
+        delete seed.partnership_requests;                    // a fila nasce vazia
+        seed.affiliates = { affX: { id: 'affX', name: 'Douglas Pedro' } };
+        return seed;
+      };
+
+      it('notifica o gerente, nominalmente, e diz onde agir', async () => {
+        const db = makeFirestore(semParceria());
+        await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+          .post('/api/partnerships').set('Authorization', 'Bearer aff-uid').send({ dealId: 'dg' }).expect(201);
+
+        const avisos = [...(db.__store.get('user_notifications')?.values() ?? [])] as any[];
+        expect(avisos).toHaveLength(1);
+        expect(avisos[0]).toMatchObject({ recipientUid: 'ger-uid', affiliateId: 'GER', type: 'partnership_awaiting_pricing' });
+        expect(avisos[0].body).toContain('Douglas Pedro');
+        expect(avisos[0].body).toContain('OleyBet');
+        expect(avisos[0].body).toContain('Meus afiliados');
+        expect(avisos[0].body).not.toContain('—');           // régua de copy do repo
+      });
+
+      it('acordo DIRETO não avisa ninguém: a fila é do admin, que já vê em /acordos', async () => {
+        const seed: any = semParceria();
+        seed.deals.dg.type = 'direto';
+        const db = makeFirestore(seed);
+        await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+          .post('/api/partnerships').set('Authorization', 'Bearer aff-uid').send({ dealId: 'dg' }).expect(201);
+        expect(db.__store.get('user_notifications')?.size ?? 0).toBe(0);
+      });
+
+      it('gerente que deixou de ser especial ativo não é avisado (a fila virou do admin)', async () => {
+        const seed: any = semParceria();
+        seed.special_affiliates.GER.active = false;
+        const db = makeFirestore(seed);
+        await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+          .post('/api/partnerships').set('Authorization', 'Bearer aff-uid').send({ dealId: 'dg' }).expect(201);
+        expect(db.__store.get('user_notifications')?.size ?? 0).toBe(0);
+      });
+
+      it('afiliado sem nome no mirror não quebra o aviso', async () => {
+        const seed: any = semParceria();
+        delete seed.affiliates;
+        const db = makeFirestore(seed);
+        await request(createApp({ adminApp: makeAdminApp(), adminDb: db }))
+          .post('/api/partnerships').set('Authorization', 'Bearer aff-uid').send({ dealId: 'dg' }).expect(201);
+        const avisos = [...(db.__store.get('user_notifications')?.values() ?? [])] as any[];
+        expect(avisos).toHaveLength(1);
+        expect(avisos[0].body).toContain('Um afiliado da sua rede');
+      });
+    });
   });
 
   // §11 do BACKLOG: até 24/08/2026 o produto só sabia DESATIVAR acordo, e limpar

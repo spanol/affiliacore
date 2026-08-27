@@ -5233,6 +5233,11 @@ export function createApp(deps: ServerDeps) {
         entityType: 'partnership', entityId: ref.id, entityLabel: buildDealLabel(deal),
         action: 'partnership.request', metadata: { affiliateId, dealId },
       });
+      // Num acordo gerenciado a vez é do GERENTE, e ele precisa saber disso. Quando
+      // não há gerente elegível `uplineId` vem nulo e a fila é do admin, que já vê a
+      // solicitação em /acordos: nada a avisar.
+      const { uplineId } = await resolvePartnershipPricing(deal, affiliateId);
+      if (uplineId) await notifyPartnershipQueuedForUpline(uplineId, affiliateId, deal.operatorName);
       return res.status(201).json(partnershipFromDoc(await ref.get()));
     } catch (e: any) {
       console.error('[partnerships] erro ao solicitar:', e);
@@ -5328,6 +5333,44 @@ export function createApp(deps: ServerDeps) {
       await batch.commit();
     } catch (e) {
       console.error('[partnerships] falha ao notificar a recusa:', e);
+    }
+  };
+
+  // Avisa o GERENTE que caiu uma solicitação na fila dele (acordo `gerenciado`).
+  // Sem isso ninguém no sistema sabe que é a vez dele: a solicitação nasce em
+  // `requested`, o afiliado lê "aguardando seu gerente" e espera, e o gerente só
+  // descobriria abrindo /network/afiliados por conta própria. Foi assim que quatro
+  // pedidos da equipe do Kratos dormiram um dia inteiro na Infinity (26/08/2026) e
+  // o caso subiu como bug de aprovação do admin.
+  // Best-effort, igual à recusa: nunca derruba a solicitação já gravada.
+  const notifyPartnershipQueuedForUpline = async (
+    uplineId: string,
+    affiliateId: string,
+    operatorName: string
+  ) => {
+    if (!adminDb || !uplineId) return;
+    try {
+      const [usersSnap, affSnap] = await Promise.all([
+        adminDb.collection('users').where('affiliateId', '==', uplineId).get(),
+        adminDb.collection('affiliates').doc(affiliateId).get(),
+      ]);
+      if (usersSnap.empty) return;
+      const quem = String((affSnap.data() as any)?.name ?? '').trim() || 'Um afiliado da sua rede';
+      const batch = adminDb.batch();
+      usersSnap.forEach((u) => {
+        batch.set(adminDb!.collection('user_notifications').doc(), {
+          recipientUid: u.id,
+          affiliateId: uplineId,
+          type: 'partnership_awaiting_pricing',
+          title: 'Solicitação esperando a sua comissão',
+          body: `${quem} solicitou parceria com ${operatorName || 'uma operadora'}. Defina a comissão dele nesta casa em "Meus afiliados" para a agência emitir o link.`,
+          readAt: null,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+      await batch.commit();
+    } catch (e) {
+      console.error('[partnerships] falha ao avisar o gerente:', e);
     }
   };
 
