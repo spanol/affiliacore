@@ -39,6 +39,7 @@ permite refazer um cadastro apagado sem entrar no painel:
 | `betnacional` | BetNacional Casino BR - Regulated | 20914058 | 25 EUR |
 | `betwarrior` | BetWarrior BR | 21764673 | 20 EUR |
 | `blaze` | Blaze BR - Regulated | 20997138 | 30 EUR |
+| `cristal-poker` | Cristal Poker BR | 21982469 | 30 EUR |
 | `estrelabet` | EstrelaBet BR | 21236152 | 20 EUR |
 | `jonbet` | JonBet BR | 21279644 | 16 EUR |
 | `kto` | KTO BR - Regulated | 21210669 | 15 EUR |
@@ -52,6 +53,13 @@ permite refazer um cadastro apagado sem entrar no painel:
 apagadas e, em 24/08, os 4 acordos correspondentes saíram da vitrine. As ofertas
 Sports continuam existindo na rede (ex.: BetNacional Sports `21960807`, Blaze
 Sports `21960827`, ambas 25 e 30 EUR); simplesmente não são operadas aqui.
+
+**Cristal Poker ativada em 27/08 (pedido do Jotta):** casa `cristal-poker`,
+oferta `21982469`, 30 EUR no `ftd`. A oferta se confirmou pelo PRÓPRIO ledger,
+sem abrir o painel: o teste de postagem da rede chegou em 27/08 já com
+`payout: 30` e `currency: EUR` no doc `fpb__21982469__ftd__replace_it`. É a
+mesma leitura que decidiu a BetFury, com um ganho: o payout do disparo confere
+o CPA da oferta, então o valor não depende da tabela do painel.
 
 ⚠️ A BetFury tem DUAS ofertas clonadas na rede ("BetFury BR" `21889241` e
 "BetFury BR - 1" `21945140`, mesmos 25 EUR/termos/validade). A casa aponta para a
