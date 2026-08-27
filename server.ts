@@ -26,7 +26,7 @@ import {
 import { buildPullPayload, pullWindow } from './src/lib/housePull';
 import { buildStatisticsUrl, adaptLeonBetRows, LEONBET_API_BASE } from './src/lib/leonbetPull';
 import {
-  parseFomentoPostback, fomentoPostbackDocId, fomentoEventsToPullRows,
+  parseFomentoPostback, fomentoPostbackDocId, fomentoEventsToPullRows, isFomentoTestFire,
   FOMENTO_INTEGRATION_ID, type FomentoEventDoc,
 } from './src/lib/fomentoPostback';
 import {
@@ -6511,6 +6511,13 @@ export function createApp(deps: ServerDeps) {
         // Sem aff_click_id não há âncora de dedupe: aceita com id automático.
         await adminDb.collection('postback_events').add(eventDoc);
       }
+
+      // Teste de postagem do painel: gravado (foi um deles que revelou qual clone
+      // da BetFury o tráfego usa) e NUNCA contabilizado. 200 porque não é erro
+      // nosso: 4xx viraria retry da rede por um disparo que ela mandou de
+      // propósito. O núcleo puro já o pula no recompute; aqui só evitamos
+      // reescrever o dia da casa à toa e devolvemos o motivo no log da Offer18.
+      if (isFomentoTestFire(data)) return res.json({ ok: true, test: true });
 
       const houseDoc = await fomentoHouseByOffer(data.offerId);
       if (!houseDoc) {

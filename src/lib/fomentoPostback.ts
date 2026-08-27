@@ -127,6 +127,39 @@ export function fomentoEventDeltas(
   return null;
 }
 
+/**
+ * DISPARO DE TESTE do painel × conversão de verdade.
+ *
+ * O painel da Offer18 tem "teste de postagem" por oferta, e ele substitui só o
+ * `{offerid}` e o `{event_token}`: os demais tokens saem CRUS, com o texto
+ * `replace_it` que a tela usa de placeholder. O `parseFomentoPostback` não tem
+ * como recusar (offer e event chegam válidos), então o teste entrava no ledger
+ * como um `ftd` qualquer e viraria 1 FTD + 1 CPA no próximo recompute — dinheiro
+ * de uma conversão que não existiu, e margem CHEIA, porque a tag de placeholder
+ * não é de ninguém e não gera repasse. Aconteceu duas vezes: BetFury (26/08) e
+ * Cristal Poker (27/08), ambas ativações de casa nova.
+ *
+ * O discriminador é o CLICK ID, nunca a tag. Conversão real sempre carrega o
+ * `aff_click_id` que a rede gerou no clique; um click id de placeholder só
+ * existe se ninguém clicou. A tag NÃO serve para isso: tag órfã (`ref`, apelido
+ * não cadastrado) acontece em conversão LEGÍTIMA cuja atribuição se perdeu, que
+ * deve continuar contando no agregado e caindo na fila de pendentes.
+ *
+ * O evento segue GRAVADO no ledger de propósito: foi um disparo de teste que
+ * revelou qual das duas ofertas clonadas da BetFury o tráfego usa. Ele só não
+ * conta métrica.
+ */
+const PLACEHOLDER_CLICK_IDS = new Set(['replace_it']);
+
+export function isFomentoTestFire(
+  data: Pick<ParsedFomentoPostback, 'clickId'> | Pick<FomentoEventDoc, 'clickId'> | null | undefined,
+): boolean {
+  const click = String((data as any)?.clickId ?? '').trim().toLowerCase();
+  if (!click) return false; // disparo sem click id é aceito e documentado
+  // Token não resolvido ({aff_click_id}) ou o placeholder literal da tela.
+  return /^\{.*\}$/.test(click) || PLACEHOLDER_CLICK_IDS.has(click);
+}
+
 // Id de doc do Firestore: sem '/', e com folga ampla sob o limite de 1500 bytes.
 const sanitizeIdPart = (v: string): string => v.replace(/\//g, '_').slice(0, 120);
 
@@ -166,6 +199,13 @@ export function fomentoEventsToPullRows(events: FomentoEventDoc[] | null | undef
   for (const ev of Array.isArray(events) ? events : []) {
     const day = String(ev?.day ?? '').slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+    // Teste do painel: fica no ledger, fora das métricas. A guarda mora AQUI (e
+    // não só na rota) porque este é o único caminho ledger -> dinheiro, então
+    // ela vale também para evento já gravado antes do fix.
+    if (isFomentoTestFire(ev)) {
+      ignored++;
+      continue;
+    }
     const deltas = fomentoEventDeltas(ev?.event ?? '');
     if (!deltas) {
       ignored++;

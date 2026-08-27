@@ -4,6 +4,7 @@ import {
   fomentoEventDeltas,
   fomentoPostbackDocId,
   fomentoEventsToPullRows,
+  isFomentoTestFire,
   FOMENTO_POSTBACK_TEMPLATE,
   type FomentoEventDoc,
 } from './fomentoPostback';
@@ -136,6 +137,42 @@ describe('fomentoEventsToPullRows', () => {
   it('disparo sem tag agrega na linha de tag vazia (tráfego órfão da casa)', () => {
     const { rows } = fomentoEventsToPullRows([ev({ tag: '' })]);
     expect(rows[0].tag).toBe('');
+  });
+});
+
+describe('isFomentoTestFire', () => {
+  it('click id de placeholder é teste do painel (offer e event chegam VÁLIDOS, então o parse não recusa)', () => {
+    expect(isFomentoTestFire({ clickId: 'replace_it' })).toBe(true);
+    expect(isFomentoTestFire({ clickId: 'REPLACE_IT' })).toBe(true);
+    expect(isFomentoTestFire({ clickId: '{aff_click_id}' })).toBe(true);
+  });
+
+  it('o discriminador é o CLICK, nunca a tag: conversão real com tag órfã continua valendo', () => {
+    // Tag órfã (`ref`, apelido não cadastrado) acontece em conversão LEGÍTIMA
+    // cuja atribuição se perdeu — tem que contar no agregado e cair na fila de
+    // pendentes, não ser descartada como teste.
+    expect(isFomentoTestFire({ clickId: 'clk-real-123' })).toBe(false);
+    expect(isFomentoTestFire({ clickId: '' })).toBe(false);
+  });
+});
+
+describe('disparo de teste não vira dinheiro', () => {
+  it('teste do painel fica no ledger e FORA das métricas (senão vira 1 FTD + 1 CPA sem dono)', () => {
+    const { rows, counted, ignored } = fomentoEventsToPullRows([
+      ev({ clickId: 'replace_it', tag: 'replace_it' }),
+    ]);
+    expect(rows).toHaveLength(0);
+    expect(counted).toBe(0);
+    expect(ignored).toBe(1);
+  });
+
+  it('a guarda vale no RECOMPUTE, então evento gravado antes do fix também para de contar', () => {
+    const { rows } = fomentoEventsToPullRows([
+      ev({ clickId: 'replace_it', tag: 'replace_it' }),
+      ev({ clickId: 'clk-real', tag: 'mauricio' }),
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ tag: 'mauricio', first_deposits: 1, qualified_cpa: 1 });
   });
 });
 

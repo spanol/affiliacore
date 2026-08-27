@@ -5520,6 +5520,32 @@ describe('postback da Fomento — /api/postback/fomento', () => {
     expect(db.__store.get('postback_events')!.size).toBe(2);
   });
 
+  it('teste de postagem do painel entra no ledger e NUNCA vira métrica', async () => {
+    // O teste POR OFERTA manda offer/event válidos e deixa cru só o click/tag
+    // (`replace_it`), então o 400 do template mal colado não pega. Sem a guarda
+    // isso viraria 1 FTD + 1 CPA sem dono: margem cheia sobre nada.
+    const db = makeFirestore(seed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await fire(app, 's=seg&offer=22007840&event=ftd&click=replace_it&tag=replace_it&payout=35&currency=EUR').expect(200);
+    expect(res.body).toMatchObject({ ok: true, test: true });
+    // Gravado: foi um disparo desses que revelou a oferta certa da BetFury.
+    expect(db.__store.get('postback_events')!.get('fpb__22007840__ftd__replace_it')).toBeTruthy();
+    expect(db.__store.get('house_results')?.size ?? 0).toBe(0);
+  });
+
+  it('reprocesso não ressuscita o teste, mas conta a conversão real do mesmo dia', async () => {
+    const db = makeFirestore(seed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    await fire(app, 's=seg&offer=22007840&event=ftd&click=replace_it&tag=replace_it').expect(200);
+    await fire(app, 's=seg&offer=22007840&event=ftd&click=c1&tag=mauricio').expect(200);
+
+    await request(app).post('/api/houses/spininio/pull')
+      .set('Authorization', 'Bearer admin-uid').send({ days: 7 }).expect(200);
+
+    const rows = [...db.__store.get('house_results')!.values()];
+    expect(rows.find((r: any) => r.affiliateId === null)).toMatchObject({ first_deposits: 1, qualified_cpa: 1 });
+  });
+
   it('oferta sem casa: evento fica no ledger, nada em house_results, 200 (sem retry na rede)', async () => {
     const db = makeFirestore(seed());
     const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
