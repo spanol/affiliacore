@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { otgEnabled, marketplaceEnabled } from './instance';
+import { otgEnabled, marketplaceEnabled, revEnabled } from './instance';
 
 describe('otgEnabled · interruptor do módulo OTG por instância (P2)', () => {
   it('ausente/vazio → LIGADA (retrocompat: instância existente não muda sem config)', () => {
@@ -44,5 +44,27 @@ describe('marketplaceEnabled · módulo opt-in por instância (P2/P3, default OF
     expect(marketplaceEnabled('1')).toBe(false);
     expect(marketplaceEnabled('on')).toBe(false);
     expect(marketplaceEnabled(false)).toBe(false);
+  });
+});
+
+describe('revEnabled · exibição do REV Share por instância', () => {
+  it('sem env → REV visível (nenhuma instância existente muda sem pedir)', () => {
+    expect(revEnabled(undefined)).toBe(true);
+    expect(revEnabled(null)).toBe(true);
+    expect(revEnabled('')).toBe(true);
+    expect(revEnabled('   ')).toBe(true);
+  });
+
+  it("só 'false' esconde (case-insensitive, com espaços)", () => {
+    expect(revEnabled('false')).toBe(false);
+    expect(revEnabled('FALSE')).toBe(false);
+    expect(revEnabled(' False ')).toBe(false);
+    expect(revEnabled(false)).toBe(false); // Vite pode coagir a boolean
+  });
+
+  it('qualquer outro valor → visível (typo não apaga o REV da tela)', () => {
+    expect(revEnabled('0')).toBe(true);
+    expect(revEnabled('off')).toBe(true);
+    expect(revEnabled('no')).toBe(true);
   });
 });

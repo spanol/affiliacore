@@ -40,6 +40,7 @@ import { buildAffiliateDailySeries } from '../lib/affiliateDailySeries';
 import { pluralize } from '../lib/plural';
 import { buildCsvFilename } from '../lib/csv';
 import { downloadCsvFile } from '../lib/browserDownload';
+import { REV_ENABLED } from '../lib/instanceClient';
 
 export default function ClientDashboard() {
   const { profile } = useAuth();
@@ -199,7 +200,7 @@ export default function ClientDashboard() {
   // MESMA taxa/casa do card "Comissão total" acima — nunca reimplementa o cálculo.
   const handleExportCsv = () => {
     const brandId = isAllBrands ? undefined : String(selectedBrandRow?.id ?? '');
-    const csv = buildDailyExtractCsv(dailyResults, config, brandId);
+    const csv = buildDailyExtractCsv(dailyResults, config, brandId, REV_ENABLED);
     downloadCsvFile(buildCsvFilename('extrato', `${range.startDate}_a_${range.endDate}`), csv);
   };
 
@@ -292,7 +293,7 @@ export default function ClientDashboard() {
                 <div className="bg-white dark:bg-neutral-900 p-8 rounded-3xl border border-slate-100 dark:border-neutral-800 shadow-sm space-y-6">
                   <div>
                     <div className="flex items-center gap-1 text-xs font-bold text-slate-500 mb-2">
-                      Comissão total <InfoTooltip text="Seu ganho no período: CPA Calculado + REV Share, conforme a configuração do seu contrato." align="left" />
+                      Comissão total <InfoTooltip text={REV_ENABLED ? 'Seu ganho no período: CPA Calculado + REV Share, conforme a configuração do seu contrato.' : 'Seu ganho no período: CPA Calculado, conforme a configuração do seu contrato.'} align="left" />
                     </div>
                     <div className="flex items-baseline gap-4">
                       <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white break-words">
@@ -315,7 +316,9 @@ export default function ClientDashboard() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Instância que fecha só CPA esconde o REV (VITE_REV_ENABLED=false):
+                      o card de CPA fica sozinho e ocupa a linha inteira. */}
+                  <div className={REV_ENABLED ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'grid grid-cols-1 gap-4'}>
                     <div className="p-6 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800 flex items-center justify-between group hover:border-brand/20 transition-all">
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-xl bg-white dark:bg-neutral-800 flex items-center justify-center text-slate-400 group-hover:text-brand dark:group-hover:text-white transition-colors shadow-sm text-xs font-black">
@@ -336,6 +339,7 @@ export default function ClientDashboard() {
                       </div>
                     </div>
 
+                    {REV_ENABLED && (
                     <div className="p-6 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800 flex items-center justify-between group hover:border-brand/20 transition-all">
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-xl bg-white dark:bg-neutral-800 flex items-center justify-center text-slate-400 group-hover:text-brand dark:group-hover:text-white transition-colors shadow-sm">
@@ -355,6 +359,7 @@ export default function ClientDashboard() {
                         </div>
                       </div>
                     </div>
+                    )}
                   </div>
                 </div>
 

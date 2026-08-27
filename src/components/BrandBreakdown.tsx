@@ -5,6 +5,7 @@ import { num } from '../lib/commission';
 import { getKnownBrandName } from '../lib/brand';
 import InfoTooltip from './InfoTooltip';
 import BrandLogo from './BrandLogo';
+import { REV_ENABLED } from '../lib/instanceClient';
 
 interface BrandBreakdownProps {
   data: any[];
@@ -76,9 +77,11 @@ export default function BrandBreakdown({ data, config }: BrandBreakdownProps) {
     </div>
   );
 
+  // Instância com REV escondido (VITE_REV_ENABLED=false) fica com o card de CPA
+  // sozinho: a grade vira uma coluna só, senão sobra metade da largura vazia.
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8">
-      {renderCard('REV (R$) por Casa', 'rev', maxRev)}
+    <div className={REV_ENABLED ? 'grid grid-cols-1 md:grid-cols-2 gap-6 pb-8' : 'grid grid-cols-1 gap-6 pb-8'}>
+      {REV_ENABLED && renderCard('REV (R$) por Casa', 'rev', maxRev)}
       {renderCard('CPA (R$) por Casa', 'cpa', maxCpa)}
     </div>
   );

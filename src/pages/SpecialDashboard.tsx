@@ -22,6 +22,7 @@ import {
 } from '../services/affiliateService';
 import { buildPerHousePayout, type HouseMetricRow } from '../lib/perHousePayout';
 import { splitSpecialCommission } from '../lib/specialCommissionSplit';
+import { REV_ENABLED } from '../lib/instanceClient';
 import { networkHouseKeys, filterBrandRows } from '../lib/networkHouses';
 import { buildFunnelItems, sumFunnelTotals, formatFunnelValue, type FunnelItemKey } from '../lib/funnel';
 import { buildSpecialDailySeries } from '../lib/specialDaily';
@@ -200,7 +201,8 @@ export default function SpecialDashboard() {
     { label: 'Total da rede', value: brl(split.total.total), icon: DollarSign },
     { label: 'CPA próprio', value: brl(split.propria.cpa), icon: BarChart3 },
     { label: 'CPA da rede', value: brl(split.rede.cpa), icon: BarChart3 },
-    { label: 'REV da rede', value: brl(split.total.rev), icon: TrendingUp },
+    // Instância que fecha só CPA com as casas esconde o REV (VITE_REV_ENABLED).
+    ...(REV_ENABLED ? [{ label: 'REV da rede', value: brl(split.total.rev), icon: TrendingUp }] : []),
   ];
 
   // Série diária: a API agrega own+subs por dia. buildSpecialDailySeries troca a

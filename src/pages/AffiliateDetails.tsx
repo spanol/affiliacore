@@ -71,6 +71,7 @@ import EntityAuditHistory from '../components/EntityAuditHistory';
 import FunnelGrid from '../components/FunnelGrid';
 import DateRangePicker from '../components/DateRangePicker';
 import InfoTooltip from '../components/InfoTooltip';
+import { REV_ENABLED } from '../lib/instanceClient';
 import TrendBadge from '../components/TrendBadge';
 import { DateRange, getDefaultRange, getPreviousRange, percentChange } from '../lib/dateRange';
 import { ALL_BRANDS, getKnownBrandName, buildBrandIdOf } from '../lib/brand';
@@ -763,7 +764,7 @@ export default function AffiliateDetails() {
                   <div className="bg-white dark:bg-neutral-900 p-8 rounded-3xl border border-slate-100 dark:border-neutral-800 shadow-sm space-y-6">
                     <div>
                       <div className="flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-neutral-400 mb-2">
-                        Comissão total <InfoTooltip text="Seu ganho no período: CPA Calculado + REV Share, conforme a configuração do seu contrato." align="left" />
+                        Comissão total <InfoTooltip text={REV_ENABLED ? 'Seu ganho no período: CPA Calculado + REV Share, conforme a configuração do seu contrato.' : 'Seu ganho no período: CPA Calculado, conforme a configuração do seu contrato.'} align="left" />
                       </div>
                       <div className="flex items-baseline gap-4">
                         <h2 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white break-words">
@@ -783,7 +784,8 @@ export default function AffiliateDetails() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Instância que fecha só CPA esconde o REV (VITE_REV_ENABLED=false). */}
+                    <div className={REV_ENABLED ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'grid grid-cols-1 gap-4'}>
                       <div className="p-6 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800 flex items-center justify-between group hover:border-brand/20 dark:hover:border-white/10 transition-all">
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 rounded-xl bg-white dark:bg-neutral-800 flex items-center justify-center text-slate-400 group-hover:text-brand dark:group-hover:text-white transition-colors shadow-sm text-xs font-black">
@@ -806,6 +808,7 @@ export default function AffiliateDetails() {
                         </div>
                       </div>
 
+                      {REV_ENABLED && (
                       <div className="p-6 bg-slate-50 dark:bg-neutral-800/50 rounded-2xl border border-slate-100 dark:border-neutral-800 flex items-center justify-between group hover:border-brand/20 dark:hover:border-white/10 transition-all">
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 rounded-xl bg-white dark:bg-neutral-800 flex items-center justify-center text-slate-400 group-hover:text-brand dark:group-hover:text-white transition-colors shadow-sm">
@@ -821,6 +824,7 @@ export default function AffiliateDetails() {
                           </div>
                         </div>
                       </div>
+                      )}
                     </div>
                   </div>
 

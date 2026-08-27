@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart3 } from 'lucide-react';
+import { REV_ENABLED } from '../lib/instanceClient';
 import {
   BarChart,
   Bar,
@@ -164,7 +165,7 @@ export default function AffiliatePerformanceChart({
               />
               <Bar name="Comissão" dataKey="Comissão" fill="url(#commissionGradient)" radius={[6, 6, 0, 0]} barSize={22} />
               <Bar name="CPA" dataKey="CPA" fill="url(#cpaGradient)" radius={[6, 6, 0, 0]} barSize={22} />
-              <Bar name="REV" dataKey="REV" fill="url(#revGradient)" radius={[6, 6, 0, 0]} barSize={22} />
+              {REV_ENABLED && <Bar name="REV" dataKey="REV" fill="url(#revGradient)" radius={[6, 6, 0, 0]} barSize={22} />}
             </BarChart>
           </ResponsiveContainer>
         ) : (

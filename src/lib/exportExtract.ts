@@ -46,6 +46,17 @@ const EXTRACT_COLUMNS: CsvColumn<DailyExtractRow>[] = [
   { key: 'commission', label: 'Comissão (R$)', format: (r) => r.commission.toFixed(2) },
 ];
 
-export function buildDailyExtractCsv(dailyResults: any[], config?: AffiliateConfig | null, brandId?: string): string {
-  return buildCsv(EXTRACT_COLUMNS, buildDailyExtractRows(dailyResults, config, brandId));
+// `showRev = false` corta a coluna de RVS: instância que fecha só CPA
+// (VITE_REV_ENABLED=false) esconde o REV dos cards, e um extrato com uma coluna
+// de unidades de receita compartilhada que a tela não explica só gera dúvida. A
+// coluna de comissão NÃO muda: a parcela REV continua apurada e paga se houver
+// taxa. Default `true` = o extrato de sempre.
+export function buildDailyExtractCsv(
+  dailyResults: any[],
+  config?: AffiliateConfig | null,
+  brandId?: string,
+  showRev = true,
+): string {
+  const columns = showRev ? EXTRACT_COLUMNS : EXTRACT_COLUMNS.filter((c) => c.key !== 'rvs');
+  return buildCsv(columns, buildDailyExtractRows(dailyResults, config, brandId));
 }

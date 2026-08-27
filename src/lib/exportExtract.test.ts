@@ -42,3 +42,19 @@ describe('buildDailyExtractCsv', () => {
     expect(buildDailyExtractCsv([], cfg)).toBe('Data,Cadastros,Primeiros Depósitos,CPA Qualificado,REV (unidades),Comissão (R$)');
   });
 });
+
+describe('buildDailyExtractCsv · instância sem REV', () => {
+  it('corta a coluna de RVS sem mexer na comissão', () => {
+    const rows = [{ id: '2026-08-01', registrations: 4, first_deposits: 2, qualified_cpa: 2, rvs: 500 }];
+    const config = { affiliateId: 'a1', cpaValue: 100, revPercentage: 20 };
+    const comRev = buildDailyExtractCsv(rows, config);
+    const semRev = buildDailyExtractCsv(rows, config, undefined, false);
+
+    expect(comRev).toContain('REV (unidades)');
+    expect(semRev).not.toContain('REV (unidades)');
+    expect(semRev).not.toContain('500');
+    // A parcela REV segue apurada e paga: 2 × 100 + 500 × 20% = 300.
+    expect(comRev).toContain('300.00');
+    expect(semRev).toContain('300.00');
+  });
+});

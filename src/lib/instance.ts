@@ -21,3 +21,17 @@ export function otgEnabled(raw: string | boolean | undefined | null): boolean {
 export function marketplaceEnabled(raw: string | boolean | undefined | null): boolean {
   return String(raw ?? '').trim().toLowerCase() === 'true';
 }
+
+// REV Share como MÓDULO desligável por instância (call com o Jotta, 27/08/2026).
+// Agência que fecha só CPA com as casas não tem o que mostrar no REV, e um card
+// zerado ao lado da comissão só levanta a pergunta "cadê meu REV?". Mesmo default
+// do OTG (LIGADO): ausente/qualquer valor ≠ 'false' → o REV aparece, então nenhuma
+// instância existente muda sem pedir; 'false' esconde o REV das telas de RESULTADO
+// do afiliado e do gerente.
+// ATENÇÃO: é interruptor de EXIBIÇÃO, não de cálculo. A parcela REV continua sendo
+// apurada e somada à comissão (esconder o número não pode mudar o dinheiro que o
+// afiliado recebe); quem não quer pagar REV configura a taxa em 0. Por isso a
+// configuração de REV (/afiliados, editor por casa) NÃO é escondida por esta flag.
+export function revEnabled(raw: string | boolean | undefined | null): boolean {
+  return String(raw ?? '').trim().toLowerCase() !== 'false';
+}
