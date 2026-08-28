@@ -28,12 +28,12 @@ import { buildFunnelItems, sumFunnelTotals, formatFunnelValue, type FunnelItemKe
 import AffiliatePerformanceChart from '../components/AffiliatePerformanceChart';
 import BrandFilter from '../components/BrandFilter';
 import BrandLogo from '../components/BrandLogo';
-import { getBrandName, uniqueBrands, ALL_BRANDS, getKnownBrandName, getBrandMeta, getKnownBrands, buildBrandIdOf } from '../lib/brand';
+import { getBrandName, ALL_BRANDS, getKnownBrandName, getBrandMeta, getKnownBrands, buildBrandIdOf } from '../lib/brand';
 import { OTG_ENABLED } from '../lib/instanceClient';
-import { withKnownBrandNames } from '../lib/knownHouses';
+import { buildBrandFilterOptions } from '../lib/brandFilterOptions';
 import { StoredManualRow, aggregateByHouse, aggregateByAffiliate, emptyMetrics, addMetrics } from '../lib/houseResults';
 import { buildAffiliatePerformance, indexPerformanceById } from '../lib/adminAffiliatePerformance';
-import { fetchHouses, syncKnownBrandsFrom } from '../services/houseService';
+import { fetchHouses, syncKnownBrandsFrom, type House } from '../services/houseService';
 import { fetchFxQuotes, getCachedFxQuotes, type FxQuotes } from '../lib/currency';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
 import { producingAffiliateIds } from '../lib/affiliateActivity';
@@ -68,6 +68,10 @@ export default function AdminDashboard() {
   // Cotações do dia (AwesomeAPI) — convertem o CPA das casas em moeda estrangeira
   // p/ R$. Casa de cotação FIXA ignora isto e usa a taxa dela (src/lib/currency.ts).
   const [fxQuotes, setFxQuotes] = useState<FxQuotes>(() => getCachedFxQuotes());
+  // Cadastro de casas. É ESTADO, e não o cache de módulo lido por getKnownBrands():
+  // o filtro deriva dele, e um cache mutável lido de dentro de um useMemo não
+  // dispara recálculo quando chega. Ver lib/brandFilterOptions.
+  const [houses, setHouses] = useState<House[]>([]);
 
   // Lista de afiliados (com brand) — base do filtro e do mapa id→marca.
   useEffect(() => {
@@ -83,11 +87,21 @@ export default function AdminDashboard() {
     return map;
   }, [affiliates]);
 
-  // Casas conhecidas (ex.: SportingBet vazia) entram no filtro mesmo sem afiliados
-  // — espelha o portal OTG. No-op em produção (só Superbet). [[B6]]
-  const availableBrands = useMemo(() => withKnownBrandNames(uniqueBrands(affiliates)), [affiliates]);
+  // As casas do filtro saem do CADASTRO (fonte de verdade de quais casas existem),
+  // unidas às marcas do mirror de afiliados (o modelo da OTG, preservado). Antes
+  // saíam só do mirror: numa instância OTG-free o afiliado nasce sem `brand`, e o
+  // painel da Infinity oferecia 2 casas tendo 17 cadastradas e 6 produzindo.
+  const availableBrands = useMemo(
+    () => buildBrandFilterOptions(houses, affiliates, OTG_ENABLED),
+    [houses, affiliates]
+  );
 
-  // IDs da marca selecionada (CSV) para reescopar a busca de campanhas. null = todas.
+  // IDs da marca selecionada (CSV) para reescopar a busca de campanhas.
+  // `null` = todas as casas. String VAZIA = a casa selecionada não tem afiliado
+  // nenhum atribuído a ela pelo mirror, que é o caso de toda casa MANUAL: campanha
+  // vem da OTG e nenhuma linha dela pertence a essa casa. A distinção importa
+  // porque `fetchAllResultsByCampaign` ignora CSV vazio e devolveria TODAS as
+  // campanhas, ou seja, o número da rede inteira debaixo de um filtro de casa.
   const brandAffiliateIds = useMemo(() => {
     if (brandFilter === ALL_BRANDS) return null;
     return affiliates
@@ -110,14 +124,17 @@ export default function AdminDashboard() {
         // OTG (o DashboardLayout o popula em paralelo, async) → casa manual saía R$ 0,00
         // na comissão enquanto o lucro (reativo) vinha certo. Carregamos aqui de forma
         // DETERMINÍSTICA. [[boost-house-cpa-eur]]
-        const [houses, fx] = await Promise.all([fetchHouses(), fetchFxQuotes()]);
-        if (houses.length) syncKnownBrandsFrom(houses);
+        const [houseList, fx] = await Promise.all([fetchHouses(), fetchFxQuotes()]);
+        if (houseList.length) syncKnownBrandsFrom(houseList);
+        setHouses(houseList);
         setFxQuotes(fx);
 
         const [allResults, cfgs, campaigns, specialData, byBrand, manual, uplineMap] = await Promise.all([
           fetchAllResults(range),
           fetchAffiliateConfigs(),
-          fetchAllResultsByCampaign(range, brandAffiliateIds ?? undefined),
+          brandAffiliateIds === ''
+            ? Promise.resolve([] as CampaignRow[])
+            : fetchAllResultsByCampaign(range, brandAffiliateIds ?? undefined),
           fetchSpecialAffiliates(),
           fetchAllResultsByBrand(range),
           fetchManualResults(range),
