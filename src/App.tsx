@@ -29,6 +29,7 @@ import PartnerApiExplorer from './pages/PartnerApiExplorer';
 import OtgRoster from './pages/OtgRoster';
 import { OTG_ENABLED, MARKETPLACE_ENABLED } from './lib/instanceClient';
 import Houses from './pages/Houses';
+import FomentoOffers from './pages/FomentoOffers';
 import RegistrationRequests from './pages/RegistrationRequests';
 import Deals from './pages/Deals';
 import Partnerships from './pages/Partnerships';
@@ -187,6 +188,15 @@ export default function App() {
             <Route path="/casas" element={
               <ProtectedRoute role="admin">
                 <Houses />
+              </ProtectedRoute>
+            } />
+            {/* Fila de ativação das casas da rede Fomento (Offer18): as ofertas que
+                já dispararam postback aqui, com o CPA que a rede informou. A rota
+                existe em toda label (o servidor responde 503 onde a integração está
+                desligada); quem some é o item da sidebar. */}
+            <Route path="/fomento" element={
+              <ProtectedRoute role="admin">
+                <FomentoOffers />
               </ProtectedRoute>
             } />
             {/* Captação: fila de quem pediu cadastro (auto-cadastro + lead do

@@ -29,6 +29,7 @@ import {
   parseFomentoPostback, fomentoPostbackDocId, fomentoEventsToPullRows, isFomentoTestFire,
   FOMENTO_INTEGRATION_ID, type FomentoEventDoc,
 } from './src/lib/fomentoPostback';
+import { summarizeFomentoOffers, deriveFomentoLinkTemplate } from './src/lib/fomentoOffers';
 import {
   INTEGRATION_CATALOG, findIntegrationSpec, integrationFromDoc, resolveConnectorSettings,
   sanitizeIntegrationPatch, toPublicIntegration, numericSetting,
@@ -6631,6 +6632,46 @@ export function createApp(deps: ServerDeps) {
       return res.status(500).json({ error: e?.message || 'Falha ao reprocessar o postback da casa.' });
     }
   };
+
+  // Tela /fomento: a fila de ofertas da rede vista pelo LEDGER. Admin-only porque
+  // `postback_events` é server-only (sem rule) e a resposta cruza a produção da
+  // rede com o mapa de tags — dado de gestão, não de afiliado.
+  //
+  // Não existe listagem das 103 ofertas aprovadas: isso é a Offers API, que
+  // depende da chave que o operador ainda não gerou. O que dá para saber sem ela é
+  // quais ofertas JÁ DISPARARAM aqui, que é o momento em que a casa precisa
+  // existir. Ver src/lib/fomentoOffers.ts.
+  app.get('/api/fomento/offers', requireAdmin, async (_req, res) => {
+    if (!adminDb) return res.status(500).json({ error: 'Firebase Admin não está inicializado.' });
+    const settings = await connectorSettings(FOMENTO_INTEGRATION_ID);
+    if (!settings?.enabled) {
+      return res.status(503).json({ error: 'Integração desligada em Integrações.' });
+    }
+    try {
+      const [eventsSnap, housesSnap, linksSnap, aliasSnap] = await Promise.all([
+        adminDb.collection('postback_events').get(),
+        adminDb.collection('houses').get(),
+        adminDb.collection('affiliate_links').get(),
+        adminDb.collection('affiliate_tag_aliases').get(),
+      ]);
+      const houses = housesSnap.docs.map((d) => ({ slug: d.id, ...(d.data() as any) }));
+      // MESMO índice do import/recompute: se a atribuição divergir entre a tela e o
+      // reprocesso, a tela mente sobre quem é dono da tag.
+      const tagIndex = buildTagIndex(
+        linksSnap.docs.map((d) => d.data() as any),
+        aliasSnap.docs.map((d) => ({ ...(d.data() as any), tag: (d.data() as any)?.tag ?? d.id })),
+      );
+      const offers = summarizeFomentoOffers(
+        eventsSnap.docs.map((d) => d.data() as FomentoEventDoc),
+        houses,
+        tagIndex as any,
+      );
+      return res.json({ offers, linkTemplate: deriveFomentoLinkTemplate(houses) });
+    } catch (e: any) {
+      console.error('[fomento-offers] falhou:', e);
+      return res.status(500).json({ error: 'Falha ao listar as ofertas da Fomento.' });
+    }
+  });
 
   // Registro de CONECTORES de pull POR CASA. A casa declara o seu na flag
   // `integration` do doc dela (auto-carimbada pelo conector a cada rodada) —

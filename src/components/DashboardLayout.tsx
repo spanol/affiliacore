@@ -39,6 +39,8 @@ import DirectMessagePopup from './DirectMessagePopup';
 import { LOCAL_VERSION, LOCAL_COMMIT } from '../lib/version';
 import InstanceLogo from './InstanceLogo';
 import { fetchSupportContact } from '../services/supportService';
+import { fetchIntegrations } from '../services/integrationService';
+import { FOMENTO_INTEGRATION_ID } from '../lib/fomentoPostback';
 import { buildWhatsappUrl, SUPPORT_CONTACT_EMPTY, type SupportContact } from '../lib/supportContact';
 
 export default function DashboardLayout() {
@@ -49,6 +51,7 @@ export default function DashboardLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [specials, setSpecials] = useState<Record<string, SpecialAffiliate>>({});
   const [supportContact, setSupportContact] = useState<SupportContact>(SUPPORT_CONTACT_EMPTY);
+  const [fomentoOn, setFomentoOn] = useState(false);
 
   // Carrega o registro de casas (backoffice) uma vez no boot da área autenticada e
   // popula o cache vivo de marcas — toda a UI (logos/filtros/breakdown por casa)
@@ -80,6 +83,17 @@ export default function DashboardLayout() {
   useEffect(() => {
     if (profile?.role !== 'admin') return;
     fetchSpecialAffiliates().then(setSpecials).catch(() => {});
+  }, [profile?.role]);
+
+  // A tela da Fomento só faz sentido na label que opera essa rede, e o que decide
+  // isso é DADO da instância (o doc `integrations/fomento-offer18`), não env: o
+  // mesmo bundle serve todas as labels. Admin-only, uma vez, falha silenciosa —
+  // item ausente é melhor que item que abre em 503.
+  useEffect(() => {
+    if (profile?.role !== 'admin') return;
+    fetchIntegrations()
+      .then((list) => setFomentoOn(list.some((i) => i.id === FOMENTO_INTEGRATION_ID && i.enabled)))
+      .catch(() => {});
   }, [profile?.role]);
 
   // Na visão de detalhe (/affiliates/:id) o pathname não bate exato com nenhum item;
@@ -163,6 +177,9 @@ export default function DashboardLayout() {
           // Rede de afiliados (upline N níveis) — árvore + lucro sobre equipe.
           { label: 'Rede', path: '/rede', icon: NetworkIcon },
           { label: 'Casas', path: '/casas', icon: Building2 },
+          // Fila de ativação das casas da rede Fomento (Offer18). Só na label que
+          // opera a rede: o item segue o toggle de /integracoes.
+          ...(fomentoOn ? [{ label: 'Fomento', path: '/fomento', icon: NetworkIcon }] : []),
           // Captação: quem pediu cadastro e ainda não é afiliado (auto-cadastro do
           // /register + lead do formulário público). Antes o auto-cadastro não
           // tinha leitor NENHUM e o lead só existia no console do Firestore.

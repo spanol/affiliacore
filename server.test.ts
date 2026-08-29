@@ -5575,6 +5575,51 @@ describe('postback da Fomento — /api/postback/fomento', () => {
     expect(db.__store.get('postback_events')!.size).toBe(2);
   });
 
+  it('GET /api/fomento/offers: integração desligada → 503 (a tela some da sidebar junto)', async () => {
+    const dbOff = makeFirestore({ ...seed(), integrations: { 'fomento-offer18': { enabled: false, apiKey: 'seg' } } });
+    const appOff = createApp({ adminApp: makeAdminApp(), adminDb: dbOff });
+    await request(appOff).get('/api/fomento/offers').set('Authorization', 'Bearer admin-uid').expect(503);
+  });
+
+  it('GET /api/fomento/offers: fila com a oferta SEM casa na frente e o CPA que a rede informou', async () => {
+    const db = makeFirestore(seed());
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    // Oferta já vinculada (spininio) recebe conversão real...
+    await fire(app, 's=seg&offer=22007840&event=ftd&click=c1&tag=mauricio&payout=35&currency=EUR').expect(200);
+    // ...e uma oferta desconhecida recebe só o teste do painel, como no go-live de
+    // toda casa nova: é dela que sai o CPA antes de existir conversão.
+    await fire(app, 's=seg&offer=99999&event=ftd&click=replace_it&tag=replace_it&payout=12&currency=EUR').expect(200);
+
+    const res = await request(app).get('/api/fomento/offers').set('Authorization', 'Bearer admin-uid').expect(200);
+    const [semCasa, comCasa] = res.body.offers;
+    expect(semCasa).toMatchObject({
+      offerId: '99999', houseSlug: null, events: 0, tests: 1, cpaHint: 12, currency: 'EUR',
+    });
+    expect(comCasa).toMatchObject({
+      offerId: '22007840', houseSlug: 'spininio', houseName: 'Spininio BR Sports', ftd: 1, tests: 0,
+    });
+    // A tag do link cadastrado tem dono; a de placeholder nem entra na lista.
+    expect(comCasa.unattributedTags).toEqual([]);
+    expect(semCasa.tags).toEqual([]);
+  });
+
+  it('GET /api/fomento/offers: template de link sai de uma casa irmã, com a conta da label', async () => {
+    const db = makeFirestore({
+      ...seed(),
+      houses: {
+        spininio: {
+          slug: 'spininio', name: 'Spininio BR Sports', dataSource: 'manual',
+          integration: 'fomento-offer18', integrationExternalId: '22007840',
+          registerUrlTemplate: 'https://acme.o18.link/c?o=22007840&m=7910&a=703626&sub_aff_id={ref}',
+          defaultCpa: 35, cpaCurrency: 'EUR', active: true,
+        },
+      },
+    });
+    const app = createApp({ adminApp: makeAdminApp(), adminDb: db });
+    const res = await request(app).get('/api/fomento/offers').set('Authorization', 'Bearer admin-uid').expect(200);
+    expect(res.body.linkTemplate).toBe('https://acme.o18.link/c?o=<OFFER_ID>&m=7910&a=703626&sub_aff_id={ref}');
+  });
+
   it('teste de postagem do painel entra no ledger e NUNCA vira métrica', async () => {
     // O teste POR OFERTA manda offer/event válidos e deixa cru só o click/tag
     // (`replace_it`), então o 400 do template mal colado não pega. Sem a guarda

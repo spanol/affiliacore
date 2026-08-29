@@ -116,6 +116,8 @@ const normNameKey = (s) => String(s || '').normalize('NFD').replace(/\p{Diacriti
 const today = new Date();
 const WINDOW = Array.from({ length: 30 }, (_, i) => addDays(today, i - 29)); // hoje-29 .. hoje
 const daysAgoTs = (n) => Timestamp.fromDate(addDays(today, -n));
+// Dia BR do evento no ledger de postback (o campo `day` é string YYYY-MM-DD).
+const dayISO = (n) => toISO(addDays(today, -n));
 
 async function commitChunked(writes) {
   for (let i = 0; i < writes.length; i += 400) {
@@ -206,6 +208,7 @@ async function main() {
     'deals', 'partnership_requests', 'legal_documents', 'legal_acceptances', 'withdrawal_requests',
     'achievement_tiers', 'achievement_requests', 'affiliate_referrals', 'integrations',
     'affiliate_links', 'link_click_stats', 'link_clicks', 'affiliate_tag_aliases',
+    'postback_events',
   ];
   for (const col of OWN_COLLECTIONS) {
     const n = await deleteCollection(col);
@@ -686,6 +689,62 @@ async function main() {
     updatedBy: adminUid,
   }));
 
+  // 13.1) rede Fomento (Offer18) + ledger de postback — alimenta a tela /fomento.
+  // A tela é a fila de ativação de casas da rede: sem estes docs ela abre vazia e
+  // quem avalia o produto não vê a feature (é o buraco que a trava de cobertura
+  // existe para impedir). O cenário semeia os TRÊS estados que a tela distingue:
+  //
+  //   a) oferta JÁ VINCULADA, produzindo (winhugo);
+  //   b) oferta SEM CASA com conversão real -> o alerta âmbar, que é o motivo de a
+  //      tela existir: o resultado fica retido no ledger e fora de todo relatório;
+  //   c) oferta SEM CASA só com o disparo de teste do painel -> o caminho em que o
+  //      CPA da nova casa vem do payout que a própria rede informou.
+  writes.push((b) => b.set(db.collection('integrations').doc('fomento-offer18'), {
+    id: 'fomento-offer18',
+    enabled: true,
+    apiKey: 'demo-fomento-postback-secret-5811', // só a máscara volta ao browser
+    houseId: null,                               // rede 1:N: o alvo é por casa
+    config: {},
+    updatedAt: daysAgoTs(12),
+    updatedBy: adminUid,
+  }));
+  writes.push((b) => b.set(db.collection('houses').doc('winhugo'), {
+    slug: 'winhugo', name: 'Winhugo', brandId: null, logo: null,
+    registerUrlTemplate: 'https://demoindustries10525901.o18.link/c?o=21764206&m=7910&a=703626&sub_aff_id={ref}',
+    active: true, order: 20, dataSource: 'manual',
+    integration: 'fomento-offer18', integrationExternalId: '21764206',
+    defaultCpa: 25, defaultRev: 0, cpaCurrency: 'EUR', fxMode: 'live', fxRate: null,
+    revInProfit: true, issPercent: 0,
+    createdByUid: adminUid, createdAt: daysAgoTs(12), updatedAt: daysAgoTs(12),
+  }));
+  const TAG_FOMENTO = 'demo-winhugo-01';
+  if (demoAfiliado) {
+    writes.push((b) => b.set(db.collection('affiliate_tag_aliases').doc(TAG_FOMENTO), {
+      tag: TAG_FOMENTO, affiliateId: demoAfiliado.affiliateId, houseSlug: 'winhugo',
+      createdByUid: adminUid, createdAt: daysAgoTs(11),
+    }));
+  }
+  const pb = (id, o) => writes.push((b) => b.set(db.collection('postback_events').doc(id), o));
+  // (a) vinculada e produzindo — tag com dono, some da fila de pendentes.
+  [3, 2, 1].forEach((d, i) => pb(`fpb__21764206__ftd__demo${i}`, {
+    offerId: '21764206', event: 'ftd', tag: TAG_FOMENTO, clickId: `demo${i}`,
+    playerId: `jog${i}`, payout: 25, currency: 'EUR', day: dayISO(d), receivedAt: daysAgoTs(d),
+  }));
+  pb('fpb__21764206__lead__demoL', {
+    offerId: '21764206', event: 'lead', tag: TAG_FOMENTO, clickId: 'demoL',
+    playerId: '', payout: 0, currency: 'EUR', day: dayISO(2), receivedAt: daysAgoTs(2),
+  });
+  // (b) SEM casa e com conversão: o alerta. Tag sem dono, de propósito.
+  [2, 1].forEach((d, i) => pb(`fpb__21999148__ftd__orfa${i}`, {
+    offerId: '21999148', event: 'ftd', tag: 'parceiro-novo', clickId: `orfa${i}`,
+    playerId: `jogx${i}`, payout: 14, currency: 'EUR', day: dayISO(d), receivedAt: daysAgoTs(d),
+  }));
+  // (c) SEM casa e só teste do painel: click id de placeholder, fora das métricas.
+  pb('fpb__21982469__ftd__replace_it', {
+    offerId: '21982469', event: 'ftd', tag: 'replace_it', clickId: 'replace_it',
+    playerId: '', payout: 30, currency: 'EUR', day: dayISO(0), receivedAt: daysAgoTs(0),
+  });
+
   // 14) conquistas — catálogo de placas + fila de solicitações. Metas calibradas
   // pra demo: o afiliado demo (top produtor) já bate as primeiras.
   const TIERS = [
@@ -928,7 +987,7 @@ async function main() {
   let totalComm = 0, totalFtd = 0;
   hrSnap.forEach((d) => { const v = d.data(); totalComm += Number(v.total_commission) || 0; totalFtd += Number(v.first_deposits) || 0; });
   const counts = {};
-  for (const col of ['affiliates', 'affiliate_configs', 'houses', 'house_results', 'payment_profiles', 'withdrawal_requests', 'deals', 'partnership_requests', 'affiliate_links', 'link_click_stats', 'link_clicks', 'legal_documents', 'legal_acceptances', 'contacts', 'direct_messages', 'daily_rankings', 'achievement_tiers', 'achievement_requests', 'affiliate_referrals', 'integrations', 'settings', 'invites', 'special_affiliates']) {
+  for (const col of ['affiliates', 'affiliate_configs', 'houses', 'house_results', 'payment_profiles', 'withdrawal_requests', 'deals', 'partnership_requests', 'affiliate_links', 'link_click_stats', 'link_clicks', 'legal_documents', 'legal_acceptances', 'contacts', 'direct_messages', 'daily_rankings', 'achievement_tiers', 'achievement_requests', 'affiliate_referrals', 'integrations', 'settings', 'invites', 'special_affiliates', 'postback_events']) {
     counts[col] = (await db.collection(col).count().get()).data().count;
   }
   console.log(`  headline janela 30d: R$ ${totalComm.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} · FTD ${totalFtd}`);
