@@ -41,6 +41,7 @@ permite refazer um cadastro apagado sem entrar no painel:
 | `blaze` | Blaze BR - Regulated | 20997138 | 30 EUR |
 | `cristal-poker` | Cristal Poker BR | 21982469 | 30 EUR |
 | `estrelabet` | EstrelaBet BR | 21236152 | 20 EUR |
+| `ivibet` | Ivibet | 22019151 | 10 EUR |
 | `jonbet` | JonBet BR | 21279644 | 16 EUR |
 | `kto` | KTO BR - Regulated | 21210669 | 15 EUR |
 | `novibet` | Novibet BR | 20280494 | 15 EUR |
@@ -53,6 +54,12 @@ permite refazer um cadastro apagado sem entrar no painel:
 apagadas e, em 24/08, os 4 acordos correspondentes saíram da vitrine. As ofertas
 Sports continuam existindo na rede (ex.: BetNacional Sports `21960807`, Blaze
 Sports `21960827`, ambas 25 e 30 EUR); simplesmente não são operadas aqui.
+
+**Ivibet ativada em 28/08 (pedido do Jotta):** casa `ivibet`, oferta `22019151`,
+10 EUR no `ftd`, mesma leitura de ledger da Cristal (teste de postagem do painel
+chegou com `payout: 10` e `currency: EUR`). Ícone: app icon oficial de
+`ivibet.com` (192x192 PNG) embutido como data URL no doc; a Ivibet NÃO tem
+licença SPA/MF, então fica fora do catálogo de presets, igual à LEON Bet.
 
 **Cristal Poker ativada em 27/08 (pedido do Jotta):** casa `cristal-poker`,
 oferta `21982469`, 30 EUR no `ftd`. A oferta se confirmou pelo PRÓPRIO ledger,
