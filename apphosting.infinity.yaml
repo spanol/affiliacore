@@ -32,6 +32,19 @@ env:
       - BUILD
       - RUNTIME
 
+  # Editor inline da taxa de TOPO em /afiliados: DESLIGADO (decisão 28/08/2026).
+  # A operação da Infinity precifica POR CASA (byBrand, via gerente e marketplace);
+  # o topo é o fallback que vale em toda casa sem override, e um número digitado na
+  # grade reprecificaria até 17 casas de uma vez, sem aviso. A taxa de topo já
+  # gravada continua valendo no cálculo; some só o gesto da lista. O override por
+  # casa na ficha do afiliado não é afetado. Reverter = remover e re-rollout.
+  # Ver src/lib/instance.ts (topRateEditorEnabled).
+  - variable: VITE_TOP_RATE_EDITOR_ENABLED
+    value: 'false'
+    availability:
+      - BUILD
+      - RUNTIME
+
   # Tipo de acordo padrão (call de 15/08). `gerenciado` = o afiliado vê baseline e
   # KPIs mas não o CPA, o GERENTE define a comissão do filho direto e só a agência
   # emite o link. Decide o pré-marcado do radio em /acordos e o tipo do rascunho que

@@ -25,7 +25,7 @@ import DateRangePicker from '../components/DateRangePicker';
 import { DateRange, getDefaultRange } from '../lib/dateRange';
 import { producingAffiliateIds } from '../lib/affiliateActivity';
 import { StoredManualRow } from '../lib/houseResults';
-import { OTG_ENABLED } from '../lib/instanceClient';
+import { OTG_ENABLED, TOP_RATE_EDITOR_ENABLED } from '../lib/instanceClient';
 import SpecialAffiliateModal from '../components/SpecialAffiliateModal';
 import { useToast } from '../contexts/ToastContext';
 import { cn, humanizeName } from '../lib/utils';
@@ -681,24 +681,31 @@ export default function AffiliatesList() {
                     <>
                         <th className="px-6 py-4">Cargo</th>
                       <th className="px-6 py-4">Ativo</th>
-                      <th className="px-6 py-4">
-                        <span className="inline-flex items-center gap-1">
-                          Config. CPA (R$)
-                          <InfoTooltip
-                            text="Repasse PADRÃO ao afiliado, válido em TODAS as casas (o que a agência paga a ele). Taxa diferente em uma casa? Abra o afiliado → Override por casa. Não é a taxa de Casas (que é a receita da casa)."
-                            size={12}
-                          />
-                        </span>
-                      </th>
-                      <th className="px-6 py-4">
-                        <span className="inline-flex items-center gap-1">
-                          Config. REV (%)
-                          <InfoTooltip
-                            text="REV Share PADRÃO do afiliado (% sobre o RVS), válido em todas as casas. O override por casa fica na ficha do afiliado."
-                            size={12}
-                          />
-                        </span>
-                      </th>
+                      {/* Editor da taxa de TOPO: módulo por instância (o topo vale em
+                          toda casa sem override; instância que precifica POR CASA o
+                          desliga). Ver topRateEditorEnabled em lib/instance.ts. */}
+                      {TOP_RATE_EDITOR_ENABLED && (
+                        <>
+                          <th className="px-6 py-4">
+                            <span className="inline-flex items-center gap-1">
+                              Config. CPA (R$)
+                              <InfoTooltip
+                                text="Repasse PADRÃO ao afiliado, válido em TODAS as casas (o que a agência paga a ele). Taxa diferente em uma casa? Abra o afiliado → Override por casa. Não é a taxa de Casas (que é a receita da casa)."
+                                size={12}
+                              />
+                            </span>
+                          </th>
+                          <th className="px-6 py-4">
+                            <span className="inline-flex items-center gap-1">
+                              Config. REV (%)
+                              <InfoTooltip
+                                text="REV Share PADRÃO do afiliado (% sobre o RVS), válido em todas as casas. O override por casa fica na ficha do afiliado."
+                                size={12}
+                              />
+                            </span>
+                          </th>
+                        </>
+                      )}
                       <th className="px-6 py-4 text-right">Ação</th>
                     </>
                   )}
@@ -750,7 +757,8 @@ export default function AffiliatesList() {
                       </td>
                       {isAdmin && (item.isPending ? (
                         <>
-                          <td className="px-6 py-4" colSpan={4}>
+                          {/* Cobre Cargo + Ativo (+ CPA/REV quando o editor de topo existe). */}
+                          <td className="px-6 py-4" colSpan={TOP_RATE_EDITOR_ENABLED ? 4 : 2}>
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 border border-amber-200/60 dark:border-amber-900/40 text-[10px] font-bold uppercase tracking-widest text-amber-700 dark:text-amber-400">
                               <Clock size={11} /> Aguardando produção · sem ID de relatório
                             </span>
@@ -801,39 +809,43 @@ export default function AffiliatesList() {
                               <option value="inactive">Desativado</option>
                             </select>
                           </td>
-                          <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                            <div className="relative group/input">
-                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 dark:text-neutral-500">R$</span>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={config.cpaValue}
-                                onChange={(e) => handleConfigChange(affiliateId, 'cpaValue', e.target.value)}
-                                className={cn(
-                                  "w-24 pl-7 pr-2 py-1.5 border rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white",
-                                  pendingCfg ? "border-amber-400 dark:border-amber-500/60 bg-amber-50/60 dark:bg-amber-900/10" : "border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800/60"
-                                )}
-                              />
-                            </div>
-                          </td>
-                          <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                            <div className="relative group/input">
-                              <Percent size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300 dark:text-neutral-500" />
-                              <input
-                                type="number"
-                                min="0"
-                                max="100"
-                                step="0.1"
-                                value={config.revPercentage}
-                                onChange={(e) => handleConfigChange(affiliateId, 'revPercentage', e.target.value)}
-                                className={cn(
-                                  "w-24 pl-6 pr-2 py-1.5 border rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white",
-                                  pendingCfg ? "border-amber-400 dark:border-amber-500/60 bg-amber-50/60 dark:bg-amber-900/10" : "border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800/60"
-                                )}
-                              />
-                            </div>
-                          </td>
+                          {TOP_RATE_EDITOR_ENABLED && (
+                            <>
+                              <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                <div className="relative group/input">
+                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 dark:text-neutral-500">R$</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={config.cpaValue}
+                                    onChange={(e) => handleConfigChange(affiliateId, 'cpaValue', e.target.value)}
+                                    className={cn(
+                                      "w-24 pl-7 pr-2 py-1.5 border rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white",
+                                      pendingCfg ? "border-amber-400 dark:border-amber-500/60 bg-amber-50/60 dark:bg-amber-900/10" : "border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800/60"
+                                    )}
+                                  />
+                                </div>
+                              </td>
+                              <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                <div className="relative group/input">
+                                  <Percent size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300 dark:text-neutral-500" />
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.1"
+                                    value={config.revPercentage}
+                                    onChange={(e) => handleConfigChange(affiliateId, 'revPercentage', e.target.value)}
+                                    className={cn(
+                                      "w-24 pl-6 pr-2 py-1.5 border rounded-lg text-[11px] font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white",
+                                      pendingCfg ? "border-amber-400 dark:border-amber-500/60 bg-amber-50/60 dark:bg-amber-900/10" : "border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800/60"
+                                    )}
+                                  />
+                                </div>
+                              </td>
+                            </>
+                          )}
                           <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-2">
                               {needsAccess(item) && (
@@ -858,24 +870,26 @@ export default function AffiliatesList() {
                               >
                                 <Crown size={14} />
                               </button>
-                              <button
-                                onClick={(e) => handleSaveConfig(affiliateId, e)}
-                                disabled={savingId === affiliateId}
-                                className={cn(
-                                  "p-2 rounded-lg transition-all",
-                                  savedId === affiliateId
-                                    ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                                    : "bg-accent-50 text-accent-600 hover:bg-accent-500 hover:text-accent-contrast dark:bg-accent-900/10 dark:text-accent-400 dark:hover:bg-accent-500 dark:hover:text-accent-contrast"
-                                )}
-                              >
-                                {savingId === affiliateId ? (
-                                  <Loader2 size={14} className="animate-spin" />
-                                ) : savedId === affiliateId ? (
-                                  <CheckCircle size={14} />
-                                ) : (
-                                  <Save size={14} />
-                                )}
-                              </button>
+                              {TOP_RATE_EDITOR_ENABLED && (
+                                <button
+                                  onClick={(e) => handleSaveConfig(affiliateId, e)}
+                                  disabled={savingId === affiliateId}
+                                  className={cn(
+                                    "p-2 rounded-lg transition-all",
+                                    savedId === affiliateId
+                                      ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                                      : "bg-accent-50 text-accent-600 hover:bg-accent-500 hover:text-accent-contrast dark:bg-accent-900/10 dark:text-accent-400 dark:hover:bg-accent-500 dark:hover:text-accent-contrast"
+                                  )}
+                                >
+                                  {savingId === affiliateId ? (
+                                    <Loader2 size={14} className="animate-spin" />
+                                  ) : savedId === affiliateId ? (
+                                    <CheckCircle size={14} />
+                                  ) : (
+                                    <Save size={14} />
+                                  )}
+                                </button>
+                              )}
                             </div>
                           </td>
                         </>
@@ -972,64 +986,70 @@ export default function AffiliatesList() {
                             <option value="inactive">Desativado</option>
                           </select>
                         </label>
-                        <label className="block">
-                          <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-1 flex items-center gap-1">
-                            Config. CPA (R$)
-                            <InfoTooltip
-                              text="Repasse PADRÃO ao afiliado, válido em TODAS as casas (o que a agência paga a ele). Taxa diferente em uma casa? Abra o afiliado → Override por casa. Não é a taxa de Casas (que é a receita da casa)."
-                              size={12}
-                              align="left"
-                            />
-                          </span>
-                          <div className="relative">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 dark:text-neutral-500">R$</span>
-                            <input
-                              type="number" min="0" step="0.01"
-                              value={config.cpaValue}
-                              onChange={(e) => handleConfigChange(affiliateId, 'cpaValue', e.target.value)}
-                              className={cn(
-                                "w-full pl-7 pr-2 py-2 border rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white",
-                                pendingCfg ? "border-amber-400 dark:border-amber-500/60 bg-amber-50/60 dark:bg-amber-900/10" : "border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800/60"
-                              )}
-                            />
-                          </div>
-                        </label>
-                        <label className="block">
-                          <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-1 flex items-center gap-1">
-                            Config. REV (%)
-                            <InfoTooltip
-                              text="REV Share PADRÃO do afiliado (% sobre o RVS), válido em todas as casas. O override por casa fica na ficha do afiliado."
-                              size={12}
-                              align="right"
-                            />
-                          </span>
-                          <div className="relative">
-                            <Percent size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300 dark:text-neutral-500" />
-                            <input
-                              type="number" min="0" max="100" step="0.1"
-                              value={config.revPercentage}
-                              onChange={(e) => handleConfigChange(affiliateId, 'revPercentage', e.target.value)}
-                              className={cn(
-                                "w-full pl-6 pr-2 py-2 border rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white",
-                                pendingCfg ? "border-amber-400 dark:border-amber-500/60 bg-amber-50/60 dark:bg-amber-900/10" : "border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800/60"
-                              )}
-                            />
-                          </div>
-                        </label>
-                      </div>
-                      <button
-                        onClick={(e) => handleSaveConfig(affiliateId, e)}
-                        disabled={savingId === affiliateId}
-                        className={cn(
-                          "w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all",
-                          savedId === affiliateId
-                            ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                            : "bg-accent-50 text-accent-600 hover:bg-accent-500 hover:text-accent-contrast dark:bg-accent-900/10 dark:text-accent-400 dark:hover:bg-accent-500 dark:hover:text-accent-contrast"
+                        {TOP_RATE_EDITOR_ENABLED && (
+                          <>
+                            <label className="block">
+                              <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                                Config. CPA (R$)
+                                <InfoTooltip
+                                  text="Repasse PADRÃO ao afiliado, válido em TODAS as casas (o que a agência paga a ele). Taxa diferente em uma casa? Abra o afiliado → Override por casa. Não é a taxa de Casas (que é a receita da casa)."
+                                  size={12}
+                                  align="left"
+                                />
+                              </span>
+                              <div className="relative">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 dark:text-neutral-500">R$</span>
+                                <input
+                                  type="number" min="0" step="0.01"
+                                  value={config.cpaValue}
+                                  onChange={(e) => handleConfigChange(affiliateId, 'cpaValue', e.target.value)}
+                                  className={cn(
+                                    "w-full pl-7 pr-2 py-2 border rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white",
+                                    pendingCfg ? "border-amber-400 dark:border-amber-500/60 bg-amber-50/60 dark:bg-amber-900/10" : "border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800/60"
+                                  )}
+                                />
+                              </div>
+                            </label>
+                            <label className="block">
+                              <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                                Config. REV (%)
+                                <InfoTooltip
+                                  text="REV Share PADRÃO do afiliado (% sobre o RVS), válido em todas as casas. O override por casa fica na ficha do afiliado."
+                                  size={12}
+                                  align="right"
+                                />
+                              </span>
+                              <div className="relative">
+                                <Percent size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300 dark:text-neutral-500" />
+                                <input
+                                  type="number" min="0" max="100" step="0.1"
+                                  value={config.revPercentage}
+                                  onChange={(e) => handleConfigChange(affiliateId, 'revPercentage', e.target.value)}
+                                  className={cn(
+                                    "w-full pl-6 pr-2 py-2 border rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 transition-all dark:text-white",
+                                    pendingCfg ? "border-amber-400 dark:border-amber-500/60 bg-amber-50/60 dark:bg-amber-900/10" : "border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800/60"
+                                  )}
+                                />
+                              </div>
+                            </label>
+                          </>
                         )}
-                      >
-                        {savingId === affiliateId ? <Loader2 size={14} className="animate-spin" /> : savedId === affiliateId ? <CheckCircle size={14} /> : <Save size={14} />}
-                        {savedId === affiliateId ? 'Salvo!' : 'Salvar configuração'}
-                      </button>
+                      </div>
+                      {TOP_RATE_EDITOR_ENABLED && (
+                        <button
+                          onClick={(e) => handleSaveConfig(affiliateId, e)}
+                          disabled={savingId === affiliateId}
+                          className={cn(
+                            "w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all",
+                            savedId === affiliateId
+                              ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                              : "bg-accent-50 text-accent-600 hover:bg-accent-500 hover:text-accent-contrast dark:bg-accent-900/10 dark:text-accent-400 dark:hover:bg-accent-500 dark:hover:text-accent-contrast"
+                          )}
+                        >
+                          {savingId === affiliateId ? <Loader2 size={14} className="animate-spin" /> : savedId === affiliateId ? <CheckCircle size={14} /> : <Save size={14} />}
+                          {savedId === affiliateId ? 'Salvo!' : 'Salvar configuração'}
+                        </button>
+                      )}
                       <button
                         onClick={() => handleOpenSpecial(item)}
                         className={cn(

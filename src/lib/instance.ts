@@ -35,3 +35,21 @@ export function marketplaceEnabled(raw: string | boolean | undefined | null): bo
 export function revEnabled(raw: string | boolean | undefined | null): boolean {
   return String(raw ?? '').trim().toLowerCase() !== 'false';
 }
+
+// Editor INLINE da taxa de TOPO em /afiliados como MÓDULO desligável por instância
+// (decisão 28/08/2026). O topo é o "valor de contrato": vale em TODA casa em que o
+// afiliado não tem override no byBrand (resolveBrandRates cai nele). Numa operação
+// que precifica POR CASA — a Infinity tem 16 de 18 configs só em byBrand — um número
+// digitado ali reprecifica de 8 a 17 casas de uma vez, e a grade não diz isso em
+// lugar nenhum. É o MESMO gesto que o §11 do REDE-AFILIADOS.md tirou da tela do
+// gerente; para o admin ele é legítimo (contrato é papel dele), então não sai do
+// produto: sai da instância que não o usa.
+// Mesmo default do OTG/REV (LIGADO): ausente/qualquer valor ≠ 'false' → o editor
+// aparece, nenhuma instância existente muda sem pedir; 'false' esconde os campos de
+// CPA/REV e o salvar da lista. Interruptor de TELA, não de dados: a taxa de topo já
+// gravada continua valendo no cálculo (removê-la seria mexer em dinheiro), e os
+// selos/contadores "config pendente" continuam — o diagnóstico segue verdadeiro e a
+// taxa se configura na ficha do afiliado, por casa.
+export function topRateEditorEnabled(raw: string | boolean | undefined | null): boolean {
+  return String(raw ?? '').trim().toLowerCase() !== 'false';
+}

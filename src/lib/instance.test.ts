@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { otgEnabled, marketplaceEnabled, revEnabled } from './instance';
+import { otgEnabled, marketplaceEnabled, revEnabled, topRateEditorEnabled } from './instance';
 
 describe('otgEnabled · interruptor do módulo OTG por instância (P2)', () => {
   it('ausente/vazio → LIGADA (retrocompat: instância existente não muda sem config)', () => {
@@ -66,5 +66,27 @@ describe('revEnabled · exibição do REV Share por instância', () => {
     expect(revEnabled('0')).toBe(true);
     expect(revEnabled('off')).toBe(true);
     expect(revEnabled('no')).toBe(true);
+  });
+});
+
+describe('topRateEditorEnabled · editor da taxa de TOPO em /afiliados por instância', () => {
+  it('sem env → editor visível (nenhuma instância existente muda sem pedir)', () => {
+    expect(topRateEditorEnabled(undefined)).toBe(true);
+    expect(topRateEditorEnabled(null)).toBe(true);
+    expect(topRateEditorEnabled('')).toBe(true);
+    expect(topRateEditorEnabled('   ')).toBe(true);
+  });
+
+  it("só 'false' esconde (case-insensitive, com espaços)", () => {
+    expect(topRateEditorEnabled('false')).toBe(false);
+    expect(topRateEditorEnabled('FALSE')).toBe(false);
+    expect(topRateEditorEnabled(' False ')).toBe(false);
+    expect(topRateEditorEnabled(false)).toBe(false); // Vite pode coagir a boolean
+  });
+
+  it('qualquer outro valor → visível (typo não some com o editor)', () => {
+    expect(topRateEditorEnabled('0')).toBe(true);
+    expect(topRateEditorEnabled('off')).toBe(true);
+    expect(topRateEditorEnabled('no')).toBe(true);
   });
 });
